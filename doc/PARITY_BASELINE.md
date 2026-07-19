@@ -25,7 +25,7 @@ The current suite checks:
 
 The test-only state bridge is installed through a development-only dynamic import. It exposes deep-cloned serializable state and no mutation functions, and it is absent from the production bundle.
 
-Visual snapshots use light color scheme, English UI, UTC, reduced motion, fixed fonts, hidden carets, and a maximum 0.1% pixel-difference ratio. CI may compare snapshots but must never update them automatically.
+Visual snapshots use light color scheme, English UI, UTC, reduced motion, fixed fonts, and hidden carets. The oracle permits zero pixels above a 1% perceived-color difference threshold; CI may compare snapshots but must never update them automatically.
 
 ## Production build baseline
 

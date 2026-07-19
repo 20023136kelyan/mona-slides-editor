@@ -21,6 +21,7 @@
     "parity:measure:build": "node scripts/measure-build.mjs",
     "parity:measure:runtime": "node scripts/measure-reference.mjs",
     "type-check:gate2": "npm run type-check -w @mona/presentation-core && npm exec -w @mona/presentation-core -- tsc -p ../parity-fixtures/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-interactions/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-state/tsconfig.json",
+    "check:gate2-boundaries": "node scripts/check-gate2-boundaries.mjs",
     "test:gate2": "npm exec -w @mona/presentation-core -- vitest run --config vitest.gate2.config.ts",
     "benchmark:gate2": "GATE2_WRITE_BASELINE=1 npm exec -w @mona/presentation-core -- vitest run --config vitest.gate2.config.ts tests/gate2/state-performance.test.ts",
     "test:react": "npm run test -w @mona/web",

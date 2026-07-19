@@ -384,7 +384,7 @@ Exit: both applications run, build, type-check, lint, and test; no editor behavi
 
 ### Gate 2 — extract domain and state boundaries
 
-Status: **complete**. Evidence and go decision: [REACT_GATE_2.md](./REACT_GATE_2.md).
+Status: **complete**, including the pre-Gate 3 boundary and visual audit. Evidence and go decision: [REACT_GATE_2.md](./REACT_GATE_2.md).
 
 Deliverables:
 

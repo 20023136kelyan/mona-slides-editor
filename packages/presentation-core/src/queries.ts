@@ -14,9 +14,10 @@ export interface FormattedAnimation {
 }
 
 export const selectCurrentSlide = (state: PresentationState): Slide => {
-  const slide = state.slides[state.slideIndex]
-  if (!slide) throw new Error(`Current slide index is invalid: ${state.slideIndex}`)
-  return slide
+  // Keep the Vue getter's runtime behavior during initial empty-state loading.
+  // Its historical static type was Slide even though the array lookup can yield
+  // undefined before persistence finishes hydrating the store.
+  return state.slides[state.slideIndex] as Slide
 }
 
 export const selectSlideById = (
@@ -52,7 +53,7 @@ export const buildElementIndex = (
 
 export const selectCurrentSlideAnimations = (state: PresentationState): PPTAnimation[] => {
   const currentSlide = selectCurrentSlide(state)
-  if (!currentSlide.animations) return []
+  if (!currentSlide?.animations) return []
 
   const elementIds = new Set(currentSlide.elements.map(element => element.id))
   return currentSlide.animations.filter(animation => elementIds.has(animation.elId))
@@ -74,7 +75,7 @@ export const selectFormattedCurrentSlideAnimations = (
       last.animations = last.animations.filter(item => item.elId !== animation.elId)
       last.animations.push(animation)
     }
-    else {
+    else if (animation.trigger === 'auto') {
       const last = formatted[formatted.length - 1]
       if (!last) continue
       last.autoNext = true

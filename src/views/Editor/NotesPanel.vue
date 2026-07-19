@@ -80,7 +80,7 @@
 import { ref, computed, watch, nextTick, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
-import { nanoid } from 'nanoid'
+import { createPresentationId } from '@mona/presentation-core'
 import { useMainStore, useSlidesStore } from '@/store'
 import type { Note } from '@/types/slides'
 
@@ -120,7 +120,7 @@ const createNote = () => {
   }
 
   const newNote: Note = {
-    id: nanoid(),
+    id: createPresentationId(21),
     content: content.value,
     time: new Date().getTime(),
     user: t('notes.testUser'),
@@ -152,7 +152,7 @@ const createNoteReply = () => {
   const newReplies = [
     ...currentNote.replies || [],
     {
-      id: nanoid(),
+      id: createPresentationId(21),
       content: replyContent.value,
       time: new Date().getTime(),
       user: t('notes.testUser'),

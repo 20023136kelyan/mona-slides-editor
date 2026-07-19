@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { PPTShapeElement } from './model'
+import type { PPTAnimation, PPTShapeElement } from './model'
 import { applyPresentationCommand } from './commands'
 import { createDeterministicIdFactory } from './ids'
-import { selectCurrentSlide, selectElementById } from './queries'
+import {
+  selectCurrentSlide,
+  selectCurrentSlideAnimations,
+  selectElementById,
+  selectFormattedCurrentSlideAnimations,
+} from './queries'
 import type { PresentationState } from './state'
 import { applyPresentationTransaction, createPresentationTransaction } from './transactions'
 import { validatePresentationState } from './validation'
@@ -105,5 +110,36 @@ describe('presentation core', () => {
     const state = fixture()
     expect(selectCurrentSlide(state)?.id).toBe('slide-1')
     expect(validatePresentationState(state)).toEqual({ valid: true, issues: [] })
+  })
+
+  it('preserves the empty-deck getter behavior from the Vue reference store', () => {
+    const state = { ...fixture(), slides: [] }
+
+    expect(selectCurrentSlide(state)).toBeUndefined()
+    expect(selectCurrentSlideAnimations(state)).toEqual([])
+    expect(selectFormattedCurrentSlideAnimations(state)).toEqual([])
+  })
+
+  it('filters and formats current-slide animations with the Vue ordering semantics', () => {
+    const animations: PPTAnimation[] = [
+      { id: 'animation-1', elId: 'shape-1', effect: 'fadeIn', type: 'in', trigger: 'click', duration: 1000 },
+      { id: 'animation-2', elId: 'shape-1', effect: 'fadeOut', type: 'out', trigger: 'meantime', duration: 1000 },
+      { id: 'animation-orphan', elId: 'missing', effect: 'fadeIn', type: 'in', trigger: 'auto', duration: 1000 },
+      { id: 'animation-3', elId: 'shape-1', effect: 'fadeIn', type: 'in', trigger: 'auto', duration: 1000 },
+    ]
+    const state = fixture()
+    const firstSlide = state.slides[0]
+    if (!firstSlide) throw new Error('Animation fixture requires a first slide')
+    state.slides[0] = { ...firstSlide, animations }
+
+    expect(selectCurrentSlideAnimations(state).map(animation => animation.id)).toEqual([
+      'animation-1',
+      'animation-2',
+      'animation-3',
+    ])
+    expect(selectFormattedCurrentSlideAnimations(state)).toEqual([
+      { animations: [animations[1]], autoNext: true },
+      { animations: [animations[3]], autoNext: false },
+    ])
   })
 })

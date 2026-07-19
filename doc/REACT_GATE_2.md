@@ -1,6 +1,6 @@
 # React migration Gate 2: domain and state boundaries
 
-Status: complete, go decision recorded 2026-07-19.
+Status: complete, pre-Gate 3 audit passed 2026-07-19.
 
 Gate 2 changes no intended pixels or editor behavior. It moves the existing presentation schema and mutations behind framework-neutral contracts, proves the Vue oracle can consume them unchanged, and measures the state design intended for React and the future agent SDK.
 
@@ -38,15 +38,37 @@ Pointer-frequency state never enters Redux. `editor-interactions` exposes cached
 
 ## Contract and parity evidence
 
-`npm run test:gate2` runs 25 tests:
+`npm run test:gate2` runs 27 tests:
 
-- 5 presentation-core mutation/query/validation/transaction tests;
+- 7 presentation-core mutation/query/validation/transaction tests;
 - 15 shared operations executed through both the pure core and the public Vue store actions;
 - 3 Redux adapter/reference-stability tests;
 - 1 interaction-controller contract test;
 - 1 large-deck state/interaction budget test.
 
 The shared Vue/core scenarios cover title, theme, viewport size/ratio, slide replacement, templates, slide add/update/property removal/deletion/focus, and element add/delete/update/property removal. Normalized output must match exactly.
+
+## Pre-Gate 3 completeness audit
+
+The transition was re-audited from the frozen Vue schema and rendered oracle before any Gate 3 renderer work began. The audit found and fixed two boundary defects that normal startup and screenshot coverage had masked:
+
+- note and note-reply IDs were persisted presentation entities but still used a direct Vue-side Nano ID import; they now use the core ID policy while preserving the original 21-character length;
+- `selectCurrentSlide()` threw during the initial empty-deck hydration window, whereas the Vue getter historically returned `undefined` at runtime; the original behavior and static compatibility are restored and covered by a regression test.
+
+`npm run check:gate2-boundaries` now fails if the frozen schema hash changes, a canonical presentation type is duplicated, a framework-neutral package imports React/Vue/Pinia, a persistent UI path bypasses the presentation ID policy, a Vue presentation action loses its command mapping, or source code writes directly to the presentation store outside its adapter.
+
+Additional audit evidence:
+
+- the canonical model is byte-equivalent to the frozen Vue model after normalizing trailing whitespace;
+- every one of the 15 public Vue presentation actions maps to its named core command;
+- remaining direct Nano ID imports are limited to the editor-session database ID, transient AI-outline row keys, and an SVG DOM marker;
+- Gate 2 changed no Vue template, style block, canvas geometry, or CSS rule—only presentation-core imports;
+- the seven-test Vue reference suite passes without updating snapshots;
+- the visual oracle now permits zero pixels above a 1% perceived-color threshold, replacing its former 0.1% whole-image allowance;
+- live browser inspection confirms the editor and settings surfaces render and interact correctly with no warning or error logs;
+- the Vue production build and the React foundation build, lint, unit, and browser smoke suites all pass.
+
+The inherited production dependency audit remains seven advisories (three moderate, three high, one critical). No advisory was introduced by this audit; remediation remains isolated from the framework-parity work so it cannot silently alter document behavior.
 
 The frozen seven-test Vue Playwright suite passes without updating snapshots. It includes the exact initial editor screenshot, settings screenshot and interaction, slide-navigation screenshot, normalized initial document state, title editing, and slide creation. Browser QA at `http://127.0.0.1:5173/` also found no warning/error logs. The visual mismatch ledger is empty.
 
