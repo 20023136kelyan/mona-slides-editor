@@ -1,5 +1,5 @@
 import { storeToRefs } from 'pinia'
-import { nanoid } from 'nanoid'
+import { createPresentationId as nanoid } from '@mona/presentation-core'
 import { useSlidesStore, useMainStore } from '@/store'
 import type { PPTElement, Slide } from '@/types/slides'
 import { createSlideIdMap, createElementIdMap, getElementRange } from '@/utils/element'

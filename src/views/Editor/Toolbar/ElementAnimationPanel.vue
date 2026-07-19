@@ -120,7 +120,7 @@
 <script lang="ts" setup>
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { nanoid } from 'nanoid'
+import { createPresentationId as nanoid } from '@mona/presentation-core'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import type { AnimationTrigger, AnimationType, PPTAnimation } from '@/types/slides'

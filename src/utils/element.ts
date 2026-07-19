@@ -1,5 +1,5 @@
 import tinycolor from 'tinycolor2'
-import { nanoid } from 'nanoid'
+import { createPresentationId as nanoid } from '@mona/presentation-core'
 import type { LinePoint, PPTElement, PPTLineElement, Slide } from '@/types/slides'
 
 interface RotatedElementData {

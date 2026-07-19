@@ -1,6 +1,6 @@
 # React migration inventory
 
-Status: initial static audit, 2026-07-19. Update this document at every migration gate.
+Status: updated through Gate 2, 2026-07-19. Update this document at every migration gate.
 
 ## Baseline identity
 
@@ -130,9 +130,9 @@ Before a feature starts, add its exact files and tests to this table.
 | Domain | Vue reference | React target | Contract status |
 | --- | --- | --- | --- |
 | app shell/settings/i18n | `src/App.vue`, header/settings, `src/i18n/**` | `apps/web` shell | localization behavior exists; React contract pending |
-| document model | `src/types/slides.ts`, `src/store/slides.ts` | `presentation-core`, `editor-state` | pending |
-| selection/canvas session | `src/store/main.ts`, canvas hooks/components | `editor-state`, `editor-interactions` | pending |
-| history | `src/store/snapshot.ts` | history adapter | pending |
+| document model | `src/types/slides.ts` compatibility export, `src/store/slides.ts` Vue adapter | `presentation-core`, `editor-state` | Gate 2 core/Vue operation contract automated; renderer pending |
+| selection/canvas session | `src/store/main.ts`, canvas hooks/components | `editor-state`, `editor-interactions` | Gate 2 isolated state/gesture prototypes automated; Vue UI port pending |
+| history | `src/store/snapshot.ts` | `PresentationHistoryAdapter` | contract defined; existing Dexie implementation intentionally retained |
 | slide renderer | `src/views/components/Slide.vue` and element components | React slide/element renderers | pending |
 | thumbnails | thumbnail components and `Thumbnails` view | React thumbnail vertical slice | pending |
 | import | `src/hooks/useImport.ts` | runtime adapter | corpus required |

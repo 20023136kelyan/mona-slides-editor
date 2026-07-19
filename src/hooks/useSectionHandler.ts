@@ -1,5 +1,5 @@
 import { storeToRefs } from 'pinia'
-import { nanoid } from 'nanoid'
+import { createPresentationId as nanoid } from '@mona/presentation-core'
 import { useSlidesStore } from '@/store'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import useSlideHandler from '@/hooks/useSlideHandler'

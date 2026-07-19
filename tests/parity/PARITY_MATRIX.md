@@ -1,13 +1,13 @@
 # Vue to React parity matrix
 
-Status: Gate 0 harness operational; reference coverage expands before each React editor slice.
+Status: Gate 2 complete; reference coverage expands before each React editor slice.
 
 `Reference` means the Vue behavior has a repeatable contract. `React` remains empty until the corresponding migration slice begins.
 
 | Priority | Surface | Reference contract | React parity | Evidence |
 | --- | --- | --- | --- | --- |
 | P0 | Desktop app loads | Automated | Foundation only | Vue shell assertions/console guard/screenshot; React foundation E2E |
-| P0 | Initial document state | Automated | — | normalized development bridge snapshot |
+| P0 | Initial document state | Automated | Core/state adapter automated | normalized development bridge snapshot; 15 Vue/core operation contracts; transaction tests |
 | P0 | Settings opens/closes | Automated | Foundation automated | Vue interaction/component screenshot; React browser component + E2E |
 | P0 | Slide navigation | Automated | — | thumbnail selection assertion and screenshot |
 | P0 | Presentation title editing | Automated | — | UI interaction and resulting document-state assertion |
@@ -28,9 +28,9 @@ Status: Gate 0 harness operational; reference coverage expands before each React
 | P1 | Mobile editor/preview | Pending | — | — |
 | P1 | English/Chinese UI | English shell automated; Chinese pending | Foundation automated | shared-catalog unit test; React browser locale switch/document language/storage contract |
 | P1 | Keyboard/focus/accessibility | Pending | — | — |
-| P1 | Large-deck performance | Fixture pending | — | — |
+| P1 | Large-deck performance | State fixture automated | State/interaction prototype automated | 120 slides / 4,800 elements; semantic transaction and pointer-frequency budgets |
 
-The frozen build and production-runtime measurements live in `tests/parity/baselines/`, including separate React-foundation reports that are not yet complete-editor comparisons. The current screenshots and normalized state snapshot live beside the reference specs. See `doc/PARITY_BASELINE.md` and `doc/REACT_FOUNDATION.md` for the environment and interpretation rules.
+The frozen build and production-runtime measurements live in `tests/parity/baselines/`, including separate React-foundation and Gate 2 reports that are not yet complete-editor comparisons. The current screenshots and normalized state snapshot live beside the reference specs. See `doc/PARITY_BASELINE.md`, `doc/REACT_FOUNDATION.md`, and `doc/REACT_GATE_2.md` for the environment and interpretation rules.
 
 ## Evidence rules
 

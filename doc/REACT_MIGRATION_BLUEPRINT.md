@@ -352,6 +352,8 @@ Only one gate is active at a time. A gate ends with a runnable artifact, tests, 
 
 ### Gate 0 — freeze and measure the oracle
 
+Status: **complete** (`2c155c25`, tag `mona-vue-baseline-2026-07-19`).
+
 Deliverables:
 
 1. Commit the current intended Vue/localization state after review.
@@ -366,6 +368,8 @@ Exit: the current Vue product can be rebuilt and its critical behavior is reprod
 
 ### Gate 1 — React foundation, no editor replacement
 
+Status: **complete** (`07b6b42b`).
+
 Deliverables:
 
 1. Add npm workspaces and `apps/web` without relocating Vue.
@@ -379,6 +383,8 @@ Deliverables:
 Exit: both applications run, build, type-check, lint, and test; no editor behavior has moved.
 
 ### Gate 2 — extract domain and state boundaries
+
+Status: **complete**. Evidence and go decision: [REACT_GATE_2.md](./REACT_GATE_2.md).
 
 Deliverables:
 

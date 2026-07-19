@@ -1,6 +1,6 @@
 # React foundation
 
-Status: Gate 1 implementation in progress, 2026-07-19.
+Status: Gate 1 complete, 2026-07-19 (`07b6b42b`).
 
 The React application lives in `apps/web` and runs beside the untouched Vue reference. Vue remains at port 5173; React uses port 5174. Nothing in Gate 1 replaces editor behavior.
 

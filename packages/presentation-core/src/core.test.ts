@@ -1,0 +1,109 @@
+import { describe, expect, it } from 'vitest'
+import type { PPTShapeElement } from './model'
+import { applyPresentationCommand } from './commands'
+import { createDeterministicIdFactory } from './ids'
+import { selectCurrentSlide, selectElementById } from './queries'
+import type { PresentationState } from './state'
+import { applyPresentationTransaction, createPresentationTransaction } from './transactions'
+import { validatePresentationState } from './validation'
+
+const shape = (id: string, left = 0): PPTShapeElement => ({
+  type: 'shape',
+  id,
+  left,
+  top: 0,
+  width: 100,
+  height: 100,
+  rotate: 0,
+  viewBox: [100, 100],
+  path: 'M 0 0 L 100 0 L 100 100 Z',
+  fixedRatio: false,
+  fill: '#000',
+})
+
+const fixture = (): PresentationState => ({
+  title: 'Fixture',
+  theme: {
+    themeColors: ['#000'],
+    fontColor: '#111',
+    fontName: '',
+    backgroundColor: '#fff',
+    shadow: { h: 1, v: 1, blur: 1, color: '#000' },
+    outline: { width: 1, color: '#000', style: 'solid' },
+  },
+  slides: [
+    { id: 'slide-1', elements: [shape('shape-1')] },
+    { id: 'slide-2', elements: [shape('shape-2', 200)], sectionTag: { id: 'section-1' } },
+    { id: 'slide-3', elements: [shape('shape-3', 400)] },
+  ],
+  slideIndex: 0,
+  viewportSize: 1000,
+  viewportRatio: 0.5625,
+  templates: [],
+})
+
+describe('presentation core', () => {
+  it('updates only the target slide and element references', () => {
+    const state = fixture()
+    const result = applyPresentationCommand(state, {
+      type: 'element.update',
+      payload: { id: 'shape-1', props: { left: 42 } },
+    })
+
+    expect(selectElementById(result.state, 'shape-1')?.left).toBe(42)
+    expect(result.state.slides[0]).not.toBe(state.slides[0])
+    expect(result.state.slides[1]).toBe(state.slides[1])
+    expect(result.state.slides[1]?.elements[0]).toBe(state.slides[1]?.elements[0])
+  })
+
+  it('adds a slide without mutating the caller and preserves insertion semantics', () => {
+    const state = fixture()
+    const input = { id: 'added', elements: [], sectionTag: { id: 'discard-me' } }
+    const result = applyPresentationCommand(state, { type: 'slide.add', slides: input })
+
+    expect(input.sectionTag).toEqual({ id: 'discard-me' })
+    expect(result.state.slides.map(slide => slide.id)).toEqual(['slide-1', 'added', 'slide-2', 'slide-3'])
+    expect(result.state.slides[1]?.sectionTag).toBeUndefined()
+    expect(result.state.slideIndex).toBe(1)
+  })
+
+  it('transfers a deleted section marker to the following slide', () => {
+    const state = { ...fixture(), slideIndex: 1 }
+    const result = applyPresentationCommand(state, { type: 'slide.delete', slideIds: 'slide-2' })
+
+    expect(result.state.slides.map(slide => slide.id)).toEqual(['slide-1', 'slide-3'])
+    expect(result.state.slides[1]?.sectionTag).toEqual({ id: 'section-1' })
+    expect(result.state.slideIndex).toBe(1)
+  })
+
+  it('applies valid transactions atomically and rejects invalid output', () => {
+    const state = fixture()
+    const idFactory = createDeterministicIdFactory('tx')
+    const valid = createPresentationTransaction({
+      label: 'Move shape',
+      origin: 'test',
+      commands: [{ type: 'element.update', payload: { id: 'shape-1', props: { left: 80 } } }],
+    }, idFactory)
+    const validResult = applyPresentationTransaction(state, valid)
+    expect(validResult.ok).toBe(true)
+    if (validResult.ok) expect(selectElementById(validResult.state, 'shape-1')?.left).toBe(80)
+
+    const invalid = createPresentationTransaction({
+      label: 'Duplicate slide ID',
+      origin: 'test',
+      commands: [{ type: 'slide.add', slides: { id: 'slide-1', elements: [] } }],
+    }, idFactory)
+    const invalidResult = applyPresentationTransaction(state, invalid)
+    expect(invalidResult.ok).toBe(false)
+    expect(invalidResult.state).toBe(state)
+    if (!invalidResult.ok) {
+      expect(invalidResult.issues.some(issue => issue.code === 'slide.id.duplicate')).toBe(true)
+    }
+  })
+
+  it('queries and validates the unchanged persisted schema', () => {
+    const state = fixture()
+    expect(selectCurrentSlide(state)?.id).toBe('slide-1')
+    expect(validatePresentationState(state)).toEqual({ valid: true, issues: [] })
+  })
+})

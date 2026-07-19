@@ -20,6 +20,9 @@
     "parity:reference:update": "playwright test --project=reference-chromium --update-snapshots",
     "parity:measure:build": "node scripts/measure-build.mjs",
     "parity:measure:runtime": "node scripts/measure-reference.mjs",
+    "type-check:gate2": "npm run type-check -w @mona/presentation-core && npm exec -w @mona/presentation-core -- tsc -p ../parity-fixtures/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-interactions/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-state/tsconfig.json",
+    "test:gate2": "npm exec -w @mona/presentation-core -- vitest run --config vitest.gate2.config.ts",
+    "benchmark:gate2": "GATE2_WRITE_BASELINE=1 npm exec -w @mona/presentation-core -- vitest run --config vitest.gate2.config.ts tests/gate2/state-performance.test.ts",
     "test:react": "npm run test -w @mona/web",
     "e2e:react": "npm run e2e -w @mona/web",
     "lint:react": "npm run lint -w @mona/web",
@@ -29,6 +32,7 @@
   "author": "pipipi_pikachu@163.com",
   "homepage": "https://github.com/pipipi-pikachu/PPTist",
   "dependencies": {
+    "@mona/presentation-core": "0.0.0",
     "animate.css": "^4.1.1",
     "axios": "^1.7.9",
     "clipboard": "^2.0.11",

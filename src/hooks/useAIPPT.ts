@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { nanoid } from 'nanoid'
+import { createPresentationId as nanoid } from '@mona/presentation-core'
 import type { ImageClipDataRange, PPTElement, PPTImageElement, PPTShapeElement, PPTTextElement, Slide, TextType } from '@/types/slides'
 import type { AIPPTSlide } from '@/types/AIPPT'
 import { useSlidesStore } from '@/store'

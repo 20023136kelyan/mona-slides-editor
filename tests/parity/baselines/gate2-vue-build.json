@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "runtime": "vue-gate2",
+  "totals": {
+    "files": 49,
+    "bytes": 49272806,
+    "gzipBytes": 45514790
+  },
+  "byGroup": {
+    "fonts": {
+      "files": 21,
+      "bytes": 44230564,
+      "gzipBytes": 44168673
+    },
+    "js": {
+      "files": 2,
+      "bytes": 3233797,
+      "gzipBytes": 1041268
+    },
+    "css": {
+      "files": 1,
+      "bytes": 250565,
+      "gzipBytes": 38092
+    },
+    "md": {
+      "files": 2,
+      "bytes": 2332,
+      "gzipBytes": 1362
+    },
+    "other": {
+      "files": 1,
+      "bytes": 1,
+      "gzipBytes": 21
+    },
+    "ico": {
+      "files": 1,
+      "bytes": 4286,
+      "gzipBytes": 2014
+    },
+    "images": {
+      "files": 9,
+      "bytes": 122214,
+      "gzipBytes": 121205
+    },
+    "html": {
+      "files": 1,
+      "bytes": 2070,
+      "gzipBytes": 1014
+    },
+    "json": {
+      "files": 11,
+      "bytes": 1426977,
+      "gzipBytes": 141141
+    }
+  },
+  "largestFiles": [
+    {
+      "file": "assets/SourceHanSerif-BepnSM6I.woff2",
+      "group": "fonts",
+      "bytes": 10413080,
+      "gzipBytes": 10416278
+    },
+    {
+      "file": "assets/SourceHanSans-yquDYLED.woff2",
+      "group": "fonts",
+      "bytes": 7511656,
+      "gzipBytes": 7513963
+    },
+    {
+      "file": "assets/MiSans-AGu9P6z3.woff2",
+      "group": "fonts",
+      "bytes": 4847960,
+      "gzipBytes": 4849275
+    },
+    {
+      "file": "assets/LXGWNeoZhiSong-Wd4C2T97.woff2",
+      "group": "fonts",
+      "bytes": 4348620,
+      "gzipBytes": 4327459
+    },
+    {
+      "file": "assets/AlibabaPuHuiTi-DmhZZWZO.woff2",
+      "group": "fonts",
+      "bytes": 4150196,
+      "gzipBytes": 4136263
+    },
+    {
+      "file": "assets/LXGWNeoXiHei-BJtf2oyf.woff2",
+      "group": "fonts",
+      "bytes": 3222008,
+      "gzipBytes": 3189899
+    },
+    {
+      "file": "assets/index-Bs3CFEb-.js",
+      "group": "js",
+      "bytes": 3180211,
+      "gzipBytes": 1028999
+    },
+    {
+      "file": "assets/ZhuQueFangSong-DEfOC7qi.woff2",
+      "group": "fonts",
+      "bytes": 2598904,
+      "gzipBytes": 2597402
+    },
+    {
+      "file": "assets/WenDingPLKaiTi-B5NXxUeg.woff2",
+      "group": "fonts",
+      "bytes": 1962288,
+      "gzipBytes": 1962902
+    },
+    {
+      "file": "assets/LXGWWenKai-DZFs0NHN.woff2",
+      "group": "fonts",
+      "bytes": 1826736,
+      "gzipBytes": 1827310
+    },
+    {
+      "file": "assets/WenDingPLSongTi-BGRqPW57.woff2",
+      "group": "fonts",
+      "bytes": 1399284,
+      "gzipBytes": 1399723
+    },
+    {
+      "file": "assets/DeYiHei-Cv0cLOfB.woff2",
+      "group": "fonts",
+      "bytes": 1361616,
+      "gzipBytes": 1361061
+    }
+  ]
+}

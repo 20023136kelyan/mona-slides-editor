@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
-import { omit } from 'lodash'
-import type { Slide, SlideTheme, PPTElement, PPTAnimation, SlideTemplate } from '@/types/slides'
+import {
+  applyPresentationCommand,
+  selectCurrentSlide,
+  selectCurrentSlideAnimations,
+  selectFormattedCurrentSlideAnimations,
+  type PresentationCommand,
+  type PresentationState,
+} from '@mona/presentation-core'
+import type { Slide, SlideTheme, PPTElement, SlideTemplate } from '@/types/slides'
 import { translate } from '@/i18n'
 
 interface RemovePropData {
@@ -14,19 +21,20 @@ interface UpdateElementData {
   slideId?: string
 }
 
-interface FormatedAnimation {
-  animations: PPTAnimation[]
-  autoNext: boolean
-}
+export type SlidesState = PresentationState
 
-export interface SlidesState {
-  title: string
-  theme: SlideTheme
-  slides: Slide[]
-  slideIndex: number
-  viewportSize: number
-  viewportRatio: number
-  templates: SlideTemplate[]
+const commitPresentationCommand = (
+  target: PresentationState,
+  command: PresentationCommand,
+) => {
+  const next = applyPresentationCommand(target, command).state
+  if (next.title !== target.title) target.title = next.title
+  if (next.theme !== target.theme) target.theme = next.theme
+  if (next.slides !== target.slides) target.slides = next.slides
+  if (next.slideIndex !== target.slideIndex) target.slideIndex = next.slideIndex
+  if (next.viewportSize !== target.viewportSize) target.viewportSize = next.viewportSize
+  if (next.viewportRatio !== target.viewportRatio) target.viewportRatio = next.viewportRatio
+  if (next.templates !== target.templates) target.templates = next.templates
 }
 
 export const useSlidesStore = defineStore('slides', {
@@ -67,172 +75,94 @@ export const useSlidesStore = defineStore('slides', {
 
   getters: {
     currentSlide(state) {
-      return state.slides[state.slideIndex]
+      return selectCurrentSlide(state)
     },
   
     currentSlideAnimations(state) {
-      const currentSlide = state.slides[state.slideIndex]
-      if (!currentSlide?.animations) return []
-
-      const els = currentSlide.elements
-      const elIds = els.map(el => el.id)
-      return currentSlide.animations.filter(animation => elIds.includes(animation.elId))
+      return selectCurrentSlideAnimations(state)
     },
 
     // 格式化的当前页动画
     // 将触发条件为“与上一动画同时”的项目向上合并到序列中的同一位置
     // 为触发条件为“上一动画之后”项目的上一项添加自动向下执行标记
     formatedAnimations(state) {
-      const currentSlide = state.slides[state.slideIndex]
-      if (!currentSlide?.animations) return []
-
-      const els = currentSlide.elements
-      const elIds = els.map(el => el.id)
-      const animations = currentSlide.animations.filter(animation => elIds.includes(animation.elId))
-
-      const formatedAnimations: FormatedAnimation[] = []
-      for (const animation of animations) {
-        if (animation.trigger === 'click' || !formatedAnimations.length) {
-          formatedAnimations.push({ animations: [animation], autoNext: false })
-        }
-        else if (animation.trigger === 'meantime') {
-          const last = formatedAnimations[formatedAnimations.length - 1]
-          last.animations = last.animations.filter(item => item.elId !== animation.elId)
-          last.animations.push(animation)
-          formatedAnimations[formatedAnimations.length - 1] = last
-        }
-        else if (animation.trigger === 'auto') {
-          const last = formatedAnimations[formatedAnimations.length - 1]
-          last.autoNext = true
-          formatedAnimations[formatedAnimations.length - 1] = last
-          formatedAnimations.push({ animations: [animation], autoNext: false })
-        }
-      }
-      return formatedAnimations
+      return selectFormattedCurrentSlideAnimations(state)
     },
   },
 
   actions: {
     setTitle(title: string) {
-      if (!title) this.title = translate('header.untitledPresentation')
-      else this.title = title
+      commitPresentationCommand(this.$state, {
+        type: 'presentation.title.set',
+        title,
+        fallbackTitle: translate('header.untitledPresentation'),
+      })
     },
 
     setTheme(themeProps: Partial<SlideTheme>) {
-      this.theme = { ...this.theme, ...themeProps }
+      commitPresentationCommand(this.$state, { type: 'presentation.theme.update', props: themeProps })
     },
   
     setViewportSize(size: number) {
-      this.viewportSize = size
+      commitPresentationCommand(this.$state, { type: 'presentation.viewport-size.set', size })
     },
   
     setViewportRatio(viewportRatio: number) {
-      this.viewportRatio = viewportRatio
+      commitPresentationCommand(this.$state, { type: 'presentation.viewport-ratio.set', ratio: viewportRatio })
     },
   
     setSlides(slides: Slide[], themeProps?: Partial<SlideTheme>) {
-      this.slides = slides
-      if (themeProps) this.setTheme(themeProps)
+      commitPresentationCommand(this.$state, {
+        type: 'presentation.slides.replace',
+        slides,
+        theme: themeProps,
+      })
     },
   
     setTemplates(templates: SlideTemplate[]) {
-      this.templates = templates
+      commitPresentationCommand(this.$state, { type: 'presentation.templates.replace', templates })
     },
   
     addSlide(slide: Slide | Slide[]) {
-      const slides = Array.isArray(slide) ? slide : [slide]
-      for (const slide of slides) {
-        if (slide.sectionTag) delete slide.sectionTag
-      }
-
-      const addIndex = this.slideIndex + 1
-      this.slides.splice(addIndex, 0, ...slides)
-      this.slideIndex = addIndex
+      commitPresentationCommand(this.$state, { type: 'slide.add', slides: slide })
     },
   
     updateSlide(props: Partial<Slide>, slideId?: string) {
-      const slideIndex = slideId ? this.slides.findIndex(item => item.id === slideId) : this.slideIndex
-      this.slides[slideIndex] = { ...this.slides[slideIndex], ...props }
+      commitPresentationCommand(this.$state, { type: 'slide.update', props, slideId })
     },
   
     removeSlideProps(data: RemovePropData) {
-      const { id, propName } = data
-
-      const slides = this.slides.map(slide => {
-        return slide.id === id ? omit(slide, propName) : slide
-      }) as Slide[]
-      this.slides = slides
+      commitPresentationCommand(this.$state, {
+        type: 'slide.properties.remove',
+        payload: { id: data.id, property: data.propName },
+      })
     },
   
     deleteSlide(slideId: string | string[]) {
-      const slidesId = Array.isArray(slideId) ? slideId : [slideId]
-      const slides: Slide[] = JSON.parse(JSON.stringify(this.slides))
-  
-      const deleteSlidesIndex = []
-      for (const deletedId of slidesId) {
-        const index = slides.findIndex(item => item.id === deletedId)
-        deleteSlidesIndex.push(index)
-
-        const deletedSlideSection = slides[index].sectionTag
-        if (deletedSlideSection) {
-          const handleSlideNext = slides[index + 1]
-          if (handleSlideNext && !handleSlideNext.sectionTag) {
-            delete slides[index].sectionTag
-            slides[index + 1].sectionTag = deletedSlideSection
-          }
-        }
-
-        slides.splice(index, 1)
-      }
-      let newIndex = Math.min(...deleteSlidesIndex)
-  
-      const maxIndex = slides.length - 1
-      if (newIndex > maxIndex) newIndex = maxIndex
-  
-      this.slideIndex = newIndex
-      this.slides = slides
+      commitPresentationCommand(this.$state, { type: 'slide.delete', slideIds: slideId })
     },
   
     updateSlideIndex(index: number) {
-      this.slideIndex = index
+      commitPresentationCommand(this.$state, { type: 'slide.focus', index })
     },
   
     addElement(element: PPTElement | PPTElement[]) {
-      const elements = Array.isArray(element) ? element : [element]
-      const currentSlideEls = this.slides[this.slideIndex].elements
-      const newEls = [...currentSlideEls, ...elements]
-      this.slides[this.slideIndex].elements = newEls
+      commitPresentationCommand(this.$state, { type: 'element.add', elements: element })
     },
 
     deleteElement(elementId: string | string[]) {
-      const elementIdList = Array.isArray(elementId) ? elementId : [elementId]
-      const currentSlideEls = this.slides[this.slideIndex].elements
-      const newEls = currentSlideEls.filter(item => !elementIdList.includes(item.id))
-      this.slides[this.slideIndex].elements = newEls
+      commitPresentationCommand(this.$state, { type: 'element.delete', elementIds: elementId })
     },
   
     updateElement(data: UpdateElementData) {
-      const { id, props, slideId } = data
-      const elIdList = typeof id === 'string' ? [id] : id
-
-      const slideIndex = slideId ? this.slides.findIndex(item => item.id === slideId) : this.slideIndex
-      const slide = this.slides[slideIndex]
-      const elements = slide.elements.map(el => {
-        return elIdList.includes(el.id) ? { ...el, ...props } : el
-      })
-      this.slides[slideIndex].elements = (elements as PPTElement[])
+      commitPresentationCommand(this.$state, { type: 'element.update', payload: data })
     },
   
     removeElementProps(data: RemovePropData) {
-      const { id, propName } = data
-      const propsNames = typeof propName === 'string' ? [propName] : propName
-  
-      const slideIndex = this.slideIndex
-      const slide = this.slides[slideIndex]
-      const elements = slide.elements.map(el => {
-        return el.id === id ? omit(el, propsNames) : el
+      commitPresentationCommand(this.$state, {
+        type: 'element.properties.remove',
+        payload: { id: data.id, property: data.propName },
       })
-      this.slides[slideIndex].elements = (elements as PPTElement[])
     },
   },
 })
