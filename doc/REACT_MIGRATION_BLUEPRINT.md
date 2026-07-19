@@ -416,6 +416,8 @@ Exit: representative JSON and imported decks render within the approved visual t
 
 ### Gate 4 — editing substrate
 
+Status: **complete**, including the common context-menu parity correction, interaction-browser coverage, and production performance evidence. See [REACT_GATE_4.md](./REACT_GATE_4.md).
+
 Port the common interaction system before feature panels:
 
 1. current slide and selection model;

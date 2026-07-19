@@ -3,7 +3,21 @@ export interface PointerPosition {
   readonly y: number
 }
 
-export type InteractionGestureKind = 'drag' | 'resize' | 'rotate' | 'crop' | 'lasso' | 'pan'
+export interface PointerModifiers {
+  readonly alt: boolean
+  readonly control: boolean
+  readonly meta: boolean
+  readonly shift: boolean
+}
+
+export const EMPTY_POINTER_MODIFIERS: PointerModifiers = Object.freeze({
+  alt: false,
+  control: false,
+  meta: false,
+  shift: false,
+})
+
+export type InteractionGestureKind = 'drag' | 'resize' | 'rotate' | 'crop' | 'lasso' | 'pan' | 'create'
 
 export interface InteractionSnapshot {
   readonly status: 'idle' | 'active'
@@ -12,6 +26,7 @@ export interface InteractionSnapshot {
   readonly origin: PointerPosition
   readonly pointer: PointerPosition
   readonly delta: PointerPosition
+  readonly modifiers: PointerModifiers
   readonly revision: number
 }
 
@@ -21,19 +36,21 @@ export interface CompletedInteraction {
   readonly origin: PointerPosition
   readonly pointer: PointerPosition
   readonly delta: PointerPosition
+  readonly modifiers: PointerModifiers
 }
 
 export interface BeginInteractionInput {
   readonly gestureId: string
   readonly kind: InteractionGestureKind
   readonly pointer: PointerPosition
+  readonly modifiers?: Partial<PointerModifiers>
 }
 
 export interface InteractionController {
   getSnapshot: () => InteractionSnapshot
   subscribe: (listener: () => void) => () => void
   begin: (input: BeginInteractionInput) => void
-  updatePointer: (pointer: PointerPosition) => void
+  updatePointer: (pointer: PointerPosition, modifiers?: Partial<PointerModifiers>) => void
   complete: () => CompletedInteraction | undefined
   cancel: () => void
 }
@@ -47,7 +64,15 @@ const idleSnapshot = (revision: number): InteractionSnapshot => ({
   origin: IDLE_POSITION,
   pointer: IDLE_POSITION,
   delta: IDLE_POSITION,
+  modifiers: EMPTY_POINTER_MODIFIERS,
   revision,
+})
+
+const createModifiers = (input: Partial<PointerModifiers> = {}): PointerModifiers => ({
+  alt: input.alt ?? false,
+  control: input.control ?? false,
+  meta: input.meta ?? false,
+  shift: input.shift ?? false,
 })
 
 /**
@@ -78,12 +103,21 @@ export const createInteractionController = (): InteractionController => {
         origin: input.pointer,
         pointer: input.pointer,
         delta: IDLE_POSITION,
+        modifiers: createModifiers(input.modifiers),
         revision: snapshot.revision + 1,
       })
     },
-    updatePointer: pointer => {
+    updatePointer: (pointer, modifiers) => {
       if (snapshot.status !== 'active') return
-      if (pointer.x === snapshot.pointer.x && pointer.y === snapshot.pointer.y) return
+      const nextModifiers = modifiers ? createModifiers(modifiers) : snapshot.modifiers
+      if (
+        pointer.x === snapshot.pointer.x &&
+        pointer.y === snapshot.pointer.y &&
+        nextModifiers.alt === snapshot.modifiers.alt &&
+        nextModifiers.control === snapshot.modifiers.control &&
+        nextModifiers.meta === snapshot.modifiers.meta &&
+        nextModifiers.shift === snapshot.modifiers.shift
+      ) return
       publish({
         ...snapshot,
         pointer,
@@ -91,6 +125,7 @@ export const createInteractionController = (): InteractionController => {
           x: pointer.x - snapshot.origin.x,
           y: pointer.y - snapshot.origin.y,
         },
+        modifiers: nextModifiers,
         revision: snapshot.revision + 1,
       })
     },
@@ -107,6 +142,7 @@ export const createInteractionController = (): InteractionController => {
         origin: snapshot.origin,
         pointer: snapshot.pointer,
         delta: snapshot.delta,
+        modifiers: snapshot.modifiers,
       }
       publish(idleSnapshot(snapshot.revision + 1))
       return completed

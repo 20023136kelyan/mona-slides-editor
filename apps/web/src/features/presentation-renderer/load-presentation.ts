@@ -4,13 +4,14 @@ import {
 } from '@mona/presentation-core'
 import type { Slide } from '@mona/presentation-core/model'
 
-const allowedFixtures = new Set(['slides', 'gate3-renderer'])
+const allowedFixtures = new Set(['slides', 'gate3-renderer', 'gate4-editor'])
 
 export async function loadPresentation({ request }: { request: Request }): Promise<PresentationState> {
   const url = new URL(request.url)
   const requestedFixture = url.searchParams.get('rendererFixture') || 'slides'
   const fixture = allowedFixtures.has(requestedFixture) ? requestedFixture : 'slides'
-  const response = await fetch(`/${fixture}.json`)
+  const fixtureFile = fixture === 'gate4-editor' ? 'gate3-renderer' : fixture
+  const response = await fetch(`/${fixtureFile}.json`)
   if (!response.ok) throw new Error(`Unable to load presentation fixture: ${response.status}`)
   const slides = await response.json() as Slide[]
   const presentation: PresentationState = {

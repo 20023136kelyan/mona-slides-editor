@@ -62,4 +62,43 @@ describe('canonical editor state adapter', () => {
     expect(store.getState().presentation).toBe(presentation)
     expect(store.getState().lastRejectedTransaction?.transactionId).toBe('tx-invalid')
   })
+
+  it('keeps viewport and editing focus in session state', () => {
+    const store = createEditorStore({ presentation: createGate2Presentation() })
+    const presentation = store.getState().presentation
+    store.dispatch(editorActions.canvasZoomChanged(135))
+    store.dispatch(editorActions.canvasPanChanged({ x: 24, y: -12 }))
+    store.dispatch(editorActions.canvasFocusChanged(true))
+    store.dispatch(editorActions.gridLineSizeChanged(50))
+    store.dispatch(editorActions.rulerVisibilityChanged(true))
+
+    expect(store.getState().session).toMatchObject({
+      canvasZoom: 135,
+      canvasPan: { x: 24, y: -12 },
+      canvasFocus: true,
+      gridLineSize: 50,
+      showRuler: true,
+    })
+    expect(store.getState().presentation).toBe(presentation)
+  })
+
+  it('restores history atomically and preserves still-valid document selection', () => {
+    const initial = createGate2Presentation()
+    const store = createEditorStore({ presentation: initial })
+    store.dispatch(editorActions.selectionChanged(['fixture-shape-1']))
+    store.dispatch(editorActions.transactionCommitted(createPresentationTransaction({
+      id: 'tx-history-target',
+      label: 'Move before restore',
+      origin: 'test',
+      commands: [{
+        type: 'element.update',
+        payload: { id: 'fixture-shape-1', props: { left: 777 } },
+      }],
+    })))
+
+    store.dispatch(editorActions.historyRestored(initial))
+    expect(store.getState().presentation).toBe(initial)
+    expect(store.getState().session.activeElementIds).toEqual(['fixture-shape-1'])
+    expect(store.getState().lastAppliedTransactionId).toBeNull()
+  })
 })

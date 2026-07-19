@@ -5,7 +5,7 @@ import { useLoaderData } from 'react-router'
 import type { PresentationState } from '@mona/presentation-core'
 
 import { Button } from '@/components/ui/button'
-import { ReadOnlyDeck } from '@/features/presentation-renderer/ReadOnlyDeck'
+import { EditorDeck } from '@/features/editor/EditorDeck'
 import { SettingsMenu } from '@/features/settings/SettingsMenu'
 
 const FOUNDATION_DOCUMENT_TITLE = 'Untitled presentation'
@@ -31,7 +31,7 @@ export function FoundationPage() {
         <SettingsMenu />
       </header>
 
-      <ReadOnlyDeck presentation={presentation} />
+      <EditorDeck presentation={presentation} />
     </div>
   )
 }

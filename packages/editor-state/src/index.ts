@@ -22,6 +22,12 @@ export interface EditorSessionState {
   selectedSlideIndexes: number[]
   activeTool: string | null
   openPanel: string | null
+  canvasZoom: number
+  canvasPan: { x: number; y: number }
+  canvasFocus: boolean
+  gridLineSize: number
+  showRuler: boolean
+  cropElementId: string | null
 }
 
 export interface RejectedEditorTransaction {
@@ -53,6 +59,12 @@ const createSessionState = (
   selectedSlideIndexes: input.selectedSlideIndexes ?? [],
   activeTool: input.activeTool ?? null,
   openPanel: input.openPanel ?? null,
+  canvasZoom: input.canvasZoom ?? 100,
+  canvasPan: input.canvasPan ?? { x: 0, y: 0 },
+  canvasFocus: input.canvasFocus ?? false,
+  gridLineSize: input.gridLineSize ?? 0,
+  showRuler: input.showRuler ?? false,
+  cropElementId: input.cropElementId ?? null,
 })
 
 const emptyPresentation: PresentationState = {
@@ -99,6 +111,24 @@ const editorSlice = createSlice({
       state.lastAppliedTransactionId = action.payload.id
       state.lastRejectedTransaction = null
     },
+    historyRestored(state, action: PayloadAction<PresentationState>) {
+      state.presentation = action.payload
+      state.lastAppliedTransactionId = null
+      state.lastRejectedTransaction = null
+      const validElementIds = new Set(action.payload.slides.flatMap(slide => slide.elements.map(element => element.id)))
+      state.session.activeElementIds = state.session.activeElementIds.filter(id => validElementIds.has(id))
+      if (!state.session.handleElementId || !validElementIds.has(state.session.handleElementId)) {
+        state.session.handleElementId = state.session.activeElementIds.length === 1
+          ? state.session.activeElementIds[0] ?? null
+          : null
+      }
+      if (state.session.activeGroupElementId && !validElementIds.has(state.session.activeGroupElementId)) {
+        state.session.activeGroupElementId = null
+      }
+      if (state.session.cropElementId && !validElementIds.has(state.session.cropElementId)) {
+        state.session.cropElementId = null
+      }
+    },
     selectionChanged(state, action: PayloadAction<string[]>) {
       state.session.activeElementIds = action.payload
       state.session.handleElementId = action.payload.length === 1 ? action.payload[0] ?? null : null
@@ -120,6 +150,24 @@ const editorSlice = createSlice({
     },
     openPanelChanged(state, action: PayloadAction<string | null>) {
       state.session.openPanel = action.payload
+    },
+    canvasZoomChanged(state, action: PayloadAction<number>) {
+      state.session.canvasZoom = Math.min(200, Math.max(20, action.payload))
+    },
+    canvasPanChanged(state, action: PayloadAction<{ x: number; y: number }>) {
+      state.session.canvasPan = action.payload
+    },
+    canvasFocusChanged(state, action: PayloadAction<boolean>) {
+      state.session.canvasFocus = action.payload
+    },
+    gridLineSizeChanged(state, action: PayloadAction<number>) {
+      state.session.gridLineSize = action.payload
+    },
+    rulerVisibilityChanged(state, action: PayloadAction<boolean>) {
+      state.session.showRuler = action.payload
+    },
+    cropElementChanged(state, action: PayloadAction<string | null>) {
+      state.session.cropElementId = action.payload
     },
   },
 })
@@ -155,6 +203,12 @@ export const selectSlides = (state: EditorRootState) => state.presentation.slide
 export const selectSlideIndex = (state: EditorRootState) => state.presentation.slideIndex
 export const selectSession = (state: EditorRootState) => state.session
 export const selectActiveElementIds = (state: EditorRootState) => state.session.activeElementIds
+export const selectCanvasFocus = (state: EditorRootState) => state.session.canvasFocus
+export const selectCanvasPan = (state: EditorRootState) => state.session.canvasPan
+export const selectCanvasZoom = (state: EditorRootState) => state.session.canvasZoom
+export const selectCropElementId = (state: EditorRootState) => state.session.cropElementId
+export const selectGridLineSize = (state: EditorRootState) => state.session.gridLineSize
+export const selectShowRuler = (state: EditorRootState) => state.session.showRuler
 export const selectLastRejectedTransaction = (state: EditorRootState) => state.lastRejectedTransaction
 
 export const selectCurrentSlide = createSelector(

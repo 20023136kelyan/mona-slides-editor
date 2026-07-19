@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "runtime": "react-gate4",
+  "serverMode": "production-preview",
+  "url": "http://127.0.0.1:4174/?rendererFixture=gate4-editor",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "sampleCount": 5,
+  "medians": {
+    "editorReadyMs": 845,
+    "domContentLoadedMs": 26.5,
+    "loadMs": 26.799999997019768,
+    "firstContentfulPaintMs": 48,
+    "resourceCount": 6,
+    "transferBytes": 388729,
+    "decodedBodyBytes": 1202823,
+    "usedJSHeapBytes": 10000000
+  },
+  "samples": [
+    {
+      "editorReadyMs": 849.7000000029802,
+      "domContentLoadedMs": 29.599999994039536,
+      "loadMs": 29.799999997019768,
+      "firstContentfulPaintMs": 48,
+      "resourceCount": 6,
+      "transferBytes": 388729,
+      "decodedBodyBytes": 1202823,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 852.2999999970198,
+      "domContentLoadedMs": 28.100000008940697,
+      "loadMs": 28.299999997019768,
+      "firstContentfulPaintMs": 48,
+      "resourceCount": 6,
+      "transferBytes": 388729,
+      "decodedBodyBytes": 1202823,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 845,
+      "domContentLoadedMs": 26.200000002980232,
+      "loadMs": 26.400000005960464,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 6,
+      "transferBytes": 388729,
+      "decodedBodyBytes": 1202823,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 845,
+      "domContentLoadedMs": 26.30000001192093,
+      "loadMs": 26.600000008940697,
+      "firstContentfulPaintMs": 56,
+      "resourceCount": 6,
+      "transferBytes": 388729,
+      "decodedBodyBytes": 1202823,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 839.2999999970198,
+      "domContentLoadedMs": 26.5,
+      "loadMs": 26.799999997019768,
+      "firstContentfulPaintMs": 56,
+      "resourceCount": 6,
+      "transferBytes": 388729,
+      "decodedBodyBytes": 1202823,
+      "usedJSHeapBytes": 10000000
+    }
+  ]
+}
