@@ -1,16 +1,16 @@
 <template>
-  <MoveablePanel 
-    class="notes-panel" 
-    :width="300" 
-    :height="130" 
-    title="幻灯片类型标注" 
-    :left="-270" 
+  <MoveablePanel
+    class="notes-panel"
+    :width="300"
+    :height="130"
+    :title="$t('markup.title')"
+    :left="-270"
     :top="90"
     @close="close()"
   >
     <div class="container">
       <div class="row">
-        <div style="width: 40%;">当前页面类型：</div>
+        <div style="width: 40%;">{{ $t('markup.currentSlide') }}</div>
         <Select
           style="width: 60%;"
           :value="slideType"
@@ -19,7 +19,7 @@
         />
       </div>
       <div class="row" v-if="handleElement && (handleElement.type === 'text' || (handleElement.type === 'shape' && handleElement.text))">
-        <div style="width: 40%;">当前文本类型：</div>
+        <div style="width: 40%;">{{ $t('markup.currentText') }}</div>
         <Select
           style="width: 60%;"
           :value="textType"
@@ -28,7 +28,7 @@
         />
       </div>
       <div class="row" v-else-if="handleElement && handleElement.type === 'image'">
-        <div style="width: 40%;">当前图片类型：</div>
+        <div style="width: 40%;">{{ $t('markup.currentImage') }}</div>
         <Select
           style="width: 60%;"
           :value="imageType"
@@ -36,13 +36,14 @@
           :options="imageTypeOptions"
         />
       </div>
-      <div class="placeholder" v-else>选中图片、文字、带文字的形状，标记类型</div>
+      <div class="placeholder" v-else>{{ $t('markup.placeholder') }}</div>
     </div>
   </MoveablePanel>
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import type { ImageType, SlideType, TextType } from '@/types/slides'
@@ -51,38 +52,24 @@ import MoveablePanel from '@/components/MoveablePanel.vue'
 import Select from '@/components/Select.vue'
 
 const slidesStore = useSlidesStore()
+const { t } = useI18n()
 const mainStore = useMainStore()
 const { currentSlide } = storeToRefs(slidesStore)
 const { handleElement, handleElementId } = storeToRefs(mainStore)
 
-const slideTypeOptions = ref<{ label: string; value: SlideType | '' }[]>([
-  { label: '未标记类型', value: '' },
-  { label: '封面页', value: 'cover' },
-  { label: '目录页', value: 'contents' },
-  { label: '过渡页', value: 'transition' },
-  { label: '内容页', value: 'content' },
-  { label: '结束页', value: 'end' },
+const slideTypeOptions = computed<{ label: string; value: SlideType | '' }[]>(() => [
+  { label: t('markup.unlabeled'), value: '' },
+  ...(['cover', 'contents', 'transition', 'content', 'end'] as SlideType[]).map(value => ({ label: t(`markup.slide.${value}`), value })),
 ])
 
-const textTypeOptions = ref<{ label: string; value: TextType | '' }[]>([
-  { label: '未标记类型', value: '' },
-  { label: '标题', value: 'title' },
-  { label: '副标题', value: 'subtitle' },
-  { label: '正文', value: 'content' },
-  { label: '列表项目', value: 'item' },
-  { label: '列表项标题', value: 'itemTitle' },
-  { label: '注释', value: 'notes' },
-  { label: '页眉', value: 'header' },
-  { label: '页脚', value: 'footer' },
-  { label: '节编号', value: 'partNumber' },
-  { label: '项目编号', value: 'itemNumber' },
+const textTypeOptions = computed<{ label: string; value: TextType | '' }[]>(() => [
+  { label: t('markup.unlabeled'), value: '' },
+  ...(['title', 'subtitle', 'content', 'item', 'itemTitle', 'notes', 'header', 'footer', 'partNumber', 'itemNumber'] as TextType[]).map(value => ({ label: t(`markup.text.${value}`), value })),
 ])
 
-const imageTypeOptions = ref<{ label: string; value: ImageType | '' }[]>([
-  { label: '未标记类型', value: '' },
-  { label: '页面插图', value: 'pageFigure' },
-  { label: '项目插图', value: 'itemFigure' },
-  { label: '背景图', value: 'background' },
+const imageTypeOptions = computed<{ label: string; value: ImageType | '' }[]>(() => [
+  { label: t('markup.unlabeled'), value: '' },
+  ...(['pageFigure', 'itemFigure', 'background'] as ImageType[]).map(value => ({ label: t(`markup.image.${value}`), value })),
 ])
 
 const slideType = computed(() => currentSlide.value?.type || '')

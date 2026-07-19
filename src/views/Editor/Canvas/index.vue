@@ -104,6 +104,7 @@
 
 <script lang="ts" setup>
 import { nextTick, onMounted, onUnmounted, provide, ref, watch, watchEffect, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { throttle } from 'lodash'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore, useKeyboardStore } from '@/store'
@@ -149,6 +150,7 @@ import Modal from '@/components/Modal.vue'
 import message from '@/utils/message'
 
 const mainStore = useMainStore()
+const { t } = useI18n()
 const {
   activeElementIdList,
   activeGroupElementId,
@@ -279,7 +281,7 @@ const toggleRuler = () => {
 // 开关浮动菜单
 const toggleBubbleMenu = () => {
   mainStore.setBubbleMenuState(!showBubbleMenu.value)
-  message.success(`元素气泡菜单已${showBubbleMenu.value ? '启用' : '禁用'}`)
+  message.success(t('canvas.bubbleMenuStatus', { status: t(showBubbleMenu.value ? 'common.enabled' : 'common.disabled') }))
 }
 
 // 在鼠标绘制的范围插入元素
@@ -307,58 +309,58 @@ const insertCustomShape = (data: CreateCustomShapeData) => {
 const contextmenus = (): ContextmenuItem[] => {
   return [
     {
-      text: '粘贴',
+      text: t('common.paste'),
       subText: 'Ctrl + V',
       handler: pasteElement,
     },
     {
-      text: '全选',
+      text: t('common.selectAll'),
       subText: 'Ctrl + A',
       handler: selectAllElements,
     },
     {
-      text: '标尺',
+      text: t('canvas.ruler'),
       subText: showRuler.value ? '√' : '',
       handler: toggleRuler,
     },
     {
-      text: '网格线',
+      text: t('canvas.gridLines'),
       handler: () => mainStore.setGridLineSize(gridLineSize.value ? 0 : 50),
       children: [
         {
-          text: '无',
+          text: t('common.none'),
           subText: gridLineSize.value === 0 ? '√' : '',
           handler: () => mainStore.setGridLineSize(0),
         },
         {
-          text: '小',
+          text: t('canvas.small'),
           subText: gridLineSize.value === 25 ? '√' : '',
           handler: () => mainStore.setGridLineSize(25),
         },
         {
-          text: '中',
+          text: t('canvas.medium'),
           subText: gridLineSize.value === 50 ? '√' : '',
           handler: () => mainStore.setGridLineSize(50),
         },
         {
-          text: '大',
+          text: t('canvas.large'),
           subText: gridLineSize.value === 100 ? '√' : '',
           handler: () => mainStore.setGridLineSize(100),
         },
       ],
     },
     {
-      text: '重置当前页',
+      text: t('canvas.resetSlide'),
       handler: deleteAllElements,
     },
     {
-      text: '气泡菜单',
+      text: t('canvas.bubbleMenu'),
       subText: showBubbleMenu.value ? '√' : '',
       handler: toggleBubbleMenu,
     },
     { divider: true },
     {
-      text: '幻灯片放映',
+      text: t('canvas.slideshow'),
       subText: 'F5',
       handler: enterScreeningFromStart,
     },

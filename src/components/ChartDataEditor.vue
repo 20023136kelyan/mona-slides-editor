@@ -68,7 +68,7 @@
 
     <div class="btns">
       <div class="left">
-        图表类型：{{ CHART_TYPE_MAP[chartType] }}
+        {{ $t('chartData.type', { type: $t(`chartTypes.${chartType}`) }) }}
         <Popover trigger="click" placement="top" v-model:value="chartTypeSelectVisible">
           <template #content>
             <PopoverMenuItem
@@ -76,15 +76,15 @@
               v-for="item in chartList" 
               :key="item" 
               @click="chartType = item; chartTypeSelectVisible = false"
-            >{{CHART_TYPE_MAP[item]}}</PopoverMenuItem>
+            >{{ $t(`chartTypes.${item}`) }}</PopoverMenuItem>
           </template>
-          <span class="change">点击更换</span>
+          <span class="change">{{ $t('chartData.change') }}</span>
         </Popover>
       </div>
       <div class="right">
-        <Button class="btn" @click="closeEditor()">取消</Button>
-        <Button class="btn" @click="clear()">清空数据</Button>
-        <Button type="primary" class="btn" @click="getTableData()">确认</Button>
+        <Button class="btn" @click="closeEditor()">{{ $t('common.cancel') }}</Button>
+        <Button class="btn" @click="clear()">{{ $t('chartData.clear') }}</Button>
+        <Button type="primary" class="btn" @click="getTableData()">{{ $t('common.confirm') }}</Button>
       </div>
     </div>
   </div>
@@ -92,9 +92,9 @@
 
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ChartData, ChartType } from '@/types/slides'
 import { KEYS } from '@/configs/hotkey'
-import { CHART_TYPE_MAP } from '@/configs/chart'
 import { pasteCustomClipboardString, pasteExcelClipboardString, pasteHTMLTableClipboardString } from '@/utils/clipboard'
 import Button from '@/components/Button.vue'
 import Popover from '@/components/Popover.vue'
@@ -104,6 +104,7 @@ const props = defineProps<{
   type: ChartType
   data: ChartData
 }>()
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (event: 'save', payload: {
@@ -206,13 +207,13 @@ const getTableData = () => {
 
   // 第一行为系列名，第一列为项目名，实际数据从第二行第二列开始
   for (let rowIndex = 1; rowIndex < row; rowIndex++) {
-    let labelsItem = `类别${rowIndex}`
+    let labelsItem = t('chartData.category', { number: rowIndex })
     const labelInputRef = document.querySelector(`#cell-${rowIndex}-0`) as HTMLInputElement
     if (labelInputRef && labelInputRef.value) labelsItem = labelInputRef.value
     labels.push(labelsItem)
   }
   for (let colIndex = 1; colIndex < col; colIndex++) {
-    let legendsItem = `系列${colIndex}`
+    let legendsItem = t('chartData.series', { number: colIndex })
     const labelInputRef = document.querySelector(`#cell-0-${colIndex}`) as HTMLInputElement
     if (labelInputRef && labelInputRef.value) legendsItem = labelInputRef.value
     legends.push(legendsItem)

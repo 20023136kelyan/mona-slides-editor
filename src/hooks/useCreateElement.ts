@@ -5,7 +5,7 @@ import { getImageSize } from '@/utils/image'
 import type { PPTLineElement, PPTElement, TableCell, TableCellStyle, PPTShapeElement, ChartType, PPTVideoElement, PPTAudioElement } from '@/types/slides'
 import { type ShapePoolItem, SHAPE_PATH_FORMULAS } from '@/configs/shapes'
 import type { LinePoolItem } from '@/configs/lines'
-import { CHART_DEFAULT_DATA } from '@/configs/chart'
+import { getChartDefaultData } from '@/configs/chart'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 
 interface CommonElementPosition {
@@ -98,7 +98,7 @@ export default () => {
       rotate: 0,
       themeColors: theme.value.themeColors,
       textColor: theme.value.fontColor,
-      data: CHART_DEFAULT_DATA[type],
+      data: getChartDefaultData(type),
     })
   }
   

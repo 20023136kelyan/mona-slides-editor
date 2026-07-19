@@ -5,10 +5,10 @@
         style="width: 50%;"
         :value="textAttrs.fontname"
         search
-        searchLabel="搜索字体"
+        :searchLabel="$t('canvas.fontSearch')"
         autofocus
         @update:value="value => updateTextAttrs({ fontname: value as string })"
-        :options="FONTS"
+        :options="fontOptions"
       >
         <template #icon>
           <i-icon-park-outline:font-size />
@@ -18,7 +18,7 @@
         style="width: 50%;"
         :value="textAttrs.fontsize"
         search
-        searchLabel="搜索字号"
+        :searchLabel="$t('canvas.fontSizeSearch')"
         autofocus
         @update:value="value => updateTextAttrs({ fontsize: value as string })"
         :options="fontSizeOptions.map(item => ({
@@ -39,7 +39,7 @@
             @update:modelValue="value => updateTextAttrs({ color: value })"
           />
         </template>
-        <TextColorButton first v-tooltip="'文字颜色'" :color="textAttrs.color">
+        <TextColorButton first v-tooltip="$t('toolbar.textColor')" :color="textAttrs.color">
           <i-icon-park-outline:text />
         </TextColorButton>
       </Popover>
@@ -50,7 +50,7 @@
             @update:modelValue="value => updateTextAttrs({ backcolor: value })"
           />
         </template>
-        <TextColorButton last v-tooltip="'单元格填充'" :color="textAttrs.backcolor">
+        <TextColorButton last v-tooltip="$t('toolbar.cellFill')" :color="textAttrs.backcolor">
           <i-icon-park-outline:fill />
         </TextColorButton>
       </Popover>
@@ -60,25 +60,25 @@
       <CheckboxButton 
         style="flex: 1;"
         :checked="textAttrs.bold"
-        v-tooltip="'加粗'"
+        v-tooltip="$t('common.bold')"
         @click="updateTextAttrs({ bold: !textAttrs.bold })"
       ><i-icon-park-outline:text-bold /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="textAttrs.em"
-        v-tooltip="'斜体'"
+        v-tooltip="$t('common.italic')"
         @click="updateTextAttrs({ em: !textAttrs.em })"
       ><i-icon-park-outline:text-italic /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="textAttrs.underline"
-        v-tooltip="'下划线'"
+        v-tooltip="$t('common.underline')"
         @click="updateTextAttrs({ underline: !textAttrs.underline })"
       ><i-icon-park-outline:text-underline /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="textAttrs.strikethrough"
-        v-tooltip="'删除线'"
+        v-tooltip="$t('common.strikethrough')"
         @click="updateTextAttrs({ strikethrough: !textAttrs.strikethrough })"
       ><i-icon-park-outline:strikethrough /></CheckboxButton>
     </ButtonGroup>
@@ -89,10 +89,10 @@
       :value="textAttrs.align"
       @update:value="value => updateTextAttrs({ align: value as TextAlign })"
     >
-      <RadioButton value="left" v-tooltip="'左对齐'" style="flex: 1;"><i-icon-park-outline:align-text-left /></RadioButton>
-      <RadioButton value="center" v-tooltip="'居中'" style="flex: 1;"><i-icon-park-outline:align-text-center /></RadioButton>
-      <RadioButton value="right" v-tooltip="'右对齐'" style="flex: 1;"><i-icon-park-outline:align-text-right /></RadioButton>
-      <RadioButton value="justify" v-tooltip="'两端对齐'" style="flex: 1;"><i-icon-park-outline:align-text-both /></RadioButton>
+      <RadioButton value="left" v-tooltip="$t('common.leftAlign')" style="flex: 1;"><i-icon-park-outline:align-text-left /></RadioButton>
+      <RadioButton value="center" v-tooltip="$t('common.centerAlign')" style="flex: 1;"><i-icon-park-outline:align-text-center /></RadioButton>
+      <RadioButton value="right" v-tooltip="$t('common.rightAlign')" style="flex: 1;"><i-icon-park-outline:align-text-right /></RadioButton>
+      <RadioButton value="justify" v-tooltip="$t('common.justify')" style="flex: 1;"><i-icon-park-outline:align-text-both /></RadioButton>
     </RadioGroup>
 
     <RadioGroup 
@@ -101,9 +101,9 @@
       :value="textAttrs.vAlign"
       @update:value="value => updateTextAttrs({ vAlign: value as TextAlignVertical })"
     >
-      <RadioButton value="top" v-tooltip="'顶对齐'" style="flex: 1;"><i-icon-park-outline:align-text-top-one /></RadioButton>
-      <RadioButton value="middle" v-tooltip="'垂直居中'" style="flex: 1;"><i-icon-park-outline:align-text-middle-one /></RadioButton>
-      <RadioButton value="bottom" v-tooltip="'底对齐'" style="flex: 1;"><i-icon-park-outline:align-text-bottom-one /></RadioButton>
+      <RadioButton value="top" v-tooltip="$t('common.topAlign')" style="flex: 1;"><i-icon-park-outline:align-text-top-one /></RadioButton>
+      <RadioButton value="middle" v-tooltip="$t('common.verticalCenter')" style="flex: 1;"><i-icon-park-outline:align-text-middle-one /></RadioButton>
+      <RadioButton value="bottom" v-tooltip="$t('common.bottomAlign')" style="flex: 1;"><i-icon-park-outline:align-text-bottom-one /></RadioButton>
     </RadioGroup>
 
     <Divider />
@@ -113,28 +113,28 @@
     <Divider />
 
     <div class="row">
-      <div style="width: 40%;">操作行：</div>
+      <div style="width: 40%;">{{ $t('tableStyle.rowActions') }}</div>
       <ButtonGroup style="width: 60%;" passive>
-        <Button first style="flex: 1;" @click="emitTableCommand('insert-row', 'after')">添加行</Button>
+        <Button first style="flex: 1;" @click="emitTableCommand('insert-row', 'after')">{{ $t('tableStyle.addRow') }}</Button>
         <Popover trigger="click">
           <template #content>
-            <PopoverMenuItem center @click="emitTableCommand('insert-row', 'before')">上方添加</PopoverMenuItem>
-            <PopoverMenuItem center @click="emitTableCommand('insert-row', 'after')">下方添加</PopoverMenuItem>
-            <PopoverMenuItem center @click="emitTableCommand('delete-row')">删除行</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('insert-row', 'before')">{{ $t('tableStyle.addAbove') }}</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('insert-row', 'after')">{{ $t('tableStyle.addBelow') }}</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('delete-row')">{{ $t('table.deleteRow') }}</PopoverMenuItem>
           </template>
           <Button last class="popover-btn"><i-icon-park-outline:down /></Button>
         </Popover>
       </ButtonGroup>
     </div>
     <div class="row">
-      <div style="width: 40%;">操作列：</div>
+      <div style="width: 40%;">{{ $t('tableStyle.columnActions') }}</div>
       <ButtonGroup style="width: 60%;" passive>
-        <Button first style="flex: 1;" @click="emitTableCommand('insert-col', 'after')">添加列</Button>
+        <Button first style="flex: 1;" @click="emitTableCommand('insert-col', 'after')">{{ $t('tableStyle.addColumn') }}</Button>
         <Popover trigger="click">
           <template #content>
-            <PopoverMenuItem center @click="emitTableCommand('insert-col', 'before')">左侧添加</PopoverMenuItem>
-            <PopoverMenuItem center @click="emitTableCommand('insert-col', 'after')">右侧添加</PopoverMenuItem>
-            <PopoverMenuItem center @click="emitTableCommand('delete-col')">删除列</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('insert-col', 'before')">{{ $t('tableStyle.addLeft') }}</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('insert-col', 'after')">{{ $t('tableStyle.addRight') }}</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitTableCommand('delete-col')">{{ $t('table.deleteColumn') }}</PopoverMenuItem>
           </template>
           <Button last class="popover-btn"><i-icon-park-outline:down /></Button>
         </Popover>
@@ -144,7 +144,7 @@
     <Divider />
 
     <div class="row theme-switch">
-      <div style="width: 40%;">启用主题表格：</div>
+      <div style="width: 40%;">{{ $t('tableStyle.enableTheme') }}</div>
       <div class="switch-wrapper" style="width: 60%;">
         <Switch 
           :value="hasTheme" 
@@ -159,27 +159,27 @@
           @update:value="value => updateTheme({ rowHeader: value })" 
           :value="theme.rowHeader" 
           style="flex: 1;"
-        >标题行</Checkbox>
+        >{{ $t('tableStyle.headerRow') }}</Checkbox>
         <Checkbox 
           @update:value="value => updateTheme({ rowFooter: value })" 
           :value="theme.rowFooter" 
           style="flex: 1;"
-        >汇总行</Checkbox>
+        >{{ $t('tableStyle.totalRow') }}</Checkbox>
       </div>
       <div class="row">
         <Checkbox 
           @update:value="value => updateTheme({ colHeader: value })" 
           :value="theme.colHeader" 
           style="flex: 1;"
-        >第一列</Checkbox>
+        >{{ $t('tableStyle.firstColumn') }}</Checkbox>
         <Checkbox 
           @update:value="value => updateTheme({ colFooter: value })" 
           :value="theme.colFooter" 
           style="flex: 1;"
-        >最后一列</Checkbox>
+        >{{ $t('tableStyle.lastColumn') }}</Checkbox>
       </div>
       <div class="row">
-        <div style="width: 40%;">主题颜色：</div>
+        <div style="width: 40%;">{{ $t('tableStyle.themeColor') }}</div>
         <Popover trigger="click" style="width: 60%;">
           <template #content>
             <ColorPicker
@@ -199,7 +199,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import type { PPTTableElement, TableCell, TableCellStyle, TableTheme, TextAlign, TextAlignVertical } from '@/types/slides'
-import { FONTS } from '@/configs/font'
+import useLocalizedFonts from '@/hooks/useLocalizedFonts'
 import emitter, { EmitterEvents, type TableCommand } from '@/utils/emitter'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 
@@ -222,6 +222,7 @@ import PopoverMenuItem from '@/components/PopoverMenuItem.vue'
 
 const slidesStore = useSlidesStore()
 const { handleElement, handleElementId, selectedTableCells: selectedCells } = storeToRefs(useMainStore())
+const fontOptions = useLocalizedFonts()
 const themeColor = computed(() => slidesStore.theme.themeColors[0])
 
 const fontSizeOptions = [

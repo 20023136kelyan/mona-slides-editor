@@ -1,7 +1,7 @@
 <template>
   <div class="element-filter">
     <div class="row">
-      <div style="flex: 2;">启用滤镜：</div>
+      <div style="flex: 2;">{{ $t('toolbar.enableFilter') }}</div>
       <div class="switch-wrapper" style="flex: 3;">
         <Switch 
           :value="hasFilters" 
@@ -13,12 +13,12 @@
       <div class="presets">
         <div class="preset-item" v-for="(item, index) in presetFilters" :key="index" @click="applyPresetFilters(item.values)">
           <img :src="handleImageElement.src" alt="" :style="{ filter: filters2Style(item.values) }">
-          <span class="preset-label">{{ item.label }}</span>
+          <span class="preset-label">{{ $t(`filters.${item.key}`) }}</span>
         </div>
       </div>
       <div class="filter">
         <div class="filter-item" v-for="filter in filterOptions" :key="filter.key">
-          <div class="name">{{filter.label}}</div>
+          <div class="name">{{ $t(`filters.${filter.key}`) }}</div>
           <Slider
             class="filter-slider"
             :max="filter.max"
@@ -44,7 +44,6 @@ import Switch from '@/components/Switch.vue'
 import Slider from '@/components/Slider.vue'
 
 interface FilterOption {
-  label: string
   key: ImageElementFilterKeys
   default: number
   value: number
@@ -54,30 +53,30 @@ interface FilterOption {
 }
 
 const defaultFilters: FilterOption[] = [
-  { label: '模糊', key: 'blur', default: 0, value: 0, unit: 'px', max: 10, step: 1 },
-  { label: '亮度', key: 'brightness', default: 100, value: 100, unit: '%', max: 200, step: 5 },
-  { label: '对比度', key: 'contrast', default: 100, value: 100, unit: '%', max: 200, step: 5 },
-  { label: '灰度', key: 'grayscale', default: 0, value: 0, unit: '%', max: 100, step: 5 },
-  { label: '饱和度', key: 'saturate', default: 100, value: 100, unit: '%', max: 200, step: 5 },
-  { label: '色相', key: 'hue-rotate', default: 0, value: 0, unit: 'deg', max: 360, step: 10 },
-  { label: '褐色', key: 'sepia', default: 0, value: 0, unit: '%', max: 100, step: 5 },
-  { label: '反转', key: 'invert', default: 0, value: 0, unit: '%', max: 100, step: 5 },
-  { label: '不透明度', key: 'opacity', default: 100, value: 100, unit: '%', max: 100, step: 5 },
+  { key: 'blur', default: 0, value: 0, unit: 'px', max: 10, step: 1 },
+  { key: 'brightness', default: 100, value: 100, unit: '%', max: 200, step: 5 },
+  { key: 'contrast', default: 100, value: 100, unit: '%', max: 200, step: 5 },
+  { key: 'grayscale', default: 0, value: 0, unit: '%', max: 100, step: 5 },
+  { key: 'saturate', default: 100, value: 100, unit: '%', max: 200, step: 5 },
+  { key: 'hue-rotate', default: 0, value: 0, unit: 'deg', max: 360, step: 10 },
+  { key: 'sepia', default: 0, value: 0, unit: '%', max: 100, step: 5 },
+  { key: 'invert', default: 0, value: 0, unit: '%', max: 100, step: 5 },
+  { key: 'opacity', default: 100, value: 100, unit: '%', max: 100, step: 5 },
 ]
 
 const presetFilters: {
-  label: string
+  key: string
   values: ImageElementFilters
 }[] = [
-  { label: '黑白', values: { 'grayscale': '100%' } },
-  { label: '复古', values: { 'sepia': '50%', 'contrast': '110%', 'brightness': '90%' } },
-  { label: '锐化', values: { 'contrast': '150%' } },
-  { label: '柔和', values: { 'brightness': '110%', 'contrast': '90%' } },
-  { label: '暖色', values: { 'sepia': '30%', 'saturate': '135%' } },
-  { label: '明亮', values: { 'brightness': '110%', 'contrast': '110%' } },
-  { label: '鲜艳', values: { 'saturate': '200%' } },
-  { label: '模糊', values: { 'blur': '2px' } },
-  { label: '反转', values: { 'invert': '100%' } },
+  { key: 'blackWhite', values: { 'grayscale': '100%' } },
+  { key: 'vintage', values: { 'sepia': '50%', 'contrast': '110%', 'brightness': '90%' } },
+  { key: 'sharpen', values: { 'contrast': '150%' } },
+  { key: 'soft', values: { 'brightness': '110%', 'contrast': '90%' } },
+  { key: 'warm', values: { 'sepia': '30%', 'saturate': '135%' } },
+  { key: 'bright', values: { 'brightness': '110%', 'contrast': '110%' } },
+  { key: 'vivid', values: { 'saturate': '200%' } },
+  { key: 'blur', values: { 'blur': '2px' } },
+  { key: 'invert', values: { 'invert': '100%' } },
 ]
 
 const slidesStore = useSlidesStore()

@@ -8,11 +8,11 @@
     <ElementFlip />
 
     <ButtonGroup class="row" passive>
-      <Button first style="width: calc(100% - 32px);" @click="clipImage()"><i-icon-park-outline:tailoring /> 裁剪图片</Button>
+      <Button first style="width: calc(100% - 32px);" @click="clipImage()"><i-icon-park-outline:tailoring /> {{ $t('elementStyle.cropImage') }}</Button>
       <Popover trigger="click" v-model:value="clipPanelVisible" style="width: 32px;">
         <template #content>
           <div class="clip">
-            <div class="title">按形状：</div>
+            <div class="title">{{ $t('elementStyle.byShape') }}</div>
             <div class="shape-clip">
               <div 
                 class="shape-clip-item" 
@@ -24,8 +24,8 @@
               </div>
             </div>
 
-            <template v-for="typeItem in ratioClipOptions" :key="typeItem.label">
-              <div class="title" v-if="typeItem.label">按{{typeItem.label}}：</div>
+            <template v-for="typeItem in ratioClipOptions" :key="typeItem.labelKey">
+              <div class="title" v-if="typeItem.labelKey">{{ $t('elementStyle.byRatio', { ratio: $t(typeItem.labelKey) }) }}</div>
               <ButtonGroup class="row">
                 <Button 
                   style="flex: 1;"
@@ -42,7 +42,7 @@
     </ButtonGroup>
     
     <div class="row">
-      <div style="width: 40%;">圆角半径：</div>
+      <div style="width: 40%;">{{ $t('elementStyle.cornerRadius') }}</div>
       <NumberInput 
         :value="handleImageElement.radius || 0" 
         @update:value="value => updateImage({ radius: value })" 
@@ -61,10 +61,10 @@
     <Divider />
     
     <FileInput @change="files => replaceImage(files)">
-      <Button class="full-width-btn"><i-icon-park-outline:transform /> 替换图片</Button>
+      <Button class="full-width-btn"><i-icon-park-outline:transform /> {{ $t('elementStyle.replaceImage') }}</Button>
     </FileInput>
-    <Button class="full-width-btn" @click="resetImage()"><i-icon-park-outline:undo /> 重置样式</Button>
-    <Button class="full-width-btn" @click="setBackgroundImage()"><i-icon-park-outline:theme /> 设为背景</Button>
+    <Button class="full-width-btn" @click="resetImage()"><i-icon-park-outline:undo /> {{ $t('elementStyle.resetStyle') }}</Button>
+    <Button class="full-width-btn" @click="setBackgroundImage()"><i-icon-park-outline:theme /> {{ $t('elementStyle.setAsBackground') }}</Button>
   </div>
 </template>
 
@@ -92,13 +92,13 @@ import NumberInput from '@/components/NumberInput.vue'
 const shapeClipPathOptions = CLIPPATHS
 const ratioClipOptions = [
   {
-    label: '纵横比（正方形）',
+    labelKey: 'elementStyle.squareRatio',
     children: [
       { key: '1:1', ratio: 1 / 1 },
     ],
   },
   {
-    label: '纵横比（纵向）',
+    labelKey: 'elementStyle.portraitRatio',
     children: [
       { key: '2:3', ratio: 3 / 2 },
       { key: '3:4', ratio: 4 / 3 },
@@ -107,7 +107,7 @@ const ratioClipOptions = [
     ],
   },
   {
-    label: '纵横比（横向）',
+    labelKey: 'elementStyle.landscapeRatio',
     children: [
       { key: '3:2', ratio: 2 / 3 },
       { key: '4:3', ratio: 3 / 4 },
@@ -116,6 +116,7 @@ const ratioClipOptions = [
     ],
   },
   {
+    labelKey: '',
     children: [
       { key: '16:9', ratio: 9 / 16 },
       { key: '16:10', ratio: 10 / 16 },

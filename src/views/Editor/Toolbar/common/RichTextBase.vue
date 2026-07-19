@@ -5,10 +5,10 @@
         style="width: 60%;"
         :value="richTextAttrs.fontname"
         search
-        searchLabel="搜索字体"
+        :searchLabel="$t('canvas.fontSearch')"
         autofocus
         @update:value="value => emitRichTextCommand('fontname', value as string)"
-        :options="FONTS"
+        :options="fontOptions"
       >
         <template #icon>
           <i-icon-park-outline:font-size />
@@ -18,7 +18,7 @@
         style="width: 40%;"
         :value="richTextAttrs.fontsize"
         search
-        searchLabel="搜索字号"
+        :searchLabel="$t('canvas.fontSizeSearch')"
         autofocus
         @update:value="value => emitRichTextCommand('fontsize', value as string)"
         :options="fontSizeOptions.map(item => ({
@@ -39,7 +39,7 @@
             @update:modelValue="value => emitRichTextCommand('color', value)"
           />
         </template>
-        <TextColorButton first v-tooltip="'文字颜色'" :color="richTextAttrs.color">
+        <TextColorButton first v-tooltip="$t('toolbar.textColor')" :color="richTextAttrs.color">
           <i-icon-park-outline:text />
         </TextColorButton>
       </Popover>
@@ -50,21 +50,21 @@
             @update:modelValue="value => emitRichTextCommand('backcolor', value)"
           />
         </template>
-        <TextColorButton v-tooltip="'文字高亮'" :color="richTextAttrs.backcolor">
+        <TextColorButton v-tooltip="$t('toolbar.textHighlight')" :color="richTextAttrs.backcolor">
           <i-icon-park-outline:high-light />
         </TextColorButton>
       </Popover>
       <Button 
         class="font-size-btn"
         style="width: 20%;"
-        v-tooltip="'增大字号'"
+        v-tooltip="$t('common.increaseFontSize')"
         @click="emitRichTextCommand('fontsize-add')"
       ><i-icon-park-outline:font-size />+</Button>
       <Button
         last
         class="font-size-btn"
         style="width: 20%;"
-        v-tooltip="'减小字号'"
+        v-tooltip="$t('common.decreaseFontSize')"
         @click="emitRichTextCommand('fontsize-reduce')"
       ><i-icon-park-outline:font-size />-</Button>
     </ButtonGroup>
@@ -73,25 +73,25 @@
       <CheckboxButton 
         style="flex: 1;"
         :checked="richTextAttrs.bold"
-        v-tooltip="'加粗'"
+        v-tooltip="$t('common.bold')"
         @click="emitRichTextCommand('bold')"
       ><i-icon-park-outline:text-bold /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="richTextAttrs.em"
-        v-tooltip="'斜体'"
+        v-tooltip="$t('common.italic')"
         @click="emitRichTextCommand('em')"
       ><i-icon-park-outline:text-italic /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="richTextAttrs.underline"
-        v-tooltip="'下划线'"
+        v-tooltip="$t('common.underline')"
         @click="emitRichTextCommand('underline')"
       ><i-icon-park-outline:text-underline /></CheckboxButton>
       <CheckboxButton 
         style="flex: 1;"
         :checked="richTextAttrs.strikethrough"
-        v-tooltip="'删除线'"
+        v-tooltip="$t('common.strikethrough')"
         @click="emitRichTextCommand('strikethrough')"
       ><i-icon-park-outline:strikethrough /></CheckboxButton>
     </ButtonGroup>
@@ -100,25 +100,25 @@
       <CheckboxButton
         style="flex: 1;"
         :checked="richTextAttrs.superscript"
-        v-tooltip="'上标'"
+        v-tooltip="$t('common.superscript')"
         @click="emitRichTextCommand('superscript')"
       >A²</CheckboxButton>
       <CheckboxButton
         style="flex: 1;"
         :checked="richTextAttrs.subscript"
-        v-tooltip="'下标'"
+        v-tooltip="$t('common.subscript')"
         @click="emitRichTextCommand('subscript')"
       >A₂</CheckboxButton>
       <CheckboxButton
         style="flex: 1;"
         :checked="richTextAttrs.code"
-        v-tooltip="'行内代码'"
+        v-tooltip="$t('common.inlineCode')"
         @click="emitRichTextCommand('code')"
       ><i-icon-park-outline:code /></CheckboxButton>
       <CheckboxButton
         style="flex: 1;"
         :checked="richTextAttrs.blockquote"
-        v-tooltip="'引用'"
+        v-tooltip="$t('common.quote')"
         @click="emitRichTextCommand('blockquote')"
       ><i-icon-park-outline:quote /></CheckboxButton>
     </ButtonGroup>
@@ -126,35 +126,35 @@
     <ButtonGroup class="row" passive>
       <Popover trigger="click" v-model:value="AIPopoverVisible" style="width: 25%;">
         <template #content>
-          <PopoverMenuItem center @click="execAI('美化改写')">美化</PopoverMenuItem>
-          <PopoverMenuItem center @click="execAI('扩写丰富')">扩写</PopoverMenuItem>
-          <PopoverMenuItem center @click="execAI('精简提炼')">精简</PopoverMenuItem>
+          <PopoverMenuItem center @click="execAI($t('toolbar.aiCommandPolish'))">{{ $t('toolbar.aiPolish') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="execAI($t('toolbar.aiCommandExpand'))">{{ $t('toolbar.aiExpand') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="execAI($t('toolbar.aiCommandCondense'))">{{ $t('toolbar.aiCondense') }}</PopoverMenuItem>
         </template>
         <CheckboxButton
           first
           style="width: 100%;"
-          v-tooltip="'AI辅助'"
+          v-tooltip="$t('toolbar.aiAssist')"
         ><span :class="{ 'ai-loading': isAIWriting }">{{ isAIWriting ? '' : 'AI' }}</span></CheckboxButton>
       </Popover>
       <CheckboxButton
         style="flex: 1;"
-        v-tooltip="'清除格式'"
+        v-tooltip="$t('common.clearFormatting')"
         @click="emitRichTextCommand('clear')"
       ><i-icon-park-outline:format /></CheckboxButton>
       <CheckboxButton
         style="flex: 1;"
         :checked="!!textFormatPainter"
-        v-tooltip="'格式刷（双击连续使用）'"
+        v-tooltip="$t('toolbar.formatPainter')"
         @click="toggleTextFormatPainter()"
         @dblclick="toggleTextFormatPainter(true)"
       ><i-icon-park-outline:format-brush /></CheckboxButton>
       <Popover placement="bottom-end" trigger="click" v-model:value="linkPopoverVisible" style="width: 25%;">
         <template #content>
           <div class="link-popover">
-            <Input v-model:value="link" placeholder="请输入超链接" />
+            <Input v-model:value="link" :placeholder="$t('toolbar.hyperlinkPlaceholder')" />
             <div class="btns">
-              <Button size="small" :disabled="!richTextAttrs.link" @click="removeLink()" style="margin-right: 5px;">移除</Button>
-              <Button size="small" type="primary" @click="updateLink(link)">确认</Button>
+              <Button size="small" :disabled="!richTextAttrs.link" @click="removeLink()" style="margin-right: 5px;">{{ $t('canvas.remove') }}</Button>
+              <Button size="small" type="primary" @click="updateLink(link)">{{ $t('common.confirm') }}</Button>
             </div>
           </div>
         </template>
@@ -162,7 +162,7 @@
           last
           style="width: 100%;"
           :checked="!!richTextAttrs.link"
-          v-tooltip="'超链接'"
+          v-tooltip="$t('common.hyperlink')"
           @click="openLinkPopover()"
         ><i-icon-park-outline:link-one /></CheckboxButton>
       </Popover>
@@ -175,10 +175,10 @@
       :value="richTextAttrs.align"
       @update:value="value => emitRichTextCommand('align', value)"
     >
-      <RadioButton value="left" v-tooltip="'左对齐'" style="flex: 1;"><i-icon-park-outline:align-text-left /></RadioButton>
-      <RadioButton value="center" v-tooltip="'居中'" style="flex: 1;"><i-icon-park-outline:align-text-center /></RadioButton>
-      <RadioButton value="right" v-tooltip="'右对齐'" style="flex: 1;"><i-icon-park-outline:align-text-right /></RadioButton>
-      <RadioButton value="justify" v-tooltip="'两端对齐'" style="flex: 1;"><i-icon-park-outline:align-text-both /></RadioButton>
+      <RadioButton value="left" v-tooltip="$t('common.leftAlign')" style="flex: 1;"><i-icon-park-outline:align-text-left /></RadioButton>
+      <RadioButton value="center" v-tooltip="$t('common.centerAlign')" style="flex: 1;"><i-icon-park-outline:align-text-center /></RadioButton>
+      <RadioButton value="right" v-tooltip="$t('common.rightAlign')" style="flex: 1;"><i-icon-park-outline:align-text-right /></RadioButton>
+      <RadioButton value="justify" v-tooltip="$t('common.justify')" style="flex: 1;"><i-icon-park-outline:align-text-both /></RadioButton>
     </RadioGroup>
 
     <div class="row" passive>
@@ -187,7 +187,7 @@
           first
           :type="richTextAttrs.bulletList ? 'primary' : 'default'"
           style="flex: 1;"
-          v-tooltip="'项目符号'"
+          v-tooltip="$t('common.bullets')"
           @click="emitRichTextCommand('bulletList')"
         ><i-icon-park-outline:list /></Button>
         <Popover trigger="click" v-model:value="bulletListPanelVisible">
@@ -212,7 +212,7 @@
           first
           :type="richTextAttrs.orderedList ? 'primary' : 'default'"
           style="flex: 1;"
-          v-tooltip="'编号'"
+          v-tooltip="$t('common.numbering')"
           @click="emitRichTextCommand('orderedList')"
         ><i-icon-park-outline:ordered-list /></Button>
         <Popover trigger="click" v-model:value="orderedListPanelVisible">
@@ -235,20 +235,20 @@
 
     <div class="row">
       <ButtonGroup style="flex: 1;" passive>
-        <Button first style="flex: 1;" v-tooltip="'减小段落缩进'" @click="emitRichTextCommand('indent', '-1')"><i-icon-park-outline:indent-left /></Button>
+        <Button first style="flex: 1;" v-tooltip="$t('toolbar.decreaseParagraphIndent')" @click="emitRichTextCommand('indent', '-1')"><i-icon-park-outline:indent-left /></Button>
         <Popover trigger="click" v-model:value="indentLeftPanelVisible">
           <template #content>
-            <PopoverMenuItem center @click="emitRichTextCommand('textIndent', '-1')">减小首行缩进</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitRichTextCommand('textIndent', '-1')">{{ $t('toolbar.decreaseFirstLineIndent') }}</PopoverMenuItem>
           </template>
           <Button last class="popover-btn"><i-icon-park-outline:down /></Button>
         </Popover>
       </ButtonGroup>
       <div style="width: 10px;"></div>
       <ButtonGroup style="flex: 1;" passive>
-        <Button first style="flex: 1;" v-tooltip="'增大段落缩进'" @click="emitRichTextCommand('indent', '+1')"><i-icon-park-outline:indent-right /></Button>
+        <Button first style="flex: 1;" v-tooltip="$t('toolbar.increaseParagraphIndent')" @click="emitRichTextCommand('indent', '+1')"><i-icon-park-outline:indent-right /></Button>
         <Popover trigger="click" v-model:value="indentRightPanelVisible">
           <template #content>
-            <PopoverMenuItem center @click="emitRichTextCommand('textIndent', '+1')">增大首行缩进</PopoverMenuItem>
+            <PopoverMenuItem center @click="emitRichTextCommand('textIndent', '+1')">{{ $t('toolbar.increaseFirstLineIndent') }}</PopoverMenuItem>
           </template>
           <Button last class="popover-btn"><i-icon-park-outline:down /></Button>
         </Popover>
@@ -259,11 +259,12 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import api from '@/services'
 import { useMainStore } from '@/store'
 import emitter, { EmitterEvents } from '@/utils/emitter'
-import { FONTS } from '@/configs/font'
+import useLocalizedFonts from '@/hooks/useLocalizedFonts'
 import useTextFormatPainter from '@/hooks/useTextFormatPainter'
 import message from '@/utils/message'
 import { htmlToText } from '@/utils/common'
@@ -283,6 +284,8 @@ import RadioGroup from '@/components/RadioGroup.vue'
 import PopoverMenuItem from '@/components/PopoverMenuItem.vue'
 
 const { handleElement, handleElementId, richTextAttrs, textFormatPainter } = storeToRefs(useMainStore())
+const { t } = useI18n()
+const fontOptions = useLocalizedFonts()
 
 const { toggleTextFormatPainter } = useTextFormatPainter()
 
@@ -319,7 +322,7 @@ const openLinkPopover = () => {
 }
 const updateLink = (link?: string) => {
   const linkRegExp = /^(https?):\/\/[\w\-]+(\.[\w\-]+)+([\w\-.,@?^=%&:\/~+#]*[\w\-@?^=%&\/~+#])?$/
-  if (!link || !linkRegExp.test(link)) return message.error('不是正确的网页链接地址')
+  if (!link || !linkRegExp.test(link)) return message.error(t('toolbar.invalidLink'))
 
   emitRichTextCommand('link', link)
   linkPopoverVisible.value = false
@@ -343,7 +346,7 @@ const execAI = async (command: string) => {
     content = handleElement.value.text.content
   }
 
-  if (!content) return message.error('没有可以执行的文本内容')
+  if (!content) return message.error(t('toolbar.noTextContent'))
 
   let resultText = ''
 
@@ -352,7 +355,7 @@ const execAI = async (command: string) => {
     command,
   })
   if (typeof stream === 'object' && stream.state === -1) {
-    return message.error('该模型API的并发数过高，请更换其他模型重试')
+    return message.error(t('toolbar.aiBusy'))
   }
 
   isAIWriting.value = true

@@ -5,19 +5,20 @@
         class="animation-item" 
         :class="{ 'active': currentTurningMode === item.value }" 
         v-for="item in animations" 
-        :key="item.label"
+        :key="item.value"
         @click="updateTurningMode(item.value)"
       >
         <div :class="['animation-block', item.value]">P</div>
-        <div class="animation-text">{{item.label}}</div>
+        <div class="animation-text">{{ $t(`slideTransitions.${item.value}`) }}</div>
       </div>
     </div>
-    <Button style="width: 100%;" @click="applyAllSlide()"><i-icon-park-outline:check /> 应用到全部</Button>
+    <Button style="width: 100%;" @click="applyAllSlide()"><i-icon-park-outline:check /> {{ $t('animationPanel.applyAll') }}</Button>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useSlidesStore } from '@/store'
 import type { TurningMode } from '@/types/slides'
@@ -27,6 +28,7 @@ import message from '@/utils/message'
 import Button from '@/components/Button.vue'
 
 const slidesStore = useSlidesStore()
+const { t } = useI18n()
 const { slides, currentSlide } = storeToRefs(slidesStore)
 
 const currentTurningMode = computed(() => currentSlide.value.turningMode || 'slideY')
@@ -51,7 +53,7 @@ const applyAllSlide = () => {
     }
   })
   slidesStore.setSlides(newSlides)
-  message.success('已应用到全部')
+  message.success(t('animationPanel.appliedAll'))
   addHistorySnapshot()
 }
 </script>

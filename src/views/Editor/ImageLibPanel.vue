@@ -1,21 +1,21 @@
 <template>
-  <MoveablePanel 
-    class="image-lib-panel" 
-    :width="360" 
-    :height="580" 
-    :left="-270" 
+  <MoveablePanel
+    class="image-lib-panel"
+    :width="360"
+    :height="580"
+    :left="-270"
     :top="90"
     :contentStyle="{
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
     }"
-    title="图片库（来自 pexels.com）" 
+    :title="$t('imageLibrary.title')"
     @close="close()"
   >
-    <div class="container" v-loading="{ state: loading, text: '加载中...' }">
+    <div class="container" v-loading="{ state: loading, text: $t('common.loading') }">
       <div class="tools">
-        <Input class="input" v-model:value="searchWord" placeholder="搜索图片" @enter="search()">
+        <Input class="input" v-model:value="searchWord" :placeholder="$t('imageLibrary.searchPlaceholder')" @enter="search()">
           <template #prefix>
             <Popover class="more-icon" trigger="click" v-model:value="orientationVisible">
               <template #content>
@@ -37,7 +37,7 @@
         </Input>
       </div>
 
-      <ImageWaterfallViewer 
+      <ImageWaterfallViewer
         class="imgs-wrap"
         :list="imgs"
         :columnSpacing="5"
@@ -48,7 +48,7 @@
           <div class="img-item">
             <img :src="props.src">
             <div class="mask">
-              <Button type="primary" size="small" @click="createImageElement(props.src)">插入</Button>
+              <Button type="primary" size="small" @click="createImageElement(props.src)">{{ $t('imageLibrary.insert') }}</Button>
             </div>
           </div>
         </template>
@@ -58,7 +58,8 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '@/services'
 import { useMainStore } from '@/store/main'
 import useCreateElement from '@/hooks/useCreateElement'
@@ -80,6 +81,7 @@ interface ImageItem {
 type Orientation = 'landscape' | 'portrait' | 'square' | 'all'
 
 const mainStore = useMainStore()
+const { t } = useI18n({ useScope: 'global' })
 
 const { createImageElement } = useCreateElement()
 
@@ -92,33 +94,33 @@ const perPage = ref(50)
 const total = ref(0)
 const max = ref(500)
 const orientation = ref<Orientation>('all')
-const orientationOptions: {
+const orientationOptions = computed<{
   key: Orientation
   label: string
-}[] = [
-  { key: 'all', label: '全部' },
-  { key: 'landscape', label: '横向' },
-  { key: 'portrait', label: '纵向' },
-  { key: 'square', label: '方形' },
-]
-const orientationMap: Record<string, string> = {
-  'all': '全部',
-  'landscape': '横向',
-  'portrait': '纵向',
-  'square': '方形',
-}
+}[]>(() => [
+  { key: 'all', label: t('imageLibrary.all') },
+  { key: 'landscape', label: t('imageLibrary.landscape') },
+  { key: 'portrait', label: t('imageLibrary.portrait') },
+  { key: 'square', label: t('imageLibrary.square') },
+])
+const orientationMap = computed<Record<Orientation, string>>(() => ({
+  'all': t('imageLibrary.all'),
+  'landscape': t('imageLibrary.landscape'),
+  'portrait': t('imageLibrary.portrait'),
+  'square': t('imageLibrary.square'),
+}))
 
 const close = () => {
   mainStore.setImageLibPanelState(false)
 }
 
 onMounted(() => {
-  search('风景')
+  search(t('imageLibrary.defaultQuery'))
 })
 
-const search = (q?: string) => {  
+const search = (q?: string) => {
   const query = q || searchWord.value
-  if (!query) return message.error('请输入搜索关键词')
+  if (!query) return message.error(t('imageLibrary.enterKeyword'))
 
   loading.value = true
   page.value = 1
@@ -145,15 +147,15 @@ const setOrientation = (value: Orientation) => {
 
 const loadMore = () => {
   if (loading.value) return
-  
+
   const count = page.value * perPage.value
   if (count >= Math.min(max.value, total.value)) return
-  
+
   loading.value = true
   page.value += 1
 
   api.searchImage({
-    query: searchWord.value || '风景',
+    query: searchWord.value || t('imageLibrary.defaultQuery'),
     per_page: perPage.value,
     page: page.value,
     orientation: orientation.value,

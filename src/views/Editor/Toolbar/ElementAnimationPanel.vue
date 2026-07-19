@@ -17,12 +17,12 @@
           />
           <template v-for="key in animationTypes">
             <div :class="['animation-pool', key]" :key="key" v-if="activeTab === key">
-              <div class="pool-type" :key="effect.name" v-for="effect in animations[key]">
-                <div class="type-title">{{effect.name}}：</div>
+              <div class="pool-type" :key="effect.type" v-for="effect in animations[key]">
+                <div class="type-title">{{ $t(`animationGroups.${effect.type}`) }}:</div>
                 <div class="pool-item-wrapper">
                   <div 
                     class="pool-item" 
-                    v-for="item in effect.children" :key="item.name"
+                    v-for="item in effect.children" :key="item.value"
                     @mouseenter="hoverPreviewAnimation = item.value"
                     @mouseleave="hoverPreviewAnimation = ''"
                     @click="addAnimation(key, item.value)"
@@ -34,7 +34,7 @@
                         `${ANIMATION_CLASS_PREFIX}fast`,
                         hoverPreviewAnimation === item.value && `${ANIMATION_CLASS_PREFIX}${item.value}`,
                       ]"
-                    >{{item.name}}</div>
+                    >{{ $t(`animations.${item.value}`) }}</div>
                   </div>
                 </div>
               </div>
@@ -43,12 +43,12 @@
           </template>
         </template>
         <Button class="element-animation-btn" @click="handleAnimationId = ''">
-          <i-icon-park-outline:effects /> 添加动画
+          <i-icon-park-outline:effects /> {{ $t('animationPanel.addAnimation') }}
         </Button>
       </Popover>
     </div>
 
-    <div class="tip" v-else><i-icon-park-outline:click style="margin-right: 5px;" /> 选中画布中的元素添加动画</div>
+    <div class="tip" v-else><i-icon-park-outline:click style="margin-right: 5px;" /> {{ $t('animationPanel.selectElementTip') }}</div>
     
     <Divider />
 
@@ -68,8 +68,8 @@
             <div class="index">{{element.index}}</div>
             <div class="text">「{{element.elType}}」{{element.animationEffect}}</div>
             <div class="handler">
-              <i-icon-park-outline:play-one class="handler-btn" v-tooltip="'预览'" @click.stop="runAnimation(element.elId, element.effect, element.duration)" />
-              <i-icon-park-outline:close-small class="handler-btn" v-tooltip="'删除'" @click.stop="deleteAnimation(element.id)" />
+              <i-icon-park-outline:play-one class="handler-btn" v-tooltip="$t('common.preview')" @click.stop="runAnimation(element.elId, element.effect, element.duration)" />
+              <i-icon-park-outline:close-small class="handler-btn" v-tooltip="$t('common.delete')" @click.stop="deleteAnimation(element.id)" />
             </div>
           </div>
 
@@ -77,7 +77,7 @@
             <Divider :margin="16" />
 
             <div class="config-item">
-              <div style="width: 35%;">持续时长：</div>
+              <div style="width: 35%;">{{ $t('animationPanel.duration') }}</div>
               <NumberInput 
                 :min="500"
                 :max="3000"
@@ -88,20 +88,20 @@
               />
             </div>
             <div class="config-item">
-              <div style="width: 35%;">触发方式：</div>
+              <div style="width: 35%;">{{ $t('animationPanel.trigger') }}</div>
               <Select
                 :value="element.trigger"
                 @update:value="value => updateElementAnimationTrigger(element.id, value as AnimationTrigger)"
                 style="width: 65%;"
                 :options="[
-                  { label: '主动触发', value: 'click' },
-                  { label: '与上一动画同时', value: 'meantime' },
-                  { label: '上一动画之后', value: 'auto' },
+                  { label: $t('animationPanel.onClick'), value: 'click' },
+                  { label: $t('animationPanel.withPrevious'), value: 'meantime' },
+                  { label: $t('animationPanel.afterPrevious'), value: 'auto' },
                 ]"
               />
             </div>
             <div class="config-item">
-              <Button style="width: 100%;" @click="openAnimationPool(element.id)"><i-icon-park-outline:switch /> 更换动画</Button>
+              <Button style="width: 100%;" @click="openAnimationPool(element.id)"><i-icon-park-outline:switch /> {{ $t('animationPanel.replaceAnimation') }}</Button>
             </div>
           </div>
         </div>
@@ -111,7 +111,7 @@
     <template v-if="animationSequence.length >= 2">
       <Divider />
       <Button @click="runAllAnimation()">
-        <i-icon-park-outline:pause v-if="animateIn" /><i-icon-park-outline:play-one v-else /> {{ animateIn ? '停止预览' : '预览全部'}}
+        <i-icon-park-outline:pause v-if="animateIn" /><i-icon-park-outline:play-one v-else /> {{ animateIn ? $t('animationPanel.stopPreview') : $t('animationPanel.previewAll') }}
       </Button>
     </template>
   </div>
@@ -119,6 +119,7 @@
 
 <script lang="ts" setup>
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { nanoid } from 'nanoid'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
@@ -131,7 +132,6 @@ import {
   ANIMATION_DEFAULT_TRIGGER,
   ANIMATION_CLASS_PREFIX,
 } from '@/configs/animation'
-import { ELEMENT_TYPE_ZH } from '@/configs/element'
 import useHistorySnapshot from '@/hooks/useHistorySnapshot'
 import useSelectElement from '@/hooks/useSelectElement'
 
@@ -143,23 +143,6 @@ import NumberInput from '@/components/NumberInput.vue'
 import Select from '@/components/Select.vue'
 import Popover from '@/components/Popover.vue'
 
-const animationEffects: Record<string, string> = {}
-for (const effect of ENTER_ANIMATIONS) {
-  for (const animation of effect.children) {
-    animationEffects[animation.value] = animation.name
-  }
-}
-for (const effect of EXIT_ANIMATIONS) {
-  for (const animation of effect.children) {
-    animationEffects[animation.value] = animation.name
-  }
-}
-for (const effect of ATTENTION_ANIMATIONS) {
-  for (const animation of effect.children) {
-    animationEffects[animation.value] = animation.name
-  }
-}
-
 interface TabItem {
   key: AnimationType
   label: string
@@ -167,16 +150,26 @@ interface TabItem {
 }
 
 const animationTypes: AnimationType[] = ['in', 'out', 'attention']
+const { t } = useI18n()
+const animationEffects = computed<Record<string, string>>(() => {
+  const labels: Record<string, string> = {}
+  for (const group of [...ENTER_ANIMATIONS, ...EXIT_ANIMATIONS, ...ATTENTION_ANIMATIONS]) {
+    for (const animation of group.children) {
+      labels[animation.value] = t(`animations.${animation.value}`)
+    }
+  }
+  return labels
+})
 
 const slidesStore = useSlidesStore()
 const { handleElement, handleElementId } = storeToRefs(useMainStore())
 const { currentSlide, formatedAnimations, currentSlideAnimations } = storeToRefs(slidesStore)
 
-const tabs: TabItem[] = [
-  { key: 'in', label: '入场', color: '#68a490' },
-  { key: 'out', label: '退场', color: '#d86344' },
-  { key: 'attention', label: '强调', color: '#e8b76a' },
-]
+const tabs = computed<TabItem[]>(() => [
+  { key: 'in', label: t('animationPanel.entrance'), color: '#68a490' },
+  { key: 'out', label: t('animationPanel.exit'), color: '#d86344' },
+  { key: 'attention', label: t('animationPanel.emphasis'), color: '#e8b76a' },
+])
 const activeTab = ref('in')
 const animateIn = ref(false)
 watch(() => handleElementId.value, () => {
@@ -199,8 +192,8 @@ const animationSequence = computed(() => {
       const el = currentSlide.value.elements.find(el => el.id === animation.elId)
       if (!el) continue
 
-      const elType = ELEMENT_TYPE_ZH[el.type]
-      const animationEffect = animationEffects[animation.effect]
+      const elType = t(`elementTypes.${el.type}`)
+      const animationEffect = animationEffects.value[animation.effect]
       animationSequence.push({
         ...animation,
         index: j === 0 ? i + 1 : '',

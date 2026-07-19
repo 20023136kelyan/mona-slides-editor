@@ -11,7 +11,7 @@
       ref="inputRef"
       v-if="type === 'web'" 
       v-model:value="address" 
-      placeholder="请输入网页链接地址"
+      :placeholder="$t('canvas.webLinkPlaceholder')"
       @enter="save()"
     />
 
@@ -23,19 +23,20 @@
     />
 
     <div class="preview" v-if="type === 'slide' && selectedSlide">
-      <div>预览：</div>
+      <div>{{ $t('canvas.preview') }}</div>
       <ThumbnailSlide class="thumbnail" :slide="selectedSlide" :size="500" />
     </div>
 
     <div class="btns">
-      <Button @click="emit('close')" style="margin-right: 10px;">取消</Button>
-      <Button type="primary" @click="save()">确认</Button>
+      <Button @click="emit('close')" style="margin-right: 10px;">{{ $t('common.cancel') }}</Button>
+      <Button type="primary" @click="save()">{{ $t('common.confirm') }}</Button>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { computed, onMounted, ref, useTemplateRef, nextTick, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useMainStore, useSlidesStore } from '@/store'
 import type { ElementLinkType, PPTElementLink } from '@/types/slides'
@@ -57,6 +58,7 @@ const emit = defineEmits<{
 }>()
 
 const mainStore = useMainStore()
+const { t } = useI18n()
 const { handleElement } = storeToRefs(mainStore)
 const { slides, currentSlide } = storeToRefs(useSlidesStore())
 
@@ -67,7 +69,7 @@ const inputRef = useTemplateRef<InstanceType<typeof Input>>('inputRef')
 
 const slideOptions = computed(() => {
   return slides.value.map((item, index) => ({
-    label: `幻灯片 ${index + 1}`,
+    label: t('canvas.slideLink', { number: index + 1 }),
     value: item.id,
     disabled: currentSlide.value.id === item.id,
   }))
@@ -82,8 +84,8 @@ const selectedSlide = computed(() => {
 })
 
 const tabs = computed<TabItem[]>(() => [
-  { key: 'web', label: '网页链接' },
-  { key: 'slide', label: '幻灯片页面', disabled: slides.value.length <= 1 },
+  { key: 'web', label: t('canvas.webLink') },
+  { key: 'slide', label: t('canvas.slidePage'), disabled: slides.value.length <= 1 },
 ])
 
 const { setLink } = useLink()

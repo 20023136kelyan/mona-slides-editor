@@ -9,6 +9,7 @@
 
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { debounce } from 'lodash'
 import { storeToRefs } from 'pinia'
 import { useKeyboardStore, useMainStore } from '@/store'
@@ -37,6 +38,7 @@ const props = withDefaults(defineProps<{
   editable: false,
   autoFocus: false,
 })
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (event: 'update', payload: { value: string; ignore: boolean }): void
@@ -130,7 +132,7 @@ const execCommand = ({ target, action }: RichTextCommand) => {
       addMark(editorView, mark)
 
       if (item.value && !document.fonts.check(`16px ${item.value}`)) {
-        message.warning('字体需要等待加载下载后生效，请稍等')
+        message.warning(t('runtime.fontLoading'))
       }
     }
     else if (item.command === 'fontsize' && item.value) {

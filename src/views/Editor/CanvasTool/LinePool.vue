@@ -1,7 +1,7 @@
 <template>
   <div class="line-pool">
     <div class="category" v-for="(item, i) in LINE_LIST" :key="item.type">
-      <div class="category-name">{{item.type}}</div>
+      <div class="category-name">{{ $t(`lineGroups.${item.type}`) }}</div>
       <div class="line-list">
         <div class="line-item" v-for="(line, j) in item.children" :key="j">
           <div class="line-content" @click="selectLine(line)">

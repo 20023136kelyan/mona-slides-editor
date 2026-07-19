@@ -1,17 +1,17 @@
 <template>
-  <MoveablePanel 
-    class="select-panel" 
-    :width="200" 
-    :height="360" 
-    :title="`选择（${activeElementIdList.length}/${currentSlide.elements.length}）`" 
-    :left="-270" 
+  <MoveablePanel
+    class="select-panel"
+    :width="200"
+    :height="360"
+    :title="$t('selection.title', { selected: activeElementIdList.length, total: currentSlide.elements.length })"
+    :left="-270"
     :top="90"
     @close="close()"
   >
     <div class="handler" v-if="elements.length">
       <div class="btns">
-        <Button size="small" style="margin-right: 5px;" @click="showAllElements()">全部显示</Button>
-        <Button size="small" @click="hideAllElements()">全部隐藏</Button>
+        <Button size="small" style="margin-right: 5px;" @click="showAllElements()">{{ $t('selection.showAll') }}</Button>
+        <Button size="small" @click="hideAllElements()">{{ $t('selection.hideAll') }}</Button>
       </div>
       <div class="icon-btns" v-if="handleElement">
         <span class="icon-btn" @click="orderElement(handleElement!, ElementOrderCommands.UP)"><i-icon-park-outline:down /></span>
@@ -21,29 +21,29 @@
     <div class="element-list" v-if="elements.length">
       <template v-for="item in elements" :key="item.id">
         <div class="group-els" v-if="item.type === 'group'">
-          <div class="group-title">组合</div>
-          <div 
-            class="item" 
+          <div class="group-title">{{ $t('selection.group') }}</div>
+          <div
+            class="item"
             :class="{
               'active': activeElementIdList.includes(groupItem.id),
               'group-active': activeGroupElementId.includes(groupItem.id),
               'lock': groupItem.lock,
             }"
-            v-for="groupItem in item.elements" 
-            :key="groupItem.id" 
+            v-for="groupItem in item.elements"
+            :key="groupItem.id"
             @click="selectGroupEl(item, groupItem.id)"
             @dblclick="enterEdit(groupItem.id)"
           >
-            <input 
-              :id="`select-panel-input-${groupItem.id}`" 
-              :value="groupItem.name || ELEMENT_TYPE_ZH[groupItem.type]" 
-              class="input" 
-              type="text" 
-              v-if="editingElId === groupItem.id" 
+            <input
+              :id="`select-panel-input-${groupItem.id}`"
+              :value="groupItem.name || elementTypeName(groupItem.type)"
+              class="input"
+              type="text"
+              v-if="editingElId === groupItem.id"
               @blur="$event => saveElementName($event, groupItem.id)"
               @keydown.enter="$event => saveElementName($event, groupItem.id)"
             >
-            <div v-else class="name">{{groupItem.name || ELEMENT_TYPE_ZH[groupItem.type]}}</div>
+            <div v-else class="name">{{ groupItem.name || elementTypeName(groupItem.type) }}</div>
             <div class="icons">
               <i-icon-park-outline:lock class="icon" style="font-size: 14px;" @click="unlockElement(groupItem)" v-if="groupItem.lock" />
               <div class="icon" style="width: 14px;" v-else />
@@ -52,26 +52,26 @@
             </div>
           </div>
         </div>
-        <div 
-          class="item" 
+        <div
+          class="item"
           :class="{
             'active': activeElementIdList.includes(item.id),
             'lock': item.lock,
           }"
-          v-else 
+          v-else
           @click="selectElement(item.id)"
           @dblclick="enterEdit(item.id)"
         >
-          <input 
-            :id="`select-panel-input-${item.id}`" 
-            :value="item.name || ELEMENT_TYPE_ZH[item.type]" 
-            class="input" 
-            type="text" 
-            v-if="editingElId === item.id" 
+          <input
+            :id="`select-panel-input-${item.id}`"
+            :value="item.name || elementTypeName(item.type)"
+            class="input"
+            type="text"
+            v-if="editingElId === item.id"
             @blur="$event => saveElementName($event, item.id)"
             @keydown.enter="$event => saveElementName($event, item.id)"
           >
-          <div v-else class="name">{{item.name || ELEMENT_TYPE_ZH[item.type]}}</div>
+          <div v-else class="name">{{ item.name || elementTypeName(item.type) }}</div>
           <div class="icons">
             <i-icon-park-outline:lock class="icon" style="font-size: 14px;" @click="unlockElement(item)" v-if="item.lock" />
             <div class="icon" style="width: 14px;" v-else />
@@ -81,16 +81,16 @@
         </div>
       </template>
     </div>
-    <div class="empty" v-if="!elements.length">本页无内容</div>
+    <div class="empty" v-if="!elements.length">{{ $t('selection.empty') }}</div>
   </MoveablePanel>
 </template>
 
 <script lang="ts" setup>
 import { computed, nextTick, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useSlidesStore, useMainStore } from '@/store'
 import type { PPTElement } from '@/types/slides'
-import { ELEMENT_TYPE_ZH } from '@/configs/element'
 import useOrderElement from '@/hooks/useOrderElement'
 import useHideElement from '@/hooks/useHideElement'
 import useSelectElement from '@/hooks/useSelectElement'
@@ -102,6 +102,7 @@ import Button from '@/components/Button.vue'
 
 const slidesStore = useSlidesStore()
 const mainStore = useMainStore()
+const { t } = useI18n({ useScope: 'global' })
 const { currentSlide } = storeToRefs(slidesStore)
 const { handleElement, handleElementId, activeElementIdList, activeGroupElementId, hiddenElementIdList } = storeToRefs(mainStore)
 
@@ -109,6 +110,8 @@ const { orderElement } = useOrderElement()
 const { selectElement } = useSelectElement()
 const { toggleHideElement, showAllElements, hideAllElements } = useHideElement()
 const { unlockElement } = useLockElement()
+
+const elementTypeName = (type: string) => t(`elementTypes.${type}`)
 
 interface GroupElements {
   type: 'group'

@@ -1,8 +1,8 @@
 <template>
   <div class="viewport-size-setting">
-    <div class="title">自定义画布尺寸</div>
+    <div class="title">{{ $t('designPanel.customCanvas') }}</div>
     <div class="row">
-      <div class="label">宽度：</div>
+      <div class="label">{{ $t('toolbar.width') }}</div>
       <NumberInput 
         v-model:value="customViewportWidth"
         :min="VIEWPORT_SIZE_MIN"
@@ -12,7 +12,7 @@
       />
     </div>
     <div class="row">
-      <div class="label">高度：</div>
+      <div class="label">{{ $t('toolbar.height') }}</div>
       <NumberInput 
         v-model:value="customViewportHeight"
         :min="VIEWPORT_SIZE_MIN"
@@ -21,16 +21,17 @@
         @enter="applyCustomViewportSize()"
       />
     </div>
-    <div class="tip">宽高范围：500 ~ 2000</div>
+    <div class="tip">{{ $t('designPanel.sizeRange', { min: VIEWPORT_SIZE_MIN, max: VIEWPORT_SIZE_MAX }) }}</div>
     <div class="btns">
-      <Button type="primary" @click="applyCustomViewportSize()">确认</Button>
-      <Button style="margin-left: 10px;" @click="emit('close')">取消</Button>
+      <Button type="primary" @click="applyCustomViewportSize()">{{ $t('common.confirm') }}</Button>
+      <Button style="margin-left: 10px;" @click="emit('close')">{{ $t('common.cancel') }}</Button>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useSlidesStore } from '@/store'
 import message from '@/utils/message'
@@ -47,6 +48,7 @@ const VIEWPORT_SIZE_MIN = 500
 const VIEWPORT_SIZE_MAX = 2000
 
 const slidesStore = useSlidesStore()
+const { t } = useI18n()
 const { viewportRatio, viewportSize } = storeToRefs(slidesStore)
 
 const customViewportWidth = ref(toFixed(viewportSize.value))
@@ -60,7 +62,7 @@ const applyCustomViewportSize = () => {
     width > VIEWPORT_SIZE_MAX ||
     height < VIEWPORT_SIZE_MIN ||
     height > VIEWPORT_SIZE_MAX
-  ) return message.warning(`画布宽高需在 ${VIEWPORT_SIZE_MIN} ~ ${VIEWPORT_SIZE_MAX} 之间`)
+  ) return message.warning(t('designPanel.sizeRangeError', { min: VIEWPORT_SIZE_MIN, max: VIEWPORT_SIZE_MAX }))
 
   slidesStore.setViewportSize(width)
   slidesStore.setViewportRatio(height / width)

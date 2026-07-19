@@ -74,6 +74,7 @@
 
 <script lang="ts" setup>
 import { computed, ref, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import message from '@/utils/message'
 
 const props = withDefaults(defineProps<{
@@ -85,6 +86,7 @@ const props = withDefaults(defineProps<{
   autoplay: false,
   scale: 1,
 })
+const { t } = useI18n()
 
 const secondToTime = (second = 0) => {
   if (second === 0 || isNaN(second)) return '00:00'
@@ -184,7 +186,7 @@ const handleProgress = () => {
   loaded.value = audioRef.value?.buffered.length ? audioRef.value.buffered.end(audioRef.value.buffered.length - 1) : 0
 }
 
-const handleError = () => message.error('视频加载失败')
+const handleError = () => message.error(t('player.loadFailed'))
 
 const thumbMove = (e: MouseEvent | TouchEvent) => {
   if (!audioRef.value || !playBarWrapRef.value) return

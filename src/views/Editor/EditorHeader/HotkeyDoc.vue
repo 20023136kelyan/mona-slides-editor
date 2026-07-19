@@ -1,8 +1,8 @@
 <template>
   <div class="hotkey-doc">
-    <template v-for="item in HOTKEY_DOC" :key="item.type">
-      <div class="title">{{item.type}}</div>
-      <div class="hotkey-item" v-for="hotkey in item.children" :key="hotkey.label">
+    <template v-for="item in hotkeyGroups" :key="item.title">
+      <div class="title">{{item.title}}</div>
+      <div class="hotkey-item" v-for="hotkey in item.items" :key="hotkey.label">
         <template v-if="hotkey.value">
           <div class="label">{{hotkey.label}}</div>
           <div class="value">{{hotkey.value}}</div>
@@ -14,7 +14,16 @@
 </template>
 
 <script lang="ts" setup>
-import { HOTKEY_DOC } from '@/configs/hotkey' 
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+interface HotkeyGroup {
+  title: string
+  items: { label: string; value?: string }[]
+}
+
+const { tm } = useI18n()
+const hotkeyGroups = computed(() => tm('hotkeys.groups') as HotkeyGroup[])
 </script>
 
 <style lang="scss" scoped>

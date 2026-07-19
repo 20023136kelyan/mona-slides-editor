@@ -1,7 +1,7 @@
 <template>
   <div class="shape-pool">
     <div class="category" v-for="item in SHAPE_LIST" :key="item.type">
-      <div class="category-name">{{item.type}}</div>
+      <div class="category-name">{{ $t(`shapeGroups.${item.type}`) }}</div>
       <div class="shape-list">
         <ShapeItemThumbnail 
           class="shape-item"

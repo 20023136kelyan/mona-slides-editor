@@ -6,9 +6,9 @@
         v-for="item in templates" 
         :key="item.id"
         @click="changeCatalog(item.id)"
-      >{{ item.name }}</div>
+      >{{ $t(`templates.catalog.${item.id}`) }}</div>
     </div>
-    <div class="content" v-loading="{ state: loading, text: '加载中...' }">
+    <div class="content" v-loading="{ state: loading, text: $t('common.loading') }">
       <div class="header">
         <div class="types">
           <div class="type" 
@@ -18,7 +18,7 @@
             @click="activeType = item.value"
           >{{ item.label }}</div>
         </div>
-        <div class="insert-all" @click="insertTemplates({ slides, theme })">插入全部</div>
+        <div class="insert-all" @click="insertTemplates({ slides, theme })">{{ $t('templates.insertAll') }}</div>
       </div>
       <div class="list" ref="listRef">
         <template v-for="slide in slides" :key="slide.id">
@@ -29,7 +29,7 @@
             <ThumbnailSlide class="thumbnail" :slide="slide" :size="180" />
     
             <div class="btns">
-              <Button class="btn" type="primary" size="small" @click="insertTemplate(slide)">插入模板</Button>
+              <Button class="btn" type="primary" size="small" @click="insertTemplate(slide)">{{ $t('templates.insertTemplate') }}</Button>
             </div>
           </div>
         </template>
@@ -39,7 +39,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, useTemplateRef } from 'vue'
+import { computed, ref, onMounted, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useSlidesStore } from '@/store'
 import type { Slide, SlideTheme } from '@/types/slides'
@@ -54,21 +55,22 @@ const emit = defineEmits<{
 }>()
 
 const slidesStore = useSlidesStore()
+const { t } = useI18n({ useScope: 'global' })
 const { templates } = storeToRefs(slidesStore)
 
 const slides = ref<Slide[]>([])
 const theme = ref<Partial<SlideTheme>>({})
 const listRef = useTemplateRef<HTMLElement>('listRef')
-const types = ref<{
+const types = computed<{
   label: string
   value: string
-}[]>([
-  { label: '全部', value: 'all' },
-  { label: '封面', value: 'cover' },
-  { label: '目录', value: 'contents' },
-  { label: '过渡', value: 'transition' },
-  { label: '内容', value: 'content' },
-  { label: '结束', value: 'end' },
+}[]>(() => [
+  { label: t('templates.all'), value: 'all' },
+  { label: t('templates.cover'), value: 'cover' },
+  { label: t('templates.contents'), value: 'contents' },
+  { label: t('templates.transition'), value: 'transition' },
+  { label: t('templates.content'), value: 'content' },
+  { label: t('templates.end'), value: 'end' },
 ])
 const activeType = ref('all')
 

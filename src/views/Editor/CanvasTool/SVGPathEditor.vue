@@ -86,17 +86,17 @@
             :value="activeSegmentType"
             @update:value="updateSegmentType"
           >
-            <RadioButton value="L" :disabled="activePointIndex === 0">直线</RadioButton>
-            <RadioButton value="Q" :disabled="activePointIndex === 0">曲线Q</RadioButton>
-            <RadioButton value="C" :disabled="activePointIndex === 0">曲线C</RadioButton>
-            <RadioButton value="A" :disabled="activePointIndex === 0">圆弧</RadioButton>
+            <RadioButton value="L" :disabled="activePointIndex === 0">{{ $t('pathEditor.straight') }}</RadioButton>
+            <RadioButton value="Q" :disabled="activePointIndex === 0">{{ $t('pathEditor.quadratic') }}</RadioButton>
+            <RadioButton value="C" :disabled="activePointIndex === 0">{{ $t('pathEditor.cubic') }}</RadioButton>
+            <RadioButton value="A" :disabled="activePointIndex === 0">{{ $t('pathEditor.arc') }}</RadioButton>
           </RadioGroup>
         </div>
 
         <Divider :margin="20" />
 
         <div class="panel-section">
-          <div class="section-title">坐标：</div>
+          <div class="section-title">{{ $t('pathEditor.coordinates') }}</div>
           <div class="input-row">
             <NumberInput
               class="number-input"
@@ -106,7 +106,7 @@
               :value="activePoint.x"
               @update:value="value => updatePointPosition('x', value)"
             >
-              <template #prefix>水平：</template>
+              <template #prefix>{{ $t('pathEditor.horizontal') }}</template>
             </NumberInput>
             <NumberInput
               class="number-input"
@@ -116,7 +116,7 @@
               :value="activePoint.y"
               @update:value="value => updatePointPosition('y', value)"
             >
-              <template #prefix>垂直：</template>
+              <template #prefix>{{ $t('pathEditor.vertical') }}</template>
             </NumberInput>
           </div>
         </div>
@@ -124,7 +124,7 @@
         <template v-if="activePoint.q">
           <Divider :margin="20" />
           <div class="panel-section">
-            <div class="section-title">控制点：</div>
+            <div class="section-title">{{ $t('pathEditor.controlPoint') }}</div>
             <div class="input-row">
               <NumberInput
                 class="number-input"
@@ -134,7 +134,7 @@
                 :value="activePoint.q.x"
                 @update:value="value => updateQuadraticPosition('x', value)"
               >
-                <template #prefix>水平：</template>
+                <template #prefix>{{ $t('pathEditor.horizontal') }}</template>
               </NumberInput>
               <NumberInput
                 class="number-input"
@@ -144,7 +144,7 @@
                 :value="activePoint.q.y"
                 @update:value="value => updateQuadraticPosition('y', value)"
               >
-                <template #prefix>垂直：</template>
+                <template #prefix>{{ $t('pathEditor.vertical') }}</template>
               </NumberInput>
             </div>
           </div>
@@ -153,7 +153,7 @@
         <template v-if="activePoint.c">
           <Divider :margin="20" />
           <div class="panel-section">
-            <div class="section-title">控制点：</div>
+            <div class="section-title">{{ $t('pathEditor.controlPoint') }}</div>
             <div class="input-row">
               <NumberInput
                 class="number-input"
@@ -163,7 +163,7 @@
                 :value="activePoint.c[0].x"
                 @update:value="value => updateCubicPosition('x', value, 0)"
               >
-                <template #prefix>1-水平：</template>
+                <template #prefix>{{ $t('pathEditor.controlPointHorizontal', { number: 1 }) }}</template>
               </NumberInput>
               <NumberInput
                 class="number-input"
@@ -173,7 +173,7 @@
                 :value="activePoint.c[0].y"
                 @update:value="value => updateCubicPosition('y', value, 0)"
               >
-                <template #prefix>1-垂直：</template>
+                <template #prefix>{{ $t('pathEditor.controlPointVertical', { number: 1 }) }}</template>
               </NumberInput>
             </div>
             <div class="input-row">
@@ -185,7 +185,7 @@
                 :value="activePoint.c[1].x"
                 @update:value="value => updateCubicPosition('x', value, 1)"
               >
-                <template #prefix>2-水平：</template>
+                <template #prefix>{{ $t('pathEditor.controlPointHorizontal', { number: 2 }) }}</template>
               </NumberInput>
               <NumberInput
                 class="number-input"
@@ -195,7 +195,7 @@
                 :value="activePoint.c[1].y"
                 @update:value="value => updateCubicPosition('y', value, 1)"
               >
-                <template #prefix>2-垂直：</template>
+                <template #prefix>{{ $t('pathEditor.controlPointVertical', { number: 2 }) }}</template>
               </NumberInput>
             </div>
           </div>
@@ -204,7 +204,7 @@
         <template v-if="activePoint.a">
           <Divider :margin="20" />
           <div class="panel-section">
-            <div class="section-title">圆弧：</div>
+            <div class="section-title">{{ $t('pathEditor.arcSettings') }}</div>
             <div class="input-row">
               <NumberInput
                 class="number-input"
@@ -214,7 +214,7 @@
                 :value="activePoint.a.rx"
                 @update:value="value => updateArcParam('rx', value)"
               >
-                <template #prefix>水平半径：</template>
+                <template #prefix>{{ $t('pathEditor.horizontalRadius') }}</template>
               </NumberInput>
               <NumberInput
                 class="number-input"
@@ -224,7 +224,7 @@
                 :value="activePoint.a.ry"
                 @update:value="value => updateArcParam('ry', value)"
               >
-                <template #prefix>垂直半径：</template>
+                <template #prefix>{{ $t('pathEditor.verticalRadius') }}</template>
               </NumberInput>
             </div>
             <div class="input-row">
@@ -236,12 +236,12 @@
                 :value="activePoint.a.rot"
                 @update:value="value => updateArcParam('rot', value)"
               >
-                <template #prefix>旋转：</template>
+                <template #prefix>{{ $t('pathEditor.rotation') }}</template>
               </NumberInput>
             </div>
             <div class="checkbox-row">
-              <Checkbox :value="activePoint.a.laf === 1" @update:value="value => updateArcParam('laf', value ? 1 : 0)">大弧</Checkbox>
-              <Checkbox :value="activePoint.a.sf === 1" @update:value="value => updateArcParam('sf', value ? 1 : 0)">顺时针</Checkbox>
+              <Checkbox :value="activePoint.a.laf === 1" @update:value="value => updateArcParam('laf', value ? 1 : 0)">{{ $t('pathEditor.largeArc') }}</Checkbox>
+              <Checkbox :value="activePoint.a.sf === 1" @update:value="value => updateArcParam('sf', value ? 1 : 0)">{{ $t('pathEditor.clockwise') }}</Checkbox>
             </div>
           </div>
         </template>
@@ -249,7 +249,7 @@
         <Divider :margin="20" />
 
         <div class="panel-section">
-          <Checkbox :value="closePath" @update:value="value => closePath = value">闭合路径</Checkbox>
+          <Checkbox :value="closePath" @update:value="value => closePath = value">{{ $t('pathEditor.closePath') }}</Checkbox>
         </div>
 
         <Divider :margin="20" />
@@ -261,10 +261,10 @@
     </div>
 
     <div class="footer">
-      <div class="tooltips">Tips: 双击追加直线，右键追加线段或删除点；拖动端点和控制点调整路径。</div>
+      <div class="tooltips">{{ $t('pathEditor.tip') }}</div>
       <div class="footer-actions">
-        <Button @click="emit('close')">关闭</Button>
-        <Button type="primary" :disabled="!canInsert" @click="insert()">确认</Button>
+        <Button @click="emit('close')">{{ $t('common.close') }}</Button>
+        <Button type="primary" :disabled="!canInsert" @click="insert()">{{ $t('common.confirm') }}</Button>
       </div>
     </div>
   </div>
@@ -272,6 +272,7 @@
 
 <script lang="ts" setup>
 import { computed, onUnmounted, ref, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ContextmenuItem } from '@/components/Contextmenu/types'
 
 import Button from '@/components/Button.vue'
@@ -283,6 +284,7 @@ import RadioGroup from '@/components/RadioGroup.vue'
 
 type SegmentType = 'L' | 'Q' | 'C' | 'A'
 type PointAxis = 'x' | 'y'
+const { t } = useI18n()
 type ArcParamKey = 'rx' | 'ry' | 'rot' | 'laf' | 'sf'
 
 interface PointPosition {
@@ -542,24 +544,24 @@ const prepareContextmenu = (e: MouseEvent) => {
 const contextmenus = (): ContextmenuItem[] => {
   return [
     {
-      text: '追加直线',
+      text: t('pathEditor.appendLine'),
       handler: () => addPoint('L'),
     },
     {
-      text: '追加二次曲线',
+      text: t('pathEditor.appendQuadratic'),
       handler: () => addPoint('Q'),
     },
     {
-      text: '追加三次曲线',
+      text: t('pathEditor.appendCubic'),
       handler: () => addPoint('C'),
     },
     {
-      text: '追加弧线',
+      text: t('pathEditor.appendArc'),
       handler: () => addPoint('A'),
     },
     { divider: true },
     {
-      text: '删除当前点',
+      text: t('pathEditor.deletePoint'),
       disable: activePointIndex.value === 0,
       handler: removeActivePoint,
     },

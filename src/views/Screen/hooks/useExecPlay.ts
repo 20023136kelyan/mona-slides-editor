@@ -6,6 +6,7 @@ import { KEYS } from '@/configs/hotkey'
 import { ANIMATION_CLASS_PREFIX } from '@/configs/animation'
 import message from '@/utils/message'
 import type { Slide } from '@/types/slides'
+import { translate } from '@/i18n'
 
 const AUDIENCE_SYNC_CHANNEL = 'pptist-audience-sync'
 
@@ -190,7 +191,7 @@ export default () => {
     }
     else {
       if (loopPlay.value) turnSlideToIndex(slides.value.length - 1)
-      else throttleMassage('已经是第一页了')
+      else throttleMassage(translate('runtime.alreadyFirstSlide'))
     }
     inAnimation.value = false
   }
@@ -207,7 +208,7 @@ export default () => {
     else {
       if (loopPlay.value) turnSlideToIndex(0)
       else {
-        throttleMassage('已经是最后一页了')
+        throttleMassage(translate('runtime.alreadyLastSlide'))
         closeAutoPlay()
       }
       inAnimation.value = false
@@ -218,7 +219,7 @@ export default () => {
   const autoPlayInterval = ref(2500)
   const autoPlay = () => {
     closeAutoPlay()
-    message.success('开始自动放映')
+    message.success(translate('runtime.autoPlayStarted'))
     autoPlayTimer.value = setInterval(execNext, autoPlayInterval.value)
   }
 

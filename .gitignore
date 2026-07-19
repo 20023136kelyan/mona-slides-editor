@@ -14,6 +14,15 @@ dist-ssr
 coverage
 *.local
 
+# Test output (golden reference screenshots are committed separately)
+.artifacts/
+playwright-report/
+test-results/
+blob-report/
+
+# Local fidelity decks may contain confidential material.
+/public/corpus/private/
+
 /cypress/videos/
 /cypress/screenshots/
 

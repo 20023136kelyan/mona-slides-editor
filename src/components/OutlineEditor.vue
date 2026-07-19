@@ -18,13 +18,14 @@
       />
       <div class="text" @click="handleFocus(item.id)" v-else>{{ item.content }}</div>
 
-      <div class="flag"></div>
+      <div class="flag" :data-label="item.lv === 1 ? $t('outline.topic') : item.lv === 2 ? $t('outline.chapter') : item.lv === 3 ? $t('outline.section') : ''"></div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, nextTick, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { nanoid } from 'nanoid'
 import type { ContextmenuItem } from '@/components/Contextmenu/types'
 import Input from './Input.vue'
@@ -46,6 +47,7 @@ const emit = defineEmits<{
 
 const data = ref<OutlineItem[]>([])
 const activeItemId = ref('')
+const { t } = useI18n()
 
 watch(data, () => {
   let markdown = ''
@@ -196,23 +198,23 @@ const contextmenus = (el: HTMLElement): ContextmenuItem[] => {
   if (lv === 1) {
     return [
       {
-        text: '添加子级大纲（章）',
-        handler: () => addItem(id, 'next', '新的一章'),
+        text: t('outline.addChildChapter'),
+        handler: () => addItem(id, 'next', t('outline.newChapter')),
       },
     ]
   }
   else if (lv === 2) {
     return [
       {
-        text: '上方添加同级大纲（章）',
-        handler: () => addItem(id, 'prev', '新的一章'),
+        text: t('outline.addChapterAbove'),
+        handler: () => addItem(id, 'prev', t('outline.newChapter')),
       },
       {
-        text: '添加子级大纲（节）',
-        handler: () => addItem(id, 'next', '新的一节'),
+        text: t('outline.addChildSection'),
+        handler: () => addItem(id, 'next', t('outline.newSection')),
       },
       {
-        text: '删除此章',
+        text: t('outline.deleteChapter'),
         handler: () => deleteItem(id, true),
       },
     ]
@@ -220,30 +222,30 @@ const contextmenus = (el: HTMLElement): ContextmenuItem[] => {
   else if (lv === 3) {
     return [
       {
-        text: '上方添加同级大纲（节）',
-        handler: () => addItem(id, 'prev', '新的一节'),
+        text: t('outline.addSectionAbove'),
+        handler: () => addItem(id, 'prev', t('outline.newSection')),
       },
       {
-        text: '添加子级大纲（项）',
-        handler: () => addItem(id, 'next', '新的一项'),
+        text: t('outline.addChildItem'),
+        handler: () => addItem(id, 'next', t('outline.newItem')),
       },
       {
-        text: '删除此节',
+        text: t('outline.deleteSection'),
         handler: () => deleteItem(id, true),
       },
     ]
   }
   return [
     {
-      text: '上方添加同级大纲（项）',
-      handler: () => addItem(id, 'prev', '新的一项'),
+      text: t('outline.addItemAbove'),
+      handler: () => addItem(id, 'prev', t('outline.newItem')),
     },
     {
-      text: '下方添加同级大纲（项）',
-      handler: () => addItem(id, 'next', '新的一项'),
+      text: t('outline.addItemBelow'),
+      handler: () => addItem(id, 'next', t('outline.newItem')),
     },
     {
-      text: '删除此项',
+      text: t('outline.deleteItem'),
       handler: () => deleteItem(id),
     },
   ]
@@ -334,14 +336,10 @@ const contextmenus = (el: HTMLElement): ContextmenuItem[] => {
       font-weight: 400;
     }
   }
-  .item.lv-1 .flag::after {
-    content: '主题';
-  }
-  .item.lv-2 .flag::after {
-    content: '章';
-  }
+  .item.lv-1 .flag::after,
+  .item.lv-2 .flag::after,
   .item.lv-3 .flag::after {
-    content: '节';
+    content: attr(data-label);
   }
   .item.lv-4 .flag::after {
     opacity: 0;

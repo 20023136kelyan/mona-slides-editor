@@ -5,12 +5,16 @@ import Icons from 'unplugin-icons/vite'
 import { FileSystemIconLoader } from 'unplugin-icons/loaders'
 import IconsResolver from 'unplugin-icons/resolver'
 import Components from 'unplugin-vue-components/vite'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '',
   plugins: [
     vue(),
+    VueI18nPlugin({
+      include: fileURLToPath(new URL('./src/i18n/locales/**', import.meta.url)),
+    }),
     Components({
       dirs: [],
       resolvers: [

@@ -3,25 +3,25 @@
     <div class="remark">
       <textarea
         :value="remark"
-        placeholder="点击输入演讲者备注"
+        :placeholder="$t('runtime.speakerNotesPlaceholder')"
         @input="$event => handleInputMark($event)"
       ></textarea>
     </div>
     <div class="toolbar">
       <ButtonGroup class="row">
-        <Button style="flex: 1;" @click="createSlide()"><i-icon-park-outline:plus class="icon" /> 新幻灯片</Button>
-        <Button style="flex: 1;" @click="copyAndPasteSlide()"><i-icon-park-outline:copy class="icon" /> 复制</Button>
-        <Button style="flex: 1;" @click="deleteSlide()"><i-icon-park-outline:delete class="icon" /> 删除</Button>
+        <Button style="flex: 1;" @click="createSlide()"><i-icon-park-outline:plus class="icon" /> {{ $t('mobile.newSlide') }}</Button>
+        <Button style="flex: 1;" @click="copyAndPasteSlide()"><i-icon-park-outline:copy class="icon" /> {{ $t('common.copy') }}</Button>
+        <Button style="flex: 1;" @click="deleteSlide()"><i-icon-park-outline:delete class="icon" /> {{ $t('common.delete') }}</Button>
       </ButtonGroup>
       <ButtonGroup class="row">
-        <Button style="flex: 1;" @click="insertTextElement()"><i-icon-park-outline:font-size class="icon" /> 文字</Button>
+        <Button style="flex: 1;" @click="insertTextElement()"><i-icon-park-outline:font-size class="icon" /> {{ $t('mobile.text') }}</Button>
         <Button style="flex: 1;">
           <FileInput @change="files => insertImageElement(files)">
-            <i-icon-park-outline:picture class="icon" /> 图片
+            <i-icon-park-outline:picture class="icon" /> {{ $t('editor.image') }}
           </FileInput>
         </Button>
-        <Button style="flex: 1;" @click="insertShapeElement('square')"><i-icon-park-outline:square class="icon" /> 矩形</Button>
-        <Button style="flex: 1;" @click="insertShapeElement('round')"><i-icon-park-outline:round class="icon" /> 圆形</Button>
+        <Button style="flex: 1;" @click="insertShapeElement('square')"><i-icon-park-outline:square class="icon" /> {{ $t('mobile.rectangle') }}</Button>
+        <Button style="flex: 1;" @click="insertShapeElement('round')"><i-icon-park-outline:round class="icon" /> {{ $t('mobile.circle') }}</Button>
       </ButtonGroup>
     </div>
 
@@ -31,6 +31,7 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useSlidesStore } from '@/store'
 import useSlideHandler from '@/hooks/useSlideHandler'
@@ -44,6 +45,7 @@ import Button from '@/components/Button.vue'
 import ButtonGroup from '@/components/ButtonGroup.vue'
 
 const slidesStore = useSlidesStore()
+const { t } = useI18n()
 const { viewportRatio, currentSlide, viewportSize } = storeToRefs(slidesStore)
 
 const { createSlide, copyAndPasteSlide, deleteSlide, } = useSlideHandler()
@@ -58,7 +60,7 @@ const insertTextElement = () => {
     top: (viewportSize.value * viewportRatio.value - height) / 2,
     width,
     height,
-  }, { content: '<p>新添加文本</p>' })
+  }, { content: `<p>${t('mobile.newText')}</p>` })
 }
 
 const insertImageElement = (files: FileList) => {

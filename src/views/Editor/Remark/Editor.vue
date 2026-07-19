@@ -31,6 +31,7 @@
 
 <script lang="ts" setup>
 import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { debounce } from 'lodash'
 import { useMainStore } from '@/store'
 import type { EditorView } from 'prosemirror-view'
@@ -46,6 +47,7 @@ import { toggleMark } from 'prosemirror-commands'
 const props = defineProps<{
   value: string
 }>()
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (event: 'update', payload: string): void
@@ -177,7 +179,7 @@ onMounted(() => {
       input: handleInput,
     },
   }, {
-    placeholder: '点击输入演讲者备注',
+    placeholder: t('runtime.speakerNotesPlaceholder'),
   })
 
   menuInstance.value = tippy(editorViewRef.value!, {

@@ -8,6 +8,15 @@ module.exports = {
     'eslint:recommended',
     '@vue/eslint-config-typescript'
   ],
+  plugins: [
+    '@intlify/vue-i18n',
+  ],
+  settings: {
+    'vue-i18n': {
+      localeDir: './src/i18n/locales/*.json',
+      messageSyntaxVersion: '^11.0.0',
+    },
+  },
   parserOptions: {
     ecmaVersion: 'latest'
   },
@@ -73,5 +82,6 @@ module.exports = {
     '@typescript-eslint/consistent-type-imports': 'error',
     'vue/multi-word-component-names': 'off',
     'vue/no-reserved-component-names': 'off',
+    '@intlify/vue-i18n/no-missing-keys': 'error',
   }
 }

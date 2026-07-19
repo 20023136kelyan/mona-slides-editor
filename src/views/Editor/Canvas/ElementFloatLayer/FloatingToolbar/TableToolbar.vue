@@ -6,7 +6,7 @@
       </template>
       <button class="toolbar-btn">
         <i-icon-park-outline:fill class="icon" />
-        <span>填充</span>
+        <span>{{ $t('common.fill') }}</span>
       </button>
     </Popover>
     <BorderPanel />
@@ -16,27 +16,27 @@
     <Popover trigger="click">
       <template #content>
         <div class="table-command-menu">
-          <PopoverMenuItem center @click="emitTableCommand('insert-row', 'before')">上方插入行</PopoverMenuItem>
-          <PopoverMenuItem center @click="emitTableCommand('insert-row', 'after')">下方插入行</PopoverMenuItem>
-          <PopoverMenuItem center @click="emitTableCommand('insert-col', 'before')">左侧插入列</PopoverMenuItem>
-          <PopoverMenuItem center @click="emitTableCommand('insert-col', 'after')">右侧插入列</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('insert-row', 'before')">{{ $t('table.insertRowAbove') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('insert-row', 'after')">{{ $t('table.insertRowBelow') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('insert-col', 'before')">{{ $t('table.insertColumnLeft') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('insert-col', 'after')">{{ $t('table.insertColumnRight') }}</PopoverMenuItem>
         </div>
       </template>
       <button class="toolbar-btn">
         <i-icon-park-outline:add class="icon" />
-        <span>添加</span>
+        <span>{{ $t('common.add') }}</span>
       </button>
     </Popover>
     <Popover trigger="click">
       <template #content>
         <div class="table-command-menu">
-          <PopoverMenuItem center @click="emitTableCommand('delete-row')">删除行</PopoverMenuItem>
-          <PopoverMenuItem center @click="emitTableCommand('delete-col')">删除列</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('delete-row')">{{ $t('table.deleteRow') }}</PopoverMenuItem>
+          <PopoverMenuItem center @click="emitTableCommand('delete-col')">{{ $t('table.deleteColumn') }}</PopoverMenuItem>
         </div>
       </template>
       <button class="toolbar-btn">
         <i-icon-park-outline:reduce class="icon" />
-        <span>删除</span>
+        <span>{{ $t('common.delete') }}</span>
       </button>
     </Popover>
   </div>

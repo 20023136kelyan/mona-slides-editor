@@ -22,7 +22,7 @@
   >
     <template #content>
       <template v-if="search">
-        <Input ref="searchInputRef" simple :placeholder="searchLabel" v-model:value="searchKey" :style="{ width: width + 2 + 'px' }" />
+        <Input ref="searchInputRef" simple :placeholder="resolvedSearchLabel" v-model:value="searchKey" :style="{ width: width + 2 + 'px' }" />
         <Divider :margin="0" />
       </template>
       <div class="options" ref="optionsRef" :style="{ width: width + 2 + 'px' }">
@@ -50,6 +50,7 @@
 
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick, onBeforeUnmount, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Popover from './Popover.vue'
 import Input from './Input.vue'
 import Divider from './Divider.vue'
@@ -73,8 +74,11 @@ const props = withDefaults(defineProps<{
   autofocus: false,
   defaultLabel: '',
   search: false,
-  searchLabel: '搜索',
+  searchLabel: '',
 })
+
+const { t } = useI18n({ useScope: 'global' })
+const resolvedSearchLabel = computed(() => props.searchLabel || t('common.search'))
 
 const emit = defineEmits<{
   (event: 'update:value', payload: string | number): void

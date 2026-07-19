@@ -1,0 +1,1254 @@
+{
+  "locale": {
+    "language": "Language",
+    "english": "English",
+    "simplifiedChinese": "Simplified Chinese"
+  },
+  "common": {
+    "search": "Search",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "close": "Close",
+    "apply": "Apply",
+    "delete": "Delete",
+    "reset": "Reset",
+    "loading": "Loading...",
+    "importing": "Importing...",
+    "exporting": "Exporting...",
+    "none": "None",
+    "custom": "Custom",
+    "default": "Default",
+    "more": "More",
+    "add": "Add",
+    "insert": "Insert",
+    "upload": "Upload",
+    "edit": "Edit",
+    "copy": "Copy",
+    "cut": "Cut",
+    "paste": "Paste",
+    "duplicate": "Duplicate",
+    "replace": "Replace",
+    "replaceAll": "Replace all",
+    "selectAll": "Select all",
+    "undo": "Undo",
+    "redo": "Redo",
+    "preview": "Preview",
+    "enable": "Enable",
+    "disable": "Disable",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "rename": "Rename",
+    "group": "Group",
+    "ungroup": "Ungroup",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "moveUp": "Move forward",
+    "moveDown": "Move backward",
+    "bringToFront": "Bring to front",
+    "sendToBack": "Send to back",
+    "leftAlign": "Align left",
+    "centerAlign": "Center",
+    "rightAlign": "Align right",
+    "justify": "Justify",
+    "topAlign": "Align top",
+    "middleAlign": "Align middle",
+    "bottomAlign": "Align bottom",
+    "horizontalCenter": "Center horizontally",
+    "verticalCenter": "Center vertically",
+    "fitToScreen": "Fit to screen",
+    "all": "All",
+    "currentSlide": "Current slide",
+    "customRange": "Custom range",
+    "style": "Style",
+    "position": "Position",
+    "animation": "Animation",
+    "design": "Design",
+    "transition": "Transition",
+    "color": "Color",
+    "fill": "Fill",
+    "type": "Type",
+    "width": "Width",
+    "height": "Height",
+    "horizontal": "Horizontal",
+    "vertical": "Vertical",
+    "auto": "Auto",
+    "font": "Font",
+    "fontColor": "Font color",
+    "backgroundColor": "Background color",
+    "themeColor": "Theme color",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strikethrough": "Strikethrough",
+    "superscript": "Superscript",
+    "subscript": "Subscript",
+    "inlineCode": "Inline code",
+    "quote": "Quote",
+    "clearFormatting": "Clear formatting",
+    "hyperlink": "Hyperlink",
+    "increaseFontSize": "Increase font size",
+    "decreaseFontSize": "Decrease font size",
+    "bullets": "Bullets",
+    "numbering": "Numbering",
+    "save": "Save",
+    "select": "Select",
+    "defaultFont": "System default"
+  },
+  "header": {
+    "aiSubtitle": "Describe your idea and generate a presentation with AI",
+    "importFile": "Import file",
+    "testingOnly": "For testing only",
+    "nativeFormat": "Native format",
+    "exportFile": "Export file",
+    "resetSlides": "Reset presentation",
+    "markSlideTypes": "Label slide types",
+    "keyboardShortcuts": "Keyboard shortcuts",
+    "feedback": "Feedback",
+    "faq": "Frequently asked questions",
+    "demoNotice": "This site is a demonstration and does not provide a production service.",
+    "startSlideshow": "Start slideshow (F5)",
+    "fromBeginning": "From beginning",
+    "fromCurrentSlide": "From current slide",
+    "generateWithAI": "Generate presentation with AI",
+    "export": "Export",
+    "untitledPresentation": "Untitled presentation",
+    "settings": "Settings"
+  },
+  "editor": {
+    "commentsPanel": "Comments",
+    "selectionPanel": "Selection pane",
+    "findReplace": "Find and replace",
+    "insertText": "Insert text",
+    "textBox": "Text box",
+    "horizontalTextBox": "Horizontal text box",
+    "verticalTextBox": "Vertical text box",
+    "insertShape": "Insert shape",
+    "shape": "Shape",
+    "presetShapes": "Preset shapes",
+    "drawPath": "Draw path",
+    "freehandShape": "Freehand shape",
+    "insertImage": "Insert image",
+    "image": "Image",
+    "uploadImage": "Upload image",
+    "onlineImages": "Online images",
+    "insertLine": "Insert line",
+    "line": "Line",
+    "insertChart": "Insert chart",
+    "chart": "Chart",
+    "insertTable": "Insert table",
+    "table": "Table",
+    "insertEquation": "Insert equation",
+    "equation": "Equation",
+    "insertMedia": "Insert video or audio",
+    "media": "Media",
+    "insertSymbol": "Insert symbol",
+    "symbol": "Symbol",
+    "zoomOut": "Zoom out (Ctrl + -)",
+    "zoomIn": "Zoom in (Ctrl + =)",
+    "fitToScreenShortcut": "Fit to screen (Ctrl + 0)",
+    "undoShortcut": "Undo (Ctrl + Z)",
+    "redoShortcut": "Redo (Ctrl + Y)",
+    "addSlide": "Add slide",
+    "slideCount": "Slide {current} of {total}",
+    "sectionNamePlaceholder": "Enter section name",
+    "untitledSection": "Untitled section",
+    "defaultSection": "Default section",
+    "multiSelectStyle": "Style (multiple selection)",
+    "multiSelectPosition": "Position (multiple selection)"
+  },
+  "search": {
+    "find": "Find",
+    "replace": "Replace",
+    "findPlaceholder": "Find text",
+    "replacePlaceholder": "Replace with",
+    "ignoreCase": "Ignore case",
+    "previous": "Previous result",
+    "next": "Next result",
+    "noMatch": "No matches found",
+    "enterSearchText": "Enter text to find first"
+  },
+  "selection": {
+    "title": "Selection ({selected}/{total})",
+    "showAll": "Show all",
+    "hideAll": "Hide all",
+    "group": "Group",
+    "empty": "This slide has no elements"
+  },
+  "imageLibrary": {
+    "title": "Image library (from pexels.com)",
+    "searchPlaceholder": "Search images",
+    "insert": "Insert",
+    "all": "All",
+    "landscape": "Landscape",
+    "portrait": "Portrait",
+    "square": "Square",
+    "defaultQuery": "landscape",
+    "enterKeyword": "Enter an image search keyword"
+  },
+  "elementTypes": {
+    "text": "Text",
+    "image": "Image",
+    "shape": "Shape",
+    "line": "Line",
+    "chart": "Chart",
+    "table": "Table",
+    "video": "Video",
+    "audio": "Audio",
+    "latex": "Equation"
+  },
+  "app": {
+    "initializing": "Initializing presentation data..."
+  },
+  "thumbnails": {
+    "deleteSection": "Delete section",
+    "deleteSectionAndSlides": "Delete section and slides",
+    "deleteAllSections": "Delete all sections",
+    "renameSection": "Rename section",
+    "newSlide": "New slide",
+    "duplicateSlide": "Duplicate slide",
+    "deleteSlide": "Delete slide",
+    "addSection": "Add section",
+    "slideshow": "Start slideshow",
+    "fromCurrent": "Start from current slide"
+  },
+  "templates": {
+    "all": "All",
+    "cover": "Cover",
+    "contents": "Contents",
+    "transition": "Section",
+    "content": "Content",
+    "end": "Closing",
+    "insertAll": "Insert all",
+    "insertTemplate": "Insert layout",
+    "catalog": {
+      "template_1": "Crimson Landscape",
+      "template_2": "Urban Blue",
+      "template_3": "Smart Geometry",
+      "template_4": "Soft Morandi",
+      "template_5": "Minimal Green",
+      "template_6": "Warm Vintage",
+      "template_7": "Deep Focus",
+      "template_8": "Fresh Sky Blue"
+    }
+  },
+  "export": {
+    "range": "Export range:",
+    "format": "Export format:",
+    "mode": "Export mode:",
+    "standard": "Editable",
+    "imageOnly": "Images only",
+    "imageQuality": "Image quality:",
+    "ignoreMedia": "Ignore audio and video:",
+    "ignoreMediaHelp": "Audio and video are skipped by default. Turn this off to include media in the PPTX, but expect the export to take significantly longer.",
+    "overwriteMaster": "Replace default master:",
+    "mediaTip": "Supported formats: avi, mp4, mov, wmv, mp3, and wav. Cross-origin media cannot be exported.",
+    "ignoreWebFonts": "Ignore web fonts:",
+    "ignoreWebFontsHelp": "Web fonts are ignored by default. Turn this off to preserve web-font styling in exported images, but expect the export to take longer.",
+    "slidesPerPage": "Slides per page:",
+    "pageMargin": "Page margin:",
+    "printTip": "In the print dialog, enable background graphics and use the default margins.",
+    "nativeFileTip": ".pptist is this application's native file format and can be imported back into the editor.",
+    "exportPptist": "Export PPTIST file",
+    "exportPptx": "Export PPTX",
+    "exportImage": "Export images",
+    "exportJson": "Export JSON",
+    "exportPdf": "Print / Export PDF"
+  },
+  "canvas": {
+    "unlock": "Unlock",
+    "centerBoth": "Center horizontally and vertically",
+    "setLink": "Add link",
+    "ruler": "Ruler",
+    "gridLines": "Grid lines",
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large",
+    "resetSlide": "Reset current slide",
+    "bubbleMenu": "Floating toolbar",
+    "bubbleMenuStatus": "Floating toolbar {status}",
+    "slideshow": "Start slideshow",
+    "slideLink": "Slide {number}",
+    "webLink": "Web page",
+    "slidePage": "Slide",
+    "webLinkPlaceholder": "Enter a web address",
+    "preview": "Preview:",
+    "change": "Change",
+    "remove": "Remove",
+    "crop": "Crop",
+    "editData": "Edit data",
+    "fontSearch": "Search fonts",
+    "fontSizeSearch": "Search font sizes",
+    "border": "Border",
+    "borderStyle": "Border style:",
+    "borderColor": "Border color:",
+    "borderWidth": "Border width:",
+    "drawShapeTip": "Click to draw a freeform shape. Close the path by clicking its starting point, press Esc or right-click to cancel, or press Enter to finish early."
+  },
+  "pathEditor": {
+    "straight": "Line",
+    "quadratic": "Quadratic curve",
+    "cubic": "Cubic curve",
+    "arc": "Arc",
+    "coordinates": "Coordinates:",
+    "horizontal": "Horizontal:",
+    "vertical": "Vertical:",
+    "controlPoint": "Control point:",
+    "controlPointHorizontal": "{number} horizontal:",
+    "controlPointVertical": "{number} vertical:",
+    "arcSettings": "Arc:",
+    "horizontalRadius": "Horizontal radius:",
+    "verticalRadius": "Vertical radius:",
+    "rotation": "Rotation:",
+    "largeArc": "Large arc",
+    "clockwise": "Clockwise",
+    "closePath": "Close path",
+    "tip": "Tip: double-click to append a line. Right-click to append a segment or delete a point. Drag endpoints and control points to adjust the path.",
+    "appendLine": "Append line",
+    "appendQuadratic": "Append quadratic curve",
+    "appendCubic": "Append cubic curve",
+    "appendArc": "Append arc",
+    "deletePoint": "Delete current point"
+  },
+  "mediaInput": {
+    "video": "Video",
+    "audio": "Audio",
+    "videoPlaceholder": "Enter a video URL, e.g. https://example.com/video.mp4",
+    "audioPlaceholder": "Enter an audio URL, e.g. https://example.com/audio.mp3",
+    "uploadVideo": "Upload video",
+    "uploadAudio": "Upload audio",
+    "invalidVideo": "Enter a valid video URL first",
+    "invalidAudio": "Enter a valid audio URL first"
+  },
+  "table": {
+    "dimensions": "Table {rows} × {columns}",
+    "back": "Back",
+    "rows": "Rows:",
+    "columns": "Columns:",
+    "dimensionsError": "Rows and columns must each be between 1 and 20.",
+    "insertRowAbove": "Insert row above",
+    "insertRowBelow": "Insert row below",
+    "insertColumnLeft": "Insert column left",
+    "insertColumnRight": "Insert column right",
+    "deleteRow": "Delete row",
+    "deleteColumn": "Delete column"
+  },
+  "latexEditor": {
+    "placeholder": "Enter a LaTeX equation",
+    "preview": "Equation preview",
+    "symbols": "Common symbols",
+    "presets": "Preset equations",
+    "required": "Equation cannot be empty",
+    "edit": "Edit LaTeX"
+  },
+  "chartData": {
+    "type": "Chart type: {type}",
+    "change": "Click to change",
+    "clear": "Clear data",
+    "category": "Category {number}",
+    "series": "Series {number}",
+    "coordinate": "Coordinate {number}",
+    "value": "Value"
+  },
+  "chartTypes": {
+    "bar": "Column chart",
+    "column": "Bar chart",
+    "line": "Line chart",
+    "area": "Area chart",
+    "scatter": "Scatter chart",
+    "pie": "Pie chart",
+    "ring": "Doughnut chart",
+    "radar": "Radar chart"
+  },
+  "colorPicker": {
+    "recent": "Recently used:",
+    "eyedropperActive": "Press Esc to close the eyedropper",
+    "eyedropperFailed": "Could not start the eyedropper"
+  },
+  "toolbar": {
+    "layer": "Layer:",
+    "bringFront": "Bring to front",
+    "sendBack": "Send to back",
+    "moveForward": "Move forward",
+    "moveBackward": "Move backward",
+    "alignment": "Alignment:",
+    "x": "Horizontal:",
+    "y": "Vertical:",
+    "width": "Width:",
+    "height": "Height:",
+    "rotation": "Rotation:",
+    "lockAspectRatio": "Lock aspect ratio",
+    "unlockAspectRatio": "Unlock aspect ratio",
+    "distributeHorizontally": "Distribute horizontally",
+    "distributeVertically": "Distribute vertically",
+    "opacity": "Opacity:",
+    "enableBorder": "Enable border:",
+    "borderStyle": "Border style:",
+    "borderColor": "Border color:",
+    "borderWidth": "Border width:",
+    "enableShadow": "Enable shadow:",
+    "shadowHorizontal": "Horizontal shadow:",
+    "shadowVertical": "Vertical shadow:",
+    "blurRadius": "Blur radius:",
+    "shadowColor": "Shadow color:",
+    "colorMask": "Color overlay:",
+    "maskColor": "Overlay color:",
+    "enableFilter": "Enable filter:",
+    "verticalFlip": "Flip vertically",
+    "horizontalFlip": "Flip horizontally",
+    "lineSpacing": "Line spacing:",
+    "paragraphSpacing": "Paragraph spacing:",
+    "letterSpacing": "Letter spacing:",
+    "textBoxFill": "Text box fill:",
+    "marginTop": "Top margin:",
+    "marginBottom": "Bottom margin:",
+    "marginLeft": "Left margin:",
+    "marginRight": "Right margin:",
+    "fixedHeight": "Fixed height:",
+    "times": "{value}×",
+    "doubleClickContinuous": "Double-click to keep using",
+    "formatPainter": "Format painter (double-click to keep using)",
+    "shapeFormatPainter": "Shape format painter",
+    "textColor": "Text color",
+    "textHighlight": "Text highlight",
+    "cellFill": "Cell fill",
+    "decreaseParagraphIndent": "Decrease paragraph indent",
+    "increaseParagraphIndent": "Increase paragraph indent",
+    "decreaseFirstLineIndent": "Decrease first-line indent",
+    "increaseFirstLineIndent": "Increase first-line indent",
+    "hyperlinkPlaceholder": "Enter a hyperlink",
+    "invalidLink": "Enter a valid web address",
+    "noTextContent": "There is no text to process",
+    "aiBusy": "The selected model is at its concurrency limit. Try another model.",
+    "aiAssist": "AI assist",
+    "aiPolish": "Polish",
+    "aiExpand": "Expand",
+    "aiCondense": "Condense",
+    "aiCommandPolish": "Polish and rewrite",
+    "aiCommandExpand": "Expand with useful detail",
+    "aiCommandCondense": "Condense and clarify",
+    "largeTitle": "Large title",
+    "smallTitle": "Small title",
+    "body": "Body",
+    "smallBody": "Small body",
+    "caption1": "Caption 1",
+    "caption2": "Caption 2",
+    "replaceShape": "Click to replace shape",
+    "solidFill": "Solid fill",
+    "gradientFill": "Gradient fill",
+    "imageFill": "Image fill",
+    "linearGradient": "Linear gradient",
+    "radialGradient": "Radial gradient",
+    "currentStop": "Current color stop:",
+    "gradientAngle": "Gradient angle:"
+  },
+  "filters": {
+    "blur": "Blur",
+    "brightness": "Brightness",
+    "contrast": "Contrast",
+    "grayscale": "Grayscale",
+    "saturate": "Saturation",
+    "hue-rotate": "Hue",
+    "sepia": "Sepia",
+    "invert": "Invert",
+    "opacity": "Opacity",
+    "blackWhite": "Black and white",
+    "vintage": "Vintage",
+    "sharpen": "Sharpen",
+    "soft": "Soft",
+    "warm": "Warm",
+    "bright": "Bright",
+    "vivid": "Vivid"
+  },
+  "tableStyle": {
+    "rowActions": "Rows:",
+    "columnActions": "Columns:",
+    "addRow": "Add row",
+    "addColumn": "Add column",
+    "addAbove": "Add above",
+    "addBelow": "Add below",
+    "addLeft": "Add left",
+    "addRight": "Add right",
+    "enableTheme": "Use table theme:",
+    "headerRow": "Header row",
+    "totalRow": "Total row",
+    "firstColumn": "First column",
+    "lastColumn": "Last column",
+    "themeColor": "Theme color:",
+    "fillColor": "Fill color:"
+  },
+  "elementStyle": {
+    "replaceLine": "Click to replace line type",
+    "lineStyle": "Line style:",
+    "lineColor": "Line color:",
+    "lineWidth": "Line width:",
+    "startMarker": "Start marker:",
+    "endMarker": "End marker:",
+    "lineDirection": "Line direction:",
+    "swapDirection": "Reverse direction",
+    "cropImage": "Crop image",
+    "byShape": "By shape:",
+    "byRatio": "By {ratio}:",
+    "squareRatio": "aspect ratio (square)",
+    "portraitRatio": "aspect ratio (portrait)",
+    "landscapeRatio": "aspect ratio (landscape)",
+    "cornerRadius": "Corner radius:",
+    "replaceImage": "Replace image",
+    "resetStyle": "Reset style",
+    "setAsBackground": "Set as background",
+    "iconColor": "Icon color:",
+    "autoplay": "Autoplay:",
+    "loop": "Loop:",
+    "videoPoster": "Video preview image",
+    "firstFramePoster": "Use first frame as preview",
+    "resetPoster": "Reset preview image",
+    "weight": "Weight:",
+    "editChart": "Edit chart",
+    "stacked": "Stacked",
+    "smooth": "Smooth lines",
+    "chartBackground": "Background fill:",
+    "axisAndText": "Axes and text:",
+    "gridColor": "Grid color:",
+    "chartTheme": "Theme colors:",
+    "presetChartThemes": "Preset chart themes:",
+    "slideTheme": "Slide theme:",
+    "customColors": "Custom colors",
+    "chartThemeColors": "Chart theme colors",
+    "themeColorNumber": "Theme color {number}:",
+    "addThemeColor": "Add theme color"
+  },
+  "animationPanel": {
+    "addAnimation": "Add animation",
+    "selectElementTip": "Select an element on the canvas to add an animation",
+    "duration": "Duration:",
+    "trigger": "Start:",
+    "onClick": "On click",
+    "withPrevious": "With previous",
+    "afterPrevious": "After previous",
+    "replaceAnimation": "Replace animation",
+    "stopPreview": "Stop preview",
+    "previewAll": "Preview all",
+    "entrance": "Entrance",
+    "exit": "Exit",
+    "emphasis": "Emphasis",
+    "applyAll": "Apply to all slides",
+    "appliedAll": "Applied to all slides"
+  },
+  "designPanel": {
+    "backgroundFill": "Background fill",
+    "imageContain": "Fit",
+    "imageRepeat": "Tile",
+    "imageCover": "Fill",
+    "applyBackgroundAll": "Apply background to all slides",
+    "wide169": "Widescreen 16:9",
+    "wide1610": "Widescreen 16:10",
+    "standard43": "Standard 4:3",
+    "paperLandscape": "Paper A3 / A4",
+    "paperPortrait": "Portrait A3 / A4",
+    "canvasSize": "Canvas size: {width} × {height}",
+    "globalTheme": "Global theme",
+    "applyThemeAll": "Apply theme to all slides",
+    "applyFontAll": "Use font throughout",
+    "extractTheme": "Extract theme from slides",
+    "presetThemes": "Preset themes",
+    "sampleText": "Text Aa",
+    "set": "Set",
+    "setAndApply": "Set and apply",
+    "editThemeColors": "Edit theme colors",
+    "slideThemeColor": "Slide theme color {number}:",
+    "customCanvas": "Custom canvas size",
+    "sizeRange": "Width and height range: {min}–{max}",
+    "sizeRangeError": "Canvas width and height must be between {min} and {max}.",
+    "applyToTheme": "Apply to theme",
+    "excludeColorTip": "Click a color to exclude it",
+    "saveSelectedTheme": "Save selected settings as theme",
+    "extractCurrent": "Extract from current slide",
+    "extractAll": "Extract from all slides",
+    "themeColorLimit": "Too many theme colors; the first six were selected automatically."
+  },
+  "aiPpt": {
+    "templateStep": "Choose a template below, or {localTemplate}.",
+    "localTemplate": "generate from a local template",
+    "localTemplateTip": "Upload a .pptist template file",
+    "outlineStep": "Review the outline below. Click to edit it, or right-click to add and remove items, then choose a template.",
+    "setupStep": "Describe your presentation topic and add useful context such as the industry, role, subject, or purpose.",
+    "topicPlaceholder": "Enter a presentation topic, e.g. Career planning for university students",
+    "generateWithAi": "Generate with AI",
+    "language": "Language:",
+    "style": "Style:",
+    "model": "Model:",
+    "images": "Images:",
+    "chinese": "Chinese",
+    "english": "English",
+    "japanese": "Japanese",
+    "general": "General",
+    "academic": "Academic",
+    "business": "Business",
+    "education": "Education",
+    "marketing": "Marketing",
+    "mockImages": "Mock images",
+    "aiImageSearch": "AI image search",
+    "aiImageGeneration": "AI image generation",
+    "overwrite": "Replace existing slides",
+    "chooseTemplate": "Choose template",
+    "regenerate": "Regenerate outline",
+    "generate": "Generate",
+    "backToOutline": "Back to outline",
+    "generating": "Generating presentation with AI...",
+    "enterTopic": "Enter a presentation topic first",
+    "modelBusy": "The selected model is at its concurrency limit. Try another model.",
+    "building": "Building presentation...",
+    "invalidTemplate": "The uploaded template is invalid. Upload it again or use a preset template.",
+    "recommendations": [
+      "Technology trends shaping the next year",
+      "How big data is changing the world",
+      "Restaurant market research",
+      "How generative AI is used in education",
+      "Social media and brand marketing",
+      "How 5G is changing everyday life",
+      "Annual review and outlook",
+      "Blockchain technology and its applications",
+      "Career planning for university students",
+      "Company annual-event plan"
+    ]
+  },
+  "notes": {
+    "title": "Comments on slide {number}",
+    "reply": "Reply",
+    "replyPlaceholder": "Write a reply",
+    "empty": "No comments on this slide",
+    "selectedElement": "selected element",
+    "currentSlide": "current slide",
+    "commentPlaceholder": "Add a comment for the {target}",
+    "clearSlide": "Clear comments on this slide",
+    "add": "Add comment",
+    "testUser": "Test user"
+  },
+  "markup": {
+    "title": "Slide type labels",
+    "currentSlide": "Slide type:",
+    "currentText": "Text type:",
+    "currentImage": "Image type:",
+    "placeholder": "Select an image, text box, or shape with text to label its type.",
+    "unlabeled": "Unlabeled",
+    "slide": {
+      "cover": "Cover",
+      "contents": "Contents",
+      "transition": "Section",
+      "content": "Content",
+      "end": "Closing"
+    },
+    "text": {
+      "title": "Title",
+      "subtitle": "Subtitle",
+      "content": "Body",
+      "item": "List item",
+      "itemTitle": "List item title",
+      "notes": "Note",
+      "header": "Header",
+      "footer": "Footer",
+      "partNumber": "Section number",
+      "itemNumber": "Item number"
+    },
+    "image": {
+      "pageFigure": "Slide illustration",
+      "itemFigure": "Item illustration",
+      "background": "Background image"
+    }
+  },
+  "outline": {
+    "topic": "Topic",
+    "chapter": "Chapter",
+    "section": "Section",
+    "newChapter": "New chapter",
+    "newSection": "New section",
+    "newItem": "New item",
+    "addChildChapter": "Add child chapter",
+    "addChapterAbove": "Add chapter above",
+    "addChildSection": "Add child section",
+    "deleteChapter": "Delete chapter",
+    "addSectionAbove": "Add section above",
+    "addChildItem": "Add child item",
+    "deleteSection": "Delete section",
+    "addItemAbove": "Add item above",
+    "addItemBelow": "Add item below",
+    "deleteItem": "Delete item"
+  },
+  "symbolCategories": {
+    "face": "Faces",
+    "gesture": "Gestures",
+    "nature": "Animals & nature",
+    "food": "Food",
+    "travel": "Travel",
+    "activity": "Activities",
+    "object": "Objects",
+    "symbol": "Symbols"
+  },
+  "screen": {
+    "normalView": "Standard view",
+    "audienceView": "Audience view",
+    "presenterView": "Presenter view",
+    "pen": "Pen",
+    "laserPointer": "Laser pointer",
+    "timer": "Timer",
+    "enterFullscreen": "Enter full screen",
+    "exitFullscreen": "Exit full screen",
+    "endSlideshow": "End slideshow",
+    "speakerNotes": "Speaker notes",
+    "noNotes": "No notes",
+    "previousSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "firstSlide": "First slide",
+    "lastSlide": "Last slide",
+    "penTools": "Pen tools",
+    "slideNumber": "Slide {current} / {total}",
+    "autoPlay": "Auto-play",
+    "cancelAutoPlay": "Stop auto-play",
+    "seconds": "{value} seconds",
+    "loopSlideshow": "Loop slideshow",
+    "showToolbar": "Show toolbar",
+    "allSlides": "View all slides",
+    "bottomThumbnails": "Show thumbnails at bottom"
+  },
+  "drawingTools": {
+    "strokeWidth": "Stroke width:",
+    "shape": "Shape",
+    "highlighter": "Highlighter",
+    "eraserSize": "Eraser size:",
+    "eraser": "Eraser",
+    "clear": "Clear ink",
+    "blackboard": "Blackboard",
+    "close": "Close pen tools"
+  },
+  "timer": {
+    "pause": "Pause",
+    "start": "Start",
+    "countdown": "Countdown"
+  },
+  "mobile": {
+    "edit": "Edit",
+    "play": "Play",
+    "exitEdit": "Exit editing",
+    "exitPlay": "Exit playback",
+    "layout": "Layout",
+    "noProperties": "No settings available",
+    "newSlide": "New slide",
+    "text": "Text",
+    "rectangle": "Rectangle",
+    "circle": "Circle",
+    "newText": "New text"
+  },
+  "player": {
+    "loadFailed": "Video failed to load",
+    "speed": "Speed",
+    "loopStatus": "Loop {status}",
+    "on": "on",
+    "off": "off"
+  },
+  "tableEditing": {
+    "doubleClick": "Double-click to edit",
+    "keepOneRow": "A table must keep at least one row",
+    "keepOneColumn": "A table must keep at least one column",
+    "insertColumn": "Insert column",
+    "insertRow": "Insert row",
+    "toLeft": "To the left",
+    "toRight": "To the right",
+    "above": "Above",
+    "below": "Below",
+    "mergeCells": "Merge cells",
+    "unmergeCells": "Unmerge cells",
+    "selectColumn": "Select current column",
+    "selectRow": "Select current row",
+    "selectAllCells": "Select all cells"
+  },
+  "runtime": {
+    "speakerNotesPlaceholder": "Click to add speaker notes",
+    "fontLoading": "The font is still downloading. It will apply when loading finishes.",
+    "thumbnailLoading": "Loading...",
+    "requestUnknown": "Unknown request error",
+    "serverUnknown": "The server encountered an unknown error",
+    "serverUnavailable": "Could not connect to the server, or the request timed out",
+    "nonStreamResponse": "The server returned a non-streaming response",
+    "alreadyFirstSlide": "You are already on the first slide",
+    "alreadyLastSlide": "You are already on the last slide",
+    "autoPlayStarted": "Auto-play started",
+    "exportImageFailed": "Could not export images",
+    "exportFailed": "Export failed",
+    "noSearchMatch": "No matches found",
+    "enterSearchText": "Enter text to find first",
+    "invalidLink": "Enter a valid web address",
+    "selectLinkTarget": "Choose a link target first",
+    "fileParseFailed": "This file could not be read or parsed",
+    "clipboardEmpty": "The clipboard is empty or does not contain text",
+    "clipboardDenied": "Clipboard access is unavailable or blocked. Use Ctrl+V instead."
+  },
+  "animations": {
+    "bounceIn": "Bounce In",
+    "bounceInLeft": "Bounce In Left",
+    "bounceInRight": "Bounce In Right",
+    "bounceInUp": "Bounce In Up",
+    "bounceInDown": "Bounce In Down",
+    "fadeIn": "Fade In",
+    "fadeInDown": "Fade In Down",
+    "fadeInDownBig": "Fade In Down Big",
+    "fadeInLeft": "Fade In Left",
+    "fadeInLeftBig": "Fade In Left Big",
+    "fadeInRight": "Fade In Right",
+    "fadeInRightBig": "Fade In Right Big",
+    "fadeInUp": "Fade In Up",
+    "fadeInUpBig": "Fade In Up Big",
+    "fadeInTopLeft": "Fade In Top Left",
+    "fadeInTopRight": "Fade In Top Right",
+    "fadeInBottomLeft": "Fade In Bottom Left",
+    "fadeInBottomRight": "Fade In Bottom Right",
+    "rotateIn": "Rotate In",
+    "rotateInDownLeft": "Rotate In Down Left",
+    "rotateInDownRight": "Rotate In Down Right",
+    "rotateInUpLeft": "Rotate In Up Left",
+    "rotateInUpRight": "Rotate In Up Right",
+    "zoomIn": "Zoom In",
+    "zoomInDown": "Zoom In Down",
+    "zoomInLeft": "Zoom In Left",
+    "zoomInRight": "Zoom In Right",
+    "zoomInUp": "Zoom In Up",
+    "slideInDown": "Slide In Down",
+    "slideInLeft": "Slide In Left",
+    "slideInRight": "Slide In Right",
+    "slideInUp": "Slide In Up",
+    "flipInX": "Flip In X",
+    "flipInY": "Flip In Y",
+    "backInDown": "Back In Down",
+    "backInLeft": "Back In Left",
+    "backInRight": "Back In Right",
+    "backInUp": "Back In Up",
+    "lightSpeedInRight": "Light Speed In Right",
+    "lightSpeedInLeft": "Light Speed In Left",
+    "bounceOut": "Bounce Out",
+    "bounceOutLeft": "Bounce Out Left",
+    "bounceOutRight": "Bounce Out Right",
+    "bounceOutUp": "Bounce Out Up",
+    "bounceOutDown": "Bounce Out Down",
+    "fadeOut": "Fade Out",
+    "fadeOutDown": "Fade Out Down",
+    "fadeOutDownBig": "Fade Out Down Big",
+    "fadeOutLeft": "Fade Out Left",
+    "fadeOutLeftBig": "Fade Out Left Big",
+    "fadeOutRight": "Fade Out Right",
+    "fadeOutRightBig": "Fade Out Right Big",
+    "fadeOutUp": "Fade Out Up",
+    "fadeOutUpBig": "Fade Out Up Big",
+    "fadeOutTopLeft": "Fade Out Top Left",
+    "fadeOutTopRight": "Fade Out Top Right",
+    "fadeOutBottomLeft": "Fade Out Bottom Left",
+    "fadeOutBottomRight": "Fade Out Bottom Right",
+    "rotateOut": "Rotate Out",
+    "rotateOutDownLeft": "Rotate Out Down Left",
+    "rotateOutDownRight": "Rotate Out Down Right",
+    "rotateOutUpLeft": "Rotate Out Up Left",
+    "rotateOutUpRight": "Rotate Out Up Right",
+    "zoomOut": "Zoom Out",
+    "zoomOutDown": "Zoom Out Down",
+    "zoomOutLeft": "Zoom Out Left",
+    "zoomOutRight": "Zoom Out Right",
+    "zoomOutUp": "Zoom Out Up",
+    "slideOutDown": "Slide Out Down",
+    "slideOutLeft": "Slide Out Left",
+    "slideOutRight": "Slide Out Right",
+    "slideOutUp": "Slide Out Up",
+    "flipOutX": "Flip Out X",
+    "flipOutY": "Flip Out Y",
+    "backOutDown": "Back Out Down",
+    "backOutLeft": "Back Out Left",
+    "backOutRight": "Back Out Right",
+    "backOutUp": "Back Out Up",
+    "lightSpeedOutRight": "Light Speed Out Right",
+    "lightSpeedOutLeft": "Light Speed Out Left",
+    "shakeX": "Shake X",
+    "shakeY": "Shake Y",
+    "headShake": "Head Shake",
+    "swing": "Swing",
+    "wobble": "Wobble",
+    "tada": "Tada",
+    "jello": "Jello",
+    "bounce": "Bounce",
+    "flash": "Flash",
+    "pulse": "Pulse",
+    "rubberBand": "Rubber Band",
+    "heartBeat": "Heart Beat"
+  },
+  "animationGroups": {
+    "bounce": "Bounce",
+    "fade": "Fade",
+    "rotate": "Rotate",
+    "zoom": "Zoom",
+    "slide": "Slide",
+    "flip": "Flip",
+    "back": "Back motion",
+    "lightSpeed": "Light speed",
+    "shake": "Shake",
+    "other": "Other"
+  },
+  "slideTransitions": {
+    "no": "None",
+    "random": "Random",
+    "slideX": "Push horizontally",
+    "slideY": "Push vertically",
+    "slideX3D": "Push horizontally (3D)",
+    "slideY3D": "Push vertically (3D)",
+    "fade": "Fade",
+    "rotate": "Rotate",
+    "scaleY": "Expand vertically",
+    "scaleX": "Expand horizontally",
+    "scale": "Zoom in",
+    "scaleReverse": "Zoom out"
+  },
+  "shapeGroups": {
+    "rectangles": "Rectangles",
+    "common": "Common shapes",
+    "arrows": "Arrows",
+    "other": "Other shapes",
+    "lines": "Lines"
+  },
+  "lineGroups": {
+    "straight": "Straight lines",
+    "elbowAndCurved": "Elbow and curved lines"
+  },
+  "symbolTabs": {
+    "letter": "Letters",
+    "number": "Numbers",
+    "math": "Math",
+    "arrow": "Arrows",
+    "graph": "Shapes",
+    "emoji": "Emoji"
+  },
+  "latexCategories": {
+    "operators": "Math",
+    "group": "Structures",
+    "verbatim": "Functions",
+    "greek": "Greek"
+  },
+  "formulaPresets": [
+    "Gauss theorem",
+    "Fourier series",
+    "Taylor expansion",
+    "Definite integral",
+    "Trigonometric identity 1",
+    "Trigonometric identity 2",
+    "Sum expansion",
+    "Euler formula",
+    "Bernoulli equation",
+    "Total differential equation",
+    "Nonhomogeneous equation",
+    "Cauchy mean value theorem",
+    "Lagrange mean value theorem",
+    "Derivative formula",
+    "Trigonometric integral",
+    "Quadratic surface",
+    "Second-order differential equation",
+    "Directional derivative"
+  ],
+  "hotkeys": {
+    "groups": [
+      {
+        "title": "General",
+        "items": [
+          {
+            "label": "Cut",
+            "value": "Ctrl + X"
+          },
+          {
+            "label": "Copy",
+            "value": "Ctrl + C"
+          },
+          {
+            "label": "Paste",
+            "value": "Ctrl + V"
+          },
+          {
+            "label": "Paste as plain text",
+            "value": "Ctrl + Shift + V"
+          },
+          {
+            "label": "Quick duplicate",
+            "value": "Ctrl + D"
+          },
+          {
+            "label": "Select all",
+            "value": "Ctrl + A"
+          },
+          {
+            "label": "Undo",
+            "value": "Ctrl + Z"
+          },
+          {
+            "label": "Redo",
+            "value": "Ctrl + Y"
+          },
+          {
+            "label": "Delete",
+            "value": "Delete / Backspace"
+          },
+          {
+            "label": "Select multiple",
+            "value": "Hold Ctrl or Shift"
+          },
+          {
+            "label": "Open find and replace",
+            "value": "Ctrl + F"
+          },
+          {
+            "label": "Print",
+            "value": "Ctrl + P"
+          },
+          {
+            "label": "Close dialog",
+            "value": "Esc"
+          }
+        ]
+      },
+      {
+        "title": "Presenting",
+        "items": [
+          {
+            "label": "Start slideshow from beginning",
+            "value": "F5"
+          },
+          {
+            "label": "Start slideshow from current slide",
+            "value": "Shift + F5"
+          },
+          {
+            "label": "Previous slide",
+            "value": "↑ / ← / PgUp"
+          },
+          {
+            "label": "Next slide",
+            "value": "↓ / → / PgDown"
+          },
+          {
+            "label": "Next slide",
+            "value": "Enter / Space"
+          },
+          {
+            "label": "Exit slideshow",
+            "value": "Esc"
+          }
+        ]
+      },
+      {
+        "title": "Slide editing",
+        "items": [
+          {
+            "label": "New slide",
+            "value": "Enter"
+          },
+          {
+            "label": "Pan canvas",
+            "value": "Space + drag"
+          },
+          {
+            "label": "Zoom canvas",
+            "value": "Ctrl + mouse wheel"
+          },
+          {
+            "label": "Zoom in",
+            "value": "Ctrl + ="
+          },
+          {
+            "label": "Zoom out",
+            "value": "Ctrl + -"
+          },
+          {
+            "label": "Fit canvas to screen",
+            "value": "Ctrl + 0"
+          },
+          {
+            "label": "Previous slide (no element selected)",
+            "value": "↑"
+          },
+          {
+            "label": "Next slide (no element selected)",
+            "value": "↓"
+          },
+          {
+            "label": "Previous slide",
+            "value": "Scroll up / PgUp"
+          },
+          {
+            "label": "Next slide",
+            "value": "Scroll down / PgDown"
+          },
+          {
+            "label": "Quickly create text",
+            "value": "Double-click empty space / T"
+          },
+          {
+            "label": "Quickly create rectangle",
+            "value": "R"
+          },
+          {
+            "label": "Quickly create circle",
+            "value": "O"
+          },
+          {
+            "label": "Quickly create line",
+            "value": "L"
+          },
+          {
+            "label": "Exit drawing mode",
+            "value": "Right-click"
+          }
+        ]
+      },
+      {
+        "title": "Element operations",
+        "items": [
+          {
+            "label": "Move",
+            "value": "↑ / ← / ↓ / →"
+          },
+          {
+            "label": "Lock",
+            "value": "Ctrl + L"
+          },
+          {
+            "label": "Group",
+            "value": "Ctrl + G"
+          },
+          {
+            "label": "Ungroup",
+            "value": "Ctrl + Shift + G"
+          },
+          {
+            "label": "Bring to front",
+            "value": "Alt + F"
+          },
+          {
+            "label": "Send to back",
+            "value": "Alt + B"
+          },
+          {
+            "label": "Lock aspect ratio",
+            "value": "Hold Ctrl or Shift"
+          },
+          {
+            "label": "Quick copy",
+            "value": "Hold Ctrl + drag"
+          },
+          {
+            "label": "Create horizontal or vertical line",
+            "value": "Hold Ctrl or Shift"
+          },
+          {
+            "label": "Move focus between elements",
+            "value": "Tab"
+          },
+          {
+            "label": "Confirm image crop",
+            "value": "Enter"
+          },
+          {
+            "label": "Finish drawing custom shape",
+            "value": "Enter"
+          }
+        ]
+      },
+      {
+        "title": "Table editing",
+        "items": [
+          {
+            "label": "Focus next cell",
+            "value": "Tab"
+          },
+          {
+            "label": "Move focused cell",
+            "value": "↑ / ← / ↓ / →"
+          },
+          {
+            "label": "Insert row above",
+            "value": "Ctrl + ↑"
+          },
+          {
+            "label": "Insert row below",
+            "value": "Ctrl + ↓"
+          },
+          {
+            "label": "Insert column to the left",
+            "value": "Ctrl + ←"
+          },
+          {
+            "label": "Insert column to the right",
+            "value": "Ctrl + →"
+          }
+        ]
+      },
+      {
+        "title": "Chart data editing",
+        "items": [
+          {
+            "label": "Focus next row",
+            "value": "Enter"
+          }
+        ]
+      },
+      {
+        "title": "Text editing",
+        "items": [
+          {
+            "label": "Bold",
+            "value": "Ctrl + B"
+          },
+          {
+            "label": "Italic",
+            "value": "Ctrl + I"
+          },
+          {
+            "label": "Underline",
+            "value": "Ctrl + U"
+          },
+          {
+            "label": "Inline code",
+            "value": "Ctrl + E"
+          },
+          {
+            "label": "Superscript",
+            "value": "Ctrl + ;"
+          },
+          {
+            "label": "Subscript",
+            "value": "Ctrl + '"
+          },
+          {
+            "label": "Select paragraph",
+            "value": "Esc"
+          }
+        ]
+      },
+      {
+        "title": "Other shortcuts",
+        "items": [
+          {
+            "label": "Add image — paste an image from the system clipboard"
+          },
+          {
+            "label": "Add image — drag a local image onto the canvas"
+          },
+          {
+            "label": "Add image — paste SVG code onto the canvas"
+          },
+          {
+            "label": "Add image — paste an image URL from Pexels"
+          },
+          {
+            "label": "Add text — paste text from the system clipboard"
+          },
+          {
+            "label": "Add text — drag selected external text onto the canvas"
+          },
+          {
+            "label": "Edit text — use Markdown syntax to create lists and blockquotes"
+          }
+        ]
+      }
+    ]
+  }
+}

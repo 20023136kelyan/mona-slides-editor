@@ -1,5 +1,5 @@
 export const FONTS = [
-  { label: '默认字体', value: '' },
+  { label: '', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },

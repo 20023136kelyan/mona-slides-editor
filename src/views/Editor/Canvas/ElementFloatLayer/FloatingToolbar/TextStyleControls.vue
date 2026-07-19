@@ -3,15 +3,15 @@
     class="font-select"
     :value="richTextAttrs.fontname"
     search
-    searchLabel="搜索字体"
+    :searchLabel="$t('canvas.fontSearch')"
     @update:value="value => emitRichTextCommand('fontname', value as string)"
-    :options="FONTS"
+    :options="fontOptions"
   />
   <Select
     class="fontsize-select"
     :value="richTextAttrs.fontsize"
     search
-    searchLabel="搜索字号"
+    :searchLabel="$t('canvas.fontSizeSearch')"
     @update:value="value => emitRichTextCommand('fontsize', value as string)"
     :options="fontSizeOptions.map(item => ({ label: item, value: item }))"
   />
@@ -79,7 +79,7 @@
 import tinycolor from 'tinycolor2'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '@/store'
-import { FONTS } from '@/configs/font'
+import useLocalizedFonts from '@/hooks/useLocalizedFonts'
 import emitter, { EmitterEvents } from '@/utils/emitter'
 
 import Select from '@/components/Select.vue'
@@ -87,6 +87,7 @@ import Popover from '@/components/Popover.vue'
 import ColorPicker from '@/components/ColorPicker/index.vue'
 
 const { richTextAttrs } = storeToRefs(useMainStore())
+const fontOptions = useLocalizedFonts()
 
 const fontSizeOptions = [
   '12px', '14px', '16px', '18px', '20px', '22px', '24px', '28px', '32px',

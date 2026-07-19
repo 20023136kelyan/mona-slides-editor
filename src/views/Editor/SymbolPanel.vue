@@ -39,6 +39,7 @@
 
 <script lang="ts" setup>
 import { computed, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useMainStore } from '@/store/main'
 import { SYMBOL_LIST } from '@/configs/symbol'
@@ -51,10 +52,11 @@ const mainStore = useMainStore()
 const { handleElement } = storeToRefs(mainStore)
 
 const { createTextElement } = useCreateElement()
+const { t } = useI18n()
 
 const poolRef = useTemplateRef<HTMLElement>('poolRef')
 const selectedSymbolKey = ref(SYMBOL_LIST[0].key)
-const emojiTypeList = ref(['表情', '动作', '动植物', '食物', '旅行', '活动', '物品', '符号'])
+const emojiTypeList = computed(() => ['face', 'gesture', 'nature', 'food', 'travel', 'activity', 'object', 'symbol'].map(key => t(`symbolCategories.${key}`)))
 const selectedEmojiTypeIndex = ref(0)
 const symbolPool = computed(() => {
   const selectedSymbol = SYMBOL_LIST.find(item => item.key === selectedSymbolKey.value)
@@ -68,10 +70,10 @@ const symbolPool = computed(() => {
   return selectedSymbol.children
 })
 
-const tabs = SYMBOL_LIST.map(item => ({
+const tabs = computed(() => SYMBOL_LIST.map(item => ({
   key: item.key,
-  label: item.label,
-}))
+  label: t(`symbolTabs.${item.key}`),
+})))
 
 watch([selectedEmojiTypeIndex, selectedSymbolKey], () => {
   if (poolRef.value) poolRef.value.scrollTo(0, 0)
