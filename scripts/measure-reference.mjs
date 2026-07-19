@@ -9,6 +9,8 @@ const projectRoot = resolve(import.meta.dirname, '..')
 const referenceURL = process.env.MONA_REFERENCE_URL || 'http://127.0.0.1:5173/'
 const sampleCount = Number(process.env.MONA_PERFORMANCE_SAMPLES || 5)
 const serverMode = process.env.MONA_SERVER_MODE || 'development'
+const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'vue-reference'
+const readySelector = process.env.MONA_READY_SELECTOR
 
 const median = values => {
   const sorted = [...values].sort((left, right) => left - right)
@@ -31,9 +33,14 @@ try {
     const page = await context.newPage()
     await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
     await page.goto(referenceURL, { waitUntil: 'load' })
-    await page.locator('.pptist-editor').waitFor({ state: 'visible' })
-    await page.locator('.thumbnail-item').nth(2).waitFor({ state: 'visible' })
-    await page.locator('.page-number', { hasText: 'Slide 1 of 3' }).waitFor({ state: 'visible' })
+    if (readySelector) {
+      await page.locator(readySelector).waitFor({ state: 'visible' })
+    }
+    else {
+      await page.locator('.pptist-editor').waitFor({ state: 'visible' })
+      await page.locator('.thumbnail-item').nth(2).waitFor({ state: 'visible' })
+      await page.locator('.page-number', { hasText: 'Slide 1 of 3' }).waitFor({ state: 'visible' })
+    }
     await page.evaluate(() => document.fonts.ready)
 
     const metrics = await page.evaluate(() => {
@@ -67,7 +74,7 @@ const medians = Object.fromEntries(numericKeys.map(key => [key, median(samples.m
 
 const report = {
   schemaVersion: 1,
-  runtime: 'vue-reference',
+  runtime: runtimeLabel,
   serverMode,
   url: referenceURL,
   viewport: { width: 1440, height: 900, deviceScaleFactor: 1 },

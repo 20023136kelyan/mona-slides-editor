@@ -6,7 +6,8 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, relative, resolve } from 'node:path'
 
 const projectRoot = resolve(import.meta.dirname, '..')
-const buildDirectory = resolve(projectRoot, 'dist')
+const buildDirectory = resolve(projectRoot, process.env.MONA_BUILD_DIR || 'dist')
+const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'vue-reference'
 
 const collectFiles = async directory => {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -50,7 +51,7 @@ for (const metric of fileMetrics) {
 
 const report = {
   schemaVersion: 1,
-  runtime: 'vue-reference',
+  runtime: runtimeLabel,
   totals: {
     files: fileMetrics.length,
     bytes: fileMetrics.reduce((total, metric) => total + metric.bytes, 0),

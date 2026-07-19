@@ -2,10 +2,16 @@
   "name": "pptist",
   "version": "2.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:react": "npm run dev -w @mona/web -- --host 127.0.0.1 --port 5174",
     "build": "run-p i18n:check type-check \"build-only {@}\" --",
+    "build:react": "npm run build -w @mona/web",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build --force",
@@ -14,6 +20,9 @@
     "parity:reference:update": "playwright test --project=reference-chromium --update-snapshots",
     "parity:measure:build": "node scripts/measure-build.mjs",
     "parity:measure:runtime": "node scripts/measure-reference.mjs",
+    "test:react": "npm run test -w @mona/web",
+    "e2e:react": "npm run e2e -w @mona/web",
+    "lint:react": "npm run lint -w @mona/web",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "prepare": "husky install"
   },

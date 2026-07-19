@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "runtime": "react-foundation",
+  "serverMode": "production-preview",
+  "url": "http://127.0.0.1:4174/",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "sampleCount": 5,
+  "medians": {
+    "editorReadyMs": 64.90000000596046,
+    "domContentLoadedMs": 22.5,
+    "loadMs": 22.799999997019768,
+    "firstContentfulPaintMs": 40,
+    "resourceCount": 3,
+    "transferBytes": 162938,
+    "decodedBodyBytes": 518800,
+    "usedJSHeapBytes": 10000000
+  },
+  "samples": [
+    {
+      "editorReadyMs": 125.5,
+      "domContentLoadedMs": 58.5,
+      "loadMs": 62.79999999701977,
+      "firstContentfulPaintMs": 92,
+      "resourceCount": 3,
+      "transferBytes": 162938,
+      "decodedBodyBytes": 518800,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 63.79999999701977,
+      "domContentLoadedMs": 21.299999997019768,
+      "loadMs": 21.69999998807907,
+      "firstContentfulPaintMs": 36,
+      "resourceCount": 3,
+      "transferBytes": 162938,
+      "decodedBodyBytes": 518800,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 66.90000000596046,
+      "domContentLoadedMs": 24.600000008940697,
+      "loadMs": 24.80000001192093,
+      "firstContentfulPaintMs": 48,
+      "resourceCount": 3,
+      "transferBytes": 162938,
+      "decodedBodyBytes": 518800,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 63.099999994039536,
+      "domContentLoadedMs": 21.899999991059303,
+      "loadMs": 22,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 3,
+      "transferBytes": 162938,
+      "decodedBodyBytes": 518800,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 64.90000000596046,
+      "domContentLoadedMs": 22.5,
+      "loadMs": 22.799999997019768,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 3,
+      "transferBytes": 162938,
+      "decodedBodyBytes": 518800,
+      "usedJSHeapBytes": 10000000
+    }
+  ]
+}

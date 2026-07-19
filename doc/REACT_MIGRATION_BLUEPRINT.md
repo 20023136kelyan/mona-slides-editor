@@ -71,7 +71,7 @@ Version observations below are from the npm registry on 2026-07-19. They are can
 | --- | --- | --- |
 | Runtime | React and React DOM 19.2.7 | Use the latest stable React release, never `next`/canary in production. |
 | Build | Vite 8.1.5 and `@vitejs/plugin-react` 6.0.3 | Use the current supported Vite minor; review every major migration guide. |
-| Language | TypeScript 7.0.2 | Adopt only if the complete dependency/type gate passes; otherwise pin the newest compatible stable TypeScript and record why. |
+| Language | TypeScript 7.0.2 | Selected after the Gate 1 type/build check passed. Use Oxlint's TypeScript-7-native analysis instead of forcing the currently incompatible `typescript-eslint` parser. |
 | Styling | Tailwind CSS and `@tailwindcss/vite` 4.3.3 | Use the first-party Vite plugin and CSS-first tokens. |
 | Components | shadcn 4.13.1 | Components are copied source that Mona owns and reviews. Add only components the product uses. |
 | Unit/component tests | Vitest 4.1.10 | Node tests for pure code; Browser Mode with the Playwright provider for browser components. |
@@ -225,7 +225,7 @@ React components and Hooks must remain pure, with side effects used only to sync
 
 ### React Compiler
 
-The React Compiler is stable and works with React 19. Vite 8's React plugin provides an explicit compiler integration. Enable it in the new React application from Gate 1 in default inference mode, with the full ESLint plugin and Strict Mode enabled. See the [React Compiler introduction](https://react.dev/learn/react-compiler/introduction) and [Vite 8 React integration](https://vite.dev/blog/announcing-vite8).
+The React Compiler is stable and works with React 19. Vite 8's React plugin provides an explicit compiler integration. Enable it in the new React application from Gate 1 in default inference mode, with Oxlint's native Hooks/React Compiler analysis and Strict Mode enabled. This keeps TypeScript 7's native toolchain instead of forcing the unsupported `typescript-eslint <6.1` peer range. See the [React Compiler introduction](https://react.dev/learn/react-compiler/introduction), [Vite 8 React integration](https://vite.dev/blog/announcing-vite8), and [Oxlint built-in plugins](https://oxc.rs/docs/guide/usage/linter/plugins.html).
 
 Compiler rules:
 
@@ -369,7 +369,7 @@ Exit: the current Vue product can be rebuilt and its critical behavior is reprod
 Deliverables:
 
 1. Add npm workspaces and `apps/web` without relocating Vue.
-2. Scaffold React 19 + TypeScript + Vite with Strict Mode, ESLint, and React Compiler.
+2. Scaffold React 19 + TypeScript + Vite with Strict Mode, type-aware Oxlint, and React Compiler.
 3. Add Tailwind v4 tokens and initialize shadcn/ui with a documented preset/base choice.
 4. Add React routing/error boundaries/lazy boundaries.
 5. Port i18n runtime and render a small shell/settings surface from the same catalogs.

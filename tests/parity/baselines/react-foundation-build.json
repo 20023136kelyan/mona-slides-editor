@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "runtime": "react-foundation",
+  "totals": {
+    "files": 6,
+    "bytes": 548158,
+    "gzipBytes": 174303
+  },
+  "byGroup": {
+    "js": {
+      "files": 4,
+      "bytes": 517487,
+      "gzipBytes": 167928
+    },
+    "css": {
+      "files": 1,
+      "bytes": 30204,
+      "gzipBytes": 6074
+    },
+    "html": {
+      "files": 1,
+      "bytes": 467,
+      "gzipBytes": 301
+    }
+  },
+  "largestFiles": [
+    {
+      "file": "assets/index-BW1fn6bh.js",
+      "group": "js",
+      "bytes": 363117,
+      "gzipBytes": 115486
+    },
+    {
+      "file": "assets/FoundationPage-BfaUCdKG.js",
+      "group": "js",
+      "bytes": 125479,
+      "gzipBytes": 40478
+    },
+    {
+      "file": "assets/index-ChKneVLF.css",
+      "group": "css",
+      "bytes": 30204,
+      "gzipBytes": 6074
+    },
+    {
+      "file": "assets/zh-CN-OCV3NJX_.js",
+      "group": "js",
+      "bytes": 28538,
+      "gzipBytes": 11675
+    },
+    {
+      "file": "index.html",
+      "group": "html",
+      "bytes": 467,
+      "gzipBytes": 301
+    },
+    {
+      "file": "assets/zh-CN-DY4Qpr2b.js",
+      "group": "js",
+      "bytes": 353,
+      "gzipBytes": 289
+    }
+  ]
+}

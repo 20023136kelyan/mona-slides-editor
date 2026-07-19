@@ -6,9 +6,9 @@ Status: Gate 0 harness operational; reference coverage expands before each React
 
 | Priority | Surface | Reference contract | React parity | Evidence |
 | --- | --- | --- | --- | --- |
-| P0 | Desktop app loads | Automated | — | shell assertions, console guard, initial screenshot |
+| P0 | Desktop app loads | Automated | Foundation only | Vue shell assertions/console guard/screenshot; React foundation E2E |
 | P0 | Initial document state | Automated | — | normalized development bridge snapshot |
-| P0 | Settings opens/closes | Automated | — | interaction assertion and component screenshot |
+| P0 | Settings opens/closes | Automated | Foundation automated | Vue interaction/component screenshot; React browser component + E2E |
 | P0 | Slide navigation | Automated | — | thumbnail selection assertion and screenshot |
 | P0 | Presentation title editing | Automated | — | UI interaction and resulting document-state assertion |
 | P0 | Slide creation | Automated | — | thumbnail/UI assertion and resulting document-state assertion |
@@ -26,11 +26,11 @@ Status: Gate 0 harness operational; reference coverage expands before each React
 | P1 | Animations/transitions | Pending | — | — |
 | P1 | Slideshow/presenter | Pending | — | — |
 | P1 | Mobile editor/preview | Pending | — | — |
-| P1 | English/Chinese UI | English shell automated; Chinese pending | — | — |
+| P1 | English/Chinese UI | English shell automated; Chinese pending | Foundation automated | shared-catalog unit test; React browser locale switch/document language/storage contract |
 | P1 | Keyboard/focus/accessibility | Pending | — | — |
 | P1 | Large-deck performance | Fixture pending | — | — |
 
-The frozen build and production-runtime measurements live in `tests/parity/baselines/`. The current screenshots and normalized state snapshot live beside the reference specs. See `doc/PARITY_BASELINE.md` for the environment and interpretation rules.
+The frozen build and production-runtime measurements live in `tests/parity/baselines/`, including separate React-foundation reports that are not yet complete-editor comparisons. The current screenshots and normalized state snapshot live beside the reference specs. See `doc/PARITY_BASELINE.md` and `doc/REACT_FOUNDATION.md` for the environment and interpretation rules.
 
 ## Evidence rules
 
