@@ -1,6 +1,6 @@
 # React migration inventory
 
-Status: updated through Gate 2, 2026-07-19. Update this document at every migration gate.
+Status: updated through Gate 3, 2026-07-19. Update this document at every migration gate.
 
 ## Baseline identity
 
@@ -133,8 +133,8 @@ Before a feature starts, add its exact files and tests to this table.
 | document model | `src/types/slides.ts` compatibility export, `src/store/slides.ts` Vue adapter | `presentation-core`, `editor-state` | Gate 2 core/Vue operation contract automated; renderer pending |
 | selection/canvas session | `src/store/main.ts`, canvas hooks/components | `editor-state`, `editor-interactions` | Gate 2 isolated state/gesture prototypes automated; Vue UI port pending |
 | history | `src/store/snapshot.ts` | `PresentationHistoryAdapter` | contract defined; existing Dexie implementation intentionally retained |
-| slide renderer | `src/views/components/Slide.vue` and element components | React slide/element renderers | pending |
-| thumbnails | thumbnail components and `Thumbnails` view | React thumbnail vertical slice | pending |
+| slide renderer | Vue thumbnail/base element components remain the oracle | `apps/web/src/features/presentation-renderer/**` | Gate 3 read-only parity automated for all nine element types; editing pending |
+| thumbnails | `ThumbnailSlide` and `Thumbnails` remain the oracle | React read-only rail and shared `ScaledSlide` | Gate 3 rendering/selection automated; drag, sections, notes, and editing pending |
 | import | `src/hooks/useImport.ts` | runtime adapter | corpus required |
 | export | `src/hooks/useExport.ts`, export dialogs | runtime adapter + React dialogs | corpus required |
 | slideshow/presenter | `src/views/Screen/**` | React screen application | pending |

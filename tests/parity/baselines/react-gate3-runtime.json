@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "runtime": "react-gate3",
+  "serverMode": "production-preview",
+  "url": "http://127.0.0.1:4174/?rendererFixture=gate3-renderer",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "sampleCount": 5,
+  "medians": {
+    "editorReadyMs": 830.7999999970198,
+    "domContentLoadedMs": 25.200000002980232,
+    "loadMs": 25.700000002980232,
+    "firstContentfulPaintMs": 44,
+    "resourceCount": 6,
+    "transferBytes": 363495,
+    "decodedBodyBytes": 1124832,
+    "usedJSHeapBytes": 10000000
+  },
+  "samples": [
+    {
+      "editorReadyMs": 907.9000000059605,
+      "domContentLoadedMs": 60.70000000298023,
+      "loadMs": 64.59999999403954,
+      "firstContentfulPaintMs": 96,
+      "resourceCount": 6,
+      "transferBytes": 363495,
+      "decodedBodyBytes": 1124832,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 838.1000000089407,
+      "domContentLoadedMs": 26.400000005960464,
+      "loadMs": 26.600000008940697,
+      "firstContentfulPaintMs": 44,
+      "resourceCount": 6,
+      "transferBytes": 363495,
+      "decodedBodyBytes": 1124832,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 830.7999999970198,
+      "domContentLoadedMs": 24.200000002980232,
+      "loadMs": 24.200000002980232,
+      "firstContentfulPaintMs": 36,
+      "resourceCount": 6,
+      "transferBytes": 363495,
+      "decodedBodyBytes": 1124832,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 830.1000000089407,
+      "domContentLoadedMs": 23.799999997019768,
+      "loadMs": 24,
+      "firstContentfulPaintMs": 36,
+      "resourceCount": 6,
+      "transferBytes": 363495,
+      "decodedBodyBytes": 1124832,
+      "usedJSHeapBytes": 10000000
+    },
+    {
+      "editorReadyMs": 828,
+      "domContentLoadedMs": 25.200000002980232,
+      "loadMs": 25.700000002980232,
+      "firstContentfulPaintMs": 44,
+      "resourceCount": 6,
+      "transferBytes": 363495,
+      "decodedBodyBytes": 1124832,
+      "usedJSHeapBytes": 10000000
+    }
+  ]
+}

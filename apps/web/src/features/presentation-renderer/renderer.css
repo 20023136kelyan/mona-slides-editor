@@ -1,0 +1,321 @@
+.mona-readonly-deck {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 260px;
+  min-height: 0;
+}
+
+.mona-thumbnail-rail {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--background);
+  padding: 5px 0;
+}
+
+.mona-thumbnail-button {
+  display: grid;
+  grid-template-columns: 20px 120px;
+  justify-content: center;
+  align-items: start;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+  color: #8c8c8c;
+  text-align: left;
+}
+
+.mona-thumbnail-button[aria-pressed="true"] .mona-scaled-slide {
+  outline: 2px solid #d14424;
+  outline-offset: 0;
+}
+
+.mona-thumbnail-number {
+  padding-top: 4px;
+  font-size: 12px;
+}
+
+.mona-render-stage {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 32px;
+  background: #f3f3f3;
+}
+
+.mona-render-inspector {
+  border-left: 1px solid var(--border);
+  background: var(--background);
+}
+
+.mona-scaled-slide {
+  position: relative;
+  width: min(100%, 1000px);
+  height: min(100%, 562.5px);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+
+.mona-scaled-slide.is-fixed {
+  flex: none;
+  background: #fff;
+}
+
+.mona-scaled-slide-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.mona-slide-renderer {
+  position: relative;
+  overflow: hidden;
+  background-position: center;
+  background-color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  user-select: none;
+}
+
+.mona-rendered-element,
+.mona-element,
+.mona-chart-placeholder {
+  position: absolute;
+}
+
+.mona-rotate-wrapper,
+.mona-shape-content,
+.mona-image-element-content,
+.mona-chart-content,
+.mona-table-content,
+.mona-latex-content,
+.mona-video-content,
+.mona-audio-content {
+  width: 100%;
+  height: 100%;
+}
+
+.mona-text-content {
+  position: relative;
+  box-sizing: border-box;
+  line-height: 1.5;
+  word-break: break-word;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.mona-rich-text {
+  position: relative;
+}
+
+.mona-rich-text.is-thumbnail {
+  pointer-events: none;
+}
+
+.ProseMirror-static {
+  outline: 0;
+  border: 0;
+  font-size: 16px;
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
+}
+
+.ProseMirror-static p {
+  margin: var(--paragraphSpace) 0 0;
+}
+
+.ProseMirror-static p:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror-static ul,
+.ProseMirror-static ol,
+.ProseMirror-static li {
+  margin: var(--paragraphSpace) 0 0;
+}
+
+.ProseMirror-static ul,
+.ProseMirror-static ol {
+  padding-inline-start: 1.25em;
+}
+
+.ProseMirror-static ul,
+.ProseMirror-static ul li { list-style-type: disc; }
+.ProseMirror-static ol,
+.ProseMirror-static ol li { list-style-type: decimal; }
+.ProseMirror-static code {
+  margin: 0 1px;
+  border-radius: 4px;
+  background: #f1f1f1;
+  padding: 2px 6px;
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+.ProseMirror-static sup { vertical-align: super; font-size: smaller; }
+.ProseMirror-static sub { vertical-align: sub; font-size: smaller; }
+.ProseMirror-static blockquote {
+  overflow: hidden;
+  margin: 0.6em 0;
+  border-left: 4px solid #e0e0e0;
+  padding: 0 1.2em;
+  font-style: italic;
+}
+.ProseMirror-static [data-indent="1"] { padding-left: 1em; }
+.ProseMirror-static [data-indent="2"] { padding-left: 2em; }
+.ProseMirror-static [data-indent="3"] { padding-left: 3em; }
+.ProseMirror-static [data-indent="4"] { padding-left: 4em; }
+.ProseMirror-static [data-indent="5"] { padding-left: 5em; }
+.ProseMirror-static [data-indent="6"] { padding-left: 6em; }
+.ProseMirror-static [data-indent="7"] { padding-left: 7em; }
+.ProseMirror-static [data-indent="8"] { padding-left: 8em; }
+
+.mona-element-outline,
+.mona-image-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
+.mona-image-outline { z-index: 2; }
+
+.mona-shape-content {
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.mona-shape-content > svg,
+.mona-line-content > svg,
+.mona-latex-content > svg {
+  display: block;
+  overflow: visible;
+  transform-origin: 0 0;
+}
+
+.mona-shape-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.mona-shape-text.is-top { justify-content: flex-start; }
+.mona-shape-text.is-middle { justify-content: center; }
+.mona-shape-text.is-bottom { justify-content: flex-end; }
+
+.mona-image-element-content,
+.mona-chart-content,
+.mona-table-content,
+.mona-latex-content {
+  position: relative;
+}
+
+.mona-image-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mona-image-content img {
+  position: absolute;
+  max-width: none;
+}
+
+.mona-image-color-mask {
+  position: absolute;
+  inset: 0;
+}
+
+.mona-chart,
+.mona-chart-content {
+  width: 100%;
+  height: 100%;
+}
+
+.mona-table-element,
+.mona-static-table {
+  position: absolute;
+}
+
+.mona-table-content {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.mona-static-table {
+  position: relative;
+  user-select: none;
+}
+
+.mona-static-table table {
+  position: relative;
+  width: 100%;
+  border: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+  overflow-wrap: break-word;
+}
+
+.mona-static-table table.has-theme { background-color: #fff; }
+.mona-static-table table.has-theme tr:nth-child(2n) .mona-table-cell { background-color: var(--subThemeColor1); }
+.mona-static-table table.has-theme tr:nth-child(2n + 1) .mona-table-cell { background-color: var(--subThemeColor2); }
+.mona-static-table table.has-theme.has-row-header tr:first-child .mona-table-cell { background-color: var(--themeColor); }
+.mona-static-table table.has-theme.has-row-footer tr:last-child .mona-table-cell { background-color: var(--themeColor); }
+.mona-static-table table.has-theme.has-col-header tr .mona-table-cell:first-child { background-color: var(--themeColor); }
+.mona-static-table table.has-theme.has-col-footer tr .mona-table-cell:last-child { background-color: var(--themeColor); }
+
+.mona-table-cell {
+  position: relative;
+  background-clip: padding-box;
+  white-space: normal;
+  overflow-wrap: break-word;
+  vertical-align: middle;
+}
+
+.mona-table-cell-text {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+  padding: 5px;
+  line-height: 1.5;
+}
+
+.mona-video-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-color: #000;
+}
+
+.mona-video-icon {
+  width: 140px;
+  height: 140px;
+  color: #aaa;
+}
+
+.mona-audio-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mona-audio-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 1100px) {
+  .mona-readonly-deck { grid-template-columns: 160px minmax(0, 1fr); }
+  .mona-render-inspector { display: none; }
+}

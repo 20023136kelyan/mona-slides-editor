@@ -16,6 +16,8 @@ coverage
 
 # Test output (golden reference screenshots are committed separately)
 .artifacts/
+apps/web/.vitest-attachments/
+apps/web/src/**/__screenshots__/
 playwright-report/
 test-results/
 blob-report/

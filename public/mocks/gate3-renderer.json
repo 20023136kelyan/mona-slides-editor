@@ -1,0 +1,352 @@
+[
+  {
+    "id": "gate3-slide-foundations",
+    "background": {
+      "type": "solid",
+      "color": "#f7f3eb"
+    },
+    "elements": [
+      {
+        "type": "shape",
+        "id": "gate3-gradient-shape",
+        "groupId": "gate3-heading-group",
+        "left": 55,
+        "top": 50,
+        "width": 245,
+        "height": 180,
+        "viewBox": [245, 180],
+        "path": "M 0 0 L 245 0 L 245 180 L 0 180 Z",
+        "fill": "#5b9bd5",
+        "gradient": {
+          "type": "linear",
+          "rotate": 28,
+          "colors": [
+            { "pos": 0, "color": "#22577a" },
+            { "pos": 100, "color": "#80ed99" }
+          ]
+        },
+        "outline": { "width": 3, "style": "dashed", "color": "#17324d" },
+        "shadow": { "h": 8, "v": 10, "blur": 12, "color": "rgba(23, 50, 77, 0.28)" },
+        "fixedRatio": false,
+        "rotate": -6,
+        "opacity": 0.94,
+        "text": {
+          "content": "<p><strong><span style=\"font-size: 30px; color: #ffffff;\">Editable visuals</span></strong></p><p><span style=\"font-size: 17px; color: #f4fff8;\">One native element tree</span></p>",
+          "align": "middle",
+          "defaultFontName": "Arial",
+          "defaultColor": "#ffffff",
+          "lineHeight": 1.2,
+          "paragraphSpace": 7,
+          "inset": [18, 18, 18, 18]
+        }
+      },
+      {
+        "type": "text",
+        "id": "gate3-title",
+        "groupId": "gate3-heading-group",
+        "left": 350,
+        "top": 70,
+        "width": 560,
+        "height": 128,
+        "content": "<p><strong><span style=\"font-size: 54px;\">React renderer</span></strong></p><p><span style=\"font-size: 20px; color: #557;\">The persisted PowerPoint model, without Vue.</span></p>",
+        "defaultFontName": "Arial",
+        "defaultColor": "#1d2733",
+        "lineHeight": 1.15,
+        "wordSpace": 0.4,
+        "paragraphSpace": 4,
+        "inset": [6, 10, 6, 10],
+        "fixedHeight": true,
+        "vAlign": "middle",
+        "rotate": 0
+      },
+      {
+        "type": "line",
+        "id": "gate3-line",
+        "left": 350,
+        "top": 225,
+        "width": 5,
+        "start": [0, 0],
+        "end": [520, 0],
+        "style": "dashed",
+        "color": "#22577a",
+        "points": ["dot", "arrow"],
+        "shadow": { "h": 2, "v": 3, "blur": 3, "color": "rgba(0, 0, 0, 0.22)" }
+      },
+      {
+        "type": "shape",
+        "id": "gate3-radial-shape",
+        "left": 350,
+        "top": 295,
+        "width": 170,
+        "height": 170,
+        "viewBox": [100, 100],
+        "path": "M 50 0 L 100 50 L 50 100 L 0 50 Z",
+        "fill": "#ffb703",
+        "gradient": {
+          "type": "radial",
+          "rotate": 0,
+          "colors": [
+            { "pos": 0, "color": "#fff3b0" },
+            { "pos": 100, "color": "#fb8500" }
+          ]
+        },
+        "outline": { "width": 2, "style": "solid", "color": "#9b4b00" },
+        "fixedRatio": true,
+        "flipH": true,
+        "rotate": 14
+      },
+      {
+        "type": "shape",
+        "id": "gate3-pattern-shape",
+        "left": 610,
+        "top": 292,
+        "width": 260,
+        "height": 172,
+        "viewBox": [260, 172],
+        "path": "M 20 0 L 240 0 Q 260 0 260 20 L 260 152 Q 260 172 240 172 L 20 172 Q 0 172 0 152 L 0 20 Q 0 0 20 0 Z",
+        "fill": "#ffffff",
+        "pattern": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23eef7f2'/%3E%3Cpath d='M0 32L32 0M-8 8L8-8M24 40L40 24' stroke='%2380ed99' stroke-width='7'/%3E%3C/svg%3E",
+        "outline": { "width": 2, "style": "dotted", "color": "#22577a" },
+        "fixedRatio": false,
+        "flipV": true,
+        "rotate": -4,
+        "text": {
+          "content": "<p><strong><span style=\"font-size: 23px;\">Gradients, patterns, groups</span></strong></p>",
+          "align": "middle",
+          "defaultFontName": "Arial",
+          "defaultColor": "#17324d",
+          "inset": [10, 14, 10, 14]
+        }
+      }
+    ]
+  },
+  {
+    "id": "gate3-slide-images",
+    "background": {
+      "type": "gradient",
+      "gradient": {
+        "type": "linear",
+        "rotate": 18,
+        "colors": [
+          { "pos": 0, "color": "#eff6ff" },
+          { "pos": 100, "color": "#fdf2f8" }
+        ]
+      }
+    },
+    "elements": [
+      {
+        "type": "text",
+        "id": "gate3-image-title",
+        "left": 55,
+        "top": 30,
+        "width": 700,
+        "height": 70,
+        "content": "<p><strong><span style=\"font-size: 38px;\">Images, crops and transforms</span></strong></p>",
+        "defaultFontName": "Arial",
+        "defaultColor": "#25324a",
+        "rotate": 0
+      },
+      {
+        "type": "image",
+        "id": "gate3-image-round",
+        "left": 70,
+        "top": 135,
+        "width": 250,
+        "height": 300,
+        "rotate": -8,
+        "fixedRatio": false,
+        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='400' viewBox='0 0 500 400'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='1' y2='1'%3E%3Cstop stop-color='%230ea5e9'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='500' height='400' fill='url(%23g)'/%3E%3Ccircle cx='155' cy='150' r='92' fill='%23fde68a'/%3E%3Cpath d='M0 340L145 225L240 300L342 185L500 335V400H0Z' fill='%23f8fafc' opacity='.88'/%3E%3C/svg%3E",
+        "clip": { "range": [[8, 0], [88, 100]], "shape": "roundRect" },
+        "radius": 26,
+        "outline": { "width": 5, "style": "solid", "color": "#ffffff" },
+        "filters": { "saturate": "120%", "contrast": "108%" },
+        "shadow": { "h": 10, "v": 12, "blur": 15, "color": "rgba(30, 41, 59, 0.32)" }
+      },
+      {
+        "type": "image",
+        "id": "gate3-image-ellipse",
+        "left": 385,
+        "top": 130,
+        "width": 235,
+        "height": 235,
+        "rotate": 9,
+        "fixedRatio": true,
+        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='400' viewBox='0 0 500 400'%3E%3Crect width='500' height='400' fill='%231e293b'/%3E%3Ccircle cx='260' cy='195' r='150' fill='%2338bdf8'/%3E%3Ccircle cx='310' cy='155' r='82' fill='%23f472b6' opacity='.86'/%3E%3Cpath d='M95 335Q245 215 405 335' stroke='%23f8fafc' stroke-width='35' fill='none'/%3E%3C/svg%3E",
+        "clip": { "range": [[0, 0], [100, 100]], "shape": "ellipse" },
+        "outline": { "width": 5, "style": "dashed", "color": "#334155" },
+        "filters": { "brightness": "108%", "hue-rotate": "8deg" },
+        "flipH": true,
+        "colorMask": "rgba(14, 165, 233, 0.12)"
+      },
+      {
+        "type": "image",
+        "id": "gate3-image-polygon",
+        "left": 690,
+        "top": 130,
+        "width": 240,
+        "height": 260,
+        "rotate": -3,
+        "fixedRatio": false,
+        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='400' viewBox='0 0 500 400'%3E%3Crect width='500' height='400' fill='%23f97316'/%3E%3Cpath d='M0 75L500 0V400L0 325Z' fill='%23facc15'/%3E%3Cpath d='M75 80L425 325' stroke='%237c2d12' stroke-width='38'/%3E%3C/svg%3E",
+        "clip": { "range": [[0, 5], [100, 95]], "shape": "pentagon" },
+        "outline": { "width": 4, "style": "dotted", "color": "#7c2d12" },
+        "filters": { "sepia": "14%" },
+        "flipV": true,
+        "shadow": { "h": 5, "v": 7, "blur": 9, "color": "rgba(124, 45, 18, 0.25)" }
+      },
+      {
+        "type": "line",
+        "id": "gate3-curved-line",
+        "left": 360,
+        "top": 430,
+        "width": 6,
+        "start": [0, 0],
+        "end": [470, 0],
+        "curve": [235, 90],
+        "style": "dotted",
+        "color": "#7c3aed",
+        "points": ["arrow", "dot"]
+      }
+    ]
+  },
+  {
+    "id": "gate3-slide-data",
+    "background": { "type": "solid", "color": "#ffffff" },
+    "elements": [
+      {
+        "type": "chart",
+        "id": "gate3-chart",
+        "left": 45,
+        "top": 58,
+        "width": 455,
+        "height": 330,
+        "rotate": -1,
+        "fill": "#fbfdff",
+        "outline": { "width": 2, "style": "solid", "color": "#d8e1eb" },
+        "chartType": "bar",
+        "data": {
+          "labels": ["Plan", "Draft", "Review", "Ship"],
+          "legends": ["Team A", "Team B"],
+          "series": [[18, 30, 42, 62], [13, 26, 39, 54]]
+        },
+        "options": { "lineSmooth": false, "stack": false },
+        "themeColors": ["#2563eb", "#f97316"],
+        "textColor": "#334155",
+        "lineColor": "#dbe4ef"
+      },
+      {
+        "type": "table",
+        "id": "gate3-table",
+        "left": 535,
+        "top": 60,
+        "width": 420,
+        "height": 250,
+        "rotate": 2,
+        "outline": { "width": 2, "style": "solid", "color": "#ffffff" },
+        "theme": { "color": "#0f766e", "rowHeader": true, "rowFooter": false, "colHeader": true, "colFooter": false },
+        "colWidths": [0.36, 0.32, 0.32],
+        "cellMinHeight": 54,
+        "data": [
+          [
+            { "id": "cell-1", "colspan": 1, "rowspan": 1, "text": "Stage", "style": { "bold": true, "color": "#ffffff", "align": "left", "vAlign": "middle", "fontsize": "15px", "fontname": "Arial" } },
+            { "id": "cell-2", "colspan": 2, "rowspan": 1, "text": "Progress", "style": { "bold": true, "color": "#ffffff", "align": "center", "vAlign": "middle", "fontsize": "15px", "fontname": "Arial" } },
+            { "id": "cell-3", "colspan": 1, "rowspan": 1, "text": "", "style": {} }
+          ],
+          [
+            { "id": "cell-4", "colspan": 1, "rowspan": 2, "text": "Design", "style": { "bold": true, "color": "#134e4a", "vAlign": "middle", "fontsize": "14px", "fontname": "Arial" } },
+            { "id": "cell-5", "colspan": 1, "rowspan": 1, "text": "Visuals", "style": { "color": "#134e4a", "align": "center", "vAlign": "middle", "fontsize": "14px", "fontname": "Arial" } },
+            { "id": "cell-6", "colspan": 1, "rowspan": 1, "text": "80%", "style": { "bold": true, "color": "#134e4a", "align": "center", "vAlign": "middle", "fontsize": "14px", "fontname": "Arial" } }
+          ],
+          [
+            { "id": "cell-7", "colspan": 1, "rowspan": 1, "text": "", "style": {} },
+            { "id": "cell-8", "colspan": 1, "rowspan": 1, "text": "Copy", "style": { "color": "#134e4a", "align": "center", "vAlign": "middle", "fontsize": "14px", "fontname": "Arial" } },
+            { "id": "cell-9", "colspan": 1, "rowspan": 1, "text": "65%", "style": { "bold": true, "color": "#134e4a", "align": "center", "vAlign": "middle", "fontsize": "14px", "fontname": "Arial" } }
+          ]
+        ]
+      },
+      {
+        "type": "latex",
+        "id": "gate3-latex",
+        "left": 565,
+        "top": 380,
+        "width": 350,
+        "height": 105,
+        "rotate": -2,
+        "latex": "x^2 + y^2 = r^2",
+        "path": "M 5 80 Q 35 10 65 80 M 90 25 L 150 25 M 120 5 L 120 55 M 180 25 Q 220 75 260 25 M 285 20 L 340 20 M 285 65 L 340 65",
+        "color": "#7c3aed",
+        "strokeWidth": 5,
+        "viewBox": [350, 105],
+        "fixedRatio": false
+      },
+      {
+        "type": "text",
+        "id": "gate3-data-caption",
+        "left": 65,
+        "top": 425,
+        "width": 390,
+        "height": 75,
+        "content": "<p><strong><span style=\"font-size: 25px;\">Native charts + merged cells</span></strong></p><p><span style=\"font-size: 16px; color: #64748b;\">All remain editable document elements.</span></p>",
+        "defaultFontName": "Arial",
+        "defaultColor": "#0f172a",
+        "rotate": 0
+      }
+    ]
+  },
+  {
+    "id": "gate3-slide-media",
+    "background": { "type": "solid", "color": "#172033" },
+    "elements": [
+      {
+        "type": "text",
+        "id": "gate3-media-title",
+        "left": 55,
+        "top": 35,
+        "width": 850,
+        "height": 72,
+        "content": "<p><strong><span style=\"font-size: 40px; color: #f8fafc;\">Static media fidelity</span></strong></p>",
+        "defaultFontName": "Arial",
+        "defaultColor": "#f8fafc",
+        "rotate": 0
+      },
+      {
+        "type": "video",
+        "id": "gate3-video",
+        "left": 70,
+        "top": 145,
+        "width": 520,
+        "height": 300,
+        "rotate": -3,
+        "src": "",
+        "autoplay": false,
+        "poster": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'%3E%3Cdefs%3E%3ClinearGradient id='v' x2='1' y2='1'%3E%3Cstop stop-color='%230f172a'/%3E%3Cstop offset='1' stop-color='%232563eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='450' fill='url(%23v)'/%3E%3Ccircle cx='610' cy='105' r='85' fill='%2338bdf8' opacity='.55'/%3E%3Cpath d='M0 390L185 230L335 345L515 195L800 390V450H0Z' fill='%23f8fafc' opacity='.38'/%3E%3C/svg%3E"
+      },
+      {
+        "type": "audio",
+        "id": "gate3-audio",
+        "left": 690,
+        "top": 188,
+        "width": 170,
+        "height": 170,
+        "rotate": 7,
+        "fixedRatio": true,
+        "color": "#38bdf8",
+        "loop": false,
+        "autoplay": false,
+        "src": ""
+      },
+      {
+        "type": "text",
+        "id": "gate3-media-caption",
+        "left": 630,
+        "top": 390,
+        "width": 300,
+        "height": 90,
+        "content": "<p style=\"text-align: center;\"><strong><span style=\"font-size: 22px; color: #e2e8f0;\">Video poster + audio</span></strong></p><p style=\"text-align: center;\"><span style=\"font-size: 15px; color: #94a3b8;\">Read-only, statically rendered</span></p>",
+        "defaultFontName": "Arial",
+        "defaultColor": "#e2e8f0",
+        "rotate": 0
+      }
+    ]
+  }
+]

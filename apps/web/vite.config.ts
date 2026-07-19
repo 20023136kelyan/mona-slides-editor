@@ -6,6 +6,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vite.dev/config/
 export default defineConfig({
+  publicDir: fileURLToPath(new URL('../../public/mocks', import.meta.url)),
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),

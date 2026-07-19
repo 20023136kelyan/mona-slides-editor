@@ -399,6 +399,8 @@ Exit: the same operation fixtures pass through Vue and the new core; state archi
 
 ### Gate 3 — read-only React renderer
 
+Status: **complete**, including structural, visual, lifecycle, browser, and production-performance evidence. See [REACT_GATE_3.md](./REACT_GATE_3.md).
+
 Port in dependency order:
 
 1. slide background and viewport;

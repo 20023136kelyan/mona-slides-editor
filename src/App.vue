@@ -33,6 +33,10 @@ const { slides } = storeToRefs(slidesStore)
 const { screening } = storeToRefs(screenStore)
 
 const isAudienceMode = new URLSearchParams(window.location.search).get('mode') === 'audience'
+const requestedRendererFixture = new URLSearchParams(window.location.search).get('rendererFixture')
+const rendererFixture = import.meta.env.MODE === 'development' && requestedRendererFixture === 'gate3-renderer'
+  ? requestedRendererFixture
+  : null
 
 if (import.meta.env.MODE !== 'development') {
   window.onbeforeunload = () => false
@@ -47,7 +51,7 @@ onMounted(async () => {
     screenStore.setScreening(true)
   }
   else {
-    const slides = await api.getMockData('slides')
+    const slides = await api.getMockData(rendererFixture || 'slides')
     slidesStore.setSlides(slides)
 
     await deleteDiscardedDB()

@@ -30,3 +30,23 @@ test('loads the React foundation and changes locale without browser errors', asy
   await expect(page.getByText('Untitled presentation', { exact: true })).toBeVisible()
   expect(browserProblems).toEqual([])
 })
+
+test('renders the complete native fixture and selects a slide read-only', async ({ page }) => {
+  const browserProblems: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error' || message.type() === 'warning') browserProblems.push(`${message.type()}: ${message.text()}`)
+  })
+  page.on('pageerror', (error) => browserProblems.push(`pageerror: ${error.message}`))
+
+  await page.goto('/?rendererFixture=gate3-renderer')
+  await expect(page.getByRole('button', { name: 'Show slide 4' })).toBeVisible()
+  await expect(page.locator('.mona-thumbnail-rail [data-chart-ready] svg')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Show slide 3' }).click()
+  await expect(page.getByRole('button', { name: 'Show slide 3' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.mona-render-stage [data-slide-id="gate3-slide-data"]')).toBeVisible()
+  await expect(page.locator('.mona-render-stage [data-element-type="table"]')).toBeVisible()
+  await expect(page.locator('.mona-render-stage [data-element-type="latex"]')).toBeVisible()
+  await expect(page.getByRole('textbox')).toHaveCount(0)
+  expect(browserProblems).toEqual([])
+})

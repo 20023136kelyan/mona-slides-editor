@@ -1,13 +1,18 @@
 import { MenuIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useLoaderData } from 'react-router'
+
+import type { PresentationState } from '@mona/presentation-core'
 
 import { Button } from '@/components/ui/button'
+import { ReadOnlyDeck } from '@/features/presentation-renderer/ReadOnlyDeck'
 import { SettingsMenu } from '@/features/settings/SettingsMenu'
 
 const FOUNDATION_DOCUMENT_TITLE = 'Untitled presentation'
 
 export function FoundationPage() {
   const { t } = useTranslation()
+  const presentation = useLoaderData() as PresentationState
 
   return (
     <div
@@ -26,18 +31,7 @@ export function FoundationPage() {
         <SettingsMenu />
       </header>
 
-      <main className="grid min-h-0 grid-cols-[160px_1fr_260px]">
-        <aside aria-label="Slides" className="border-r bg-background" />
-        <section className="flex min-w-0 items-center justify-center overflow-hidden p-8">
-          <div className="flex aspect-video w-full max-w-[1000px] flex-col items-center justify-center gap-2 rounded-sm border bg-background shadow-sm">
-            <p className="text-sm font-medium">{t('foundation.status')}</p>
-            <p className="text-sm text-muted-foreground">
-              {t('foundation.referenceNotice')}
-            </p>
-          </div>
-        </section>
-        <aside aria-label="Inspector" className="border-l bg-background" />
-      </main>
+      <ReadOnlyDeck presentation={presentation} />
     </div>
   )
 }

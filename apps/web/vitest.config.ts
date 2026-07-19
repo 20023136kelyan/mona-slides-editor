@@ -22,6 +22,9 @@ export default defineConfig({
       },
       {
         plugins: [react(), tailwindcss()],
+        optimizeDeps: {
+          include: ['tinycolor2'],
+        },
         resolve: {
           alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),
