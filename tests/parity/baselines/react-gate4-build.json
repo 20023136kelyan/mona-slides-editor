@@ -3,8 +3,8 @@
   "runtime": "react-gate4",
   "totals": {
     "files": 21,
-    "bytes": 2662612,
-    "gzipBytes": 542249
+    "bytes": 2662670,
+    "gzipBytes": 542279
   },
   "byGroup": {
     "json": {
@@ -19,8 +19,8 @@
     },
     "js": {
       "files": 6,
-      "bytes": 1173821,
-      "gzipBytes": 387540
+      "bytes": 1173879,
+      "gzipBytes": 387569
     },
     "css": {
       "files": 1,
@@ -30,21 +30,21 @@
     "html": {
       "files": 1,
       "bytes": 467,
-      "gzipBytes": 304
+      "gzipBytes": 305
     }
   },
   "largestFiles": [
     {
-      "file": "assets/ChartElement-BcYUbUd1.js",
+      "file": "assets/ChartElement-BLST8J8D.js",
       "group": "js",
       "bytes": 531460,
-      "gzipBytes": 177272
+      "gzipBytes": 177274
     },
     {
-      "file": "assets/index-Dofa4mNB.js",
+      "file": "assets/index-g14lLJ7A.js",
       "group": "js",
       "bytes": 367825,
-      "gzipBytes": 117136
+      "gzipBytes": 117135
     },
     {
       "file": "template_8.json",
@@ -53,10 +53,10 @@
       "gzipBytes": 17452
     },
     {
-      "file": "assets/FoundationPage-CFYRJZKn.js",
+      "file": "assets/FoundationPage-FfNE82xR.js",
       "group": "js",
-      "bytes": 220146,
-      "gzipBytes": 71927
+      "bytes": 220204,
+      "gzipBytes": 71955
     },
     {
       "file": "template_4.json",

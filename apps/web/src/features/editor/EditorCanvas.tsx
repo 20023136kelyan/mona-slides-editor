@@ -60,6 +60,13 @@ import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 
 type CreateTool = 'text' | 'shape' | 'line'
 
+const DRAG_ACTIVATION_DISTANCE = 5
+const TRANSFORM_ACTIVATION_DISTANCE = 0.01
+
+const exceedsActivationDistance = (delta: PointerPosition, threshold: number) => (
+  Math.abs(delta.x) >= threshold || Math.abs(delta.y) >= threshold
+)
+
 type GestureContext =
   | { kind: 'drag'; elements: PPTElement[]; bounds: InteractionBounds }
   | { kind: 'resize'; elements: PPTElement[]; bounds: InteractionBounds; handle: ResizeHandle }
@@ -158,6 +165,7 @@ const derivePreview = (
   if (context.kind === 'create') return { ...emptyPreview(), createRect: normalizeRect(snapshot.origin, snapshot.pointer) }
 
   if (context.kind === 'drag') {
+    if (!exceedsActivationDistance(snapshot.delta, DRAG_ACTIVATION_DISTANCE)) return emptyPreview()
     let delta = snapshot.delta
     if (snapshot.modifiers.shift) {
       delta = Math.abs(delta.x) >= Math.abs(delta.y) ? { x: delta.x, y: 0 } : { x: 0, y: delta.y }
@@ -607,8 +615,8 @@ export function EditorCanvas({ runtime }: { runtime: EditorRuntime }) {
       }
       return
     }
-    const minimumMovement = context.kind === 'drag' ? 5 : 0.01
-    if ((Math.abs(snapshot.delta.x) < minimumMovement && Math.abs(snapshot.delta.y) < minimumMovement) || !finalPreview.updates.size) return
+    const activationDistance = context.kind === 'drag' ? DRAG_ACTIVATION_DISTANCE : TRANSFORM_ACTIVATION_DISTANCE
+    if (!exceedsActivationDistance(snapshot.delta, activationDistance) || !finalPreview.updates.size) return
     if (context.kind === 'drag' && (snapshot.modifiers.control || snapshot.modifiers.meta)) {
       const additions = duplicatePreviewElements(context.elements, finalPreview.updates)
       if (runtime.commit('Duplicate and move elements', [{ type: 'element.add', elements: additions }])) {

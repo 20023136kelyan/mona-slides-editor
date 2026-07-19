@@ -11,7 +11,7 @@ The React editor now supports:
 - current-slide focus, element selection, group selection, additive selection, and lasso selection;
 - fit scaling, zoom, pan, coordinate conversion, canvas focus, ruler, and grid sizes;
 - pointer capture for drag, resize, rotation, cropping, lasso, pan, and create gestures;
-- group-preserving drag, rotated-element bounds, anchored resize, 45-degree rotation snapping, alignment guides, and canvas/element snapping;
+- group-preserving drag, a five-unit drag activation dead zone, rotated-element bounds, anchored resize, 45-degree rotation snapping, alignment guides, and canvas/element snapping;
 - text, rectangle, and line creation from keyboard tools, plus double-click text creation;
 - image crop mode with independent crop handles;
 - arrow-key nudging, Shift nudging, select all, cut/copy/paste, quick duplicate, delete, grouping, ungrouping, locking, layer movement, zoom reset, undo, and redo;
@@ -53,7 +53,7 @@ The Gate 4 suite covers state output as well as visible UI:
 - geometry unit tests cover group bounds, rotated bounds, snapping, resize anchoring, lasso containment, rotation angles, and coordinate conversion;
 - runtime tests cover atomic commit/undo/redo, group-safe clipboard IDs, cut/select-all, and 10,000 pointer updates with zero Redux notifications followed by one commit notification;
 - browser-component tests prove the renderer remains the same element tree beneath the editable overlay and verify keyboard tool activation;
-- E2E tests cover selection, drag, resize, rotate, group alignment, group/ungroup, layer eligibility, lock/unlock, web and slide link persistence, native keyboard clipboard, delete/undo, create gestures, grid/ruler, image crop, lasso, zoom, and spacebar pan;
+- E2E tests cover stationary selection without premature snapping or guide flashes, drag, resize, rotate, group alignment, group/ungroup, layer eligibility, lock/unlock, web and slide link persistence, native keyboard clipboard, delete/undo, create gestures, grid/ruler, image crop, lasso, zoom, and spacebar pan;
 - Gate 3 structural and pixel comparisons remain unchanged and green because editing is an overlay;
 - live in-app browser inspection confirms the corrected menu inventory, submenu chrome, selection overlay, and zero console errors.
 
@@ -63,7 +63,7 @@ All of the following pass:
 - `npm run test:gate2` — 34 framework-neutral core, state, interaction, and geometry tests;
 - `npm run lint:react` and `npm run build:react`;
 - `npm run test:react` — 23 unit and browser-component tests;
-- `npm run e2e:react` — 5 React browser journeys, including 3 Gate 4 editing journeys;
+- `npm run e2e:react` — 6 React browser journeys, including 4 Gate 4 editing journeys;
 - `npm run parity:gate3` — both frozen structural/pixel parity decks;
 - `npm run parity:reference` — 7 Vue oracle tests and screenshots;
 - `npm run build` — Vue type-check, localization check, and production oracle build;
@@ -82,15 +82,15 @@ At the final production build:
 
 | Metric | Gate 4 result |
 | --- | ---: |
-| Complete build | 2,662,612 B / 542,249 B gzip |
-| JavaScript | 1,173,821 B / 387,540 B gzip |
+| Complete build | 2,662,670 B / 542,279 B gzip |
+| JavaScript | 1,173,879 B / 387,569 B gzip |
 | Application CSS | 45,914 B / 9,113 B gzip |
-| Complete fixture transfer | 388,729 B |
-| First contentful paint, median | 48 ms |
-| Full fixture chart-ready, median | 845.0 ms |
+| Complete fixture transfer | 388,758 B |
+| First contentful paint, median | 44 ms |
+| Full fixture chart-ready, median | 845.2 ms |
 | Used JavaScript heap, median | 10 MB |
 
-Against the Gate 3 read-only build, Gate 4 adds 79,660 raw bytes and 26,125 gzip bytes across the full artifact. The representative chart-ready median changes from 830.8 ms to 845.0 ms (1.7%); first contentful paint changes from 44 ms to 48 ms, and measured heap remains unchanged. The existing 531,460 B lazy ECharts chunk remains the largest file and is still loaded only for chart decks.
+Against the Gate 3 read-only build, Gate 4 adds 79,718 raw bytes and 26,155 gzip bytes across the full artifact. The representative chart-ready median changes from 830.8 ms to 845.2 ms (1.7%); first contentful paint remains 44 ms, and measured heap remains unchanged. The existing 531,460 B lazy ECharts chunk remains the largest file and is still loaded only for chart decks.
 
 ## Scope boundary and go decision
 

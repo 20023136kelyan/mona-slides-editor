@@ -6,6 +6,49 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 })
 
+test('does not activate snapping or guides until a real drag begins', async ({ page }) => {
+  const target = page.getByRole('button', { name: 'Select shape gate3-radial-shape' })
+  const rendered = page.locator('.mona-render-stage [data-element-id="gate3-radial-shape"]')
+  const initialPosition = await rendered.evaluate(element => ({
+    left: (element as HTMLElement).style.left,
+    top: (element as HTMLElement).style.top,
+  }))
+  const targetBox = await target.boundingBox()
+  expect(targetBox).not.toBeNull()
+  const pointer = {
+    x: targetBox!.x + targetBox!.width / 2,
+    y: targetBox!.y + targetBox!.height / 2,
+  }
+
+  await page.mouse.move(pointer.x, pointer.y)
+  await page.mouse.down()
+  await page.mouse.move(pointer.x + 1, pointer.y + 1)
+  await page.waitForTimeout(50)
+
+  expect(await rendered.evaluate(element => ({
+    left: (element as HTMLElement).style.left,
+    top: (element as HTMLElement).style.top,
+  }))).toEqual(initialPosition)
+  await expect(page.locator('.mona-alignment-guide')).toHaveCount(0)
+  await page.mouse.up()
+
+  const dragBox = await target.boundingBox()
+  expect(dragBox).not.toBeNull()
+  const dragPointer = {
+    x: dragBox!.x + dragBox!.width / 2,
+    y: dragBox!.y + dragBox!.height / 2,
+  }
+  await page.mouse.move(dragPointer.x, dragPointer.y)
+  await page.mouse.down()
+  await page.mouse.move(dragPointer.x + 8, dragPointer.y)
+  await expect(page.locator('.mona-alignment-guide')).toHaveCount(1)
+  expect(await rendered.evaluate(element => ({
+    left: (element as HTMLElement).style.left,
+    top: (element as HTMLElement).style.top,
+  }))).not.toEqual(initialPosition)
+  await page.mouse.up()
+})
+
 test('selects, moves, resizes, rotates, and restores elements atomically', async ({ page }) => {
   const problems: string[] = []
   page.on('console', message => {
