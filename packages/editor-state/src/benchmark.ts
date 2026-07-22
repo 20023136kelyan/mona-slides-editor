@@ -73,7 +73,9 @@ export const runGate2Benchmark = (
   }
 
   let reduxDispatches = 0
-  const unsubscribe = store.subscribe(() => { reduxDispatches += 1 })
+  const unsubscribe = store.subscribe(() => {
+    reduxDispatches += 1
+  })
   const controller = createInteractionController()
   controller.begin({ gestureId: 'benchmark-drag', kind: 'drag', pointer: { x: 0, y: 0 } })
   const pointerDurations: number[] = []

@@ -1,0 +1,39 @@
+{
+  "file": "corpus-03-media.pptx",
+  "slides": [
+    {
+      "elements": [
+        {
+          "kind": "image",
+          "x": 0.5,
+          "y": 0.5,
+          "w": 2.4,
+          "h": 1.8
+        },
+        {
+          "kind": "image",
+          "x": 3.5,
+          "y": 0.5,
+          "w": 1.8,
+          "h": 1.8,
+          "rotate": 30
+        },
+        {
+          "kind": "image",
+          "x": 6,
+          "y": 0.5,
+          "w": 2.4,
+          "h": 1.8
+        },
+        {
+          "kind": "text",
+          "text": "Images: plain, rotated 30°, 40% transparent",
+          "x": 0.5,
+          "y": 2.8,
+          "w": 8,
+          "h": 0.5
+        }
+      ]
+    }
+  ]
+}

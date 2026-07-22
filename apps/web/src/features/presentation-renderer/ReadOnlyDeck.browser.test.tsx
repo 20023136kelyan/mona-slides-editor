@@ -1,10 +1,15 @@
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
 import type { PresentationState } from '@mona/presentation-core'
 
 import { ReadOnlyDeck } from '@/features/presentation-renderer/ReadOnlyDeck'
+import { initializeI18n } from '@/i18n'
+
+beforeAll(async () => {
+  await initializeI18n()
+})
 
 const presentation: PresentationState = {
   title: 'Renderer test',

@@ -9,7 +9,7 @@ const projectRoot = resolve(import.meta.dirname, '..')
 const referenceURL = process.env.MONA_REFERENCE_URL || 'http://127.0.0.1:5173/'
 const sampleCount = Number(process.env.MONA_PERFORMANCE_SAMPLES || 5)
 const serverMode = process.env.MONA_SERVER_MODE || 'development'
-const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'vue-reference'
+const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'react-production'
 const readySelector = process.env.MONA_READY_SELECTOR
 
 const median = values => {
@@ -37,9 +37,9 @@ try {
       await page.locator(readySelector).waitFor({ state: 'visible' })
     }
     else {
-      await page.locator('.pptist-editor').waitFor({ state: 'visible' })
-      await page.locator('.thumbnail-item').nth(2).waitFor({ state: 'visible' })
-      await page.locator('.page-number', { hasText: 'Slide 1 of 3' }).waitFor({ state: 'visible' })
+      await page.locator('.mona-editor-stage').waitFor({ state: 'visible' })
+      await page.locator('.mona-thumbnail-item').nth(2).waitFor({ state: 'visible' })
+      await page.locator('.mona-thumbnail-page-number', { hasText: 'Slide 1 of 3' }).waitFor({ state: 'visible' })
     }
     await page.evaluate(() => document.fonts.ready)
 

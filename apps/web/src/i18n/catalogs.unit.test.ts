@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import enUS from '../../../../src/i18n/locales/en-US.json'
-import zhCN from '../../../../src/i18n/locales/zh-CN.json'
+import enUS from '@/i18n/shared/en-US.json'
+import zhCN from '@/i18n/shared/zh-CN.json'
 import foundationEnUS from '@/i18n/foundation/en-US.json'
 import foundationZhCN from '@/i18n/foundation/zh-CN.json'
 

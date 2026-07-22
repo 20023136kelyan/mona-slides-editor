@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { extname, resolve } from 'node:path'
 
 const root = process.cwd()
 const failures = []
-const sourceExtensions = new Set(['.ts', '.tsx', '.vue', '.js', '.mjs'])
+const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.mjs'])
 const expectedSchemaHash = 'b4ee4a7bd7978706cd0033e62c29daf8a0167a964d1be40ebf59989788347bb5'
 
 const read = path => readFileSync(resolve(root, path), 'utf8')
@@ -15,24 +15,19 @@ const normalizeSchema = source => source
 
 const walk = path => {
   const absolutePath = resolve(root, path)
+  if (!existsSync(absolutePath)) return []
   return readdirSync(absolutePath).flatMap(entry => {
     const child = `${path}/${entry}`
     const stats = statSync(resolve(root, child))
-    if (stats.isDirectory()) return entry === 'node_modules' ? [] : walk(child)
-    const extension = entry.slice(entry.lastIndexOf('.'))
-    return sourceExtensions.has(extension) ? [child] : []
+    if (stats.isDirectory()) return ['node_modules', 'dist', '__screenshots__'].includes(entry) ? [] : walk(child)
+    return sourceExtensions.has(extname(entry)) ? [child] : []
   })
 }
 
 const canonicalModel = normalizeSchema(read('packages/presentation-core/src/model.ts'))
 const modelHash = createHash('sha256').update(canonicalModel).digest('hex')
 if (modelHash !== expectedSchemaHash) {
-  failures.push('The canonical presentation model no longer matches the frozen Vue schema.')
-}
-
-const compatibilityExport = read('src/types/slides.ts')
-if (!compatibilityExport.includes("export * from '@mona/presentation-core/model'")) {
-  failures.push('src/types/slides.ts must remain a compatibility export of the canonical model.')
+  failures.push('The canonical presentation model no longer matches the frozen reference schema.')
 }
 
 const frameworkFreeRoots = [
@@ -40,11 +35,45 @@ const frameworkFreeRoots = [
   'packages/editor-state/src',
   'packages/editor-interactions/src',
   'packages/parity-fixtures/src',
+  'packages/rich-text/src',
 ]
 const forbiddenFrameworkImport = /(?:from\s+|import\s*\()['"](?:vue|pinia|react|react-dom)(?:\/[^'"]*)?['"]/
 for (const file of frameworkFreeRoots.flatMap(walk)) {
-  if (forbiddenFrameworkImport.test(read(file))) {
-    failures.push(`${file} imports a UI framework.`)
+  if (forbiddenFrameworkImport.test(read(file))) failures.push(`${file} imports a UI framework.`)
+}
+
+const applicationRoots = ['apps/web/src', ...frameworkFreeRoots]
+const applicationFiles = applicationRoots.flatMap(walk)
+const retiredFrameworkImport = /(?:from\s+|import\s*\()['"](?:vue|pinia|vue-i18n|@vue\/[^'"]+)(?:\/[^'"]*)?['"]/
+for (const file of applicationFiles) {
+  if (retiredFrameworkImport.test(read(file))) failures.push(`${file} imports retired Vue runtime code.`)
+}
+
+const vueSourceFiles = []
+const findVueFiles = path => {
+  const absolutePath = resolve(root, path)
+  if (!existsSync(absolutePath)) return
+  for (const entry of readdirSync(absolutePath)) {
+    if (['node_modules', 'dist', '.artifacts', 'tests'].includes(entry)) continue
+    const child = `${path}/${entry}`
+    const stats = statSync(resolve(root, child))
+    if (stats.isDirectory()) findVueFiles(child)
+    else if (entry.endsWith('.vue')) vueSourceFiles.push(child)
+  }
+}
+for (const path of ['apps', 'packages', 'src']) findVueFiles(path)
+for (const file of vueSourceFiles) failures.push(`${file} is a retired Vue source file.`)
+
+const manifests = ['package.json', 'apps/web/package.json', ...readdirSync(resolve(root, 'packages')).map(name => `packages/${name}/package.json`)]
+const retiredPackages = new Set(['vue', 'pinia', 'vue-i18n', 'vue-tsc', '@vitejs/plugin-vue', '@vue/compiler-dom', '@vue/compiler-sfc'])
+for (const manifest of manifests) {
+  const packageJson = JSON.parse(read(manifest))
+  for (const section of ['dependencies', 'devDependencies', 'peerDependencies']) {
+    for (const dependency of Object.keys(packageJson[section] ?? {})) {
+      if (retiredPackages.has(dependency) || dependency.startsWith('@vue/')) {
+        failures.push(`${manifest} still declares retired dependency ${dependency}.`)
+      }
+    }
   }
 }
 
@@ -64,50 +93,24 @@ const canonicalTypeNames = [
   'NoteReply',
 ]
 const duplicateTypePattern = new RegExp(`export\\s+(?:interface|type)\\s+(?:${canonicalTypeNames.join('|')})\\b`)
-for (const file of [...walk('src'), ...walk('packages')]) {
+for (const file of applicationFiles) {
   if (file === 'packages/presentation-core/src/model.ts') continue
   if (duplicateTypePattern.test(read(file))) failures.push(`${file} duplicates a canonical presentation type.`)
 }
 
-const allowedDirectNanoidImports = new Set([
-  'src/components/OutlineEditor.vue',
-  'src/store/main.ts',
-  'src/views/Editor/Toolbar/common/SVGLine.vue',
-])
-for (const file of walk('src')) {
-  if (/from\s+['"]nanoid['"]/.test(read(file)) && !allowedDirectNanoidImports.has(file)) {
+for (const file of applicationFiles) {
+  if (/from\s+['"]nanoid['"]/.test(read(file)) && file !== 'packages/presentation-core/src/ids.ts') {
     failures.push(`${file} bypasses the presentation ID policy.`)
   }
 }
 
-const slidesStore = read('src/store/slides.ts')
-const actionCommands = new Map([
-  ['setTitle', 'presentation.title.set'],
-  ['setTheme', 'presentation.theme.update'],
-  ['setViewportSize', 'presentation.viewport-size.set'],
-  ['setViewportRatio', 'presentation.viewport-ratio.set'],
-  ['setSlides', 'presentation.slides.replace'],
-  ['setTemplates', 'presentation.templates.replace'],
-  ['addSlide', 'slide.add'],
-  ['updateSlide', 'slide.update'],
-  ['removeSlideProps', 'slide.properties.remove'],
-  ['deleteSlide', 'slide.delete'],
-  ['updateSlideIndex', 'slide.focus'],
-  ['addElement', 'element.add'],
-  ['deleteElement', 'element.delete'],
-  ['updateElement', 'element.update'],
-  ['removeElementProps', 'element.properties.remove'],
-])
-for (const [action, command] of actionCommands) {
-  if (!slidesStore.includes(`${action}(`) || !slidesStore.includes(`type: '${command}'`)) {
-    failures.push(`The Vue ${action} action is not mapped to ${command}.`)
-  }
-}
-
-const directStoreWrite = /slidesStore\.(?:title|theme|slides|slideIndex|viewportSize|viewportRatio|templates)\s*=|slidesStore\.\$patch\s*\(/
-for (const file of walk('src')) {
-  if (file === 'src/store/slides.ts') continue
-  if (directStoreWrite.test(read(file))) failures.push(`${file} writes presentation state outside the core adapter.`)
+const runtime = read('apps/web/src/features/editor/editor-runtime.ts')
+for (const contract of [
+  "createEditorStore({ presentation })",
+  'editorActions.transactionCommitted',
+  'createPresentationTransaction({',
+]) {
+  if (!runtime.includes(contract)) failures.push(`The React editor runtime is missing canonical adapter contract: ${contract}`)
 }
 
 if (failures.length) {
@@ -116,4 +119,4 @@ if (failures.length) {
   process.exit(1)
 }
 
-console.log('Gate 2 boundary audit passed: schema, framework, ID, and Vue mutation boundaries are intact.')
+console.log('Gate 2 boundary audit passed: schema, framework, ID, React adapter, and retired-Vue boundaries are intact.')

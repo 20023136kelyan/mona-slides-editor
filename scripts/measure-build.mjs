@@ -6,8 +6,8 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, relative, resolve } from 'node:path'
 
 const projectRoot = resolve(import.meta.dirname, '..')
-const buildDirectory = resolve(projectRoot, process.env.MONA_BUILD_DIR || 'dist')
-const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'vue-reference'
+const buildDirectory = resolve(projectRoot, process.env.MONA_BUILD_DIR || 'apps/web/dist')
+const runtimeLabel = process.env.MONA_RUNTIME_LABEL || 'react-production'
 
 const collectFiles = async directory => {
   const entries = await readdir(directory, { withFileTypes: true })

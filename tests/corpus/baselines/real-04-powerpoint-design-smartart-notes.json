@@ -1,0 +1,75 @@
+{
+  "fixture": "real-04-powerpoint-design-smartart-notes.pptx",
+  "imported": {
+    "elementTypes": {
+      "image": 45,
+      "shape": 39,
+      "text": 59
+    },
+    "elements": 143,
+    "groupedElements": 0,
+    "groups": 0,
+    "hyperlinks": 0,
+    "lockedElements": 0,
+    "notesSlides": 17,
+    "rotatedElements": 4,
+    "slides": 28,
+    "title": "Untitled presentation",
+    "viewportRatio": 0.5625,
+    "viewportSize": 960
+  },
+  "parserGaps": {
+    "nativeChartsNotEditable": 0,
+    "nativeGroupsNotRepresented": 1,
+    "nativeSmartArtNotEditable": 4,
+    "nativeTableCountDifference": 0,
+    "notesSlideCountDifference": 0
+  },
+  "roundTrip": {
+    "elementTypes": {
+      "image": 45,
+      "shape": 137
+    },
+    "package": {
+      "charts": 0,
+      "media": 45,
+      "notesSlides": 28,
+      "slides": 28
+    },
+    "parsedSlides": 28
+  },
+  "schemaVersion": 1,
+  "sourcePackage": {
+    "slides": 28,
+    "masters": 1,
+    "layouts": 12,
+    "themes": 3,
+    "charts": 0,
+    "tables": 0,
+    "pictures": 19,
+    "groups": 1,
+    "notesSlides": 17,
+    "media": 17,
+    "hyperlinkRelationships": 0,
+    "hyperlinkReferences": 0,
+    "smartArt": 4,
+    "equations": 0,
+    "mergedCellAttributes": 0,
+    "rotatedTransforms": 0,
+    "croppedImages": 12,
+    "shadows": 5,
+    "alphaEffects": 7,
+    "transitions": 0,
+    "timingSlides": 0,
+    "slideNumberPlaceholders": 2,
+    "footerPlaceholders": 0,
+    "templateSlideNumberPlaceholders": 11,
+    "templateFooterPlaceholders": 10
+  },
+  "sourceSha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+  "visualDiffRatios": {
+    "slide-1": 0,
+    "slide-14": 0.000017,
+    "slide-28": 0
+  }
+}

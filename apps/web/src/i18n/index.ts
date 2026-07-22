@@ -1,7 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-import enUS from '../../../../src/i18n/locales/en-US.json'
+import enUS from '@/i18n/shared/en-US.json'
 import foundationEnUS from '@/i18n/foundation/en-US.json'
 import {
   DEFAULT_LOCALE,
@@ -11,7 +11,7 @@ import {
   detectInitialLocale,
   isSupportedLocale,
   type SupportedLocale,
-} from '../../../../src/i18n/locales'
+} from '@/i18n/locales'
 
 const enUSMessages = { ...enUS, foundation: foundationEnUS }
 
@@ -21,7 +21,7 @@ const localeLoaders: Record<SupportedLocale, () => Promise<{ default: MessageSch
   'en-US': () => Promise.resolve({ default: enUSMessages }),
   'zh-CN': async () => {
     const [shared, foundation] = await Promise.all([
-      import('../../../../src/i18n/locales/zh-CN.json'),
+      import('@/i18n/shared/zh-CN.json'),
       import('@/i18n/foundation/zh-CN.json'),
     ])
     return { default: { ...shared.default, foundation: foundation.default } }

@@ -57,7 +57,7 @@ export function ImageElement({ element }: { element: PPTImageElement }) {
             <img
               alt=""
               draggable={false}
-              src={element.src}
+              src={element.src || undefined}
               style={{ ...getImagePosition(element), filter: getImageFilter(element.filters) }}
             />
             {element.colorMask ? <div className="mona-image-color-mask" style={{ backgroundColor: element.colorMask }} /> : null}

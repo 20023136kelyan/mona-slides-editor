@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "runtime": "react-gate7",
+  "serverMode": "production-preview",
+  "url": "http://127.0.0.1:4174/",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "sampleCount": 7,
+  "medians": {
+    "editorReadyMs": 137.4000000357628,
+    "domContentLoadedMs": 21.400000035762787,
+    "loadMs": 26.30000001192093,
+    "firstContentfulPaintMs": 40,
+    "resourceCount": 13,
+    "transferBytes": 799069,
+    "decodedBodyBytes": 2597277,
+    "usedJSHeapBytes": 10600000
+  },
+  "samples": [
+    {
+      "editorReadyMs": 137.5999999642372,
+      "domContentLoadedMs": 23.19999998807907,
+      "loadMs": 28,
+      "firstContentfulPaintMs": 36,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 144.5999999642372,
+      "domContentLoadedMs": 21,
+      "loadMs": 29.399999976158142,
+      "firstContentfulPaintMs": 32,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 129.10000002384186,
+      "domContentLoadedMs": 21.400000035762787,
+      "loadMs": 26.30000001192093,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 127.5,
+      "domContentLoadedMs": 22,
+      "loadMs": 26.30000001192093,
+      "firstContentfulPaintMs": 44,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 138.69999998807907,
+      "domContentLoadedMs": 19.80000001192093,
+      "loadMs": 24.69999998807907,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 129.0999999642372,
+      "domContentLoadedMs": 22.899999976158142,
+      "loadMs": 27,
+      "firstContentfulPaintMs": 36,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    },
+    {
+      "editorReadyMs": 137.4000000357628,
+      "domContentLoadedMs": 20.30000001192093,
+      "loadMs": 24.900000035762787,
+      "firstContentfulPaintMs": 40,
+      "resourceCount": 13,
+      "transferBytes": 799069,
+      "decodedBodyBytes": 2597277,
+      "usedJSHeapBytes": 10600000
+    }
+  ]
+}

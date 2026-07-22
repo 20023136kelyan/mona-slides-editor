@@ -2,6 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import Icons from 'unplugin-icons/vite'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
@@ -21,7 +22,16 @@ export default defineConfig({
         },
       },
       {
-        plugins: [react(), tailwindcss()],
+        plugins: [
+          react(),
+          Icons({
+            compiler: 'jsx',
+            jsx: 'react',
+            defaultClass: 'i-icon',
+            scale: 1,
+          }),
+          tailwindcss(),
+        ],
         optimizeDeps: {
           include: ['tinycolor2'],
         },

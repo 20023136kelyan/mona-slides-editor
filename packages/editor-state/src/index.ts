@@ -21,14 +21,30 @@ export interface EditorSessionState {
   hiddenElementIds: string[]
   selectedSlideIndexes: number[]
   activeTool: string | null
-  openPanel: string | null
+  creatingCustomShape: boolean
+  openPanels: string[]
   canvasZoom: number
   canvasPan: { x: number; y: number }
+  canvasDragged: boolean
   canvasFocus: boolean
+  thumbnailsFocus: boolean
+  disableHotkeys: boolean
+  selectedTableCells: string[]
   gridLineSize: number
   showRuler: boolean
+  showBubbleMenu: boolean
   cropElementId: string | null
+  toolbarState: EditorToolbarState
 }
+
+export type EditorToolbarState =
+  | 'elAnimation'
+  | 'elPosition'
+  | 'elStyle'
+  | 'multiPosition'
+  | 'multiStyle'
+  | 'slideAnimation'
+  | 'slideDesign'
 
 export interface RejectedEditorTransaction {
   transactionId: string
@@ -58,13 +74,20 @@ const createSessionState = (
   hiddenElementIds: input.hiddenElementIds ?? [],
   selectedSlideIndexes: input.selectedSlideIndexes ?? [],
   activeTool: input.activeTool ?? null,
-  openPanel: input.openPanel ?? null,
-  canvasZoom: input.canvasZoom ?? 100,
+  creatingCustomShape: input.creatingCustomShape ?? false,
+  openPanels: input.openPanels ?? [],
+  canvasZoom: input.canvasZoom ?? 90,
   canvasPan: input.canvasPan ?? { x: 0, y: 0 },
+  canvasDragged: input.canvasDragged ?? false,
   canvasFocus: input.canvasFocus ?? false,
+  thumbnailsFocus: input.thumbnailsFocus ?? false,
+  disableHotkeys: input.disableHotkeys ?? false,
+  selectedTableCells: input.selectedTableCells ?? [],
   gridLineSize: input.gridLineSize ?? 0,
   showRuler: input.showRuler ?? false,
+  showBubbleMenu: input.showBubbleMenu ?? false,
   cropElementId: input.cropElementId ?? null,
+  toolbarState: input.toolbarState ?? 'slideDesign',
 })
 
 const emptyPresentation: PresentationState = {
@@ -132,9 +155,12 @@ const editorSlice = createSlice({
     selectionChanged(state, action: PayloadAction<string[]>) {
       state.session.activeElementIds = action.payload
       state.session.handleElementId = action.payload.length === 1 ? action.payload[0] ?? null : null
+      state.session.activeGroupElementId = null
+      state.session.selectedTableCells = []
     },
     handleElementChanged(state, action: PayloadAction<string | null>) {
       state.session.handleElementId = action.payload
+      state.session.activeGroupElementId = null
     },
     activeGroupElementChanged(state, action: PayloadAction<string | null>) {
       state.session.activeGroupElementId = action.payload
@@ -148,17 +174,44 @@ const editorSlice = createSlice({
     activeToolChanged(state, action: PayloadAction<string | null>) {
       state.session.activeTool = action.payload
     },
-    openPanelChanged(state, action: PayloadAction<string | null>) {
-      state.session.openPanel = action.payload
+    creatingCustomShapeChanged(state, action: PayloadAction<boolean>) {
+      state.session.creatingCustomShape = action.payload
+    },
+    panelVisibilityChanged(state, action: PayloadAction<{ open: boolean; panel: string }>) {
+      const { open, panel } = action.payload
+      const next = state.session.openPanels.filter(item => item !== panel)
+      if (open) next.push(panel)
+      state.session.openPanels = next
+    },
+    panelToggled(state, action: PayloadAction<string>) {
+      const panel = action.payload
+      state.session.openPanels = state.session.openPanels.includes(panel)
+        ? state.session.openPanels.filter(item => item !== panel)
+        : [...state.session.openPanels, panel]
     },
     canvasZoomChanged(state, action: PayloadAction<number>) {
-      state.session.canvasZoom = Math.min(200, Math.max(20, action.payload))
+      // PPTist's 5% commands are guarded at 30% and 200%, so one final
+      // command reaches the effective extrema of 25% and 205%.
+      state.session.canvasZoom = Math.min(205, Math.max(25, action.payload))
     },
     canvasPanChanged(state, action: PayloadAction<{ x: number; y: number }>) {
       state.session.canvasPan = action.payload
     },
+    canvasDraggedChanged(state, action: PayloadAction<boolean>) {
+      state.session.canvasDragged = action.payload
+    },
     canvasFocusChanged(state, action: PayloadAction<boolean>) {
       state.session.canvasFocus = action.payload
+    },
+    thumbnailsFocusChanged(state, action: PayloadAction<boolean>) {
+      state.session.thumbnailsFocus = action.payload
+      if (!action.payload) state.session.selectedSlideIndexes = []
+    },
+    hotkeysDisabledChanged(state, action: PayloadAction<boolean>) {
+      state.session.disableHotkeys = action.payload
+    },
+    selectedTableCellsChanged(state, action: PayloadAction<string[]>) {
+      state.session.selectedTableCells = action.payload
     },
     gridLineSizeChanged(state, action: PayloadAction<number>) {
       state.session.gridLineSize = action.payload
@@ -166,8 +219,14 @@ const editorSlice = createSlice({
     rulerVisibilityChanged(state, action: PayloadAction<boolean>) {
       state.session.showRuler = action.payload
     },
+    bubbleMenuVisibilityChanged(state, action: PayloadAction<boolean>) {
+      state.session.showBubbleMenu = action.payload
+    },
     cropElementChanged(state, action: PayloadAction<string | null>) {
       state.session.cropElementId = action.payload
+    },
+    toolbarStateChanged(state, action: PayloadAction<EditorToolbarState>) {
+      state.session.toolbarState = action.payload
     },
   },
 })

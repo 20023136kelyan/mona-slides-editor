@@ -1,0 +1,77 @@
+{
+  "fixture": "real-03-nasa-sewp-corporate.pptx",
+  "imported": {
+    "elementTypes": {
+      "image": 60,
+      "shape": 63,
+      "table": 2,
+      "text": 68
+    },
+    "elements": 193,
+    "groupedElements": 0,
+    "groups": 0,
+    "hyperlinks": 26,
+    "lockedElements": 0,
+    "notesSlides": 3,
+    "rotatedElements": 0,
+    "slides": 18,
+    "title": "Untitled presentation",
+    "viewportRatio": 0.5625394819962097,
+    "viewportSize": 2110.6666666666665
+  },
+  "parserGaps": {
+    "nativeChartsNotEditable": 0,
+    "nativeGroupsNotRepresented": 5,
+    "nativeSmartArtNotEditable": 0,
+    "nativeTableCountDifference": 0,
+    "notesSlideCountDifference": 0
+  },
+  "roundTrip": {
+    "elementTypes": {
+      "image": 60,
+      "shape": 194,
+      "table": 2
+    },
+    "package": {
+      "charts": 0,
+      "media": 61,
+      "notesSlides": 18,
+      "slides": 18
+    },
+    "parsedSlides": 18
+  },
+  "schemaVersion": 1,
+  "sourcePackage": {
+    "slides": 18,
+    "masters": 2,
+    "layouts": 8,
+    "themes": 3,
+    "charts": 0,
+    "tables": 2,
+    "pictures": 44,
+    "groups": 5,
+    "notesSlides": 3,
+    "media": 48,
+    "hyperlinkRelationships": 9,
+    "hyperlinkReferences": 28,
+    "smartArt": 0,
+    "equations": 0,
+    "mergedCellAttributes": 3,
+    "rotatedTransforms": 0,
+    "croppedImages": 8,
+    "shadows": 3,
+    "alphaEffects": 9,
+    "transitions": 2,
+    "timingSlides": 0,
+    "slideNumberPlaceholders": 17,
+    "footerPlaceholders": 3,
+    "templateSlideNumberPlaceholders": 8,
+    "templateFooterPlaceholders": 4
+  },
+  "sourceSha256": "49393aafa1cc93f8f442ab8aa53d4facd686dcd5259141c78e7f6688ebbabaa5",
+  "visualDiffRatios": {
+    "slide-1": 0.004776,
+    "slide-9": 0,
+    "slide-18": 0
+  }
+}

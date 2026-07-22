@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test('loads the React foundation and changes locale without browser errors', async ({ page }) => {
+test('loads Mona Slides and changes locale without browser errors', async ({ page }) => {
   const browserProblems: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -17,15 +17,15 @@ test('loads the React foundation and changes locale without browser errors', asy
 
   await page.goto('/')
 
-  await expect(page).toHaveTitle('Mona Slides — React foundation')
-  await expect(page.getByLabel('React migration foundation')).toBeVisible()
+  await expect(page).toHaveTitle('Mona Slides')
+  await expect(page.getByLabel('Mona Slides editor')).toBeVisible()
   await expect(page.getByText('Untitled presentation', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('combobox', { name: 'Language' }).click()
-  await page.getByRole('option', { name: 'Simplified Chinese' }).click()
+  await page.locator('.mona-header-locale-select').click()
+  await page.locator('.mona-panel-select-popover:visible .mona-panel-select-option').filter({ hasText: /^Simplified Chinese$/ }).click()
 
-  await expect(page.getByRole('button', { name: '设置' })).toBeVisible()
+  await expect(page.locator('.mona-editor-header-item[aria-label="设置"]')).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN')
   await expect(page.getByText('Untitled presentation', { exact: true })).toBeVisible()
   expect(browserProblems).toEqual([])

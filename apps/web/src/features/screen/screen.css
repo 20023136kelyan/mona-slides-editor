@@ -1,0 +1,348 @@
+.mona-pptist-screen {
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+  color: #41464b;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  line-height: normal;
+  text-size-adjust: auto;
+}
+
+.mona-screen-base,
+.mona-screen-main-surface,
+.mona-screen-audience {
+  width: 100%;
+  height: 100%;
+}
+.mona-screen-audience { position: relative; background: #1d1d1d; }
+
+.mona-screen-slide-list {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #1d1d1d;
+}
+.mona-screen-slide-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+.mona-screen-slide-item:not(.is-last, .is-next) { z-index: -1; }
+.mona-screen-slide-item.is-current { z-index: 2; }
+.mona-screen-slide-item.is-hidden { opacity: 0; }
+.mona-screen-slide-item.turning-mode-no.is-before { transform: translateY(-100%); }
+.mona-screen-slide-item.turning-mode-no.is-after { transform: translateY(100%); }
+.mona-screen-slide-item.turning-mode-fade { transition: opacity .75s; }
+.mona-screen-slide-item.turning-mode-fade.is-before,
+.mona-screen-slide-item.turning-mode-fade.is-after { opacity: 0; pointer-events: none; }
+.mona-screen-slide-item.turning-mode-slideX { transition: transform .35s; }
+.mona-screen-slide-item.turning-mode-slideX.is-before { transform: translateX(-100%); }
+.mona-screen-slide-item.turning-mode-slideX.is-after { transform: translateX(100%); }
+.mona-screen-slide-item.turning-mode-slideY { transition: transform .35s; }
+.mona-screen-slide-item.turning-mode-slideY.is-before { transform: translateY(-100%); }
+.mona-screen-slide-item.turning-mode-slideY.is-after { transform: translateY(100%); }
+.mona-screen-slide-item.turning-mode-slideX3D { transition: transform .5s; }
+.mona-screen-slide-item.turning-mode-slideX3D.is-before { transform: translateX(-100%) scale(.5); }
+.mona-screen-slide-item.turning-mode-slideX3D.is-after { transform: translateX(100%) scale(.5); }
+.mona-screen-slide-item.turning-mode-slideY3D { transition: transform .5s; }
+.mona-screen-slide-item.turning-mode-slideY3D.is-before { transform: translateY(-100%) scale(.5); }
+.mona-screen-slide-item.turning-mode-slideY3D.is-after { transform: translateY(100%) scale(.5); }
+.mona-screen-slide-item.turning-mode-rotate { transform-origin: 0 0; transition: transform .5s; }
+.mona-screen-slide-item.turning-mode-rotate.is-before { transform: rotate(90deg); }
+.mona-screen-slide-item.turning-mode-rotate.is-after { transform: rotate(-90deg); }
+.mona-screen-slide-item.turning-mode-scaleY,
+.mona-screen-slide-item.turning-mode-scaleX,
+.mona-screen-slide-item.turning-mode-scale,
+.mona-screen-slide-item.turning-mode-scaleReverse { transition: transform .5s; }
+.mona-screen-slide-item.turning-mode-scaleY.is-before,
+.mona-screen-slide-item.turning-mode-scaleY.is-after { transform: scaleY(.1); }
+.mona-screen-slide-item.turning-mode-scaleX.is-before,
+.mona-screen-slide-item.turning-mode-scaleX.is-after { transform: scaleX(.1); }
+.mona-screen-slide-item.turning-mode-scale.is-before,
+.mona-screen-slide-item.turning-mode-scale.is-after { transform: scale(.25); }
+.mona-screen-slide-item.turning-mode-scaleReverse.is-before,
+.mona-screen-slide-item.turning-mode-scaleReverse.is-after { transform: scale(2); }
+.mona-screen-slide-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  transform: translate(-50%, -50%);
+}
+.mona-screen-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  background-position: center;
+  transform-origin: 0 0;
+}
+.mona-screen-slide-background { position: absolute; width: 100%; height: 100%; background-position: center; }
+.mona-screen-element.is-link { cursor: pointer; }
+.mona-screen-element > .mona-element { z-index: inherit; }
+.mona-video-screen-content { width: 100%; height: 100%; }
+.mona-audio-content.is-screen .mona-audio-icon { cursor: pointer; }
+.mona-audio-content.is-screen .mona-audio-player { display: none; }
+.mona-audio-content.is-screen:hover .mona-audio-player { display: block; }
+
+.mona-screen-tools-left {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  z-index: 10;
+  color: #666;
+  font-size: 25px;
+}
+.mona-screen-tools-left > svg { opacity: .1; cursor: pointer; transition: opacity .2s; }
+.mona-screen-tools-left > svg:hover { opacity: 1; }
+.mona-screen-tools-left > svg + svg { margin-left: 8px; }
+.mona-screen-tools-right {
+  position: fixed;
+  right: 0;
+  bottom: -66px;
+  z-index: 5;
+  height: 66px;
+  padding: 8px;
+  transition: bottom .2s;
+}
+.mona-screen-tools-right.is-visible { bottom: 0; }
+.mona-screen-tools-right::after {
+  position: absolute;
+  top: -66px;
+  left: 0;
+  width: 100%;
+  height: 66px;
+  content: '';
+}
+.mona-screen-tools-right-content {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e6ed;
+  border-radius: 2px;
+  background-color: #fff;
+  padding: 8px 10px;
+  color: #41464b;
+  box-shadow: 0 2px 12px 0 rgb(56 56 56 / 20%);
+  font-size: 25px;
+}
+.mona-screen-tool-button { cursor: pointer; }
+.mona-screen-tool-button:hover,
+.mona-screen-tool-button.is-active { color: #d14424; }
+.mona-screen-tool-button + .mona-screen-tool-button { margin-left: 15px; }
+.mona-screen-page-number { height: 15px; padding: 0 12px; font-size: 12px; line-height: normal; }
+
+.mona-screen-bottom-thumbnails {
+  position: fixed;
+  bottom: -120px;
+  left: 0;
+  z-index: 4;
+  width: 100%;
+  transition: bottom .2s;
+}
+.mona-screen-bottom-thumbnails::after { position: absolute; top: -3px; left: 0; width: 100%; height: 3px; content: ''; }
+.mona-screen-bottom-thumbnails:hover { bottom: 0; z-index: 20; }
+.mona-screen-bottom-thumbnail-list {
+  position: relative;
+  height: 120px;
+  overflow: hidden;
+  overflow-x: auto;
+  background-color: rgb(0 0 0 / 75%);
+  padding: 10px;
+  white-space: nowrap;
+}
+.mona-screen-thumbnail { display: inline-block; outline: 2px solid #aaa; }
+.mona-screen-thumbnail + .mona-screen-thumbnail { margin-left: 10px; }
+.mona-screen-thumbnail:hover { outline-color: #d14424; }
+.mona-screen-thumbnail.is-active { outline: 3px solid #d14424; }
+.mona-screen-bottom-thumbnail-list::-webkit-scrollbar,
+.mona-screen-presenter-thumbnails::-webkit-scrollbar { width: 0; height: 0; }
+
+.mona-screen-all-slides {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 99;
+  width: 100%;
+  height: 100%;
+  background-color: #1a1a1a;
+}
+.mona-screen-all-slides-return { height: 60px; padding: 20px 30px 0; }
+.mona-screen-all-slides-return svg { color: #fff; font-size: 36px; cursor: pointer; }
+.mona-screen-all-slides-return svg:hover { color: #d14424; }
+.mona-screen-all-slides-content {
+  display: flex;
+  height: calc(100% - 100px);
+  flex-wrap: wrap;
+  align-content: flex-start;
+  overflow: overlay;
+  padding: 20px 30px 30px;
+}
+.mona-screen-all-slides-content .mona-screen-thumbnail { width: 150px; margin-right: 12px; margin-bottom: 12px; }
+.mona-screen-all-slides-content .mona-screen-thumbnail + .mona-screen-thumbnail { margin-left: 0; }
+
+.mona-screen-presenter { display: flex; width: 100%; height: 100%; }
+.mona-screen-presenter-toolbar {
+  width: 70px;
+  height: 100%;
+  margin: 20px 0;
+  border-right: 1px solid #eee;
+  background-color: #fff;
+  font-size: 12px;
+}
+.mona-screen-presenter-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+.mona-screen-presenter-tool + .mona-screen-presenter-tool { margin-top: 22px; }
+.mona-screen-presenter-tool:hover,
+.mona-screen-presenter-tool.is-active { color: #d14424; }
+.mona-screen-presenter-tool > svg { margin-bottom: 8px; font-size: 22px; }
+.mona-screen-presenter-divider { width: 70%; margin: 24px 15%; border-block-start: 1px solid rgb(5 5 5 / 6%); }
+.mona-screen-presenter-content { width: calc(100% - 430px); height: 100%; background-color: #1d1d1d; }
+.mona-screen-presenter-slide-wrap { position: relative; height: calc(100% - 190px); overflow: hidden; margin: 20px; }
+.mona-screen-presenter-thumbnails {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  overflow-x: auto;
+  border-top: 1px solid #3a3a3a;
+  padding: 15px;
+  white-space: nowrap;
+}
+.mona-screen-presenter-remark {
+  position: relative;
+  width: 360px;
+  height: 100%;
+  border-left: 1px solid #3a3a3a;
+  background-color: #2a2a2a;
+  color: #fff;
+}
+.mona-screen-presenter-remark-header {
+  display: flex;
+  height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #3a3a3a;
+  padding: 0 20px;
+  font-size: 18px;
+}
+.mona-screen-presenter-remark-content { height: calc(100% - 60px); overflow: overlay; padding: 20px; line-height: 1.5; }
+.mona-screen-presenter-remark-content.is-empty { color: #999; font-style: italic; }
+.mona-screen-presenter-remark-scale { position: absolute; right: 5px; bottom: 5px; display: flex; font-size: 22px; }
+.mona-screen-presenter-remark-scale > div { display: flex; width: 40px; height: 40px; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+.mona-screen-presenter-remark-scale > div.is-disabled { color: #666; cursor: no-drop; }
+.mona-screen-presenter-remark-scale > div:not(.is-disabled):hover { background-color: #333; }
+
+.mona-screen-countdown { user-select: none; }
+.mona-screen-countdown { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%); }
+.mona-screen-timer-header { display: flex; height: 16px; align-items: center; margin-bottom: 16px; font-size: 13px; }
+.mona-screen-timer-header span { margin-right: 8px; cursor: pointer; }
+.mona-screen-timer-header span:hover,
+.mona-screen-timer-header span.is-active { color: #d14424; }
+.mona-screen-timer-content { display: flex; justify-content: space-between; padding: 0 5px; }
+.mona-screen-timer-circle { width: 54px; height: 54px; overflow: hidden; border-radius: 50%; background-color: rgb(209 68 36 / 5%); }
+.mona-screen-timer-circle input { box-sizing: content-box; width: 100%; height: 100%; border: 0; outline: 0; background: transparent; padding: 1px 2px; text-align: center; font-family: Arial; font-size: 22px; }
+.mona-screen-timer-colon { height: 54px; font-size: 22px; line-height: 54px; }
+.mona-screen-timer-close { position: absolute; top: 0; right: 0; padding: 10px; line-height: 1; cursor: pointer; }
+.mona-screen-timer-close:hover { color: #d14424; }
+
+.mona-screen-writing-board { position: absolute; inset: 0; z-index: 10; font-size: 12px; }
+.mona-screen-writing-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.mona-screen-writing-canvas { position: absolute; inset: 0; z-index: 8; cursor: none; }
+.mona-screen-blackboard { width: 100%; height: 100%; background-color: #0f392b; }
+.mona-screen-writing-canvas-element { position: absolute; top: 0; left: 0; }
+.mona-screen-eraser-cursor,
+.mona-screen-pen-cursor { position: absolute; z-index: 9; pointer-events: none; }
+.mona-screen-eraser-cursor { display: flex; align-items: center; justify-content: center; border: 4px solid rgb(85 85 85 / 15%); border-radius: 50%; color: rgb(85 85 85 / 75%); }
+.mona-screen-pen-cursor svg { filter: drop-shadow(2px 2px 2px #555); }
+.mona-screen-writing-tools-panel { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%); }
+.mona-screen-writing-tools { display: flex; width: 100%; height: 100%; align-items: center; justify-content: space-between; }
+.mona-screen-writing-tool-content { display: flex; align-items: center; }
+.mona-screen-writing-tool-wrap { position: relative; }
+.mona-screen-writing-btn { margin-right: 5px; border-radius: 2px; padding: 5px; cursor: pointer; }
+.mona-screen-writing-btn:hover { color: #d14424; }
+.mona-screen-writing-btn.is-active { background-color: rgb(209 68 36 / 50%); color: #fff; }
+.mona-screen-writing-btn.is-close { margin-right: 0; margin-left: 5px; }
+.mona-screen-writing-btn > svg { font-size: 20px; }
+.mona-screen-writing-colors { display: flex; padding: 0 5px; }
+.mona-screen-writing-color { width: 16px; height: 16px; border-radius: 2px; cursor: pointer; }
+.mona-screen-writing-color + .mona-screen-writing-color { margin-left: 8px; }
+.mona-screen-writing-color:hover { transform: scale(1.15); }
+.mona-screen-writing-color.is-active { transform: scale(1.3); }
+.mona-screen-writing-color.is-white { border: 1px solid #f1f1f1; }
+.mona-screen-writing-setting-popover {
+  border: 1px solid #e5e7eb;
+  border-radius: 2px;
+  background: #fff;
+  padding: 10px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
+  color: #41464b;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 13px;
+  line-height: normal;
+}
+.mona-screen-writing-tool-wrap > .mona-screen-writing-setting-popover { display: none; }
+.mona-screen-writing-setting { display: flex; width: 200px; align-items: center; font-size: 13px; user-select: none; }
+.mona-screen-writing-setting.is-shape { width: 280px; }
+.mona-screen-writing-setting > span { width: 70px; }
+.mona-screen-writing-setting .mona-panel-slider { flex: 1; }
+.mona-screen-writing-shapes { display: flex; align-items: center; }
+.mona-screen-writing-shapes svg { font-size: 20px; cursor: pointer; }
+.mona-screen-writing-shapes svg + svg { margin-left: 6px; }
+.mona-screen-writing-shapes svg.is-active { color: #d14424; }
+.mona-screen-writing-divider { position: relative; display: inline-block; height: 1em; margin: 0 8px; border-inline-start: 1px solid rgb(5 5 5 / 6%); }
+
+.mona-screen-audience-writing-overlay { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+.mona-screen-audience-writing-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.mona-screen-audience-writing-content img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.mona-screen-audience-laser {
+  position: absolute;
+  z-index: 9;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  margin-left: -20px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+}
+
+.mona-screen-context-submenu {
+  position: absolute;
+  top: -6px;
+  left: 112%;
+  display: none;
+  width: 120px;
+}
+.mona-context-menu-entry:not(.is-disabled):hover > .mona-context-menu-item-content > .mona-screen-context-submenu { display: block; }
+
+@media (hover: hover) {
+  .mona-screen-base.is-laser-pen,
+  .mona-screen-presenter-slide-wrap.is-laser-pen { cursor: crosshair; }
+}
+
+.tippy-box[data-theme~='popover'] { border: 0; outline: 0; }
+.tippy-box[data-theme~='tooltip'] {
+  border-radius: 2px;
+  background-color: #262626;
+  color: #fff;
+  padding: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 12px;
+  line-height: 1.5;
+}
+.tippy-box[data-theme~='tooltip'] .tippy-arrow { width: 12px; height: 12px; color: #262626; }
+.tippy-box[data-theme~='tooltip'] .tippy-arrow::before { position: absolute; border-color: transparent; border-style: solid; content: ''; }
+.tippy-box[data-theme~='tooltip'][data-placement^='top'] > .tippy-arrow { bottom: 0; }
+.tippy-box[data-theme~='tooltip'][data-placement^='top'] > .tippy-arrow::before { bottom: -5px; left: 0; border-width: 6px 6px 0; border-top-color: initial; transform-origin: center top; }
+.tippy-box[data-theme~='tooltip'][data-placement^='bottom'] > .tippy-arrow { top: 0; }
+.tippy-box[data-theme~='tooltip'][data-placement^='bottom'] > .tippy-arrow::before { top: -5px; left: 0; border-width: 0 6px 6px; border-bottom-color: initial; transform-origin: center bottom; }
+.tippy-box[data-theme~='tooltip'][data-placement^='left'] > .tippy-arrow { right: 0; }
+.tippy-box[data-theme~='tooltip'][data-placement^='left'] > .tippy-arrow::before { right: -5px; border-width: 6px 0 6px 6px; border-left-color: initial; transform-origin: center left; }
+.tippy-box[data-theme~='tooltip'][data-placement^='right'] > .tippy-arrow { left: 0; }
+.tippy-box[data-theme~='tooltip'][data-placement^='right'] > .tippy-arrow::before { left: -5px; border-width: 6px 6px 6px 0; border-right-color: initial; transform-origin: center right; }

@@ -22,8 +22,9 @@ playwright-report/
 test-results/
 blob-report/
 
-# Local fidelity decks may contain confidential material.
-/public/corpus/private/
+# Local fidelity decks may contain confidential material. Keep them outside
+# Vite's public directory so no production build can copy them by accident.
+/tests/corpus/private/
 
 /cypress/videos/
 /cypress/screenshots/

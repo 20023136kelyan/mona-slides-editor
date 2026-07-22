@@ -1,0 +1,72 @@
+{
+  "file": "corpus-04-chart-table.pptx",
+  "slides": [
+    {
+      "elements": [
+        {
+          "kind": "chart",
+          "chart": "bar",
+          "x": 0.4,
+          "y": 0.4,
+          "w": 4.4,
+          "h": 2.8,
+          "series": [
+            [
+              91,
+              234,
+              190,
+              130
+            ]
+          ]
+        },
+        {
+          "kind": "chart",
+          "chart": "line",
+          "x": 5.2,
+          "y": 0.4,
+          "w": 4.4,
+          "h": 2.8,
+          "series": [
+            [
+              10,
+              40,
+              25,
+              60
+            ]
+          ]
+        },
+        {
+          "kind": "chart",
+          "chart": "pie",
+          "x": 0.4,
+          "y": 3.3,
+          "w": 3.4,
+          "h": 2,
+          "series": [
+            [
+              45,
+              30,
+              25
+            ]
+          ]
+        },
+        {
+          "kind": "table",
+          "x": 4.4,
+          "y": 3.3,
+          "w": 5.2,
+          "rows": 3,
+          "cols": 3,
+          "texts": [
+            "Metric",
+            "Revenue",
+            "550",
+            "645",
+            "Merged cell"
+          ],
+          "merged": true
+        }
+      ]
+    }
+  ]
+}

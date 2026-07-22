@@ -66,20 +66,37 @@ describe('canonical editor state adapter', () => {
   it('keeps viewport and editing focus in session state', () => {
     const store = createEditorStore({ presentation: createGate2Presentation() })
     const presentation = store.getState().presentation
+    expect(store.getState().session.canvasZoom).toBe(90)
     store.dispatch(editorActions.canvasZoomChanged(135))
     store.dispatch(editorActions.canvasPanChanged({ x: 24, y: -12 }))
+    store.dispatch(editorActions.canvasDraggedChanged(true))
     store.dispatch(editorActions.canvasFocusChanged(true))
+    store.dispatch(editorActions.thumbnailsFocusChanged(true))
+    store.dispatch(editorActions.hotkeysDisabledChanged(true))
     store.dispatch(editorActions.gridLineSizeChanged(50))
     store.dispatch(editorActions.rulerVisibilityChanged(true))
+    store.dispatch(editorActions.bubbleMenuVisibilityChanged(true))
 
     expect(store.getState().session).toMatchObject({
       canvasZoom: 135,
       canvasPan: { x: 24, y: -12 },
+      canvasDragged: true,
       canvasFocus: true,
+      thumbnailsFocus: true,
+      disableHotkeys: true,
       gridLineSize: 50,
       showRuler: true,
+      showBubbleMenu: true,
     })
     expect(store.getState().presentation).toBe(presentation)
+  })
+
+  it('matches the source canvas command extrema', () => {
+    const store = createEditorStore({ presentation: createGate2Presentation() })
+    store.dispatch(editorActions.canvasZoomChanged(500))
+    expect(store.getState().session.canvasZoom).toBe(205)
+    store.dispatch(editorActions.canvasZoomChanged(-500))
+    expect(store.getState().session.canvasZoom).toBe(25)
   })
 
   it('restores history atomically and preserves still-valid document selection', () => {

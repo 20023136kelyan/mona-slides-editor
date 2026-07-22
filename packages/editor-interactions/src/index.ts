@@ -50,7 +50,11 @@ export interface InteractionController {
   getSnapshot: () => InteractionSnapshot
   subscribe: (listener: () => void) => () => void
   begin: (input: BeginInteractionInput) => void
-  updatePointer: (pointer: PointerPosition, modifiers?: Partial<PointerModifiers>) => void
+  updatePointer: (
+    pointer: PointerPosition,
+    modifiers?: Partial<PointerModifiers>,
+    delta?: PointerPosition,
+  ) => void
   complete: () => CompletedInteraction | undefined
   cancel: () => void
 }
@@ -107,12 +111,18 @@ export const createInteractionController = (): InteractionController => {
         revision: snapshot.revision + 1,
       })
     },
-    updatePointer: (pointer, modifiers) => {
+    updatePointer: (pointer, modifiers, delta) => {
       if (snapshot.status !== 'active') return
       const nextModifiers = modifiers ? createModifiers(modifiers) : snapshot.modifiers
+      const nextDelta = delta ?? {
+        x: pointer.x - snapshot.origin.x,
+        y: pointer.y - snapshot.origin.y,
+      }
       if (
         pointer.x === snapshot.pointer.x &&
         pointer.y === snapshot.pointer.y &&
+        nextDelta.x === snapshot.delta.x &&
+        nextDelta.y === snapshot.delta.y &&
         nextModifiers.alt === snapshot.modifiers.alt &&
         nextModifiers.control === snapshot.modifiers.control &&
         nextModifiers.meta === snapshot.modifiers.meta &&
@@ -121,10 +131,7 @@ export const createInteractionController = (): InteractionController => {
       publish({
         ...snapshot,
         pointer,
-        delta: {
-          x: pointer.x - snapshot.origin.x,
-          y: pointer.y - snapshot.origin.y,
-        },
+        delta: nextDelta,
         modifiers: nextModifiers,
         revision: snapshot.revision + 1,
       })

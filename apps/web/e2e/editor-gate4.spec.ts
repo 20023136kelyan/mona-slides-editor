@@ -69,10 +69,12 @@ test('selects, moves, resizes, rotates, and restores elements atomically', async
   await page.mouse.up()
   await expect.poll(() => rendered.evaluate(element => (element as HTMLElement).style.left)).not.toBe(initialLeft)
 
-  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(350)
+  await page.getByRole('application', { name: 'Editable slide canvas' }).press('Control+z')
   await expect.poll(() => rendered.evaluate(element => (element as HTMLElement).style.left)).toBe(initialLeft)
-  await page.keyboard.press('Control+Shift+z')
+  await page.keyboard.press('Control+y')
   await expect.poll(() => rendered.evaluate(element => (element as HTMLElement).style.left)).not.toBe(initialLeft)
+  await target.click()
 
   const widthBefore = Number.parseFloat(await rendered.evaluate(element => (element as HTMLElement).style.width))
   const resize = page.getByRole('button', { name: 'Resize bottom-right' })
@@ -99,45 +101,54 @@ test('selects, moves, resizes, rotates, and restores elements atomically', async
 test('supports grouped selection, create gestures, context settings, clipboard, and deletion', async ({ page }) => {
   const canvas = page.getByRole('application', { name: 'Editable slide canvas' })
   const groupedShape = page.getByRole('button', { name: 'Select shape gate3-gradient-shape' })
-  const groupedText = page.getByRole('button', { name: 'Select text gate3-title' })
+  const groupedText = page.locator('.mona-editor-slide-canvas [data-element-id="gate3-title"] .mona-text-content')
   await groupedShape.click()
   await expect(page.locator('[aria-label="2 selected elements"]')).toBeVisible()
   await groupedShape.click({ button: 'right' })
   await expect(page.getByRole('menu', { name: 'Element menu' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Center horizontally' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Bring to front' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Set link' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Add link' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Ungroup' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Insert rectangle' })).toHaveCount(0)
-  await page.getByRole('menuitem', { name: 'Set link' }).click()
+  await page.getByRole('menuitem', { name: 'Add link' }).click()
   await page.getByRole('textbox', { name: 'Web address' }).fill('https://example.com/deck')
-  await page.getByRole('button', { name: 'Apply' }).click()
+  await page.getByRole('button', { name: 'Confirm' }).click()
   await groupedShape.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Set link' }).click()
+  await page.getByRole('menuitem', { name: 'Add link' }).click()
   await expect(page.getByRole('textbox', { name: 'Web address' })).toHaveValue('https://example.com/deck')
   await page.getByRole('tab', { name: 'Slide', exact: true }).click()
-  await page.getByRole('combobox', { name: 'Link target' }).selectOption({ label: 'Slide 2' })
-  await page.getByRole('button', { name: 'Apply' }).click()
+  await expect(page.locator('.mona-link-slide-preview .mona-scaled-slide')).toBeVisible()
+  await page.locator('.mona-link-select').click()
+  await page.getByRole('option', { name: 'Slide 2' }).click()
+  await page.getByRole('button', { name: 'Confirm' }).click()
   await groupedShape.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Set link' }).click()
+  await page.getByRole('menuitem', { name: 'Add link' }).click()
   await expect(page.getByRole('tab', { name: 'Slide', exact: true })).toHaveAttribute('aria-selected', 'true')
-  await expect(page.getByRole('combobox', { name: 'Link target' })).toHaveValue('gate3-slide-images')
+  await expect(page.locator('.mona-link-select-label')).toHaveText('Slide 2')
   await page.getByRole('button', { name: 'Cancel' }).click()
+  await page.waitForTimeout(350)
 
-  const groupLeftBefore = await groupedShape.evaluate(element => Number.parseFloat((element as HTMLElement).style.left))
-  const groupTextLeftBefore = await groupedText.evaluate(element => Number.parseFloat((element as HTMLElement).style.left))
+  const groupPosition = () => page.evaluate(() => {
+    const elements = window.__MONA_REACT_TEST__!.getState().presentation.slides[0]!.elements
+    return {
+      shape: elements.find(element => element.id === 'gate3-gradient-shape')!.left,
+      text: elements.find(element => element.id === 'gate3-title')!.left,
+    }
+  })
+  const groupBefore = await groupPosition()
   await groupedShape.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Center horizontally' }).click()
-  const groupLeftAfter = await groupedShape.evaluate(element => Number.parseFloat((element as HTMLElement).style.left))
-  const groupTextLeftAfter = await groupedText.evaluate(element => Number.parseFloat((element as HTMLElement).style.left))
-  expect(groupLeftAfter).not.toBe(groupLeftBefore)
-  expect(groupLeftAfter - groupLeftBefore).toBeCloseTo(groupTextLeftAfter - groupTextLeftBefore, 3)
+  const groupAfter = await groupPosition()
+  expect(groupAfter.shape).not.toBe(groupBefore.shape)
+  expect(groupAfter.shape - groupBefore.shape).toBeCloseTo(groupAfter.text - groupBefore.text, 3)
+  await page.waitForTimeout(350)
   await canvas.press('Control+z')
-  await expect.poll(() => groupedShape.evaluate(element => Number.parseFloat((element as HTMLElement).style.left))).toBe(groupLeftBefore)
+  await expect.poll(groupPosition).toEqual(groupBefore)
 
   await groupedShape.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Ungroup' }).click()
-  await groupedText.click({ modifiers: ['Control'] })
+  await groupedText.locator('.mona-text-drag-handler.is-top').click({ modifiers: ['Meta'] })
   await expect(page.locator('[aria-label="2 selected elements"]')).toBeVisible()
   await groupedShape.click({ button: 'right' })
   await expect(page.getByRole('menuitem', { name: 'Bring to front' })).toBeDisabled()
@@ -153,12 +164,16 @@ test('supports grouped selection, create gestures, context settings, clipboard, 
   await lockedMenu.getByRole('menuitem', { name: 'Unlock' }).click()
 
   const elementCount = await page.locator('.mona-render-stage [data-element-id]').count()
-  await page.keyboard.press('Control+c')
-  await page.keyboard.press('Control+v')
+  await groupedShape.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy' }).click()
+  await groupedShape.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Paste' }).click()
   await expect.poll(() => page.locator('.mona-render-stage [data-element-id]').count()).toBe(elementCount + 2)
+  await page.waitForTimeout(350)
   await page.keyboard.press('Delete')
   await expect.poll(() => page.locator('.mona-render-stage [data-element-id]').count()).toBe(elementCount)
-  await page.keyboard.press('Control+z')
+  await page.waitForTimeout(350)
+  await canvas.press('Control+z')
   await expect.poll(() => page.locator('.mona-render-stage [data-element-id]').count()).toBe(elementCount + 2)
 
   await canvas.click({ position: { x: 450, y: 700 } })
@@ -178,29 +193,52 @@ test('supports grouped selection, create gestures, context settings, clipboard, 
   await slide.click({ button: 'right', position: blankCanvasPoint })
   await expect(page.getByRole('menu', { name: 'Canvas menu' })).toBeVisible()
   await page.getByRole('menuitem', { name: 'Grid lines' }).hover()
-  await expect(page.getByRole('menuitem', { name: 'Grid: Small' })).toBeVisible()
-  await page.getByRole('menuitem', { name: 'Grid: Medium' }).click()
+  await expect(page.getByRole('menuitem', { name: 'Small' })).toBeVisible()
+  await page.getByRole('menuitem', { name: 'Medium' }).click()
   await expect(page.locator('.mona-editor-grid')).toBeVisible()
   await slide.click({ button: 'right', position: blankCanvasPoint })
-  await page.getByRole('menuitem', { name: 'Toggle ruler' }).click()
-  await expect(page.locator('.mona-editor-rulers')).toBeVisible()
+  await page.getByRole('menuitem', { name: 'Ruler' }).click()
+  await expect(page.locator('.mona-editor-ruler.is-horizontal')).toBeVisible()
 })
 
 test('crops an image and supports lasso selection, zoom, and spacebar panning', async ({ page }) => {
   await page.getByRole('button', { name: 'Show slide 2' }).click()
   await page.getByRole('button', { name: 'Select image gate3-image-round' }).click()
-  await page.keyboard.press('Enter')
+  const cropModelBefore = await page.evaluate(() => {
+    const element = window.__MONA_REACT_TEST__!.getState().presentation.slides[1]!.elements
+      .find(item => item.id === 'gate3-image-round')!
+    return structuredClone(element)
+  })
+  await page.getByRole('button', { name: 'Crop image' }).click()
   await expect(page.getByLabel('Image crop frame')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Move crop area' })).toBeVisible()
   const cropHandle = page.getByRole('button', { name: 'Crop right' })
   const cropBox = await cropHandle.boundingBox()
   await page.mouse.move(cropBox!.x + cropBox!.width / 2, cropBox!.y + cropBox!.height / 2)
   await page.mouse.down()
   await page.mouse.move(cropBox!.x - 30, cropBox!.y + cropBox!.height / 2, { steps: 3 })
   await page.mouse.up()
-  await page.keyboard.press('Control+z')
-  await expect(page.getByLabel('Image crop frame')).toBeVisible()
+  expect(await page.evaluate(() => {
+    const element = window.__MONA_REACT_TEST__!.getState().presentation.slides[1]!.elements
+      .find(item => item.id === 'gate3-image-round')!
+    return structuredClone(element)
+  })).toEqual(cropModelBefore)
 
-  await page.keyboard.press('Escape')
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('Image crop frame')).toHaveCount(0)
+  expect(await page.evaluate(() => {
+    const element = window.__MONA_REACT_TEST__!.getState().presentation.slides[1]!.elements
+      .find(item => item.id === 'gate3-image-round')!
+    return structuredClone(element)
+  })).not.toEqual(cropModelBefore)
+  await page.waitForTimeout(350)
+  await page.getByRole('application', { name: 'Editable slide canvas' }).press('Control+z')
+  await expect.poll(() => page.evaluate(() => {
+    const element = window.__MONA_REACT_TEST__!.getState().presentation.slides[1]!.elements
+      .find(item => item.id === 'gate3-image-round')!
+    return structuredClone(element)
+  })).toEqual(cropModelBefore)
+
   const slide = page.locator('.mona-editor-slide-canvas')
   const lassoSlideBox = await slide.boundingBox()
   const lassoScale = lassoSlideBox!.width / 1000
@@ -212,17 +250,20 @@ test('crops an image and supports lasso selection, zoom, and spacebar panning', 
 
   const canvas = page.getByRole('application', { name: 'Editable slide canvas' })
   const frameBefore = await page.locator('.mona-editor-viewport-frame').boundingBox()
-  await canvas.press('Control++')
+  await canvas.press('Control+=')
   const frameAfter = await page.locator('.mona-editor-viewport-frame').boundingBox()
   expect(frameAfter!.width).toBeGreaterThan(frameBefore!.width)
 
   await page.keyboard.down(' ')
   const stageBox = await canvas.boundingBox()
-  const transformBefore = await page.locator('.mona-editor-viewport-frame').evaluate(element => (element as HTMLElement).style.transform)
+  const panBefore = await page.evaluate(() => window.__MONA_REACT_TEST__!.getState().session.canvasPan)
   await page.mouse.move(stageBox!.x + 70, stageBox!.y + 70)
   await page.mouse.down()
   await page.mouse.move(stageBox!.x + 120, stageBox!.y + 100, { steps: 2 })
   await page.mouse.up()
   await page.keyboard.up(' ')
-  await expect.poll(() => page.locator('.mona-editor-viewport-frame').evaluate(element => (element as HTMLElement).style.transform)).not.toBe(transformBefore)
+  await expect.poll(() => page.evaluate(() => window.__MONA_REACT_TEST__!.getState().session.canvasPan)).toEqual({
+    x: panBefore.x + 50,
+    y: panBefore.y + 30,
+  })
 })

@@ -60,9 +60,8 @@ test('selects rendered elements and exposes transform handles without replacing 
 test('activates creation tools from the focused canvas keyboard surface', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><EditorDeck presentation={presentation} /></div>)
   const canvas = document.querySelector<HTMLElement>('[aria-label="Editable slide canvas"]')!
-  canvas.focus()
+  await page.getByRole('application', { name: 'Editable slide canvas' }).click({ position: { x: 20, y: 20 } })
   canvas.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'r' }))
-  await new Promise(resolve => setTimeout(resolve, 0))
-  expect(canvas.dataset.activeTool).toBe('shape')
+  await expect.element(page.getByRole('application', { name: 'Editable slide canvas' })).toHaveAttribute('data-active-tool', 'shape')
   await expect.element(page.getByText('shape creation tool active')).toBeInTheDocument()
 })

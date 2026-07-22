@@ -1,0 +1,411 @@
+{
+  "schemaVersion": 2,
+  "fixtures": [
+    {
+      "file": "real-01-powerpoint-native-charts-stress.pptx",
+      "location": "private/real-01-powerpoint-native-charts-stress.pptx",
+      "bytes": 403643,
+      "sha256": "5df09eff2c5fbb2bea72971421dc5507d68cab10ce3af8791969fdee35e76991",
+      "package": {
+        "slides": 34,
+        "masters": 6,
+        "layouts": 73,
+        "themes": 8,
+        "charts": 8,
+        "tables": 2,
+        "pictures": 1,
+        "groups": 0,
+        "notesSlides": 4,
+        "media": 5,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 18,
+        "rotatedTransforms": 25,
+        "croppedImages": 1,
+        "shadows": 6,
+        "alphaEffects": 1,
+        "transitions": 1,
+        "timingSlides": 26,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 79,
+        "templateFooterPlaceholders": 79
+      },
+      "charts": [
+        {
+          "part": "ppt/charts/chart1.xml",
+          "types": [
+            "bar3DChart"
+          ],
+          "series": 1,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart2.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 2,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart3.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 5,
+          "legend": true
+        },
+        {
+          "part": "ppt/charts/chart4.xml",
+          "types": [
+            "lineChart"
+          ],
+          "series": 1,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart5.xml",
+          "types": [
+            "barChart",
+            "lineChart"
+          ],
+          "series": 2,
+          "legend": true
+        },
+        {
+          "part": "ppt/charts/chart6.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 5,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart7.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 5,
+          "legend": true
+        },
+        {
+          "part": "ppt/charts/chart8.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 5,
+          "legend": false
+        }
+      ]
+    },
+    {
+      "file": "real-02-powerpoint-native-pie-chart.pptx",
+      "location": "private/real-02-powerpoint-native-pie-chart.pptx",
+      "bytes": 55297,
+      "sha256": "3b6404b59b24cb79fbb91fc2e92bd8b80cdc340aeed71a1ec1e267db0d8ad444",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 11,
+        "themes": 1,
+        "charts": 1,
+        "tables": 0,
+        "pictures": 0,
+        "groups": 0,
+        "notesSlides": 0,
+        "media": 0,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 0,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 0,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 12,
+        "templateFooterPlaceholders": 12
+      },
+      "charts": [
+        {
+          "part": "ppt/charts/chart1.xml",
+          "types": [
+            "pieChart"
+          ],
+          "series": 1,
+          "legend": true
+        }
+      ]
+    },
+    {
+      "file": "real-03-nasa-sewp-corporate.pptx",
+      "location": "private/real-03-nasa-sewp-corporate.pptx",
+      "bytes": 8141909,
+      "sha256": "49393aafa1cc93f8f442ab8aa53d4facd686dcd5259141c78e7f6688ebbabaa5",
+      "package": {
+        "slides": 18,
+        "masters": 2,
+        "layouts": 8,
+        "themes": 3,
+        "charts": 0,
+        "tables": 2,
+        "pictures": 44,
+        "groups": 5,
+        "notesSlides": 3,
+        "media": 48,
+        "hyperlinkRelationships": 9,
+        "hyperlinkReferences": 28,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 3,
+        "rotatedTransforms": 0,
+        "croppedImages": 8,
+        "shadows": 3,
+        "alphaEffects": 9,
+        "transitions": 2,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 17,
+        "footerPlaceholders": 3,
+        "templateSlideNumberPlaceholders": 8,
+        "templateFooterPlaceholders": 4
+      },
+      "charts": []
+    },
+    {
+      "file": "real-04-powerpoint-design-smartart-notes.pptx",
+      "location": "private/real-04-powerpoint-design-smartart-notes.pptx",
+      "bytes": 874522,
+      "sha256": "61afceb0365523ceba6fc00a525157148c2ddbdb3b5d843992ac3c107e9921bf",
+      "package": {
+        "slides": 28,
+        "masters": 1,
+        "layouts": 12,
+        "themes": 3,
+        "charts": 0,
+        "tables": 0,
+        "pictures": 19,
+        "groups": 1,
+        "notesSlides": 17,
+        "media": 17,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 4,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 0,
+        "croppedImages": 12,
+        "shadows": 5,
+        "alphaEffects": 7,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 2,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 11,
+        "templateFooterPlaceholders": 10
+      },
+      "charts": []
+    },
+    {
+      "file": "corpus-01-text.pptx",
+      "location": "public/corpus-01-text.pptx",
+      "bytes": 48842,
+      "sha256": "1ceeaa95b699563a31843e2c6eaeb74d9d476d778654c15f09ba31f1e116a88f",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 1,
+        "themes": 1,
+        "charts": 0,
+        "tables": 0,
+        "pictures": 0,
+        "groups": 0,
+        "notesSlides": 1,
+        "media": 0,
+        "hyperlinkRelationships": 1,
+        "hyperlinkReferences": 2,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 0,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 0,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 0,
+        "templateFooterPlaceholders": 0
+      },
+      "charts": []
+    },
+    {
+      "file": "corpus-02-shapes-lines.pptx",
+      "location": "public/corpus-02-shapes-lines.pptx",
+      "bytes": 47423,
+      "sha256": "817aeef55fe65d688877962a2ee713235dbdc816668b27f896e343d0cf583111",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 1,
+        "themes": 1,
+        "charts": 0,
+        "tables": 0,
+        "pictures": 0,
+        "groups": 0,
+        "notesSlides": 1,
+        "media": 0,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 2,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 0,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 0,
+        "templateFooterPlaceholders": 0
+      },
+      "charts": []
+    },
+    {
+      "file": "corpus-03-media.pptx",
+      "location": "public/corpus-03-media.pptx",
+      "bytes": 47149,
+      "sha256": "f368a1340171b122e8b75308e43f4a8ebece6148e61148623e7ff3f00eedbd8b",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 1,
+        "themes": 1,
+        "charts": 0,
+        "tables": 0,
+        "pictures": 3,
+        "groups": 0,
+        "notesSlides": 1,
+        "media": 3,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 1,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 1,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 0,
+        "templateFooterPlaceholders": 0
+      },
+      "charts": []
+    },
+    {
+      "file": "corpus-04-chart-table.pptx",
+      "location": "public/corpus-04-chart-table.pptx",
+      "bytes": 124559,
+      "sha256": "b4a80f27195886a363b16443bb3898d1c65384c7a93579cbef5ddad030d8bd5b",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 1,
+        "themes": 1,
+        "charts": 3,
+        "tables": 1,
+        "pictures": 0,
+        "groups": 0,
+        "notesSlides": 1,
+        "media": 0,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 2,
+        "rotatedTransforms": 0,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 0,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 0,
+        "templateFooterPlaceholders": 0
+      },
+      "charts": [
+        {
+          "part": "ppt/charts/chart1.xml",
+          "types": [
+            "barChart"
+          ],
+          "series": 1,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart2.xml",
+          "types": [
+            "lineChart"
+          ],
+          "series": 1,
+          "legend": false
+        },
+        {
+          "part": "ppt/charts/chart3.xml",
+          "types": [
+            "pieChart"
+          ],
+          "series": 1,
+          "legend": false
+        }
+      ]
+    },
+    {
+      "file": "corpus-05-groups.pptx",
+      "location": "public/corpus-05-groups.pptx",
+      "bytes": 28932,
+      "sha256": "599c35be58b9fe8db6bf40db38ff9dee87128140dc62ad854c5772f63b761c81",
+      "package": {
+        "slides": 1,
+        "masters": 1,
+        "layouts": 11,
+        "themes": 1,
+        "charts": 0,
+        "tables": 0,
+        "pictures": 0,
+        "groups": 3,
+        "notesSlides": 0,
+        "media": 0,
+        "hyperlinkRelationships": 0,
+        "hyperlinkReferences": 0,
+        "smartArt": 0,
+        "equations": 0,
+        "mergedCellAttributes": 0,
+        "rotatedTransforms": 1,
+        "croppedImages": 0,
+        "shadows": 0,
+        "alphaEffects": 0,
+        "transitions": 0,
+        "timingSlides": 0,
+        "slideNumberPlaceholders": 0,
+        "footerPlaceholders": 0,
+        "templateSlideNumberPlaceholders": 12,
+        "templateFooterPlaceholders": 12
+      },
+      "charts": []
+    }
+  ]
+}

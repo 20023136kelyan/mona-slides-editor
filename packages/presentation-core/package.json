@@ -5,7 +5,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/model.ts"
+    "./animation-config": "./src/animation-config.ts",
+    "./gate4-editor-fixture": "./src/gate4-editor-fixture.ts",
+    "./gate5-multi-fixture": "./src/gate5-multi-fixture.ts",
+    "./latex-presets": "./src/latex-presets.ts",
+    "./line-presets": "./src/line-presets.ts",
+    "./model": "./src/model.ts",
+    "./shape-path-formulas": "./src/shape-path-formulas.ts",
+    "./shape-presets": "./src/shape-presets.ts",
+    "./symbol-presets": "./src/symbol-presets.ts"
   },
   "scripts": {
     "type-check": "tsc -p tsconfig.json",

@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, MouseEventHandler, PointerEventHandler, ReactNode } from 'react'
 
 import type { PPTTextElement } from '@mona/presentation-core/model'
 
@@ -8,7 +8,14 @@ import {
   type SlideCSSProperties,
 } from '@/features/presentation-renderer/render-utils'
 
+export interface TextElementEditor {
+  content: ReactNode
+  onContextMenu: MouseEventHandler<HTMLDivElement>
+  onPointerDown: PointerEventHandler<HTMLDivElement>
+}
+
 interface TextElementProps {
+  editor?: TextElementEditor
   element: PPTTextElement
   thumbnail?: boolean
 }
@@ -19,7 +26,7 @@ const verticalAlignment: Record<NonNullable<PPTTextElement['vAlign']>, CSSProper
   bottom: 'flex-end',
 }
 
-export function TextElement({ element, thumbnail = false }: TextElementProps) {
+export function TextElement({ editor, element, thumbnail = false }: TextElementProps) {
   const inset = element.inset || [10, 10, 10, 10]
   const shadow = getShadowStyle(element.shadow)
   const contentStyle: SlideCSSProperties = {
@@ -54,12 +61,25 @@ export function TextElement({ element, thumbnail = false }: TextElementProps) {
       }}
     >
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
-        <div className="mona-text-content" style={contentStyle}>
+        <div
+          className={`mona-text-content${element.lock ? ' is-locked' : ''}`}
+          onContextMenu={editor?.onContextMenu}
+          onPointerDown={editor?.onPointerDown}
+          style={contentStyle}
+        >
           <ElementOutline height={element.height} outline={element.outline} width={element.width} />
-          <div
-            className={`mona-rich-text ProseMirror-static${thumbnail ? ' is-thumbnail' : ''}`}
-            dangerouslySetInnerHTML={markup}
-          />
+          {editor?.content ?? (
+            <div
+              className={`mona-rich-text ProseMirror-static${thumbnail ? ' is-thumbnail' : ''}`}
+              dangerouslySetInnerHTML={markup}
+            />
+          )}
+          {editor ? (
+            <>
+              <div aria-hidden="true" className="mona-text-drag-handler is-top" />
+              <div aria-hidden="true" className="mona-text-drag-handler is-bottom" />
+            </>
+          ) : null}
         </div>
       </div>
     </div>

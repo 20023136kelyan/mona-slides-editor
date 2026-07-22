@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
+import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
+import { getSlideBackgroundStyle } from '@/features/presentation-renderer/render-utils'
 import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 
 interface ScaledSlideProps {
@@ -11,6 +14,7 @@ interface ScaledSlideProps {
   thumbnail?: boolean
   viewportRatio: number
   viewportSize: number
+  visible?: boolean
 }
 
 export function ScaledSlide({
@@ -20,7 +24,9 @@ export function ScaledSlide({
   thumbnail = false,
   viewportRatio,
   viewportSize,
+  visible = true,
 }: ScaledSlideProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const [responsiveScale, setResponsiveScale] = useState(0)
   const fixedScale = fixedWidth ? fixedWidth / viewportSize : null
@@ -46,15 +52,31 @@ export function ScaledSlide({
 
   return (
     <div className={`mona-scaled-slide${fixedWidth ? ' is-fixed' : ''}`} ref={containerRef} style={frameStyle}>
-      {scale > 0 ? (
-        <div className="mona-scaled-slide-canvas" style={{ transform: `scale(${scale})` }}>
-          <SlideRenderer
-            slide={slide}
-            theme={theme}
-            thumbnail={thumbnail}
-            viewportRatio={viewportRatio}
-            viewportSize={viewportSize}
-          />
+      {!visible ? <div className="mona-scaled-slide-placeholder">{t('runtime.thumbnailLoading')}</div> : scale > 0 ? (
+        <div
+          className={`mona-scaled-slide-canvas${thumbnail ? ' is-thumbnail' : ''}`}
+          style={{
+            transform: `scale(${scale})`,
+            ...(thumbnail ? { width: viewportSize, height: viewportSize * viewportRatio } : {}),
+          }}
+        >
+          {thumbnail ? (
+            <>
+              <div className="mona-scaled-slide-background" style={getSlideBackgroundStyle(slide.background)} />
+              {slide.elements.map((element, index) => (
+                <div className="mona-rendered-element" key={element.id} style={{ zIndex: index + 1 }}>
+                  <ElementRenderer element={element} theme={theme} thumbnail />
+                </div>
+              ))}
+            </>
+          ) : (
+            <SlideRenderer
+              slide={slide}
+              theme={theme}
+              viewportRatio={viewportRatio}
+              viewportSize={viewportSize}
+            />
+          )}
         </div>
       ) : null}
     </div>

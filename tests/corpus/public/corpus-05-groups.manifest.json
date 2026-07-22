@@ -1,0 +1,38 @@
+{
+  "file": "corpus-05-groups.pptx",
+  "slides": [
+    {
+      "elements": [
+        {
+          "kind": "text",
+          "text": "Corpus 05 \u2014 groups and freeform",
+          "x": 0.5,
+          "y": 0.2,
+          "w": 9,
+          "h": 0.6
+        },
+        {
+          "kind": "group",
+          "members": 3,
+          "texts": [
+            "Grouped caption"
+          ]
+        },
+        {
+          "kind": "group",
+          "members": 3,
+          "nested": true,
+          "rotate": 15
+        },
+        {
+          "kind": "shape",
+          "shape": "freeform",
+          "x": 0.7,
+          "y": 4.0,
+          "w": 1.5,
+          "h": 1.1
+        }
+      ]
+    }
+  ]
+}

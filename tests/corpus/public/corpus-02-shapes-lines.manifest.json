@@ -1,0 +1,78 @@
+{
+  "file": "corpus-02-shapes-lines.pptx",
+  "slides": [
+    {
+      "elements": [
+        {
+          "kind": "shape",
+          "shape": "rect",
+          "x": 0.5,
+          "y": 0.5,
+          "w": 2,
+          "h": 1.2
+        },
+        {
+          "kind": "shape",
+          "shape": "roundRect",
+          "x": 3,
+          "y": 0.5,
+          "w": 2,
+          "h": 1.2
+        },
+        {
+          "kind": "shape",
+          "shape": "ellipse",
+          "x": 5.5,
+          "y": 0.5,
+          "w": 1.6,
+          "h": 1.6
+        },
+        {
+          "kind": "shape",
+          "shape": "triangle",
+          "x": 7.6,
+          "y": 0.5,
+          "w": 1.6,
+          "h": 1.4,
+          "rotate": 25
+        },
+        {
+          "kind": "shape",
+          "shape": "rect",
+          "x": 0.5,
+          "y": 2.2,
+          "w": 2,
+          "h": 1.2,
+          "rotate": 340,
+          "flipH": true
+        },
+        {
+          "kind": "shape",
+          "shape": "rect",
+          "text": "Text in shape",
+          "x": 3,
+          "y": 2.2,
+          "w": 2.5,
+          "h": 1.2
+        },
+        {
+          "kind": "line",
+          "x": 0.5,
+          "y": 4,
+          "w": 4,
+          "h": 0,
+          "arrow": "end"
+        },
+        {
+          "kind": "line",
+          "x": 5,
+          "y": 4,
+          "w": 4,
+          "h": 0.8,
+          "arrow": "both",
+          "dash": true
+        }
+      ]
+    }
+  ]
+}

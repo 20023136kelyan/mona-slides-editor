@@ -23,7 +23,7 @@ function centerCrop(image: PNG, width: number, height: number): PNG {
 }
 
 async function getReactInventory(page: Page) {
-  return page.locator('.mona-thumbnail-button').evaluateAll(thumbnails => thumbnails.map(thumbnail => (
+  return page.locator('.mona-thumbnail-item').evaluateAll(thumbnails => thumbnails.map(thumbnail => (
     Array.from(thumbnail.querySelectorAll('[data-element-type]')).map(element => element.getAttribute('data-element-type')).sort()
   )))
 }
@@ -54,12 +54,12 @@ async function compareDeck({
   const vuePage = await browser.newPage()
   await vuePage.goto(`http://127.0.0.1:5173/${fixtureQuery}`)
 
-  const reactThumbnails = page.locator('.mona-thumbnail-button .mona-slide-renderer')
+  const reactThumbnails = page.locator('.mona-thumbnail-item .mona-scaled-slide-canvas.is-thumbnail')
   const vueThumbnails = vuePage.locator('.thumbnail-slide .elements')
   await expect(reactThumbnails).toHaveCount(slideCount)
   await expect(vueThumbnails).toHaveCount(slideCount)
   if (requireCompleteCoverage) {
-    await expect(page.locator('.mona-thumbnail-rail [data-chart-ready] svg')).toBeVisible()
+    await expect(page.locator('.mona-thumbnail-list [data-chart-ready] svg')).toBeVisible()
     await expect(vuePage.locator('.thumbnail-slide .chart svg')).toBeVisible()
   }
 

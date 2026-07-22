@@ -1,0 +1,70 @@
+{
+  "fixture": "corpus-04-chart-table.pptx",
+  "imported": {
+    "elementTypes": {
+      "table": 1
+    },
+    "elements": 1,
+    "groupedElements": 0,
+    "groups": 0,
+    "hyperlinks": 0,
+    "lockedElements": 0,
+    "notesSlides": 1,
+    "rotatedElements": 0,
+    "slides": 1,
+    "title": "Untitled presentation",
+    "viewportRatio": 0.5625,
+    "viewportSize": 960
+  },
+  "parserGaps": {
+    "nativeChartsNotEditable": 3,
+    "nativeGroupsNotRepresented": 0,
+    "nativeSmartArtNotEditable": 0,
+    "nativeTableCountDifference": 0,
+    "notesSlideCountDifference": 0
+  },
+  "roundTrip": {
+    "elementTypes": {
+      "table": 1
+    },
+    "package": {
+      "charts": 0,
+      "media": 0,
+      "notesSlides": 1,
+      "slides": 1
+    },
+    "parsedSlides": 1
+  },
+  "schemaVersion": 1,
+  "sourcePackage": {
+    "slides": 1,
+    "masters": 1,
+    "layouts": 1,
+    "themes": 1,
+    "charts": 3,
+    "tables": 1,
+    "pictures": 0,
+    "groups": 0,
+    "notesSlides": 1,
+    "media": 0,
+    "hyperlinkRelationships": 0,
+    "hyperlinkReferences": 0,
+    "smartArt": 0,
+    "equations": 0,
+    "mergedCellAttributes": 2,
+    "rotatedTransforms": 0,
+    "croppedImages": 0,
+    "shadows": 0,
+    "alphaEffects": 0,
+    "transitions": 0,
+    "timingSlides": 0,
+    "slideNumberPlaceholders": 0,
+    "footerPlaceholders": 0,
+    "templateSlideNumberPlaceholders": 0,
+    "templateFooterPlaceholders": 0
+  },
+  "sourceSha256": "b4a80f27195886a363b16443bb3898d1c65384c7a93579cbef5ddad030d8bd5b",
+  "visualDiffRatios": {
+    "slide-1": 0
+  }
+}

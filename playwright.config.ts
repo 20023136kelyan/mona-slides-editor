@@ -43,7 +43,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
+    command: 'npm run oracle:vue -- --host 127.0.0.1 --port 5173',
     url: referenceURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

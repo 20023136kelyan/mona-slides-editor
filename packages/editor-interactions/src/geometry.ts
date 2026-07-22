@@ -44,6 +44,12 @@ export const normalizeRect = (origin: PointerPosition, pointer: PointerPosition)
   height: Math.abs(pointer.y - origin.y),
 })
 
+export const lockDeltaToDominantAxis = (delta: PointerPosition): PointerPosition => {
+  if (Math.abs(delta.x) > Math.abs(delta.y)) return { x: delta.x, y: 0 }
+  if (Math.abs(delta.x) < Math.abs(delta.y)) return { x: 0, y: delta.y }
+  return delta
+}
+
 export const rectToBounds = (rect: InteractionRect): InteractionBounds => ({
   minX: rect.left,
   maxX: rect.left + rect.width,
@@ -68,20 +74,19 @@ export const intersectsBounds = (left: InteractionBounds, right: InteractionBoun
   left.maxY > right.minY && left.minY < right.maxY
 )
 
-const closestSnap = (
+const firstSnap = (
   anchors: readonly number[],
   candidates: readonly SnapCandidate[],
   threshold: number,
 ) => {
-  let match: { correction: number; candidate: SnapCandidate } | undefined
-  for (const anchor of anchors) {
-    for (const candidate of candidates) {
+  for (const candidate of candidates) {
+    for (const anchor of anchors) {
       const correction = candidate.value - anchor
       if (Math.abs(correction) >= threshold) continue
-      if (!match || Math.abs(correction) < Math.abs(match.correction)) match = { correction, candidate }
+      return { correction, candidate }
     }
   }
-  return match
+  return undefined
 }
 
 export const snapMove = (input: {
@@ -98,12 +103,12 @@ export const snapMove = (input: {
     minY: input.bounds.minY + input.delta.y,
     maxY: input.bounds.maxY + input.delta.y,
   }
-  const horizontal = closestSnap(
+  const horizontal = firstSnap(
     [translated.minY, translated.maxY, (translated.minY + translated.maxY) / 2],
     input.horizontalCandidates,
     threshold,
   )
-  const vertical = closestSnap(
+  const vertical = firstSnap(
     [translated.minX, translated.maxX, (translated.minX + translated.maxX) / 2],
     input.verticalCandidates,
     threshold,
@@ -112,27 +117,24 @@ export const snapMove = (input: {
     x: input.delta.x + (vertical?.correction ?? 0),
     y: input.delta.y + (horizontal?.correction ?? 0),
   }
-  const moved = {
-    minX: input.bounds.minX + delta.x,
-    maxX: input.bounds.maxX + delta.x,
-    minY: input.bounds.minY + delta.y,
-    maxY: input.bounds.maxY + delta.y,
-  }
   const guides: AlignmentGuide[] = []
   if (horizontal) {
     guides.push({
       orientation: 'horizontal',
       axis: horizontal.candidate.value,
-      from: Math.min(horizontal.candidate.range[0], moved.minX) - 50,
-      to: Math.max(horizontal.candidate.range[1], moved.maxX) + 50,
+      // Vue measures both guide extents from the translated bounds before
+      // either axis' adsorption correction is applied. In particular, a
+      // simultaneous vertical snap must not shift a horizontal guide's ends.
+      from: Math.min(horizontal.candidate.range[0], translated.minX) - 50,
+      to: Math.max(horizontal.candidate.range[1], translated.maxX) + 50,
     })
   }
   if (vertical) {
     guides.push({
       orientation: 'vertical',
       axis: vertical.candidate.value,
-      from: Math.min(vertical.candidate.range[0], moved.minY) - 50,
-      to: Math.max(vertical.candidate.range[1], moved.maxY) + 50,
+      from: Math.min(vertical.candidate.range[0], translated.minY) - 50,
+      to: Math.max(vertical.candidate.range[1], translated.maxY) + 50,
     })
   }
   return { delta, guides }
@@ -142,9 +144,16 @@ export const resizeBounds = (
   origin: InteractionBounds,
   handle: ResizeHandle,
   delta: PointerPosition,
-  options: { lockAspectRatio?: boolean; minimumSize?: number } = {},
+  options: {
+    lockAspectRatio?: boolean
+    minimumHeight?: number
+    minimumSize?: number
+    minimumWidth?: number
+  } = {},
 ): InteractionBounds => {
   const minimumSize = options.minimumSize ?? 20
+  const minimumWidth = options.minimumWidth ?? minimumSize
+  const minimumHeight = options.minimumHeight ?? minimumSize
   let { minX, maxX, minY, maxY } = origin
   if (handle.includes('left')) minX += delta.x
   if (handle.includes('right')) maxX += delta.x
@@ -167,13 +176,13 @@ export const resizeBounds = (
     }
   }
 
-  if (maxX - minX < minimumSize) {
-    if (handle.includes('left')) minX = maxX - minimumSize
-    else maxX = minX + minimumSize
+  if (maxX - minX < minimumWidth) {
+    if (handle.includes('left')) minX = maxX - minimumWidth
+    else maxX = minX + minimumWidth
   }
-  if (maxY - minY < minimumSize) {
-    if (handle.startsWith('top')) minY = maxY - minimumSize
-    else maxY = minY + minimumSize
+  if (maxY - minY < minimumHeight) {
+    if (handle.startsWith('top')) minY = maxY - minimumHeight
+    else maxY = minY + minimumHeight
   }
   return { minX, maxX, minY, maxY }
 }
@@ -184,6 +193,8 @@ export const snapAngle = (angle: number, increment = 45, threshold = 5): number 
 }
 
 export const angleFromPoint = (center: PointerPosition, pointer: PointerPosition): number => {
-  const angle = Math.atan2(pointer.y - center.y, pointer.x - center.x) * 180 / Math.PI + 90
-  return snapAngle(angle)
+  let angle = Math.atan2(pointer.y - center.y, pointer.x - center.x) * 180 / Math.PI + 90
+  while (angle > 180) angle -= 360
+  while (angle < -180) angle += 360
+  return angle
 }

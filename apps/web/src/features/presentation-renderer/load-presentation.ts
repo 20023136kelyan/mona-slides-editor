@@ -1,19 +1,27 @@
 import {
+  DEFAULT_TEMPLATE_CATALOG,
   validatePresentationState,
   type PresentationState,
 } from '@mona/presentation-core'
 import type { Slide } from '@mona/presentation-core/model'
 
-const allowedFixtures = new Set(['slides', 'gate3-renderer', 'gate4-editor'])
+const fetchProductionSlides = async (): Promise<Slide[]> => {
+  const response = await fetch('/mocks/slides.json')
+  if (!response.ok) throw new Error(`Unable to load presentation: ${response.status}`)
+  return response.json() as Promise<Slide[]>
+}
+
+const loadSlides = async (request: Request): Promise<Slide[]> => {
+  if (import.meta.env.DEV) {
+    const { loadDevelopmentSlides } = await import('./load-development-slides')
+    return loadDevelopmentSlides(request)
+  }
+
+  return fetchProductionSlides()
+}
 
 export async function loadPresentation({ request }: { request: Request }): Promise<PresentationState> {
-  const url = new URL(request.url)
-  const requestedFixture = url.searchParams.get('rendererFixture') || 'slides'
-  const fixture = allowedFixtures.has(requestedFixture) ? requestedFixture : 'slides'
-  const fixtureFile = fixture === 'gate4-editor' ? 'gate3-renderer' : fixture
-  const response = await fetch(`/${fixtureFile}.json`)
-  if (!response.ok) throw new Error(`Unable to load presentation fixture: ${response.status}`)
-  const slides = await response.json() as Slide[]
+  const slides = await loadSlides(request)
   const presentation: PresentationState = {
     title: 'Untitled presentation',
     theme: {
@@ -28,7 +36,7 @@ export async function loadPresentation({ request }: { request: Request }): Promi
     slideIndex: 0,
     viewportSize: 1000,
     viewportRatio: 0.5625,
-    templates: [],
+    templates: structuredClone([...DEFAULT_TEMPLATE_CATALOG]),
   }
   const validation = validatePresentationState(presentation)
   if (!validation.valid) {

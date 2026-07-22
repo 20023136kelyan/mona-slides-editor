@@ -1,6 +1,11 @@
 # React migration inventory
 
-Status: updated through Gate 3, 2026-07-19. Update this document at every migration gate.
+> Historical inventory captured during Gates 0–3. Counts, paths, and framework
+> ownership below describe the retired Vue source and must not be read as the
+> current repository architecture. Current ownership is recorded in
+> [GATE_8_CUTOVER_LEDGER.md](./GATE_8_CUTOVER_LEDGER.md).
+
+Status: archived after Gate 8, 2026-07-21.
 
 ## Baseline identity
 

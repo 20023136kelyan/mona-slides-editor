@@ -1,3 +1,5 @@
+import type { MouseEventHandler, PointerEventHandler, ReactNode } from 'react'
+
 import type { PPTShapeElement, ShapeText, SlideTheme } from '@mona/presentation-core/model'
 
 import {
@@ -8,8 +10,18 @@ import {
 } from '@/features/presentation-renderer/render-utils'
 
 interface ShapeElementProps {
+  editor?: ShapeElementEditor
   element: PPTShapeElement
   theme: SlideTheme
+}
+
+export interface ShapeElementEditor {
+  ariaLabel: string
+  content?: ReactNode
+  onContextMenu: MouseEventHandler<HTMLDivElement>
+  onDoubleClick: MouseEventHandler<HTMLDivElement>
+  onPointerDown: PointerEventHandler<HTMLDivElement>
+  onPointerUp: PointerEventHandler<HTMLDivElement>
 }
 
 function ShapeGradient({ element }: { element: PPTShapeElement }) {
@@ -46,7 +58,7 @@ function ShapeGradient({ element }: { element: PPTShapeElement }) {
   )
 }
 
-export function ShapeElement({ element, theme }: ShapeElementProps) {
+export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
   const outline = getOutlineRenderStyle(element.outline)
   const shadow = getShadowStyle(element.shadow)
   const flip = getFlipTransform(element.flipH, element.flipV)
@@ -79,7 +91,13 @@ export function ShapeElement({ element, theme }: ShapeElementProps) {
     >
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
         <div
+          aria-label={editor?.ariaLabel}
           className="mona-shape-content"
+          onContextMenu={editor?.onContextMenu}
+          onDoubleClick={editor?.onDoubleClick}
+          onPointerDown={editor?.onPointerDown}
+          onPointerUp={editor?.onPointerUp}
+          role={editor ? 'button' : undefined}
           style={{
             opacity: element.opacity,
             filter: shadow ? `drop-shadow(${shadow})` : '',
@@ -87,6 +105,7 @@ export function ShapeElement({ element, theme }: ShapeElementProps) {
             color: text.defaultColor,
             fontFamily: text.defaultFontName,
           }}
+          tabIndex={editor ? -1 : undefined}
         >
           <svg aria-hidden="true" height={element.height} overflow="visible" width={element.width}>
             <defs><ShapeGradient element={element} /></defs>
@@ -103,8 +122,8 @@ export function ShapeElement({ element, theme }: ShapeElementProps) {
               />
             </g>
           </svg>
-          <div className={`mona-shape-text is-${text.align}`} style={textStyle}>
-            <div className="ProseMirror-static" dangerouslySetInnerHTML={markup} />
+          <div className={`mona-shape-text is-${text.align}${editor?.content || text.content ? ' is-editable' : ''}`} style={textStyle}>
+            {editor?.content ?? <div className="ProseMirror-static" dangerouslySetInnerHTML={markup} />}
           </div>
         </div>
       </div>

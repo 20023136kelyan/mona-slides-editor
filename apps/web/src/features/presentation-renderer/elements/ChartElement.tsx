@@ -22,11 +22,25 @@ function getThemeColors(colors: string[]): string[] {
 
 function ChartCanvas({ element }: { element: PPTChartElement }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<echarts.ECharts | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return undefined
     const chart = echarts.init(container, null, { renderer: 'svg' })
+    chartRef.current = chart
+    const resizeObserver = new ResizeObserver(() => chart.resize())
+    resizeObserver.observe(container)
+    return () => {
+      resizeObserver.disconnect()
+      chartRef.current = null
+      chart.dispose()
+    }
+  }, [])
+
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
     const option = getChartOption({
       type: element.chartType,
       data: element.data,
@@ -37,13 +51,6 @@ function ChartCanvas({ element }: { element: PPTChartElement }) {
       stack: element.options?.stack || false,
     })
     if (option) chart.setOption(option, true)
-
-    const resizeObserver = new ResizeObserver(() => chart.resize())
-    resizeObserver.observe(container)
-    return () => {
-      resizeObserver.disconnect()
-      chart.dispose()
-    }
   }, [element])
 
   return <div className="mona-chart" data-chart-ready ref={containerRef} />

@@ -38,11 +38,12 @@ Pointer-frequency state never enters Redux. `editor-interactions` exposes cached
 
 ## Contract and parity evidence
 
-`npm run test:gate2` runs 27 tests:
+`npm run test:gate2` now runs 38 tests:
 
 - 7 presentation-core mutation/query/validation/transaction tests;
 - 15 shared operations executed through both the pure core and the public Vue store actions;
-- 3 Redux adapter/reference-stability tests;
+- 6 Redux adapter/reference-stability and history tests;
+- 8 shared editor-geometry tests;
 - 1 interaction-controller contract test;
 - 1 large-deck state/interaction budget test.
 

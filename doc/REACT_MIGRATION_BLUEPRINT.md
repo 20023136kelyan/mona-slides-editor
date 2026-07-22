@@ -1,6 +1,8 @@
 # React migration blueprint
 
-Status: accepted product direction and implementation plan, 2026-07-19.
+Status: **React migration complete through Gate 8, 2026-07-21**. This document
+retains the original plan and historical measurements; current cutover evidence
+is in [GATE_8_CUTOVER_LEDGER.md](./GATE_8_CUTOVER_LEDGER.md).
 
 ## Decision
 
@@ -99,6 +101,10 @@ shadcn/ui officially supports React 19, Tailwind v4, Vite, monorepos, and source
 This follows Vite's own recommendation to update regularly while locking the current TypeScript-compatible minor rather than floating blindly.
 
 ## Repository shape during migration
+
+Historical note: this was the temporary topology. After Gate 8, `apps/web` is
+the only production frontend, the root `src/` Vue tree is removed, and the
+immutable compiled reference lives only at `tests/oracle/vue/` for tests.
 
 Use npm workspaces without moving the Vue application on day one. This minimizes the first diff and preserves the current dev server as the oracle.
 
@@ -416,7 +422,9 @@ Exit: representative JSON and imported decks render within the approved visual t
 
 ### Gate 4 — editing substrate
 
-Status: **complete**, including the common context-menu parity correction, interaction-browser coverage, and production performance evidence. See [REACT_GATE_4.md](./REACT_GATE_4.md).
+Status: **complete — 46 shared Vue/React interaction contracts green**. See
+[REACT_GATE_4.md](./REACT_GATE_4.md) and
+[GATE_4_PARITY_LEDGER.md](./GATE_4_PARITY_LEDGER.md).
 
 Port the common interaction system before feature panels:
 
@@ -427,9 +435,13 @@ Port the common interaction system before feature panels:
 5. keyboard shortcuts, clipboard, context menu, and undo/redo;
 6. create-element gesture controller.
 
-Exit: the interaction fixture deck can be edited with state, visual, keyboard, and performance parity.
+Exit: identical interaction contracts run against Vue and React and pass state,
+geometry, control-inventory, visual, keyboard, focus, clipboard/history, and
+performance comparisons. React-only checks do not satisfy this exit.
 
 ### Gate 5 — editable element vertical slices
+
+Status: **complete**. See [GATE_5_PARITY_LEDGER.md](./GATE_5_PARITY_LEDGER.md).
 
 Port complete user flows, not component folders:
 
@@ -448,6 +460,8 @@ Exit: every native element type is editable and passes its full parity row.
 
 ### Gate 6 — presentation workflows and secondary surfaces
 
+Status: **complete**. See [GATE_6_PARITY_LEDGER.md](./GATE_6_PARITY_LEDGER.md).
+
 Port:
 
 - thumbnails, templates, sections, notes, selection/search/markup panels;
@@ -460,11 +474,17 @@ Exit: all reference journeys run against React and the Vue fallback is no longer
 
 ### Gate 7 — corpus, performance, and stabilization
 
+Status: **complete**. See
+[GATE_7_STABILIZATION_LEDGER.md](./GATE_7_STABILIZATION_LEDGER.md).
+
 Run the full real-deck corpus and stress fixtures. Fix fidelity regressions, listener leaks, long tasks, broad rerenders, chunking problems, memory growth, and browser differences. Exercise production builds, not only HMR.
 
 Exit: React meets or improves the frozen Vue budgets and no P0/P1 parity row is open.
 
 ### Gate 8 — cutover and Vue removal
+
+Status: **complete**. See
+[GATE_8_CUTOVER_LEDGER.md](./GATE_8_CUTOVER_LEDGER.md).
 
 1. Make `apps/web` the production entry.
 2. Keep a release-level fallback only for the agreed stabilization window.
@@ -472,7 +492,9 @@ Exit: React meets or improves the frozen Vue budgets and no P0/P1 parity row is 
 4. Remove the fallback after telemetry and regression tests are clean.
 5. Rebaseline documentation and dependency ownership.
 
-Exit: one React production application remains; the complete parity suite continues to run without Vue.
+Exit: satisfied. One React production application remains. The two-sided suites
+use an immutable compiled Vue test oracle; they require no Vue source,
+framework dependency, build plugin, or secondary production application.
 
 ### Gate 9 — Mona agent and drawing-first product loop
 
@@ -528,4 +550,6 @@ The React migration is complete only when:
 - Vue, Pinia, Vue-specific build plugins, and migration bridges are removed;
 - the AI/Excalidraw architecture can call the same framework-free presentation core used by the editor.
 
-Until then, this is an active migration, not a finished rewrite.
+Migration complete: the React application is the sole production frontend and
+the frozen Vue oracle is retained only as immutable test evidence. Gate 9 is a
+separate product phase, not a condition of the framework migration.

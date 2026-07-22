@@ -84,20 +84,40 @@ export function getChartOption({
     }
   }
 
-  if (type === 'line' || type === 'area') {
+  if (type === 'line') {
     return {
       color: themeColors,
       textStyle,
       legend,
-      xAxis: { type: 'category', boundaryGap: type === 'area' ? false : undefined, data: data.labels, axisLine, axisLabel },
+      xAxis: { type: 'category', data: data.labels, axisLine, axisLabel },
       yAxis: { type: 'value', axisLine, axisLabel, splitLine },
       series: data.series.map((values, index) => {
         const series: LineSeriesOption = {
           data: values,
           name: data.legends[index],
           type: 'line',
-          smooth: type === 'line' ? lineSmooth : undefined,
-          areaStyle: type === 'area' ? {} : undefined,
+          smooth: lineSmooth,
+          label: { show: true },
+        }
+        if (stack) series.stack = 'A'
+        return series
+      }),
+    }
+  }
+
+  if (type === 'area') {
+    return {
+      color: themeColors,
+      textStyle,
+      legend,
+      xAxis: { type: 'category', boundaryGap: false, data: data.labels, axisLine, axisLabel },
+      yAxis: { type: 'value', axisLine, axisLabel, splitLine },
+      series: data.series.map((values, index) => {
+        const series: LineSeriesOption = {
+          data: values,
+          name: data.legends[index],
+          type: 'line',
+          areaStyle: {},
           label: { show: true },
         }
         if (stack) series.stack = 'A'
@@ -114,9 +134,9 @@ export function getChartOption({
       radius: type === 'ring' ? ['40%', '70%'] : '70%',
       emphasis: type === 'pie'
         ? {
-            itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' },
-            label: { show: true, fontSize: 14, fontWeight: 'bold' },
-          }
+          itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' },
+          label: { show: true, fontSize: 14, fontWeight: 'bold' },
+        }
         : { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
     }
     if (type === 'ring') {

@@ -4,6 +4,30 @@
 @import "./features/presentation-renderer/renderer.css";
 @import "./features/editor/editor.css";
 
+/* PPTist's global link treatment also applies inside rendered slide HTML. */
+a {
+    color: #d14424;
+    text-decoration: none;
+}
+
+/* PPTist's icon baseline is part of the rendered contract. Tailwind's SVG
+   reset otherwise changes antialiasing and inline alignment during the port. */
+.i-icon {
+    display: inline-block;
+    box-sizing: content-box;
+    color: inherit;
+    font-style: normal;
+    line-height: 0;
+    outline: 0;
+    overflow: hidden;
+    text-align: center;
+    text-transform: none;
+    vertical-align: -.125em;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

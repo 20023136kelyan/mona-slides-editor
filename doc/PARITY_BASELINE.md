@@ -1,5 +1,9 @@
 # Vue parity baseline
 
+> Historical freeze record. The source application described below has been
+> retired; its immutable compiled output now lives at `tests/oracle/vue/` and
+> is served only by the parity harness.
+
 Captured on 2026-07-19 from the Mona-localized Vue/PPTist application on macOS with Chromium 149.0.7827.55 at a fixed 1440 × 900 CSS-pixel viewport and device scale factor 1.
 
 This is the executable oracle for the React migration. It is not a claim that every editor behavior is covered yet. A React editor slice cannot replace Vue until its rows in `tests/parity/PARITY_MATRIX.md` have reference contracts and matching React evidence.

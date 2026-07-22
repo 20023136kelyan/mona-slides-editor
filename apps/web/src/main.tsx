@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
+import 'prosemirror-view/style/prosemirror.css'
+import 'animate.css'
 
 import { router } from '@/app/router'
 import { initializeI18n } from '@/i18n'

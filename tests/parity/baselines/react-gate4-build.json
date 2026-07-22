@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "runtime": "react-gate4",
   "totals": {
-    "files": 21,
-    "bytes": 2662670,
-    "gzipBytes": 542279
+    "files": 23,
+    "bytes": 3033311,
+    "gzipBytes": 657908
   },
   "byGroup": {
     "json": {
@@ -18,33 +18,33 @@
       "gzipBytes": 1021
     },
     "js": {
-      "files": 6,
-      "bytes": 1173879,
-      "gzipBytes": 387569
+      "files": 8,
+      "bytes": 1531079,
+      "gzipBytes": 500936
     },
     "css": {
       "files": 1,
-      "bytes": 45914,
-      "gzipBytes": 9113
+      "bytes": 59198,
+      "gzipBytes": 11333
     },
     "html": {
       "files": 1,
-      "bytes": 467,
-      "gzipBytes": 305
+      "bytes": 624,
+      "gzipBytes": 347
     }
   },
   "largestFiles": [
     {
-      "file": "assets/ChartElement-BLST8J8D.js",
+      "file": "assets/FoundationPage-DEldnG4X.js",
       "group": "js",
-      "bytes": 531460,
-      "gzipBytes": 177274
+      "bytes": 566688,
+      "gzipBytes": 180527
     },
     {
-      "file": "assets/index-g14lLJ7A.js",
+      "file": "assets/ChartElement-B6_YTqZ9.js",
       "group": "js",
-      "bytes": 367825,
-      "gzipBytes": 117135
+      "bytes": 531466,
+      "gzipBytes": 177277
     },
     {
       "file": "template_8.json",
@@ -53,10 +53,10 @@
       "gzipBytes": 17452
     },
     {
-      "file": "assets/FoundationPage-FfNE82xR.js",
+      "file": "assets/index-CstnhXgN.js",
       "group": "js",
-      "bytes": 220204,
-      "gzipBytes": 71955
+      "bytes": 207118,
+      "gzipBytes": 65845
     },
     {
       "file": "template_4.json",
@@ -75,6 +75,12 @@
       "group": "json",
       "bytes": 168855,
       "gzipBytes": 15533
+    },
+    {
+      "file": "assets/i18n-CVcbtKym.js",
+      "group": "js",
+      "bytes": 162072,
+      "gzipBytes": 52473
     },
     {
       "file": "template_1.json",
@@ -99,12 +105,6 @@
       "group": "json",
       "bytes": 137542,
       "gzipBytes": 13926
-    },
-    {
-      "file": "assets/index-BZXKlImt.css",
-      "group": "css",
-      "bytes": 45914,
-      "gzipBytes": 9113
     }
   ]
 }
