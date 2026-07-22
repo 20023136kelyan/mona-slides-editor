@@ -3,6 +3,8 @@
   "errorTitle": "Mona Slides could not open this view.",
   "errorDescription": "Reload the page and try again.",
   "editor": {
+    "surfaceError": "This area ran into an error. Your presentation data is unaffected.",
+    "surfaceRetry": "Try again",
     "colorPicker": {
       "eyedropperActive": "Press Esc to close the eyedropper",
       "eyedropperFailed": "Could not start the eyedropper",

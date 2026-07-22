@@ -2,6 +2,8 @@ import { lazy, Suspense } from 'react'
 
 import type { PPTElement, SlideTheme } from '@mona/presentation-core/model'
 
+import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
+
 import { ImageElement } from '@/features/presentation-renderer/elements/ImageElement'
 import { LatexElement } from '@/features/presentation-renderer/elements/LatexElement'
 import { LineElement } from '@/features/presentation-renderer/elements/LineElement'
@@ -38,9 +40,11 @@ export function ElementRenderer({ element, mediaEditor, mediaScreen, shapeEditor
     case 'audio': return <AudioElement editor={mediaEditor?.(element)} element={element} screen={mediaScreen} />
     case 'chart':
       return (
-        <Suspense fallback={<div aria-label="Loading chart" className="mona-chart-placeholder" style={{ top: element.top, left: element.left, width: element.width, height: element.height }} />}>
-          <ChartElement element={element} thumbnail={thumbnail} />
-        </Suspense>
+        <EditorErrorBoundary>
+          <Suspense fallback={<div aria-label="Loading chart" className="mona-chart-placeholder" style={{ top: element.top, left: element.left, width: element.width, height: element.height }} />}>
+            <ChartElement element={element} thumbnail={thumbnail} />
+          </Suspense>
+        </EditorErrorBoundary>
       )
     default:
       return element satisfies never

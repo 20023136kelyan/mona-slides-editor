@@ -83,15 +83,9 @@ export function ElementPositionPanel({
       viewportHeight: presentation.viewportSize * presentation.viewportRatio,
       viewportWidth: presentation.viewportSize,
     })
-    // Vue's deep handle-element watcher mirrors changed geometry through the
-    // mounted one-decimal NumberInputs. Their value watcher then writes the
-    // rounded handle coordinates back, while the other selected group members
-    // retain the alignment calculation's full precision.
-    const alignedHandle = elements.find(candidate => candidate.id === element.id)
-    if (alignedHandle) {
-      alignedHandle.left = round(alignedHandle.left, 1)
-      alignedHandle.top = round(alignedHandle.top, 1)
-    }
+    // Quirk retired: Vue's NumberInput watcher wrote the handle element's
+    // coordinates back rounded to one decimal while other members kept full
+    // precision. All aligned members now keep the calculation's precision.
     runtime.commit('Align element to canvas', [{ type: 'slide.update', props: { elements } }], { historyKey })
   }
   const resize = (nextWidth: number, nextHeight: number) => {

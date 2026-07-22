@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 
 import {
   createDocument,
@@ -55,30 +55,21 @@ export function EditorRichText({
   const emptyCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shapeContentChangedRef = useRef(false)
   const wasHandleElementRef = useRef(isHandleElement)
-  const latestRef = useRef({
+  // One effect event hands every long-lived ProseMirror closure the latest
+  // render's props, replacing the manual latestRef mirroring pattern.
+  const readLatest = useEffectEvent(() => ({
     element,
     fallbackColor: resolvedFallbackColor,
     fallbackFontName: resolvedFallbackFontName,
     modifierPressed,
     onMouseDown,
     runtime,
-  })
+  }))
   const formatPainterActive = useSyncExternalStore(
     runtime.richText.subscribe,
     runtime.richText.getFormatPainterSnapshot,
     runtime.richText.getFormatPainterSnapshot,
   )
-
-  useLayoutEffect(() => {
-    latestRef.current = {
-      element,
-      fallbackColor: resolvedFallbackColor,
-      fallbackFontName: resolvedFallbackFontName,
-      modifierPressed,
-      onMouseDown,
-      runtime,
-    }
-  })
 
   useLayoutEffect(() => {
     const mount = mountRef.current
@@ -88,7 +79,7 @@ export function EditorRichText({
       inputTimerRef.current = setTimeout(() => {
         inputTimerRef.current = null
         const view = editorRef.current
-        const current = latestRef.current
+        const current = readLatest()
         if (!view) return
         const state = current.runtime.store.getState()
         const slide = state.presentation.slides[state.presentation.slideIndex]
@@ -118,7 +109,7 @@ export function EditorRichText({
       }, 300)
     }
     const currentAttrs = () => {
-      const current = latestRef.current
+      const current = readLatest()
       const text = hostText(current.element, current.fallbackColor, current.fallbackFontName)
       return getTextAttrs(view, {
         color: text.defaultColor,
@@ -129,11 +120,11 @@ export function EditorRichText({
       if (attrsTimerRef.current) clearTimeout(attrsTimerRef.current)
       attrsTimerRef.current = setTimeout(() => {
         attrsTimerRef.current = null
-        latestRef.current.runtime.richText.sync(latestRef.current.element.id)
+        readLatest().runtime.richText.sync(readLatest().element.id)
       }, 30)
     }
     const checkEmptyShape = () => {
-      const current = latestRef.current
+      const current = readLatest()
       const state = current.runtime.store.getState()
       const slide = state.presentation.slides[state.presentation.slideIndex]
       const shape = slide?.elements.find(candidate => candidate.id === current.element.id)
@@ -143,19 +134,19 @@ export function EditorRichText({
         payload: { id: shape.id, property: 'text' },
       }])
     }
-    const initial = hostText(latestRef.current.element, latestRef.current.fallbackColor, latestRef.current.fallbackFontName)
+    const initial = hostText(readLatest().element, readLatest().fallbackColor, readLatest().fallbackFontName)
     const view = initProsemirrorEditor(mount, initial.content, {
-      editable: () => !latestRef.current.element.lock,
+      editable: () => !readLatest().element.lock,
       handleDOMEvents: {
         blur: () => {
-          latestRef.current.runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false))
-          if (latestRef.current.element.type === 'shape') checkEmptyShape()
+          readLatest().runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false))
+          if (readLatest().element.type === 'shape') checkEmptyShape()
           return false
         },
         focus: () => {
-          const state = latestRef.current.runtime.store.getState().session
-          const modifier = state.activeElementIds.length > 1 && latestRef.current.modifierPressed()
-          if (!modifier) latestRef.current.runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
+          const state = readLatest().runtime.store.getState().session
+          const modifier = state.activeElementIds.length > 1 && readLatest().modifierPressed()
+          if (!modifier) readLatest().runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
           return false
         },
         keydown: (_view, event) => {
@@ -170,18 +161,18 @@ export function EditorRichText({
           return false
         },
         mousedown: (_view, event) => {
-          latestRef.current.onMouseDown(event)
+          readLatest().onMouseDown(event)
           return false
         },
         mouseup: () => {
-          latestRef.current.runtime.richText.applyFormatPainter(latestRef.current.element.id)
+          readLatest().runtime.richText.applyFormatPainter(readLatest().element.id)
           return false
         },
       },
     })
     editorRef.current = view
-    const unregister = latestRef.current.runtime.richText.register(
-      latestRef.current.element.id,
+    const unregister = readLatest().runtime.richText.register(
+      readLatest().element.id,
       {
         execute: (action, historyKey) => {
           executeRichTextActions(view, action, currentAttrs(), {
@@ -197,8 +188,8 @@ export function EditorRichText({
         getAttrs: currentAttrs,
       },
     )
-    if (latestRef.current.runtime.store.getState().session.handleElementId === element.id) {
-      latestRef.current.runtime.richText.sync(element.id)
+    if (readLatest().runtime.store.getState().session.handleElementId === element.id) {
+      readLatest().runtime.richText.sync(element.id)
     }
     return () => {
       if (inputTimerRef.current) clearTimeout(inputTimerRef.current)
@@ -230,7 +221,7 @@ export function EditorRichText({
     view.dispatch(tr.replaceRangeWith(0, doc.content.size, createDocument(elementText.content)))
     // Vue re-syncs richTextAttrs on every deep handle-element change, so the
     // toolbars refresh after an external replacement (undo/redo) too.
-    const { element: latestElement, runtime: latestRuntime } = latestRef.current
+    const { element: latestElement, runtime: latestRuntime } = readLatest()
     if (latestRuntime.store.getState().session.handleElementId === latestElement.id) {
       latestRuntime.richText.sync(latestElement.id)
     }
@@ -241,20 +232,16 @@ export function EditorRichText({
     wasHandleElementRef.current = isHandleElement
     if (!wasHandleElement || isHandleElement) return
     if (element.type === 'shape') {
-      // PPTist's shape editor creates one more debounced snapshot when an
-      // edited shape loses handle focus. It is intentionally allowed to be
-      // identical to the edit snapshot; that boundary affects immediate
-      // undo when another operation starts inside the 300 ms window.
-      if (shapeContentChangedRef.current) {
-        shapeContentChangedRef.current = false
-        runtime.recordHistorySnapshot(`rich-text-shape-blur-${element.id}`)
-      }
+      // Quirk retired: PPTist recorded a second, identical snapshot when an
+      // edited shape lost handle focus. The edit's own debounced snapshot is
+      // the single history boundary now.
+      shapeContentChangedRef.current = false
       return
     }
     if (emptyCheckTimerRef.current) clearTimeout(emptyCheckTimerRef.current)
     emptyCheckTimerRef.current = setTimeout(() => {
       emptyCheckTimerRef.current = null
-      const current = latestRef.current
+      const current = readLatest()
       const state = current.runtime.store.getState()
       const slide = state.presentation.slides[state.presentation.slideIndex]
       const text = slide?.elements.find(candidate => candidate.id === current.element.id)

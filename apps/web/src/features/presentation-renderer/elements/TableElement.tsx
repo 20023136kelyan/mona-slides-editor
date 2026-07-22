@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -164,20 +165,27 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
   }, [element])
 
   // Commits build from the latest element so a flush never overwrites a
-  // sibling cell's already-committed text with stale data.
-  const flushPendingCellEdit = useCallback(() => {
+  // sibling cell's already-committed text. Returns the flushed element so a
+  // follow-up commit (paste) composes on top of it. Kept as a ref-backed
+  // callback because it is invoked from JSX handlers and debounce timers,
+  // where useEffectEvent is not allowed to be called.
+  const flushPendingCellEdit = useCallback((): PPTTableElement => {
     if (inputTimerRef.current) {
       clearTimeout(inputTimerRef.current)
       inputTimerRef.current = null
     }
-    const pending = pendingCellEditRef.current
-    if (!pending) return
-    pendingCellEditRef.current = null
     const latest = elementRef.current
-    editorRef.current?.onElementChange({ ...latest, data: updateTableCellText(latest, pending.row, pending.column, pending.value) }, 'Edit table cell')
+    const pending = pendingCellEditRef.current
+    if (!pending) return latest
+    pendingCellEditRef.current = null
+    const updated = { ...latest, data: updateTableCellText(latest, pending.row, pending.column, pending.value) }
+    editorRef.current?.onElementChange(updated, 'Edit table cell')
+    return updated
   }, [])
 
-  useEffect(() => () => flushPendingCellEdit(), [flushPendingCellEdit])
+  useEffect(() => () => {
+    flushPendingCellEdit()
+  }, [flushPendingCellEdit])
 
   const hasEditor = Boolean(editor)
   useEffect(() => {
@@ -188,24 +196,25 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
     return () => document.removeEventListener('mouseup', mouseup)
   }, [])
 
+  const commitMeasuredHeight = useEffectEvent((height: number) => {
+    if (height !== element.height) editor?.onHeightChange(height)
+  })
   useEffect(() => {
     const root = rootRef.current
-    if (!root || !editorRef.current) return undefined
+    if (!root || !hasEditor) return undefined
     let measurementFrame = 0
     let measuredHeight: number | undefined
     const flushHeight = () => {
       measurementFrame = 0
-      if (measuredHeight !== undefined && measuredHeight !== element.height) {
-        editorRef.current?.onHeightChange(measuredHeight)
-      }
-    }
-    const observer = new ResizeObserver(entries => {
-      measuredHeight = entries[0]?.contentRect.height
       // WebKit reports an undelivered-notification error when the measured
       // element is synchronously resized from inside its observer callback.
       // Defer the store write to the next frame while preserving PPTist's
       // measured content-box value.
-      if (measuredHeight !== undefined && measuredHeight !== element.height && !measurementFrame) {
+      if (measuredHeight !== undefined) commitMeasuredHeight(measuredHeight)
+    }
+    const observer = new ResizeObserver(entries => {
+      measuredHeight = entries[0]?.contentRect.height
+      if (measuredHeight !== undefined && !measurementFrame) {
         measurementFrame = requestAnimationFrame(flushHeight)
       }
     })
@@ -214,7 +223,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
       if (measurementFrame) cancelAnimationFrame(measurementFrame)
       observer.disconnect()
     }
-  }, [hasEditor, element.height])
+  }, [hasEditor])
 
   useEffect(() => () => {
     if (inputTimerRef.current) clearTimeout(inputTimerRef.current)
@@ -405,8 +414,8 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
                                 }, 300)
                               }}
                               onPasteData={values => {
-                                flushPendingCellEdit()
-                                editor?.onElementChange(expandAndFillTable(elementRef.current, rowIndex, columnIndex, values), 'Paste table cells')
+                                const base = flushPendingCellEdit()
+                                editor?.onElementChange(expandAndFillTable(base, rowIndex, columnIndex, values), 'Paste table cells')
                               }}
                               style={getTableTextStyle(element.cellMinHeight, cell.style)}
                             />

@@ -11,6 +11,7 @@ import type { Slide, SlideTheme, SlideType } from '@mona/presentation-core/model
 import { Popover as PopoverPrimitive } from 'radix-ui'
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { navigateWithSlideTransition } from '@/features/editor/editor-view-transition'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 
@@ -180,6 +181,9 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
 }) {
   const { t } = useTranslation()
   const state = runtime.store.getState()
+  // Deliberately NOT useDeferredValue: the rail's click/Shift-click selection
+  // math reads this snapshot, and the gate-6 contracts require it to be in
+  // lockstep with the store like Vue's rail (deferral produced stale ranges).
   const presentation = useEditorSelector(runtime.store, current => current.presentation)
   const selectedSlideIndexes = useEditorSelector(runtime.store, current => current.session.selectedSlideIndexes)
   const thumbnailsFocus = useEditorSelector(runtime.store, current => current.session.thumbnailsFocus)
@@ -260,8 +264,10 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
   }
 
   const focusSlide = (index: number) => {
-    runtime.store.dispatch(editorActions.selectionChanged([]))
-    runtime.focusSlide(index)
+    navigateWithSlideTransition(() => {
+      runtime.store.dispatch(editorActions.selectionChanged([]))
+      runtime.focusSlide(index)
+    })
   }
 
   const selectThumbnail = (event: MouseEvent, index: number) => {

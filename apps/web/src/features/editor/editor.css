@@ -433,6 +433,14 @@
   padding: 5px 0;
 }
 .mona-thumbnail-container { transition: transform 200ms ease; }
+/* Skip layout/paint for offscreen thumbnails on large decks. The remembered
+   ("auto") intrinsic size keeps scroll geometry stable after first render;
+   browsers without content-visibility simply render everything as before. */
+.mona-thumbnail-container {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px auto 90px;
+}
+
 .mona-thumbnail-item {
   position: relative;
   display: flex;
@@ -1149,6 +1157,39 @@
   left: 0;
   transform-origin: 0 0;
 }
+
+/* Slide-switch view transitions crossfade only the canvas frame; the root
+   opts out so the surrounding UI never animates. Browsers without the View
+   Transitions API ignore all of this and switch instantly. */
+:root { view-transition-name: none; }
+.mona-editor-viewport-frame { view-transition-name: mona-editor-slide; }
+::view-transition-old(mona-editor-slide),
+::view-transition-new(mona-editor-slide) {
+  animation-duration: 150ms;
+}
+
+.mona-surface-error {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  color: #666;
+  font-size: 13px;
+  text-align: center;
+}
+.mona-surface-error-retry {
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  background: #fff;
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.mona-surface-error-retry:hover { border-color: #d14424; color: #d14424; }
 
 .mona-link-handler {
   position: absolute;

@@ -23,7 +23,10 @@ export default defineConfig({
     video: 'off',
   },
   webServer: {
-    command: 'npm run preview -w @mona/web -- --host 127.0.0.1 --port 4174',
+    // Real builds prune the fixture base JSON (exclude-development-fixtures);
+    // the stability harness seeds it back so the production preview can load
+    // the gate6-workflows fixture deck.
+    command: 'cp public/mocks/gate3-renderer.json apps/web/dist/mocks/gate3-renderer.json && npm run preview -w @mona/web -- --host 127.0.0.1 --port 4174',
     url: 'http://127.0.0.1:4174',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

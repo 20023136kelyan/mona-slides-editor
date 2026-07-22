@@ -3,6 +3,8 @@
   "errorTitle": "Mona Slides 无法打开此视图。",
   "errorDescription": "请重新加载页面后再试。",
   "editor": {
+    "surfaceError": "此区域发生错误，演示文稿数据未受影响。",
+    "surfaceRetry": "重试",
     "colorPicker": {
       "eyedropperActive": "按 ESC 键关闭取色吸管",
       "eyedropperFailed": "取色吸管初始化失败",

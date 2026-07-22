@@ -1,5 +1,5 @@
 /* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/media-has-caption, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- PPTist's pointer-first custom media controls, captionless user media, and composite video control surface are parity requirements; a semantic button cannot contain the player's nested buttons. */
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import PauseIcon from '~icons/icon-park-outline/pause'
@@ -50,7 +50,8 @@ function StaticVolumeIcon() {
   return <VolumeNoticeIcon aria-hidden="true" className="mona-audio-icon" />
 }
 
-const AudioPlayer = forwardRef<AudioPlayerHandle, { autoplay?: boolean; element: PPTAudioElement; scale: number; style: React.CSSProperties }>(function AudioPlayer({ autoplay = false, element, scale, style }, forwardedRef) {
+// React 19: ref is a regular prop, no forwardRef wrapper needed.
+function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autoplay?: boolean; element: PPTAudioElement; ref?: Ref<AudioPlayerHandle>; scale: number; style: React.CSSProperties }) {
   const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement>(null)
   const playBarRef = useRef<HTMLDivElement>(null)
@@ -92,7 +93,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, { autoplay?: boolean; element:
     audioRef.current?.pause()
   }
   const toggle = () => paused ? play() : pause()
-  useImperativeHandle(forwardedRef, () => ({ toggle }))
+  useImperativeHandle(ref, () => ({ toggle }))
   const setVolume = (percentage: number) => {
     const audio = audioRef.current
     if (!audio) return
@@ -203,7 +204,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, { autoplay?: boolean; element:
       </div>
     </div>
   )
-})
+}
 
 function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean; element: PPTVideoElement; scale: number }) {
   const { t } = useTranslation()

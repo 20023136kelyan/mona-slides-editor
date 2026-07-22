@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -104,6 +105,7 @@ import {
   type ImageCropGeometry,
   type LineControlHandle,
 } from '@/features/editor/editor-geometry'
+import { navigateWithSlideTransition } from '@/features/editor/editor-view-transition'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 
@@ -827,9 +829,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   // burn through the snapshot stack.
   const lastUndoAtRef = useRef(Number.NEGATIVE_INFINITY)
   const lastRedoAtRef = useRef(Number.NEGATIVE_INFINITY)
-  const keyDownHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined)
-  const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined)
-  const pasteHandlerRef = useRef<(event: ClipboardEvent) => void>(() => undefined)
   const [gestureContext, setGestureContext] = useState<GestureContext | null>(null)
   const [viewportFit, setViewportFit] = useState({ denominator: 1, dimension: 0, height: 0, width: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
@@ -988,20 +987,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       window.removeEventListener('blur', resetModifierState)
     }
   }, [runtime])
-
-  useLayoutEffect(() => {
-    if (interactionProfile === 'mobile') return undefined
-    const handleKeyDown = (event: KeyboardEvent) => keyDownHandlerRef.current(event)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [interactionProfile])
-
-  useLayoutEffect(() => {
-    if (interactionProfile === 'mobile') return undefined
-    const handlePaste = (event: ClipboardEvent) => pasteHandlerRef.current(event)
-    document.addEventListener('paste', handlePaste)
-    return () => document.removeEventListener('paste', handlePaste)
-  }, [interactionProfile])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1605,7 +1590,8 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
           runtime.store.dispatch(editorActions.activeGroupElementChanged(context.pendingActiveGroupElementId))
         }
       }
-      else runtime.recordHistorySnapshot('drag-elements')
+      // Quirk retired: PPTist recorded a history snapshot for sub-threshold
+      // moved drags even though no document field changed.
       return
     }
     if (context.kind === 'lasso' && finalPreview.lasso) {
@@ -1653,12 +1639,8 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     }
     const activationDistance = context.kind === 'drag' ? context.activationDistance : TRANSFORM_ACTIVATION_DISTANCE
     if (!exceedsActivationDistance(snapshot.delta, activationDistance) || !finalUpdates.size) {
-      // PPTist's single-element rotate hook initializes its local angle to 0.
-      // Clicking the handle of an already-rotated element therefore records a
-      // duplicate snapshot even though no element field changes.
-      if (context.kind === 'rotate' && context.mode === 'single' && context.rotationReference) {
-        runtime.recordHistorySnapshot()
-      }
+      // Quirk retired: PPTist recorded a duplicate snapshot when the handle
+      // of an already-rotated element was clicked without movement.
       return
     }
     if (context.kind === 'drag' && context.duplicateActivated) {
@@ -2127,7 +2109,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       const index = livePresentation.slideIndex + (event.key === 'ArrowUp' ? -1 : 1)
       if (index >= 0 && index < livePresentation.slides.length) {
         flushCurrentTableMeasurements()
-        runtime.focusSlide(index)
+        navigateWithSlideTransition(() => runtime.focusSlide(index))
       }
       return
     }
@@ -2136,7 +2118,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       const index = livePresentation.slideIndex + (event.key === 'PageUp' ? -1 : 1)
       if (index >= 0 && index < livePresentation.slides.length) {
         flushCurrentTableMeasurements()
-        runtime.focusSlide(index)
+        navigateWithSlideTransition(() => runtime.focusSlide(index))
       }
       return
     }
@@ -2347,19 +2329,33 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     const { slideIndex, slides } = runtime.store.getState().presentation
     if (event.deltaY > 0 && slideIndex < slides.length - 1) {
       flushCurrentTableMeasurements()
-      runtime.focusSlide(slideIndex + 1)
+      navigateWithSlideTransition(() => runtime.focusSlide(slideIndex + 1))
     }
     else if (event.deltaY < 0 && slideIndex > 0) {
       flushCurrentTableMeasurements()
-      runtime.focusSlide(slideIndex - 1)
+      navigateWithSlideTransition(() => runtime.focusSlide(slideIndex - 1))
     }
   }
 
+  // useEffectEvent replaces the manual ref-mirroring pattern: the long-lived
+  // native listeners below always observe the latest render's handlers.
+  const dispatchDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => handleKeyDown(event))
+  const dispatchDocumentPaste = useEffectEvent((event: ClipboardEvent) => handlePaste(event))
+  const dispatchStageWheel = useEffectEvent((event: WheelEvent) => handleWheel(event))
+
   useLayoutEffect(() => {
-    keyDownHandlerRef.current = handleKeyDown
-    pasteHandlerRef.current = handlePaste
-    wheelHandlerRef.current = handleWheel
-  })
+    if (interactionProfile === 'mobile') return undefined
+    const listener = (event: KeyboardEvent) => dispatchDocumentKeyDown(event)
+    document.addEventListener('keydown', listener)
+    return () => document.removeEventListener('keydown', listener)
+  }, [interactionProfile])
+
+  useLayoutEffect(() => {
+    if (interactionProfile === 'mobile') return undefined
+    const listener = (event: ClipboardEvent) => dispatchDocumentPaste(event)
+    document.addEventListener('paste', listener)
+    return () => document.removeEventListener('paste', listener)
+  }, [interactionProfile])
 
   // Unmounting mid-gesture (e.g. F5 slideshow during a drag) must not leave
   // the shared interaction controller publishing phantom pointer updates.
@@ -2393,7 +2389,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     if (interactionProfile === 'mobile' || !hasCurrentSlide) return undefined
     const stage = stageRef.current
     if (!stage) return undefined
-    const listener = (event: WheelEvent) => wheelHandlerRef.current(event)
+    const listener = (event: WheelEvent) => dispatchStageWheel(event)
     stage.addEventListener('wheel', listener, { passive: false })
     return () => stage.removeEventListener('wheel', listener)
   }, [interactionProfile, hasCurrentSlide])

@@ -14,7 +14,11 @@ const fetchProductionSlides = async (): Promise<Slide[]> => {
 }
 
 const loadSlides = async (request: Request): Promise<Slide[]> => {
-  if (import.meta.env.DEV) {
+  // The fixture path also serves production-preview test runs (gate 7
+  // stability drives the real build with ?rendererFixture=...). The module
+  // stays a lazy chunk that ordinary sessions never fetch, and the fixture
+  // base JSON is pruned from real builds by exclude-development-fixtures.
+  if (import.meta.env.DEV || new URL(request.url).searchParams.has('rendererFixture')) {
     const { loadDevelopmentSlides } = await import('./load-development-slides')
     return loadDevelopmentSlides(request)
   }

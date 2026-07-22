@@ -15,6 +15,7 @@ import { fileToDataUrl, fitImageToPresentation, getImageSize } from '@/features/
 import { createTableElement } from '@/features/editor/editor-table'
 import { createChartElement } from '@/features/editor/editor-chart'
 import { createLatexElement, type LatexRenderResult } from '@/features/editor/editor-latex'
+import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
 import { EditorThumbnails } from '@/features/editor/EditorThumbnails'
 import { EditorRemark } from '@/features/editor/EditorRemark'
 import { SlideDesignPanel } from '@/features/editor/SlideDesignPanel'
@@ -396,11 +397,13 @@ export function EditorDeck({
         }
       }}
     >
-      <EditorThumbnails
-        onOpenNotes={openNotes}
-        onStartSlideshow={startSlideshow}
-        runtime={runtime}
-      />
+      <EditorErrorBoundary>
+        <EditorThumbnails
+          onOpenNotes={openNotes}
+          onStartSlideshow={startSlideshow}
+          runtime={runtime}
+        />
+      </EditorErrorBoundary>
       <EditorCanvasTool
         activeTool={createTool}
         customShapeActive={session.creatingCustomShape}
@@ -422,8 +425,12 @@ export function EditorDeck({
         runtime={runtime}
         symbolPanelOpen={symbolPanelOpen}
       />
-      <EditorCanvas activeCreateTool={createTool} customShapeActive={session.creatingCustomShape} onCreateToolChange={changeCreateTool} onCustomShapeChange={active => runtime.store.dispatch(editorActions.creatingCustomShapeChanged(active))} onEditChart={id => setEditingChartId(id)} onEditLatex={id => setLatexEditorTarget({ id, kind: 'edit' })} runtime={runtime} />
-      <EditorRemark height={remarkHeight} onHeightChange={setRemarkHeight} runtime={runtime} />
+      <EditorErrorBoundary>
+        <EditorCanvas activeCreateTool={createTool} customShapeActive={session.creatingCustomShape} onCreateToolChange={changeCreateTool} onCustomShapeChange={active => runtime.store.dispatch(editorActions.creatingCustomShapeChanged(active))} onEditChart={id => setEditingChartId(id)} onEditLatex={id => setLatexEditorTarget({ id, kind: 'edit' })} runtime={runtime} />
+      </EditorErrorBoundary>
+      <EditorErrorBoundary>
+        <EditorRemark height={remarkHeight} onHeightChange={setRemarkHeight} runtime={runtime} />
+      </EditorErrorBoundary>
       <aside aria-label={t('foundation.editor.inspector')} className="mona-render-inspector">
         <div className="mona-element-inspector">
           <div className="mona-inspector-tabs" role="tablist">
@@ -439,6 +446,8 @@ export function EditorDeck({
             ))}
           </div>
           <div className="mona-inspector-content">
+            {/* A crash in one panel resets when the user switches tab/element. */}
+            <EditorErrorBoundary key={`${session.toolbarState}:${session.handleElementId ?? ''}`}>
             <Suspense fallback={null}>
             {session.toolbarState === 'elStyle' && handleText ? <TextStylePanel element={handleText} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'elStyle' && handleShape ? <ShapeStylePanel element={handleShape} presentation={presentation} runtime={runtime} /> : null}
@@ -458,6 +467,7 @@ export function EditorDeck({
             {session.toolbarState === 'multiStyle' ? <MultiStylePanel activeElementIds={session.activeElementIds} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'multiPosition' ? <MultiPositionPanel activeElementIds={session.activeElementIds} handleElementId={session.handleElementId} presentation={presentation} runtime={runtime} /> : null}
             </Suspense>
+            </EditorErrorBoundary>
           </div>
         </div>
       </aside>

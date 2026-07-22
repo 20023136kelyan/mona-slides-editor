@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { selectPresentation } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
@@ -97,6 +97,7 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
     setSlideIndex,
   }), [presentation, setSlideIndex])
   const [viewMode, setViewMode] = useState<ScreenViewMode>('base')
+  const changeViewMode = (mode: ScreenViewMode) => startTransition(() => setViewMode(mode))
 
   // Playback and fullscreen state live here so toggling base/presenter view
   // keeps autoplay, loop, and animation progress. (Vue re-created them per
@@ -129,9 +130,14 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
 
   return (
     <div className="mona-pptist-screen">
+      {/* Deliberately conditional (not dual <Activity>): the gate-6 parity
+          contracts — like Vue — require exactly one mounted screen view, and
+          keeping both in the DOM duplicates every #screen-element-* node.
+          Playback/fullscreen state survives the toggle because it is hoisted
+          here. */}
       {viewMode === 'base'
-        ? <ScreenBaseView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />
-        : <ScreenPresenterView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />}
+        ? <ScreenBaseView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={changeViewMode} />
+        : <ScreenPresenterView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={changeViewMode} />}
       <ScreenNotices />
     </div>
   )
