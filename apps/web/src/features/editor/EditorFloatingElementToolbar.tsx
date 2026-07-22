@@ -79,9 +79,10 @@ export function EditorFloatingElementToolbar({
 
   const updateShape = (props: Partial<PPTShapeElement>) => runtime.commit('Update shape from floating toolbar', [{ type: 'element.update', payload: { id: element.id, props } }], { historyKey: `shape-floating-${element.id}` })
   const updateShapeOutline = (props: Partial<NonNullable<PPTShapeElement['outline']>>) => {
-    if (element.type !== 'shape') return false
-    const committed = updateShape({ outline: { ...(element.outline || presentation.theme.outline), ...props } })
-    if (committed) setBorderOpen(false)
+    if (element.type !== 'shape') return
+    // Vue keeps the border popover open across style/color/width edits so a
+    // multi-digit width can be typed in one session.
+    updateShape({ outline: { ...(element.outline || presentation.theme.outline), ...props } })
   }
   const updateLine = (props: Partial<PPTLineElement>) => runtime.commit('Update line from floating toolbar', [{ type: 'element.update', payload: { id: element.id, props } }], { historyKey: `line-floating-${element.id}` })
 

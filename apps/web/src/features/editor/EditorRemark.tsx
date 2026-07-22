@@ -27,7 +27,6 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
   const [attrs, setAttrs] = useState<RichTextAttrs | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const latestSlideRef = useRef(currentSlide)
-  const initialRemarkRef = useRef(currentSlide.remark ?? '')
 
   useLayoutEffect(() => {
     latestSlideRef.current = currentSlide
@@ -45,7 +44,12 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
 
   useLayoutEffect(() => {
     if (!mountRef.current) return undefined
-    const editor = initProsemirrorEditor(mountRef.current, initialRemarkRef.current, {
+    // The editor is recreated when the locale changes (placeholder text), so
+    // it must initialize from the CURRENT slide's remark — a mount-time
+    // snapshot would resurface another slide's old notes and the next
+    // keystroke would commit them into the current slide.
+    const initialRemark = selectCurrentSlide(runtime.store.getState())?.remark ?? ''
+    const editor = initProsemirrorEditor(mountRef.current, initialRemark, {
       handleDOMEvents: {
         blur: () => {
           runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false)); return false 
@@ -76,7 +80,13 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
     }, { placeholder: t('foundation.editor.runtime.speakerNotesPlaceholder') })
     editorRef.current = editor
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
+      if (timerRef.current) {
+        // Flush instead of dropping a pending debounced edit when the editor
+        // is recreated (locale switch) or the panel closes.
+        clearTimeout(timerRef.current)
+        timerRef.current = null
+        runtime.commit('Edit speaker notes', [{ type: 'slide.update', slideId: latestSlideRef.current.id, props: { remark: editor.dom.innerHTML } }], { recordHistory: false })
+      }
       editorRef.current = null
       editor.destroy()
     }

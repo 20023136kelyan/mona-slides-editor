@@ -5,9 +5,11 @@ import type { PresentationCommand } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { decryptNativePresentation } from '@/features/editor/editor-file-format'
+import { loadGoogleFonts } from '@/features/editor/editor-fonts'
 import { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
 import type { ParsedPptxPresentation } from '@/features/editor/editor-pptx-import'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { replaceLegacyPlaceholders } from '@/lib/utils'
 
 export type ImportFileType = 'json' | 'pptist' | 'pptx'
 
@@ -72,17 +74,6 @@ const applySerializedPresentation = (runtime: EditorRuntime, serialized: Seriali
   else runtime.insertImportedSlides(serialized.slides)
 }
 
-const loadImportedFonts = (fonts: string[]) => {
-  for (const font of new Set(fonts.map(value => value.replace(/^['"]|['"]$/g, '').trim()).filter(Boolean))) {
-    const key = `mona-import-font-${font.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-    if (document.getElementById(key)) continue
-    const link = document.createElement('link')
-    link.id = key
-    link.rel = 'stylesheet'
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font).replace(/%20/g, '+')}`
-    document.head.appendChild(link)
-  }
-}
 
 const importSerialized = async (runtime: EditorRuntime, file: File, type: 'json' | 'pptist', cover: boolean) => {
   const source = await readText(file)
@@ -96,14 +87,14 @@ const importPptx = async (runtime: EditorRuntime, file: File, t: TFunction, opti
     import('@/features/editor/editor-pptx-import'),
   ])
   const parsed = await parse(await readArrayBuffer(file), { audioMode: 'blob', imageMode: 'base64', videoMode: 'blob' }) as ParsedPptxPresentation
-  if (parsed.usedFonts.length) loadImportedFonts(parsed.usedFonts)
+  if (parsed.usedFonts.length) loadGoogleFonts(parsed.usedFonts)
   const presentation = runtime.store.getState().presentation
   const width = parsed.size.width
   const height = parsed.size.height
   const ratio = options.fixedViewport ? 1000 / width : 96 / 72
   const importedTheme = { ...presentation.theme, themeColors: parsed.themeColors }
   const slides = convertParsedPptxSlides({
-    coordinateLabel: number => t('chartData.coordinate', { number }),
+    coordinateLabel: number => replaceLegacyPlaceholders(t('chartData.coordinate'), { number }),
     parsed,
     ratio,
     theme: importedTheme,

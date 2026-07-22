@@ -32,7 +32,6 @@ import { executeTableCommand, parseTableCellKey, updateTableCellStyles, type Tab
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 const fontOptions = [
-  { label: 'System default', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
@@ -117,7 +116,7 @@ export function TableStylePanel({
   return (
     <div className="mona-table-style-panel">
       <div className="mona-panel-select-group mona-panel-row-full">
-        <InspectorSelect ariaLabel={t('foundation.editor.text.fontFamily')} icon={<FontSizeIcon />} onChange={fontname => updateText({ fontname })} options={fontOptions} search searchLabel={t('foundation.editor.text.fontSearch')} style={{ width: '50%' }} value={attrs.fontname} />
+        <InspectorSelect ariaLabel={t('foundation.editor.text.fontFamily')} icon={<FontSizeIcon />} onChange={fontname => updateText({ fontname })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('foundation.editor.text.fontSearch')} style={{ width: '50%' }} value={attrs.fontname} />
         <InspectorSelect ariaLabel={t('foundation.editor.text.fontSize')} icon={<AddTextIcon />} onChange={fontsize => updateText({ fontsize })} options={fontSizeOptions} search searchLabel={t('foundation.editor.text.fontSizeSearch')} style={{ width: '50%' }} value={attrs.fontsize} />
       </div>
       <InspectorButtonGroup className="mona-panel-row-full mona-table-color-row">

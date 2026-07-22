@@ -74,7 +74,7 @@ export function ElementAnimationPanel({
     const target = slide.elements.find(candidate => candidate.id === animation.elId)
     return target ? [{
       ...animation,
-      animationEffect: humanize(animation.effect),
+      animationEffect: t(`foundation.editor.animation.effect.${animation.effect}`, { defaultValue: humanize(animation.effect) }),
       elType: t(`foundation.editor.animation.elementType.${target.type}`),
       index: animationIndex === 0 ? groupIndex + 1 : '',
     }] : []

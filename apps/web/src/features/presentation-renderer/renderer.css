@@ -55,9 +55,6 @@
 
 .mona-scaled-slide {
   position: relative;
-  width: min(100%, 1000px);
-  height: min(100%, 562.5px);
-  aspect-ratio: 16 / 9;
   overflow: hidden;
 }
 
@@ -187,10 +184,11 @@
   padding-inline-start: 1.25em;
 }
 
-:is(.ProseMirror, .ProseMirror-static) ul,
-:is(.ProseMirror, .ProseMirror-static) ul li { list-style-type: disc; }
-:is(.ProseMirror, .ProseMirror-static) ol,
-:is(.ProseMirror, .ProseMirror-static) ol li { list-style-type: decimal; }
+:is(.ProseMirror, .ProseMirror-static) ul { list-style-type: disc; }
+:is(.ProseMirror, .ProseMirror-static) ol { list-style-type: decimal; }
+/* PPTist serializes custom markers as inline list-style-type on ul/ol; li must inherit it. */
+:is(.ProseMirror, .ProseMirror-static) ul li { list-style-type: inherit; }
+:is(.ProseMirror, .ProseMirror-static) ol li { list-style-type: inherit; }
 :is(.ProseMirror, .ProseMirror-static) code {
   margin: 0 1px;
   border-radius: 4px;
@@ -296,6 +294,8 @@
   height: 100%;
 }
 
+.mona-chart-element.is-thumbnail { pointer-events: none; }
+
 .mona-table-element,
 .mona-static-table {
   position: absolute;
@@ -383,7 +383,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity .3s;
+  transition: opacity .2s;
 }
 .mona-table-mask:not(.is-locked):hover { opacity: .9; }
 .mona-table-mask-tip {

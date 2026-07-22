@@ -38,28 +38,35 @@ function ChartCanvas({ element }: { element: PPTChartElement }) {
     }
   }, [])
 
+  const chartType = element.chartType
+  const data = element.data
+  const themeColors = element.themeColors
+  const textColor = element.textColor
+  const lineColor = element.lineColor
+  const lineSmooth = element.options?.lineSmooth || false
+  const stack = element.options?.stack || false
   useEffect(() => {
     const chart = chartRef.current
     if (!chart) return
     const option = getChartOption({
-      type: element.chartType,
-      data: element.data,
-      themeColors: getThemeColors(element.themeColors),
-      textColor: element.textColor,
-      lineColor: element.lineColor,
-      lineSmooth: element.options?.lineSmooth || false,
-      stack: element.options?.stack || false,
+      type: chartType,
+      data,
+      themeColors: getThemeColors(themeColors),
+      textColor,
+      lineColor,
+      lineSmooth,
+      stack,
     })
     if (option) chart.setOption(option, true)
-  }, [element])
+  }, [chartType, data, themeColors, textColor, lineColor, lineSmooth, stack])
 
   return <div className="mona-chart" data-chart-ready ref={containerRef} />
 }
 
-export function ChartElement({ element }: { element: PPTChartElement }) {
+export function ChartElement({ element, thumbnail = false }: { element: PPTChartElement; thumbnail?: boolean }) {
   return (
     <div
-      className="mona-element mona-chart-element"
+      className={`mona-element mona-chart-element${thumbnail ? ' is-thumbnail' : ''}`}
       data-element-id={element.id}
       data-element-type="chart"
       style={{ top: element.top, left: element.left, width: element.width, height: element.height }}

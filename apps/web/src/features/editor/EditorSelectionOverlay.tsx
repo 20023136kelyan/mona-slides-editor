@@ -49,11 +49,13 @@ function TransformHandles({
   interactionProfile,
   onResizePointerDown,
   onRotatePointerDown,
+  showRotate = true,
 }: {
   elements: PPTElement[]
   interactionProfile: 'desktop' | 'mobile'
   onResizePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
+  showRotate?: boolean
 }) {
   const { t } = useTranslation()
   const single = elements.length === 1 ? elements[0] : undefined
@@ -70,7 +72,7 @@ function TransformHandles({
           type="button"
         />
       ))}
-      {canRotateSelection(elements) ? (
+      {showRotate && canRotateSelection(elements) ? (
         <button
           aria-label={t('foundation.editor.rotateSelection')}
           className="mona-rotate-handle"
@@ -91,6 +93,7 @@ function RectSelection({
   onRotatePointerDown,
   scale,
   showHandles,
+  showRotate = true,
 }: {
   children?: ReactNode
   className?: string
@@ -100,6 +103,7 @@ function RectSelection({
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
   scale: number
   showHandles: boolean
+  showRotate?: boolean
 }) {
   const { t } = useTranslation()
   const bounds = getTransformBounds(elements)
@@ -136,6 +140,7 @@ function RectSelection({
           interactionProfile={interactionProfile}
           onResizePointerDown={onResizePointerDown}
           onRotatePointerDown={onRotatePointerDown}
+          showRotate={showRotate}
         />
       ) : null}
       {children}
@@ -413,7 +418,10 @@ export function EditorSelectionOverlay({
           onResizePointerDown={onResizePointerDown}
           onRotatePointerDown={onRotatePointerDown}
           scale={scale}
-          showHandles={!activeMember}
+          // Vue keeps the multi resize handles visible while a group member
+          // is active; only the rotate handler is hidden.
+          showHandles
+          showRotate={!activeMember}
         />
         {activeMember?.type === 'line' ? (
           <LineSelection element={activeMember} onLinePointerDown={onLinePointerDown} scale={scale} showHandles />

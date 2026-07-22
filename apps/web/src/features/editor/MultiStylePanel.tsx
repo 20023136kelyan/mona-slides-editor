@@ -30,7 +30,6 @@ import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
 
 const fontOptions = [
-  { label: 'System default', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
@@ -198,7 +197,7 @@ export function MultiStylePanel({
           ariaLabel={t('foundation.editor.text.fontFamily')}
           icon={<FontSizeIcon />}
           onChange={value => updateFontStyle('fontname', value)}
-          options={fontOptions}
+          options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]}
           search
           searchLabel={t('foundation.editor.text.fontSearch')}
           style={{ width: '60%' }}

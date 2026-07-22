@@ -21,7 +21,8 @@ import type { EditorExportActions } from '@/features/editor/EditorExportDialog'
 import { encryptNativePresentation } from '@/features/editor/editor-file-format'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
-import { getLinePath } from '@/features/presentation-renderer/render-utils'
+import { getLinePath, getOutlineRenderStyle } from '@/features/presentation-renderer/render-utils'
+import { replaceLegacyPlaceholders } from '@/lib/utils'
 
 interface ExportImageConfig {
   fontEmbedCSS?: string
@@ -252,7 +253,6 @@ function svgData(svg: string): string {
 const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 
 function shapeSvg(element: PPTShapeElement): string {
-  const outline = element.outline || {}
   let fill = element.fill || 'none'
   let defs = ''
   if (element.pattern) {
@@ -266,7 +266,13 @@ function shapeSvg(element: PPTShapeElement): string {
       : `<radialGradient id="gradient">${stops}</radialGradient>`
     fill = 'url(#gradient)'
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${element.width}" height="${element.height}" viewBox="0 0 ${element.viewBox[0]} ${element.viewBox[1]}"><defs>${defs}</defs><path d="${xml(element.path)}" fill="${xml(fill)}" fill-opacity="${element.opacity ?? 1}" stroke="${xml(outline.color || 'transparent')}" stroke-width="${outline.width || 0}"/></svg>`
+  // Match the on-canvas renderer: stretch the viewBox to the element size
+  // (special shapes keep their original viewBox when resized), keep the
+  // outline width constant, and honor dashed/dotted styles and the shared
+  // outline color default.
+  const outlineStyle = getOutlineRenderStyle(element.outline)
+  const stroke = element.outline ? outlineStyle.color : 'transparent'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${element.width}" height="${element.height}" viewBox="0 0 ${element.viewBox[0]} ${element.viewBox[1]}" preserveAspectRatio="none"><defs>${defs}</defs><path d="${xml(element.path)}" vector-effect="non-scaling-stroke" fill="${xml(fill)}" fill-opacity="${element.opacity ?? 1}" stroke="${xml(stroke)}" stroke-width="${outlineStyle.width}" stroke-dasharray="${outlineStyle.dashArray}"/></svg>`
 }
 
 function latexSvg(path: string, viewBox: [number, number], color: string, strokeWidth: number): string {
@@ -501,7 +507,7 @@ async function exportEditablePptx(
         output.addShape('custGeom' as PptxGenJS.ShapeType, options)
       }
       else if (element.type === 'chart') {
-        const data = element.data.series.map((values, index) => ({ labels: element.data.labels, name: t('chartData.series', { number: index + 1 }), values }))
+        const data = element.data.series.map((values, index) => ({ labels: element.data.labels, name: replaceLegacyPlaceholders(t('chartData.series'), { number: index + 1 }), values }))
         let colors: string[]
         if (element.themeColors.length === 10) colors = element.themeColors.map(color => formatColor(color).color)
         else if (element.themeColors.length === 1) colors = tinycolor(element.themeColors[0]).analogous(10).map(color => formatColor(color.toHexString()).color)

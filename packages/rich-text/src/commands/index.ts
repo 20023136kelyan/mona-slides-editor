@@ -46,16 +46,24 @@ export interface RichTextAction {
   value?: string
 }
 
+export interface RichTextActionOptions {
+  onFontUnavailable?: (fontname: string) => void
+}
+
 export const executeRichTextActions = (
   editorView: EditorView,
   action: RichTextAction | readonly RichTextAction[],
   attrs: Pick<RichTextAttrs, 'color' | 'fontsize'>,
+  options?: RichTextActionOptions,
 ) => {
   const actions = Array.isArray(action) ? action : [action]
   for (const item of actions) {
     if (item.command === 'fontname' && item.value !== undefined) {
       autoSelectAll(editorView)
       addMark(editorView, editorView.state.schema.marks.fontname!.create({ fontname: item.value }))
+      if (item.value && typeof document !== 'undefined' && !document.fonts.check(`16px ${item.value}`)) {
+        options?.onFontUnavailable?.(item.value)
+      }
     }
     else if (item.command === 'fontsize' && item.value) {
       autoSelectAll(editorView)
@@ -63,14 +71,16 @@ export const executeRichTextActions = (
       setListStyle(editorView, { key: 'fontsize', value: item.value })
     }
     else if (item.command === 'fontsize-add') {
-      const fontsize = `${getFontsize(editorView) + (item.value ? Number(item.value) : 2)}px`
+      // PPTist selects all first, then samples the base size from the
+      // resulting selection.
       autoSelectAll(editorView)
+      const fontsize = `${getFontsize(editorView) + (item.value ? Number(item.value) : 2)}px`
       addMark(editorView, editorView.state.schema.marks.fontsize!.create({ fontsize }))
       setListStyle(editorView, { key: 'fontsize', value: fontsize })
     }
     else if (item.command === 'fontsize-reduce') {
-      const fontsize = `${Math.max(12, getFontsize(editorView) - (item.value ? Number(item.value) : 2))}px`
       autoSelectAll(editorView)
+      const fontsize = `${Math.max(12, getFontsize(editorView) - (item.value ? Number(item.value) : 2))}px`
       addMark(editorView, editorView.state.schema.marks.fontsize!.create({ fontsize }))
       setListStyle(editorView, { key: 'fontsize', value: fontsize })
     }

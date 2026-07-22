@@ -24,11 +24,11 @@ import {
   InspectorNumberInput,
 } from '@/features/editor/EditorInspectorPrimitives'
 import {
-  alignElementsToCanvasLikeVue,
-  orderElementLikeVue,
-  type ElementCanvasAlignCommand,
+  alignElementsToCanvasLikePptist,
+  orderElementLikePptist,
   type ElementOrderCommand,
-} from '@/features/editor/editor-element-operations'
+  type MultiAlignmentCommand,
+} from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 const minSizeByType: Record<string, number> = {
@@ -71,18 +71,18 @@ export function ElementPositionPanel({
   }], { historyKey })
 
   const order = (command: ElementOrderCommand) => {
-    const elements = orderElementLikeVue(slide.elements, element, command)
+    const elements = orderElementLikePptist(slide.elements, element.id, command)
     if (!elements) return
     runtime.commit('Reorder element', [{ type: 'slide.update', props: { elements } }], { historyKey })
   }
-  const align = (command: ElementCanvasAlignCommand) => {
-    const elements = alignElementsToCanvasLikeVue(
-      slide.elements,
-      activeElementIds,
+  const align = (command: MultiAlignmentCommand) => {
+    const elements = alignElementsToCanvasLikePptist({
       command,
-      presentation.viewportSize,
-      presentation.viewportRatio,
-    )
+      elements: slide.elements,
+      selectedIds: new Set(activeElementIds),
+      viewportHeight: presentation.viewportSize * presentation.viewportRatio,
+      viewportWidth: presentation.viewportSize,
+    })
     // Vue's deep handle-element watcher mirrors changed geometry through the
     // mounted one-decimal NumberInputs. Their value watcher then writes the
     // rounded handle coordinates back, while the other selected group members

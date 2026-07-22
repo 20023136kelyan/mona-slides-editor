@@ -58,7 +58,6 @@ import { EditorNotice } from '@/features/editor/EditorContextMenu'
 import { requestAIWriting } from '@/features/editor/ai-writing'
 
 const fontOptions = [
-  { label: 'System default', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
@@ -374,7 +373,7 @@ export function RichTextBaseControls({
           ariaLabel={t('foundation.editor.text.fontFamily')}
           icon={<FontSizeIcon />}
           onChange={value => execute({ command: 'fontname', value })}
-          options={fontOptions}
+          options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]}
           search
           searchLabel={t('foundation.editor.text.fontSearch')}
           style={{ width: '60%' }}
@@ -528,7 +527,7 @@ export function TextStylePanel({
           ariaLabel={t('foundation.editor.text.fontFamily')}
           icon={<FontSizeIcon />}
           onChange={value => execute({ command: 'fontname', value })}
-          options={fontOptions}
+          options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]}
           search
           searchLabel={t('foundation.editor.text.fontSearch')}
           style={{ width: '60%' }}

@@ -38,6 +38,7 @@ import {
 
 export interface TableElementEditor {
   editable: boolean
+  isHandle: boolean
   scale: number
   selectedCells: readonly string[]
   onContextMenu: (event: ReactMouseEvent<HTMLElement>, row: number, column: number) => void
@@ -128,7 +129,9 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef(editor)
+  const elementRef = useRef(element)
   const inputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingCellEditRef = useRef<{ row: number; column: number; value: string } | null>(null)
   const selectingRef = useRef(false)
   const [startCell, setStartCell] = useState<[number, number] | null>(null)
   const [columnSizePreview, setColumnSizePreview] = useState<number[] | null>(null)
@@ -155,6 +158,26 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+
+  useEffect(() => {
+    elementRef.current = element
+  }, [element])
+
+  // Commits build from the latest element so a flush never overwrites a
+  // sibling cell's already-committed text with stale data.
+  const flushPendingCellEdit = useCallback(() => {
+    if (inputTimerRef.current) {
+      clearTimeout(inputTimerRef.current)
+      inputTimerRef.current = null
+    }
+    const pending = pendingCellEditRef.current
+    if (!pending) return
+    pendingCellEditRef.current = null
+    const latest = elementRef.current
+    editorRef.current?.onElementChange({ ...latest, data: updateTableCellText(latest, pending.row, pending.column, pending.value) }, 'Edit table cell')
+  }, [])
+
+  useEffect(() => () => flushPendingCellEdit(), [flushPendingCellEdit])
 
   const hasEditor = Boolean(editor)
   useEffect(() => {
@@ -372,10 +395,19 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
                             <EditableCellText
                               cell={cell}
                               onInput={value => {
+                                const pending = pendingCellEditRef.current
+                                if (pending && (pending.row !== rowIndex || pending.column !== columnIndex)) flushPendingCellEdit()
                                 if (inputTimerRef.current) clearTimeout(inputTimerRef.current)
-                                inputTimerRef.current = setTimeout(() => editor?.onElementChange({ ...element, data: updateTableCellText(element, rowIndex, columnIndex, value) }, 'Edit table cell'), 300)
+                                pendingCellEditRef.current = { row: rowIndex, column: columnIndex, value }
+                                inputTimerRef.current = setTimeout(() => {
+                                  inputTimerRef.current = null
+                                  flushPendingCellEdit()
+                                }, 300)
                               }}
-                              onPasteData={values => editor?.onElementChange(expandAndFillTable(element, rowIndex, columnIndex, values), 'Paste table cells')}
+                              onPasteData={values => {
+                                flushPendingCellEdit()
+                                editor?.onElementChange(expandAndFillTable(elementRef.current, rowIndex, columnIndex, values), 'Paste table cells')
+                              }}
                               style={getTableTextStyle(element.cellMinHeight, cell.style)}
                             />
                           ) : <div className="mona-table-cell-text" dangerouslySetInnerHTML={markup} style={getTableTextStyle(element.cellMinHeight, cell.style)} />}
@@ -403,7 +435,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
               }}
               role="button"
             >
-              <div className="mona-table-mask-tip" style={{ transform: `scale(${1 / editor.scale})` }}>{t('foundation.editor.tableEditing.doubleClick')}</div>
+              {editor.isHandle ? <div className="mona-table-mask-tip" style={{ transform: `scale(${1 / editor.scale})` }}>{t('foundation.editor.tableEditing.doubleClick')}</div> : null}
             </div>
           ) : null}
         </div>

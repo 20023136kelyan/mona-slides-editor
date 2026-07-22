@@ -50,7 +50,7 @@ function StaticVolumeIcon() {
   return <VolumeNoticeIcon aria-hidden="true" className="mona-audio-icon" />
 }
 
-const AudioPlayer = forwardRef<AudioPlayerHandle, { element: PPTAudioElement; scale: number; style: React.CSSProperties }>(function AudioPlayer({ element, scale, style }, forwardedRef) {
+const AudioPlayer = forwardRef<AudioPlayerHandle, { autoplay?: boolean; element: PPTAudioElement; scale: number; style: React.CSSProperties }>(function AudioPlayer({ autoplay = false, element, scale, style }, forwardedRef) {
   const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement>(null)
   const playBarRef = useRef<HTMLDivElement>(null)
@@ -164,7 +164,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, { element: PPTAudioElement; sc
         }}
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime || 0)}
         ref={audioRef}
-        autoPlay={element.autoplay}
+        autoPlay={autoplay}
         src={element.src || undefined}
       />
       <div className="mona-audio-controller">
@@ -205,7 +205,7 @@ const AudioPlayer = forwardRef<AudioPlayerHandle, { element: PPTAudioElement; sc
   )
 })
 
-function VideoPlayer({ element, scale }: { element: PPTVideoElement; scale: number }) {
+function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean; element: PPTVideoElement; scale: number }) {
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -380,9 +380,10 @@ function VideoPlayer({ element, scale }: { element: PPTVideoElement; scale: numb
           }}
           onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime || 0)}
           playsInline
+          webkit-playsinline="true"
           poster={element.poster}
           ref={videoRef}
-          autoPlay={element.autoplay}
+          autoPlay={autoplay}
           src={element.src || undefined}
         />
         <div className="mona-video-bezel"><span className={bezel ? 'is-active' : ''} onAnimationEnd={() => setBezel(false)}>{paused ? <PauseIcon /> : <PlayIcon />}</span></div>
@@ -457,7 +458,7 @@ export function VideoElement({ editor, element, screen }: { editor?: MediaElemen
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
         {screen ? (
           <div className="mona-video-screen-content">
-            {screen.active ? <VideoPlayer element={element} scale={screen.scale} /> : null}
+            {screen.active ? <VideoPlayer autoplay={element.autoplay} element={element} scale={screen.scale} /> : null}
           </div>
         ) : editor ? (
           <div
@@ -509,7 +510,7 @@ export function AudioElement({ editor, element, screen }: { editor?: MediaElemen
           tabIndex={editor ? 0 : undefined}
         >
           <span onClick={screen ? () => screenAudioRef.current?.toggle() : undefined} style={{ display: 'block', height: size, width: size }}><StaticVolumeIcon /></span>
-          {screen?.active ? <AudioPlayer element={element} ref={screenAudioRef} scale={screen.scale} style={playerPosition} /> : editor?.active ? <AudioPlayer element={element} scale={editor.scale} style={playerPosition} /> : null}
+          {screen?.active ? <AudioPlayer autoplay={element.autoplay} element={element} ref={screenAudioRef} scale={screen.scale} style={playerPosition} /> : editor?.active ? <AudioPlayer element={element} scale={editor.scale} style={playerPosition} /> : null}
         </div>
       </div>
     </div>

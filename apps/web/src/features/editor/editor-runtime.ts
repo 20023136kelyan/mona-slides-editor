@@ -133,6 +133,15 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     }, 300))
   }
 
+  // Undo/redo inside the debounce window must not skip the pending edit or
+  // resurrect a stale redo branch; settle the pending snapshot first.
+  const flushPendingHistorySnapshots = () => {
+    if (!historyTimers.size) return
+    for (const timer of historyTimers.values()) clearTimeout(timer)
+    historyTimers.clear()
+    addHistorySnapshot()
+  }
+
   const restoreHistorySnapshot = (snapshot: HistorySnapshot) => {
     const current = store.getState().presentation
     store.dispatch(editorActions.historyRestored({
@@ -500,6 +509,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       ], { recordHistory: false })
     },
     redo: () => {
+      flushPendingHistorySnapshots()
       if (snapshotCursor >= snapshots.length - 1) return false
       snapshotCursor += 1
       restoreHistorySnapshot(snapshots[snapshotCursor]!)
@@ -522,6 +532,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       return () => historyListeners.delete(listener)
     },
     undo: () => {
+      flushPendingHistorySnapshots()
       if (snapshotCursor <= 0) return false
       snapshotCursor -= 1
       restoreHistorySnapshot(snapshots[snapshotCursor]!)

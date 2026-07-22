@@ -90,12 +90,8 @@ export function EditorFloatingTableToolbar({
       <div className="mona-floating-toolbar-content">
         <InspectorPopoverButton ariaLabel={t('foundation.editor.table.fill')} className="mona-floating-toolbar-button is-labeled" content={<EditorColorPicker onChange={backcolor => commit({ data: updateTableCellStyles(element, selectedCells, { backcolor }) }, 'Update table cell fill')} value={fill || '#ffffff'} />}><FillIcon /><span>{t('foundation.editor.table.fill')}</span></InspectorPopoverButton>
         <InspectorPopoverButton ariaLabel={t('foundation.editor.table.border')} asDiv className="mona-floating-toolbar-button is-labeled is-border" content={<div className="mona-floating-border-panel">
-          <PropertyRow label={t('foundation.editor.text.borderStyle')}><InspectorSelect<LineStyleType> ariaLabel={t('foundation.editor.text.borderStyle')} onChange={style => {
-            updateOutline({ style }); setBorderOpen(false) 
-          }} options={lineStyleOptions} renderLabel={option => <LinePreview type={option?.value || 'solid'} />} renderOption={option => <LinePreview type={option.value} />} value={element.outline.style || 'solid'} /></PropertyRow>
-          <PropertyRow label={t('foundation.editor.text.borderColor')}><InspectorColorButton ariaLabel={t('foundation.editor.text.borderColor')} color={element.outline.color || '#000'} onChange={color => {
-            updateOutline({ color }); setBorderOpen(false) 
-          }} /></PropertyRow>
+          <PropertyRow label={t('foundation.editor.text.borderStyle')}><InspectorSelect<LineStyleType> ariaLabel={t('foundation.editor.text.borderStyle')} onChange={style => updateOutline({ style })} options={lineStyleOptions} renderLabel={option => <LinePreview type={option?.value || 'solid'} />} renderOption={option => <LinePreview type={option.value} />} value={element.outline.style || 'solid'} /></PropertyRow>
+          <PropertyRow label={t('foundation.editor.text.borderColor')}><InspectorColorButton ariaLabel={t('foundation.editor.text.borderColor')} color={element.outline.color || '#000'} onChange={color => updateOutline({ color })} /></PropertyRow>
           <PropertyRow label={t('foundation.editor.text.borderWidth')}><InspectorNumberInput ariaLabel={t('foundation.editor.text.borderWidth')} onChange={width => updateOutline({ width })} value={element.outline.width || 0} /></PropertyRow>
         </div>} onOpenChange={setBorderOpen} open={borderOpen}><SelectedIcon /><span>{t('foundation.editor.table.border')}</span></InspectorPopoverButton>
         <div className="mona-floating-divider" />

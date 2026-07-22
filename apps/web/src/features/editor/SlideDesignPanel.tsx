@@ -41,7 +41,6 @@ import {
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 
 const fontOptions = [
-  { label: 'System default', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
@@ -371,7 +370,7 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       <div className="mona-design-canvas-size">{canvasSize}</div>
       <div className="mona-inspector-divider" />
       <div className="mona-design-title"><span>{t('designPanel.globalTheme')}</span><button className="mona-design-more" onClick={() => setMore(value => !value)} type="button"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</button></div>
-      <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={fontOptions} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
+      <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
       <DesignRow label={`${t('common.fontColor')}:`}><InspectorColorButton ariaLabel={t('common.fontColor')} color={presentation.theme.fontColor} onChange={fontColor => updateTheme({ fontColor })} /></DesignRow>
       <DesignRow label={`${t('common.backgroundColor')}:`}><InspectorColorButton ariaLabel={t('common.backgroundColor')} color={presentation.theme.backgroundColor} onChange={backgroundColor => updateTheme({ backgroundColor })} /></DesignRow>
       <DesignRow label={`${t('common.themeColor')}:`}><ThemeColorListButton colors={presentation.theme.themeColors} onClick={() => setThemeColorsOpen(true)} /></DesignRow>

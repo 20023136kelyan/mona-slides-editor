@@ -19,10 +19,21 @@ database.version(1).stores({
   writingBoardImgs: 'id',
 })
 
+const readDiscardedIds = (): string[] => {
+  // A corrupt localStorage value must not abort cleanup or the unload marker.
+  try {
+    const value = localStorage.getItem(DISCARDED_DATABASES_KEY)
+    const parsed: unknown = value ? JSON.parse(value) : []
+    return Array.isArray(parsed) ? parsed.filter(entry => typeof entry === 'string') : []
+  }
+  catch {
+    return []
+  }
+}
+
 const deleteDiscardedDatabases = async () => {
   const now = Date.now()
-  const discardedValue = localStorage.getItem(DISCARDED_DATABASES_KEY)
-  const discardedIds: string[] = discardedValue ? JSON.parse(discardedValue) : []
+  const discardedIds = readDiscardedIds()
   const names = await Dexie.getDatabaseNames()
   const discardedNames = names.filter(name => {
     if (!name.includes(DATABASE_PREFIX)) return false
@@ -38,8 +49,7 @@ const deleteDiscardedDatabases = async () => {
 if (new URLSearchParams(window.location.search).get('mode') !== 'audience') void deleteDiscardedDatabases()
 
 window.addEventListener('beforeunload', () => {
-  const discardedValue = localStorage.getItem(DISCARDED_DATABASES_KEY)
-  const discardedIds: string[] = discardedValue ? JSON.parse(discardedValue) : []
+  const discardedIds = readDiscardedIds()
   discardedIds.push(databaseId)
   localStorage.setItem(DISCARDED_DATABASES_KEY, JSON.stringify(discardedIds))
 })
@@ -50,7 +60,7 @@ export const readWritingBoardImage = async (id: string) => {
 }
 
 export const writeWritingBoardImage = async (id: string, dataURL: string) => {
-  const images = await database.writingBoardImgs.where('id').equals(id).toArray()
-  if (images[0]) await database.writingBoardImgs.update(images[0], { dataURL })
-  else await database.writingBoardImgs.add({ dataURL, id })
+  // put() is atomic upsert; a read-then-add pair can race into a
+  // ConstraintError when two stroke-end persists overlap.
+  await database.writingBoardImgs.put({ dataURL, id })
 }

@@ -36,7 +36,9 @@ export function EditorFloatingChartToolbar({ element, frameRef, onEditData, runt
       const left = maxLeft < minLeft ? minLeft : Math.min(Math.max(requestedLeft, minLeft), maxLeft)
       const bottomTop = range.maxY * scale + 10
       const placeAbove = stageRect.height > 0 && bottomTop + 40 > stageRect.bottom - frameRect.top
-      const requestedTop = placeAbove ? range.minY * scale - 80 : bottomTop
+      // Charts have no rotate handle in PPTist, so the above-placement gap is
+      // 10 (not the 40 rotate gap): 10 gap + 40 toolbar height.
+      const requestedTop = placeAbove ? range.minY * scale - 50 : bottomTop
       const top = Math.max(stageRect.top - frameRect.top + 10, requestedTop)
       setPosition(current => current?.left === left && current.top === top ? current : { left, top })
     }

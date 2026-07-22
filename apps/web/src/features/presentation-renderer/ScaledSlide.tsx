@@ -48,7 +48,11 @@ export function ScaledSlide({
   const scale = fixedScale || responsiveScale
   const frameStyle = fixedWidth
     ? { width: fixedWidth, height: fixedWidth * viewportRatio }
-    : undefined
+    : {
+      width: `min(100%, ${viewportSize}px)`,
+      height: `min(100%, ${viewportSize * viewportRatio}px)`,
+      aspectRatio: String(1 / viewportRatio),
+    }
 
   return (
     <div className={`mona-scaled-slide${fixedWidth ? ' is-fixed' : ''}`} ref={containerRef} style={frameStyle}>

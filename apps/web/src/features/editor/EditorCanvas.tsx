@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -40,12 +41,13 @@ import {
   selectPresentation,
   selectShowRuler,
 } from '@mona/editor-state'
-import { createPresentationId, LINE_LIST, SHAPE_LIST, SHAPE_PATH_FORMULAS, type PresentationCommand } from '@mona/presentation-core'
+import { createPresentationId, LINE_LIST, selectFormattedCurrentSlideAnimations, SHAPE_LIST, SHAPE_PATH_FORMULAS, type PresentationCommand } from '@mona/presentation-core'
 import type { ElementLinkType, PPTElement, PPTImageElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { EditorContextMenu, EditorNoticeStack, LinkEditor } from '@/features/editor/EditorContextMenu'
 import { EditorRichText } from '@/features/editor/EditorRichText'
 import { EditorImageCropEditor, EditorSelectionOverlay } from '@/features/editor/EditorSelectionOverlay'
+import { EditorFloatingLinkHandler } from '@/features/editor/EditorFloatingLinkHandler'
 import { EditorFloatingTextToolbar } from '@/features/editor/EditorFloatingTextToolbar'
 import { EditorFloatingElementToolbar } from '@/features/editor/EditorFloatingElementToolbar'
 import { EditorFloatingImageToolbar } from '@/features/editor/EditorFloatingImageToolbar'
@@ -190,6 +192,7 @@ type GestureContext =
       elements: PPTElement[]
       bounds: InteractionBounds
       activationDistance: number
+      activated: boolean
       duplicateActivated: boolean
       duplicateElements: PPTElement[]
       duplicateHandleElementId: string
@@ -219,7 +222,7 @@ type GestureContext =
   | { kind: 'crop'; element: PPTImageElement; geometry: ImageCropGeometry; handle: CropControlHandle }
   | { kind: 'line-point'; element: PPTElement & { type: 'line' }; handle: LineControlHandle }
   | { kind: 'shape-keypoint'; element: PPTElement & { type: 'shape' }; index: number }
-  | { kind: 'lasso' }
+  | { kind: 'lasso'; lastRect?: InteractionRect }
   | { kind: 'pan'; pan: PointerPosition }
   | {
       kind: 'create'
@@ -346,8 +349,14 @@ const derivePreview = (
     }
   }
   if (context.kind === 'lasso') {
-    if (Math.abs(snapshot.delta.x) < 5 || Math.abs(snapshot.delta.y) < 5) return emptyPreview()
-    return { ...emptyPreview(), lasso: normalizeRect(snapshot.origin, snapshot.pointer) }
+    // Vue keeps the last >=5px marquee when the pointer shrinks back below
+    // the threshold, and selects with it on release.
+    if (Math.abs(snapshot.delta.x) < 5 || Math.abs(snapshot.delta.y) < 5) {
+      return context.lastRect ? { ...emptyPreview(), lasso: context.lastRect } : emptyPreview()
+    }
+    const rect = normalizeRect(snapshot.origin, snapshot.pointer)
+    context.lastRect = rect
+    return { ...emptyPreview(), lasso: rect }
   }
   if (context.kind === 'create') {
     const end = constrainCreateGesturePoint(context.tool.type, snapshot.origin, snapshot.pointer, snapshot.modifiers)
@@ -370,7 +379,12 @@ const derivePreview = (
   }
 
   if (context.kind === 'drag') {
-    if (!exceedsActivationDistance(snapshot.delta, context.activationDistance)) return emptyPreview()
+    // Vue latches drag activation: once the pointer exceeds the threshold the
+    // element keeps following it, even back inside the activation zone.
+    if (!context.activated) {
+      if (!exceedsActivationDistance(snapshot.delta, context.activationDistance)) return emptyPreview()
+      context.activated = true
+    }
     const delta = snapshot.modifiers.shift ? lockDeltaToDominantAxis(snapshot.delta) : snapshot.delta
     const excluded = new Set(context.elements.map(element => element.id))
     const candidates = buildSnapCandidates(slide.elements, excluded, viewportSize, viewportRatio)
@@ -509,7 +523,18 @@ const derivePreview = (
         viewportSize,
         viewportRatio,
       )
-      const handlerPoint = resizeHandlePoint(target, context.handle, rotation)
+      // Vue snaps the raw (unclamped) virtual handle position in the
+      // non-rotated branch, so snapping still engages while the element is
+      // pinned at its minimum size; the rotated branch uses the corrected
+      // geometry on both sides.
+      let handlerPoint = resizeHandlePoint(target, context.handle, rotation)
+      if (!rotation) {
+        const originPoint = resizeHandlePoint(context.bounds, context.handle)
+        handlerPoint = {
+          x: originPoint.x + (context.handle.includes('left') || context.handle.includes('right') ? localDelta.x : 0),
+          y: originPoint.y + (context.handle.startsWith('top') || context.handle.startsWith('bottom') ? localDelta.y : 0),
+        }
+      }
       const snapped = snapResizePoint({
         horizontalCandidates: candidates.horizontal,
         point: {
@@ -798,7 +823,12 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   const spacePressedRef = useRef(false)
   const lastSlideWheelAtRef = useRef(Number.NEGATIVE_INFINITY)
   const lastZoomWheelAtRef = useRef(Number.NEGATIVE_INFINITY)
+  // PPTist throttles undo/redo (100ms, leading) so key auto-repeat cannot
+  // burn through the snapshot stack.
+  const lastUndoAtRef = useRef(Number.NEGATIVE_INFINITY)
+  const lastRedoAtRef = useRef(Number.NEGATIVE_INFINITY)
   const keyDownHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined)
+  const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => undefined)
   const pasteHandlerRef = useRef<(event: ClipboardEvent) => void>(() => undefined)
   const [gestureContext, setGestureContext] = useState<GestureContext | null>(null)
   const [viewportFit, setViewportFit] = useState({ denominator: 1, dimension: 0, height: 0, width: 0 })
@@ -913,9 +943,21 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
         spacePressedRef.current = true
         setIsSpacePressed(true)
       }
-      if (!selectSession(runtime.store.getState()).disableHotkeys && event.key === 'F5') {
+      // PPTist handles Ctrl/Meta+P, F5/Shift+F5, and Ctrl+F before the
+      // disableHotkeys guard, so they also work while a text editor has focus.
+      if ((event.ctrlKey || event.metaKey) && event.key.toUpperCase() === 'P') {
+        event.preventDefault()
+        window.dispatchEvent(new CustomEvent('mona:export-request', { detail: { type: 'pdf' } }))
+        return
+      }
+      if (event.key === 'F5') {
         event.preventDefault()
         window.dispatchEvent(new CustomEvent('mona:screening-request', { detail: { fromStart: !event.shiftKey } }))
+        return
+      }
+      if (event.ctrlKey && event.key.toUpperCase() === 'F') {
+        event.preventDefault()
+        runtime.store.dispatch(editorActions.panelToggled('search'))
         return
       }
       // PPTist deliberately reserves only Control (not Command/Meta) for its
@@ -1233,6 +1275,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     begin(event, 'drag', point, {
       kind: 'drag',
       activationDistance: DRAG_ACTIVATION_DISTANCE / scale,
+      activated: false,
       duplicateActivated: false,
       duplicateElements,
       duplicateHandleElementId: duplicateElements[handleIndex]?.id ?? duplicateElements[0]!.id,
@@ -1552,7 +1595,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       runtime.store.dispatch(editorActions.canvasDraggedChanged(true))
       return
     }
-    if (context.kind === 'drag' && !exceedsActivationDistance(snapshot.delta, context.activationDistance)) {
+    if (context.kind === 'drag' && !context.activated) {
       if (snapshot.delta.x === 0 && snapshot.delta.y === 0) {
         if (context.pendingToggleIds?.length) {
           runtime.store.dispatch(editorActions.selectionChanged(context.pendingToggleIds))
@@ -1636,6 +1679,15 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       )
       return
     }
+    if (context.kind === 'rotate' && context.mode === 'group') {
+      // Vue's group-rotate hook returns before applying when deltaAngle is 0;
+      // an identical-value commit would still schedule a history snapshot.
+      const unchanged = [...finalUpdates.entries()].every(([id, props]) => {
+        const original = context.elements.find(element => element.id === id)
+        return original && Object.entries(props).every(([key, value]) => (original as unknown as Record<string, unknown>)[key] === value)
+      })
+      if (unchanged) return
+    }
     if (context.kind === 'drag' || context.kind === 'resize' || context.kind === 'rotate') {
       const labels = { drag: 'Move elements', resize: 'Resize elements', rotate: 'Rotate elements' } as const
       runtime.commit(
@@ -1660,6 +1712,13 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     rawGestureOriginRef.current = null
     setGestureContext(null)
     if (context?.kind === 'drag' && context.duplicateActivated) {
+      // The copies were committed (without history) when duplicate mode
+      // activated; a cancelled gesture must not leave them stacked on the
+      // originals as a silent document mutation.
+      runtime.commit('Cancel duplicate drag', [{
+        type: 'element.delete',
+        elementIds: context.duplicateElements.map(element => element.id),
+      }], { recordHistory: false })
       runtime.store.dispatch(editorActions.selectionChanged(context.elements.map(element => element.id)))
       runtime.store.dispatch(editorActions.handleElementChanged(context.sourceHandleElementId))
     }
@@ -1881,6 +1940,36 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     else createTextFromClipboard(payload)
   }
 
+  // Vue's useDrop: dropped media files insert through the shared paste
+  // routing; dropped plain text becomes a 600x50 text element at the origin.
+  const handleDrop = (event: ReactDragEvent<HTMLElement>) => {
+    event.preventDefault()
+    const transfer = event.dataTransfer
+    if (!transfer || transfer.items.length === 0) return
+    let handledFile = false
+    for (const item of transfer.items) {
+      if (item.kind !== 'file') continue
+      const file = item.getAsFile()
+      if (!file) continue
+      if (item.type.includes('image')) {
+        handledFile = true
+        void fileAsDataUrl(file).then(src => createImageFromClipboard(src, 'clipboard-file'))
+      }
+      else if (item.type.includes('video') || item.type.includes('audio')) {
+        handledFile = true
+        createMediaFromClipboard(file)
+      }
+    }
+    if (handledFile) return
+    const first = transfer.items[0]
+    if (first && first.kind === 'string' && first.type === 'text/plain') {
+      first.getAsString(text => {
+        if (selectSession(runtime.store.getState()).disableHotkeys) return
+        createTextFromClipboard(text)
+      })
+    }
+  }
+
   const nudgeSelection = (elements: readonly PPTElement[], x: number, y: number) => {
     const commands: PresentationCommand[] = elements.map(element => ({
       type: 'element.update',
@@ -1998,11 +2087,19 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     }
     if (modifier && key === 'z') {
       event.preventDefault()
-      runtime.undo()
+      if (event.timeStamp - lastUndoAtRef.current >= 100) {
+        lastUndoAtRef.current = event.timeStamp
+        runtime.undo()
+      }
       return
     }
     if (modifier && key === 'y') {
-      event.preventDefault(); runtime.redo(); return
+      event.preventDefault()
+      if (event.timeStamp - lastRedoAtRef.current >= 100) {
+        lastRedoAtRef.current = event.timeStamp
+        runtime.redo()
+      }
+      return
     }
     if (event.altKey && (key === 'f' || key === 'b')) {
       if (liveSession.handleElementId) {
@@ -2058,7 +2155,9 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       runtime.store.dispatch(editorActions.selectionChanged([next.id]))
       return
     }
-    if (!modifier && !event.altKey && ['r', 't', 'o', 'l'].includes(key)) {
+    // Vue arms create tools only with editor-area (canvas) focus and without
+    // Shift or Ctrl/Meta held.
+    if (!modifier && !event.altKey && !event.shiftKey && liveSession.canvasFocus && ['r', 't', 'o', 'l'].includes(key)) {
       const tool = key === 't'
         ? { type: 'text', key: 'text', vertical: false } as const
         : key === 'l'
@@ -2214,21 +2313,90 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       })
     }
     else if (action === 'set-link' && liveMenuElement) {
-      const defaultSlideId = livePresentation.slides.find(slide => slide.id !== liveCurrentSlide.id)?.id ?? ''
-      runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
-      setLinkEditor({
-        address: liveMenuElement.link?.type === 'web' ? liveMenuElement.link.target : '',
-        elementId: liveMenuElement.id,
-        slideId: liveMenuElement.link?.type === 'slide' ? liveMenuElement.link.target : defaultSlideId,
-        type: liveMenuElement.link?.type ?? 'web',
-      })
+      openLinkEditorFor(liveMenuElement)
+    }
+  }
+
+  function openLinkEditorFor(element: PPTElement) {
+    const livePresentation = runtime.store.getState().presentation
+    const liveSlide = livePresentation.slides[livePresentation.slideIndex]
+    const defaultSlideId = livePresentation.slides.find(slide => slide.id !== liveSlide?.id)?.id ?? ''
+    runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
+    setLinkEditor({
+      address: element.link?.type === 'web' ? element.link.target : '',
+      elementId: element.id,
+      slideId: element.link?.type === 'slide' ? element.link.target : defaultSlideId,
+      type: element.link?.type ?? 'web',
+    })
+  }
+
+  const handleWheel = (event: WheelEvent) => {
+    event.preventDefault()
+    if (!event.deltaY) return
+    const now = event.timeStamp
+    if (ctrlOrMetaPressedRef.current) {
+      if (now - lastZoomWheelAtRef.current < 100) return
+      lastZoomWheelAtRef.current = now
+      const zoom = selectCanvasZoom(runtime.store.getState())
+      if (event.deltaY > 0 && zoom >= 30) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
+      else if (event.deltaY < 0 && zoom <= 200) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
+      return
+    }
+    if (now - lastSlideWheelAtRef.current < 300) return
+    lastSlideWheelAtRef.current = now
+    const { slideIndex, slides } = runtime.store.getState().presentation
+    if (event.deltaY > 0 && slideIndex < slides.length - 1) {
+      flushCurrentTableMeasurements()
+      runtime.focusSlide(slideIndex + 1)
+    }
+    else if (event.deltaY < 0 && slideIndex > 0) {
+      flushCurrentTableMeasurements()
+      runtime.focusSlide(slideIndex - 1)
     }
   }
 
   useLayoutEffect(() => {
     keyDownHandlerRef.current = handleKeyDown
     pasteHandlerRef.current = handlePaste
+    wheelHandlerRef.current = handleWheel
   })
+
+  // Unmounting mid-gesture (e.g. F5 slideshow during a drag) must not leave
+  // the shared interaction controller publishing phantom pointer updates.
+  useEffect(() => () => {
+    runtime.interaction.cancel()
+  }, [runtime])
+
+  // Vue prevents the browser's default file-drop navigation across the whole
+  // document while the editor is mounted; without this a dropped file
+  // replaces the editor page.
+  useEffect(() => {
+    if (interactionProfile === 'mobile') return undefined
+    const prevent = (event: DragEvent) => event.preventDefault()
+    document.addEventListener('dragenter', prevent)
+    document.addEventListener('dragleave', prevent)
+    document.addEventListener('dragover', prevent)
+    document.addEventListener('drop', prevent)
+    return () => {
+      document.removeEventListener('dragenter', prevent)
+      document.removeEventListener('dragleave', prevent)
+      document.removeEventListener('dragover', prevent)
+      document.removeEventListener('drop', prevent)
+    }
+  }, [interactionProfile])
+
+  // React's root-delegated onWheel listener is passive, so preventDefault()
+  // inside it cannot stop browser page zoom (ctrl+wheel) or ancestor scroll.
+  // The canvas needs a native non-passive listener.
+  const hasCurrentSlide = Boolean(selectedCurrentSlide)
+  useEffect(() => {
+    if (interactionProfile === 'mobile' || !hasCurrentSlide) return undefined
+    const stage = stageRef.current
+    if (!stage) return undefined
+    const listener = (event: WheelEvent) => wheelHandlerRef.current(event)
+    stage.addEventListener('wheel', listener, { passive: false })
+    return () => stage.removeEventListener('wheel', listener)
+  }, [interactionProfile, hasCurrentSlide])
 
   const closeLinkEditor = () => {
     runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false))
@@ -2260,31 +2428,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     closeLinkEditor()
   }
 
-  const handleWheel = (event: React.WheelEvent<HTMLElement>) => {
-    event.preventDefault()
-    if (!event.deltaY) return
-    const now = performance.now()
-    if (ctrlOrMetaPressedRef.current) {
-      if (now - lastZoomWheelAtRef.current < 100) return
-      lastZoomWheelAtRef.current = now
-      const zoom = selectCanvasZoom(runtime.store.getState())
-      if (event.deltaY > 0 && zoom >= 30) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
-      else if (event.deltaY < 0 && zoom <= 200) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
-      return
-    }
-    if (now - lastSlideWheelAtRef.current < 300) return
-    lastSlideWheelAtRef.current = now
-    const { slideIndex, slides } = runtime.store.getState().presentation
-    if (event.deltaY > 0 && slideIndex < slides.length - 1) {
-      flushCurrentTableMeasurements()
-      runtime.focusSlide(slideIndex + 1)
-    }
-    else if (event.deltaY < 0 && slideIndex > 0) {
-      flushCurrentTableMeasurements()
-      runtime.focusSlide(slideIndex - 1)
-    }
-  }
-
   const frameWidth = presentation.viewportSize * scale
   const frameHeight = presentation.viewportSize * presentation.viewportRatio * scale
 
@@ -2310,6 +2453,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
         runtime.store.dispatch(editorActions.canvasFocusChanged(true))
         runtime.store.dispatch(editorActions.thumbnailsFocusChanged(false))
       }}
+      onDrop={interactionProfile === 'mobile' ? undefined : handleDrop}
       onPointerCancel={cancelGesture}
       onPointerDown={handleBlankPointerDown}
       onPointerMove={handlePointerMove}
@@ -2324,7 +2468,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
         stageRef.current?.focus()
         setMenu({ position: { x: event.clientX, y: event.clientY }, surface: 'canvas' })
       }}
-      onWheel={interactionProfile === 'mobile' ? undefined : handleWheel}
       ref={stageRef}
       role={interactionProfile === 'mobile' ? undefined : 'application'}
       tabIndex={interactionProfile === 'mobile' ? undefined : 0}
@@ -2428,6 +2571,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
               slide={renderedSlide}
               tableEditor={element => ({
                 editable: tableEditorId === element.id,
+                isHandle: session.handleElementId === element.id,
                 scale,
                 selectedCells: session.selectedTableCells,
                 onContextMenu: (event, row, column) => handleTableCellContextMenu(event, element, row, column),
@@ -2531,9 +2675,30 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
               scale={scale}
             />
             <div className="mona-editor-float-layer">
+              {!mobileInteraction && session.toolbarState === 'elAnimation' ? (() => {
+                // Vue overlays 1-based animation order badges on every
+                // animated element while the animation panel is open.
+                const formatted = selectFormattedCurrentSlideAnimations(presentation)
+                return currentSlide.elements.map(element => {
+                  if (session.hiddenElementIds.includes(element.id)) return null
+                  const indexList = formatted.flatMap((group, index) => (
+                    group.animations.some(animation => animation.elId === element.id) ? [index] : []
+                  ))
+                  if (!indexList.length) return null
+                  const range = getElementBounds(element)
+                  return (
+                    <div className="mona-animation-index" key={element.id} style={{ left: range.minX * scale - 24, top: range.minY * scale }}>
+                      {indexList.map(index => <div className="mona-animation-index-item" key={index}>{index + 1}</div>)}
+                    </div>
+                  )
+                })
+              })() : null}
               {!mobileInteraction && session.showBubbleMenu && (() => {
                 const targetId = session.activeGroupElementId || (activeElementIds.length === 1 ? activeElementIds[0] : null)
-                const target = targetId ? currentSlide.elements.find(element => element.id === targetId) : undefined
+                // Vue suppresses the floating toolbar for hidden elements
+                // ("hide all" keeps them selected).
+                const visibleTargetId = targetId && !session.hiddenElementIds.includes(targetId) ? targetId : null
+                const target = visibleTargetId ? currentSlide.elements.find(element => element.id === visibleTargetId) : undefined
                 return target?.type === 'text' ? (
                   <EditorFloatingTextToolbar element={target} frameRef={frameRef} runtime={runtime} scale={scale} stageRef={stageRef} />
                 ) : target?.type === 'shape' || target?.type === 'line' ? (
@@ -2548,6 +2713,32 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
                   <EditorFloatingLatexToolbar element={target} frameRef={frameRef} onEdit={() => onEditLatex(target.id)} runtime={runtime} scale={scale} stageRef={stageRef} />
                 ) : null
               })()}
+              {!mobileInteraction ? (() => {
+                // Vue shows an open/change/remove hyperlink bubble under the
+                // handle element whenever it carries a link.
+                const linkElement = session.handleElementId && !session.hiddenElementIds.includes(session.handleElementId)
+                  ? currentSlide.elements.find(element => element.id === session.handleElementId)
+                  : undefined
+                if (!linkElement?.link) return null
+                const toolbarTargetId = session.activeGroupElementId || (activeElementIds.length === 1 ? activeElementIds[0] : null)
+                const toolbarVisible = Boolean(
+                  session.showBubbleMenu &&
+                  toolbarTargetId === linkElement.id &&
+                  linkElement.type !== 'video' && linkElement.type !== 'audio',
+                )
+                return (
+                  <EditorFloatingLinkHandler
+                    element={linkElement}
+                    frameRef={frameRef}
+                    key={linkElement.id}
+                    onChangeLink={() => openLinkEditorFor(linkElement)}
+                    runtime={runtime}
+                    scale={scale}
+                    stageRef={stageRef}
+                    toolbarVisible={toolbarVisible}
+                  />
+                )
+              })() : null}
             </div>
           </div>
         </div>

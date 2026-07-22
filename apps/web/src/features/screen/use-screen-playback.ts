@@ -171,6 +171,10 @@ export const useScreenPlayback = ({
     channelRef.current?.postMessage({ type: 'TURN_TO_INDEX', index } satisfies ScreenSyncMessage)
     setSlideIndex(index)
     setAnimationPosition(0)
+    // A jump mid-animation unmounts the animated elements, so their
+    // animationend never fires; without this reset "next" wedges on any
+    // slide that has animations. (Shared PPTist defect, fixed here.)
+    inAnimationRef.current = false
   }, [setAnimationPosition, setSlideIndex])
   const turnSlideToId = useCallback((id: string) => {
     const index = presentationRef.current.slides.findIndex(slide => slide.id === id)
@@ -178,6 +182,7 @@ export const useScreenPlayback = ({
     channelRef.current?.postMessage({ type: 'TURN_TO_ID', id } satisfies ScreenSyncMessage)
     setSlideIndex(index)
     setAnimationPosition(0)
+    inAnimationRef.current = false
   }, [setAnimationPosition, setSlideIndex])
   const turnPrevSlide = useCallback(() => {
     setSlideIndex(presentationRef.current.slideIndex - 1)

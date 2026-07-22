@@ -9,6 +9,16 @@ import { initializeI18n } from '@/i18n'
 
 import './index.css'
 
+// PPTist arms a leave-confirmation prompt outside development so a stray
+// tab close or refresh cannot silently discard the deck.
+if (!import.meta.env.DEV) {
+  window.onbeforeunload = () => false
+}
+
+// PPTist suppresses the native context menu globally (index.html); surfaces
+// with custom menus attach their own handlers on top.
+document.oncontextmenu = event => event.preventDefault()
+
 const bootstrap = async () => {
   await initializeI18n()
 

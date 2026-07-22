@@ -23,7 +23,6 @@ import { getElementBounds } from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 const fontOptions = [
-  { label: 'System default', value: '' },
   { label: '思源黑体', value: 'SourceHanSans' },
   { label: '思源宋体', value: 'SourceHanSerif' },
   { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
@@ -72,7 +71,7 @@ export function EditorFloatingRichTextControls({ elementId, runtime }: { element
         ariaLabel={t('foundation.editor.text.fontFamily')}
         className="mona-floating-font-select"
         onChange={value => execute({ command: 'fontname', value })}
-        options={fontOptions}
+        options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]}
         search
         searchLabel={t('foundation.editor.text.fontSearch')}
         value={attrs.fontname}

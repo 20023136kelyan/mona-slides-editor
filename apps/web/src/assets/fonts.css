@@ -1,0 +1,107 @@
+/* PPTist's 21 bundled deck fonts (see doc/FONT-LICENSES.md). The font list
+   in the style panels offers exactly these families. */
+@font-face {
+  font-display: swap;
+  font-family: SourceHanSans;
+  src: url('./fonts/SourceHanSans.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: SourceHanSerif;
+  src: url('./fonts/SourceHanSerif.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: WenDingPLSongTi;
+  src: url('./fonts/WenDingPLSongTi.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: AlibabaPuHuiTi;
+  src: url('./fonts/AlibabaPuHuiTi.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: ZhuQueFangSong;
+  src: url('./fonts/ZhuQueFangSong.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: LXGWWenKai;
+  src: url('./fonts/LXGWWenKai.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: LXGWNeoZhiSong;
+  src: url('./fonts/LXGWNeoZhiSong.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: LXGWNeoXiHei;
+  src: url('./fonts/LXGWNeoXiHei.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: WenDingPLKaiTi;
+  src: url('./fonts/WenDingPLKaiTi.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: DeYiHei;
+  src: url('./fonts/DeYiHei.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: MiSans;
+  src: url('./fonts/MiSans.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: SourceSerif4;
+  src: url('./fonts/SourceSerif4.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Inter;
+  src: url('./fonts/Inter.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: JetBrainsMono;
+  src: url('./fonts/JetBrainsMono.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Literata;
+  src: url('./fonts/Literata.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Roboto;
+  src: url('./fonts/Roboto.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: OpenSans;
+  src: url('./fonts/OpenSans.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Montserrat;
+  src: url('./fonts/Montserrat.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: SourceSansPro;
+  src: url('./fonts/SourceSansPro.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Merriweather;
+  src: url('./fonts/Merriweather.woff2') format('woff2');
+}
+@font-face {
+  font-display: swap;
+  font-family: Lato;
+  src: url('./fonts/Lato.woff2') format('woff2');
+}

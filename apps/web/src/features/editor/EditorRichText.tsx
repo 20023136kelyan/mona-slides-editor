@@ -10,6 +10,7 @@ import { editorActions } from '@mona/editor-state'
 import type { PPTShapeElement, PPTTextElement } from '@mona/presentation-core/model'
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { i18n } from '@/i18n'
 
 const normalizedEditorHtml = (value: string) => value.replace(/ style=""/g, '')
 
@@ -183,7 +184,12 @@ export function EditorRichText({
       latestRef.current.element.id,
       {
         execute: (action, historyKey) => {
-          executeRichTextActions(view, action, currentAttrs())
+          executeRichTextActions(view, action, currentAttrs(), {
+            // Vue warns when the requested family has not finished loading.
+            onFontUnavailable: () => window.dispatchEvent(new CustomEvent('mona:notice', {
+              detail: { text: i18n.t('runtime.fontLoading'), type: 'warning' },
+            })),
+          })
           view.focus()
           scheduleInput(false, historyKey)
           scheduleAttrs()
@@ -222,6 +228,12 @@ export function EditorRichText({
     if (!view || view.hasFocus()) return
     const { doc, tr } = view.state
     view.dispatch(tr.replaceRangeWith(0, doc.content.size, createDocument(elementText.content)))
+    // Vue re-syncs richTextAttrs on every deep handle-element change, so the
+    // toolbars refresh after an external replacement (undo/redo) too.
+    const { element: latestElement, runtime: latestRuntime } = latestRef.current
+    if (latestRuntime.store.getState().session.handleElementId === latestElement.id) {
+      latestRuntime.richText.sync(latestElement.id)
+    }
   }, [elementText.content])
 
   useEffect(() => {

@@ -10,7 +10,7 @@ import VisibleIcon from '~icons/icon-park-outline/preview-open'
 import { editorActions, selectCurrentSlide, selectSession } from '@mona/editor-state'
 import type { PPTElement } from '@mona/presentation-core'
 
-import { orderElementLikeVue } from '@/features/editor/editor-element-operations'
+import { orderElementLikePptist } from '@/features/editor/editor-geometry'
 import { EditorMoveablePanel } from '@/features/editor/EditorMoveablePanel'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -88,7 +88,7 @@ export function EditorSelectionPanel({ onClose, runtime }: { onClose: () => void
   }
   const order = (command: 'down' | 'up') => {
     if (!handleElement) return
-    const next = orderElementLikeVue(slide.elements, handleElement, command)
+    const next = orderElementLikePptist(slide.elements, handleElement.id, command)
     if (next) runtime.commit('Order element', [{ type: 'slide.update', slideId: slide.id, props: { elements: next } }], { historyKey: 'order-element' })
   }
   const typeName = (type: string) => t(`foundation.editor.elementTypes.${type}`, { defaultValue: type })

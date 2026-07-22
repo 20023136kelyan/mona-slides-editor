@@ -5,6 +5,8 @@ import {
 } from '@mona/presentation-core'
 import type { Slide } from '@mona/presentation-core/model'
 
+import { i18n } from '@/i18n'
+
 const fetchProductionSlides = async (): Promise<Slide[]> => {
   const response = await fetch('/mocks/slides.json')
   if (!response.ok) throw new Error(`Unable to load presentation: ${response.status}`)
@@ -23,7 +25,7 @@ const loadSlides = async (request: Request): Promise<Slide[]> => {
 export async function loadPresentation({ request }: { request: Request }): Promise<PresentationState> {
   const slides = await loadSlides(request)
   const presentation: PresentationState = {
-    title: 'Untitled presentation',
+    title: i18n.t('header.untitledPresentation'),
     theme: {
       themeColors: ['#5b9bd5', '#ed7d31', '#a5a5a5', '#ffc000', '#4472c4', '#70ad47'],
       fontColor: '#333',

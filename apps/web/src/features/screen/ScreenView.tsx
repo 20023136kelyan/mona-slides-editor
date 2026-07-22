@@ -89,46 +89,6 @@ function ScreenNotices() {
   return <EditorNoticeStack notices={notices} onClose={id => setNotices(current => current.filter(notice => notice.id !== id))} />
 }
 
-function BaseScreenMode({
-  controller,
-  onExit,
-  presentation,
-  setViewMode,
-}: {
-  controller: ScreenPresentationController
-  onExit: () => void
-  presentation: PresentationState
-  setViewMode: (mode: ScreenViewMode) => void
-}) {
-  const playback = useScreenPlayback({ controller })
-  const fullscreen = useFullscreenLifecycle(onExit)
-  const openAudience = () => {
-    fullscreen.manualExitFullscreen()
-    window.open(`${location.origin}${location.pathname}?mode=audience`, 'pptist-audience', 'popup')
-  }
-  return <ScreenBaseView {...fullscreen} controller={controller} onExit={onExit} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />
-}
-
-function PresenterScreenMode({
-  controller,
-  onExit,
-  presentation,
-  setViewMode,
-}: {
-  controller: ScreenPresentationController
-  onExit: () => void
-  presentation: PresentationState
-  setViewMode: (mode: ScreenViewMode) => void
-}) {
-  const playback = useScreenPlayback({ controller })
-  const fullscreen = useFullscreenLifecycle(onExit)
-  const openAudience = () => {
-    fullscreen.manualExitFullscreen()
-    window.open(`${location.origin}${location.pathname}?mode=audience`, 'pptist-audience', 'popup')
-  }
-  return <ScreenPresenterView {...fullscreen} controller={controller} onExit={onExit} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />
-}
-
 function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: EditorRuntime }) {
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const setSlideIndex = useCallback((index: number) => runtime.focusSlide(index), [runtime])
@@ -137,6 +97,21 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
     setSlideIndex,
   }), [presentation, setSlideIndex])
   const [viewMode, setViewMode] = useState<ScreenViewMode>('base')
+
+  // Playback and fullscreen state live here so toggling base/presenter view
+  // keeps autoplay, loop, and animation progress. (Vue re-created them per
+  // view; deliberate improvement.)
+  const playback = useScreenPlayback({ controller })
+  const fullscreen = useFullscreenLifecycle(onExit)
+  const openAudience = () => {
+    fullscreen.manualExitFullscreen()
+    window.open(`${location.origin}${location.pathname}?mode=audience`, 'pptist-audience', 'popup')
+  }
+  // Vue's exitScreening leaves browser fullscreen before unmounting the show.
+  const exitShow = () => {
+    fullscreen.manualExitFullscreen()
+    onExit()
+  }
 
   useEffect(() => {
     const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
@@ -155,8 +130,8 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
   return (
     <div className="mona-pptist-screen">
       {viewMode === 'base'
-        ? <BaseScreenMode controller={controller} onExit={onExit} presentation={presentation} setViewMode={setViewMode} />
-        : <PresenterScreenMode controller={controller} onExit={onExit} presentation={presentation} setViewMode={setViewMode} />}
+        ? <ScreenBaseView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />
+        : <ScreenPresenterView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={setViewMode} />}
       <ScreenNotices />
     </div>
   )

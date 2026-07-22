@@ -39,7 +39,7 @@ export function ElementRenderer({ element, mediaEditor, mediaScreen, shapeEditor
     case 'chart':
       return (
         <Suspense fallback={<div aria-label="Loading chart" className="mona-chart-placeholder" style={{ top: element.top, left: element.left, width: element.width, height: element.height }} />}>
-          <ChartElement element={element} />
+          <ChartElement element={element} thumbnail={thumbnail} />
         </Suspense>
       )
     default:
