@@ -1,5 +1,6 @@
 import type { PPTElement, Slide } from './model'
 import type { PresentationState } from './state'
+import { collectElementTreeIds } from './elements'
 
 export type ValidationSeverity = 'error' | 'warning'
 
@@ -48,7 +49,7 @@ const validateSlide = (
 ): PresentationValidationIssue[] => {
   const issues: PresentationValidationIssue[] = []
   const slidePath = `slides[${slideIndex}]`
-  const localElementIds = new Set(slide.elements.map(element => element.id))
+  const localElementIds = new Set(collectElementTreeIds(slide.elements))
 
   if (slide.title !== undefined && typeof slide.title !== 'string') {
     issues.push({
@@ -83,8 +84,7 @@ const validateSlide = (
     })
   }
 
-  slide.elements.forEach((element, elementIndex) => {
-    const elementPath = `${slidePath}.elements[${elementIndex}]`
+  const validateElement = (element: PPTElement, elementPath: string) => {
     if (!element.id) {
       issues.push({
         code: 'element.id.empty',
@@ -112,6 +112,14 @@ const validateSlide = (
         severity: 'warning',
       })
     }
+    if (element.type === 'group') {
+      element.elements.forEach((child, childIndex) => {
+        validateElement(child, `${elementPath}.elements[${childIndex}]`)
+      })
+    }
+  }
+  slide.elements.forEach((element, elementIndex) => {
+    validateElement(element, `${slidePath}.elements[${elementIndex}]`)
   })
 
   slide.animations?.forEach((animation, animationIndex) => {
@@ -129,8 +137,44 @@ const validateSlide = (
 }
 
 const IMPORTABLE_ELEMENT_TYPES = new Set([
-  'text', 'image', 'shape', 'line', 'chart', 'table', 'latex', 'video', 'audio',
+  'text', 'image', 'shape', 'line', 'chart', 'table', 'latex', 'video', 'audio', 'group', 'opaque',
 ])
+
+const validateHierarchyElements = (
+  value: unknown,
+  path: string,
+  seenElementIds: Set<string>,
+): PresentationValidationIssue[] => {
+  if (value === undefined) return []
+  if (!Array.isArray(value)) {
+    return [importIssue('presentation.source-hierarchy.elements', 'Hierarchy elements must be an array', path)]
+  }
+  const issues: PresentationValidationIssue[] = []
+  value.forEach((element, elementIndex) => {
+    const elementPath = `${path}[${elementIndex}]`
+    if (!element || typeof element !== 'object' || Array.isArray(element)) {
+      issues.push(importIssue('presentation.source-hierarchy.element', 'Hierarchy element must be an object', elementPath))
+      return
+    }
+    const candidate = element as Partial<PPTElement> & Record<string, unknown>
+    if (typeof candidate.id !== 'string' || !candidate.id) {
+      issues.push(importIssue('presentation.source-hierarchy.element-id', 'Hierarchy element ID must be a non-empty string', `${elementPath}.id`))
+    }
+    else if (seenElementIds.has(candidate.id)) {
+      issues.push(importIssue('presentation.source-hierarchy.element-duplicate', `Duplicate element ID: ${candidate.id}`, `${elementPath}.id`))
+    }
+    else seenElementIds.add(candidate.id)
+    if (typeof candidate.type !== 'string' || !IMPORTABLE_ELEMENT_TYPES.has(candidate.type)) {
+      issues.push(importIssue('presentation.source-hierarchy.element-type', `Unknown hierarchy element type: ${String(candidate.type)}`, `${elementPath}.type`))
+      return
+    }
+    issues.push(...finiteGeometryIssues(candidate as PPTElement, elementPath))
+    if (candidate.type === 'group') {
+      issues.push(...validateHierarchyElements(candidate.elements, `${elementPath}.elements`, seenElementIds))
+    }
+  })
+  return issues
+}
 
 const importIssue = (code: string, message: string, path: string): PresentationValidationIssue =>
   ({ code, message, path, severity: 'error' })
@@ -141,6 +185,39 @@ const importIssue = (code: string, message: string, path: string): PresentationV
 // validatePresentationState still covers cross-slide invariants afterwards.
 export const validateImportedSlides = (value: unknown): PresentationValidationResult => {
   const issues: PresentationValidationIssue[] = []
+  const validateElements = (elements: unknown[], path: string) => {
+    elements.forEach((element, elementIndex) => {
+      const elementPath = `${path}[${elementIndex}]`
+      if (!element || typeof element !== 'object' || Array.isArray(element)) {
+        issues.push(importIssue('import.element.invalid', 'Element must be an object', elementPath))
+        return
+      }
+      const record = element as Partial<PPTElement> & Record<string, unknown>
+      if (typeof record.id !== 'string' || !record.id) {
+        issues.push(importIssue('import.element.id', 'Element ID must be a non-empty string', `${elementPath}.id`))
+      }
+      if (typeof record.type !== 'string' || !IMPORTABLE_ELEMENT_TYPES.has(record.type)) {
+        issues.push(importIssue('import.element.type', `Unknown element type: ${String(record.type)}`, `${elementPath}.type`))
+        return
+      }
+      const geometry: Array<[string, unknown]> = [['left', record.left], ['top', record.top], ['width', record.width]]
+      if (record.type !== 'line') geometry.push(['height', record.height])
+      for (const [key, geometryValue] of geometry) {
+        if (typeof geometryValue !== 'number' || !Number.isFinite(geometryValue)) {
+          issues.push(importIssue('import.element.geometry', `${key} must be a finite number`, `${elementPath}.${key}`))
+        }
+      }
+      if (record.type === 'group') {
+        if (!Array.isArray(record.elements)) {
+          issues.push(importIssue('import.group.elements', 'Group elements must be an array', `${elementPath}.elements`))
+        }
+        else validateElements(record.elements, `${elementPath}.elements`)
+      }
+      if (record.type === 'opaque' && (typeof record.opaqueType !== 'string' || !record.opaqueType)) {
+        issues.push(importIssue('import.opaque.type', 'Opaque element type must be a non-empty string', `${elementPath}.opaqueType`))
+      }
+    })
+  }
   if (!Array.isArray(value) || value.length === 0) {
     issues.push(importIssue('import.slides.invalid', 'Slides must be a non-empty array', 'slides'))
     return { valid: false, issues }
@@ -177,28 +254,7 @@ export const validateImportedSlides = (value: unknown): PresentationValidationRe
     ) {
       issues.push(importIssue('import.slide.duration', 'Slide duration must be between 1000 and 3600000 milliseconds', `${slidePath}.durationMs`))
     }
-    candidate.elements.forEach((element, elementIndex) => {
-      const elementPath = `${slidePath}.elements[${elementIndex}]`
-      if (!element || typeof element !== 'object' || Array.isArray(element)) {
-        issues.push(importIssue('import.element.invalid', 'Element must be an object', elementPath))
-        return
-      }
-      const record = element as Partial<PPTElement> & Record<string, unknown>
-      if (typeof record.id !== 'string' || !record.id) {
-        issues.push(importIssue('import.element.id', 'Element ID must be a non-empty string', `${elementPath}.id`))
-      }
-      if (typeof record.type !== 'string' || !IMPORTABLE_ELEMENT_TYPES.has(record.type)) {
-        issues.push(importIssue('import.element.type', `Unknown element type: ${String(record.type)}`, `${elementPath}.type`))
-        return
-      }
-      const geometry: Array<[string, unknown]> = [['left', record.left], ['top', record.top], ['width', record.width]]
-      if (record.type !== 'line') geometry.push(['height', record.height])
-      for (const [key, geometryValue] of geometry) {
-        if (typeof geometryValue !== 'number' || !Number.isFinite(geometryValue)) {
-          issues.push(importIssue('import.element.geometry', `${key} must be a finite number`, `${elementPath}.${key}`))
-        }
-      }
-    })
+    validateElements(candidate.elements, `${slidePath}.elements`)
   })
 
   return { valid: !issues.some(issue => issue.severity === 'error'), issues }
@@ -246,6 +302,120 @@ export const validatePresentationState = (
       message: `Slide index ${state.slideIndex} is outside the presentation`,
       path: 'slideIndex',
       severity: 'error',
+    })
+  }
+
+  const sourcePackages: unknown = state.sourcePackages
+  if (sourcePackages !== undefined && !Array.isArray(sourcePackages)) {
+    issues.push({
+      code: 'presentation.source-packages.invalid',
+      message: 'Source packages must be an array',
+      path: 'sourcePackages',
+      severity: 'error',
+    })
+  }
+  else if (Array.isArray(sourcePackages)) {
+    const seenPackageIds = new Set<string>()
+    sourcePackages.forEach((value, packageIndex) => {
+      const path = `sourcePackages[${packageIndex}]`
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        issues.push({
+          code: 'presentation.source-package.invalid',
+          message: 'Source package must be an object',
+          path,
+          severity: 'error',
+        })
+        return
+      }
+      const source = value as Record<string, unknown>
+      if (source.kind !== 'pptx' || typeof source.packageId !== 'string' || !source.packageId) {
+        issues.push({
+          code: 'presentation.source-package.identity',
+          message: 'Source package must have a PowerPoint package identity',
+          path: `${path}.packageId`,
+          severity: 'error',
+        })
+      }
+      else if (seenPackageIds.has(source.packageId)) {
+        issues.push({
+          code: 'presentation.source-package.duplicate',
+          message: `Duplicate source package: ${source.packageId}`,
+          path: `${path}.packageId`,
+          severity: 'error',
+        })
+      }
+      else seenPackageIds.add(source.packageId)
+      if (
+        typeof source.byteLength !== 'number'
+        || !Number.isSafeInteger(source.byteLength)
+        || source.byteLength <= 0
+      ) {
+        issues.push({
+          code: 'presentation.source-package.byte-length',
+          message: 'Source package byte length must be a positive safe integer',
+          path: `${path}.byteLength`,
+          severity: 'error',
+        })
+      }
+      if (typeof source.fileName !== 'string' || !source.fileName) {
+        issues.push({
+          code: 'presentation.source-package.file-name',
+          message: 'Source package file name must be a non-empty string',
+          path: `${path}.fileName`,
+          severity: 'error',
+        })
+      }
+      if (!Array.isArray(source.slides) || source.slides.some(slide => (
+        !slide || typeof slide !== 'object' || typeof (slide as { slidePart?: unknown }).slidePart !== 'string'
+      ))) {
+        issues.push({
+          code: 'presentation.source-package.slides',
+          message: 'Source package slides must contain valid source-part records',
+          path: `${path}.slides`,
+          severity: 'error',
+        })
+      }
+      const hierarchy = source.hierarchy
+      if (hierarchy !== undefined) {
+        if (!hierarchy || typeof hierarchy !== 'object' || Array.isArray(hierarchy)) {
+          issues.push({
+            code: 'presentation.source-hierarchy.invalid',
+            message: 'PowerPoint hierarchy must be an object',
+            path: `${path}.hierarchy`,
+            severity: 'error',
+          })
+        }
+        else {
+          for (const layerName of ['masters', 'layouts'] as const) {
+            const layers = (hierarchy as Record<string, unknown>)[layerName]
+            if (!Array.isArray(layers)) {
+              issues.push({
+                code: 'presentation.source-hierarchy.layers',
+                message: `PowerPoint hierarchy ${layerName} must be an array`,
+                path: `${path}.hierarchy.${layerName}`,
+                severity: 'error',
+              })
+              continue
+            }
+            layers.forEach((layer, layerIndex) => {
+              if (!layer || typeof layer !== 'object' || Array.isArray(layer)) {
+                issues.push({
+                  code: 'presentation.source-hierarchy.layer',
+                  message: 'PowerPoint hierarchy layer must be an object',
+                  path: `${path}.hierarchy.${layerName}[${layerIndex}]`,
+                  severity: 'error',
+                })
+                return
+              }
+              issues.push(...validateHierarchyElements(
+                (layer as Record<string, unknown>).elements,
+                `${path}.hierarchy.${layerName}[${layerIndex}].elements`,
+                seenElementIds,
+              ))
+            })
+          }
+        }
+      }
     })
   }
 

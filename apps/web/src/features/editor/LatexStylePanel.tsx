@@ -19,8 +19,8 @@ export function LatexStylePanel({ element, onEdit, runtime }: {
   }])
   return (
     <div className="mona-latex-style-panel">
-      <div className="mona-panel-row"><InspectorButton ariaLabel={t('foundation.editor.latex.edit')} className="mona-latex-edit-button" onClick={onEdit}><EditIcon /> {t('foundation.editor.latex.edit')}</InspectorButton></div>
-      <div className="mona-inspector-divider" />
+      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('foundation.editor.latex.edit')} className="mona-latex-edit-button" onClick={onEdit}><EditIcon /> {t('foundation.editor.latex.edit')}</InspectorButton></div>
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <PropertyRow label={t('foundation.editor.latex.color')}>
         <InspectorColorButton ariaLabel={t('foundation.editor.latex.color')} color={element.color} onChange={color => commit({ color }, 'Update equation color')} />
       </PropertyRow>

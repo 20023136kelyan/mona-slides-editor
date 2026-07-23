@@ -1,4 +1,4 @@
-import type { PresentationState } from '@mona/presentation-core'
+import { findElementById, flattenElementTree, type PresentationState } from '@mona/presentation-core'
 import type { PPTElement } from '@mona/presentation-core/model'
 
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
@@ -9,11 +9,15 @@ const MAX_INLINE_SOURCE_LENGTH = 512
 
 const compactElement = (element: PPTElement): PPTElement => {
   const clone = structuredClone(element)
+  if (clone.type === 'group') clone.elements = clone.elements.map(compactElement)
   if ('src' in clone && typeof clone.src === 'string' && clone.src.length > MAX_INLINE_SOURCE_LENGTH) {
     clone.src = `managed://existing/${encodeURIComponent(clone.id)}`
   }
   if ('poster' in clone && typeof clone.poster === 'string' && clone.poster.length > MAX_INLINE_SOURCE_LENGTH) {
     clone.poster = `managed://existing/${encodeURIComponent(clone.id)}/poster`
+  }
+  if (clone.type === 'opaque' && clone.preview && clone.preview.length > MAX_INLINE_SOURCE_LENGTH) {
+    clone.preview = `managed://existing/${encodeURIComponent(clone.id)}/preview`
   }
   return clone
 }
@@ -43,7 +47,6 @@ export const buildAgentDocumentContext = async ({
 }: BuildAgentContextInput): Promise<AgentDocumentContext> => {
   const currentSlide = presentation.slides[presentation.slideIndex]
   if (!currentSlide) throw new Error('The presentation has no active slide')
-  const selected = new Set(activeElementIds)
   const slides: AgentSlideContext[] = presentation.slides.map((slide, index) => ({
     id: slide.id,
     index,
@@ -58,13 +61,16 @@ export const buildAgentDocumentContext = async ({
     revision: getAgentDocumentRevision(presentation),
     selection: {
       elementIds: [...activeElementIds],
-      elements: currentSlide.elements.filter(element => selected.has(element.id)).map(compactElement),
+      elements: activeElementIds
+        .map(id => findElementById(currentSlide.elements, id))
+        .filter((element): element is PPTElement => element !== undefined)
+        .map(compactElement),
       slideId: currentSlide.id,
     },
     slides,
     summary: {
       currentSlideNumber: presentation.slideIndex + 1,
-      elementCount: presentation.slides.reduce((count, slide) => count + slide.elements.length, 0),
+      elementCount: presentation.slides.reduce((count, slide) => count + flattenElementTree(slide.elements).length, 0),
       slideCount: presentation.slides.length,
       title: presentation.title,
       viewportHeight: presentation.viewportSize * presentation.viewportRatio,

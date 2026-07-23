@@ -270,7 +270,7 @@ export function ElementAnimationPanel({
           <div className="mona-animation-add-popover">
             <Popover onOpenChange={changeOpen} open={open && !replacementId}>
               <PopoverTrigger asChild><Button aria-label={t('foundation.editor.animation.add')} className="mona-panel-button mona-animation-add-button" onClick={() => setReplacementId('')} size="editor" type="button" variant="editor"><EffectsIcon />{` ${t('foundation.editor.animation.add')}`}</Button></PopoverTrigger>
-              <PopoverContent align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
+              <PopoverContent aria-label={t('foundation.editor.animation.add')} align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
             </Popover>
           </div>
         ) : <div className="mona-animation-tip"><ClickIcon /> {t('foundation.editor.animation.selectTip')}</div>}
@@ -349,7 +349,7 @@ export function ElementAnimationPanel({
                     <PopoverTrigger asChild><Button aria-label={`${t('foundation.editor.animation.replace')} ${item.animationEffect}`} className="mona-panel-button" onClick={() => {
                       setReplacementId(item.id); changeOpen(true) 
                     }} size="editor" style={{ width: '100%' }} type="button" variant="editor"><SwitchIcon /> {t('foundation.editor.animation.replace')}</Button></PopoverTrigger>
-                    <PopoverContent align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
+                    <PopoverContent aria-label={`${t('foundation.editor.animation.replace')} ${item.animationEffect}`} align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
                   </Popover>
                 </div>
               </div>

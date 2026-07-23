@@ -21,6 +21,8 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
         editor:
           'border-border bg-background text-foreground hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground',
+        'header-pill':
+          'border-border bg-background text-foreground hover:bg-foreground/5 aria-pressed:bg-foreground/[0.08] aria-pressed:border-foreground/14 aria-expanded:bg-foreground/[0.08]',
       },
       size: {
         default:
@@ -36,6 +38,10 @@ const buttonVariants = cva(
         'icon-lg': 'size-9',
         editor: 'h-8 gap-1.5 rounded-[var(--radius-control)] px-2.5 text-[13px]',
         'editor-icon': 'size-8 rounded-[var(--radius-control)]',
+        'header-pill':
+          'h-10 min-w-10 gap-1.5 rounded-[var(--radius-action)] px-2.5 text-[13px] font-medium [&_svg:not([class*=\'size-\'])]:size-[17px]',
+        'header-icon':
+          'size-10 rounded-[var(--radius-action)] [&_svg:not([class*=\'size-\'])]:size-[17px]',
       },
     },
     defaultVariants: {

@@ -191,13 +191,13 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       <div className="mona-panel-divider" />
 
       <PropertyRow label={t('foundation.editor.image.colorMask')}>
-        <div className="mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.image.colorMask')} checked={hasColorMask} onChange={checked => checked ? commitUpdate(runtime, element, { colorMask: defaultMask }) : commitRemove(runtime, element, 'colorMask')} /></div>
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.image.colorMask')} checked={hasColorMask} onChange={checked => checked ? commitUpdate(runtime, element, { colorMask: defaultMask }) : commitRemove(runtime, element, 'colorMask')} /></div>
       </PropertyRow>
       {hasColorMask ? <PropertyRow label={t('foundation.editor.image.maskColor')}><InspectorColorButton ariaLabel={t('foundation.editor.image.maskColor')} color={element.colorMask || defaultMask} onChange={colorMask => commitUpdate(runtime, element, { colorMask })} /></PropertyRow> : null}
       <div className="mona-panel-divider" />
 
       <PropertyRow label={t('foundation.editor.image.enableFilter')}>
-        <div className="mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.image.enableFilter')} checked={hasFilters} onChange={checked => checked ? commitUpdate(runtime, element, { filters: {} }) : commitRemove(runtime, element, 'filters')} /></div>
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.image.enableFilter')} checked={hasFilters} onChange={checked => checked ? commitUpdate(runtime, element, { filters: {} }) : commitRemove(runtime, element, 'filters')} /></div>
       </PropertyRow>
       {hasFilters ? (
         <>
@@ -238,7 +238,7 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
       <div className="mona-panel-divider" />
 
-      <input accept="image/*" aria-label={t('foundation.editor.image.replaceImage')} className="mona-visually-hidden" onChange={replaceImage} ref={replaceInputRef} type="file" />
+      <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={replaceInputRef} tabIndex={-1} type="file" />
       <InspectorButton ariaLabel={t('foundation.editor.image.replaceImage')} className="mona-image-full-button" onClick={() => replaceInputRef.current?.click()}><TransformIcon /> {t('foundation.editor.image.replaceImage')}</InspectorButton>
       <InspectorButton ariaLabel={t('foundation.editor.image.resetStyle')} className="mona-image-full-button" onClick={resetImage}><UndoIcon /> {t('foundation.editor.image.resetStyle')}</InspectorButton>
       <InspectorButton ariaLabel={t('foundation.editor.image.setAsBackground')} className="mona-image-full-button" onClick={() => runtime.commit('Set image as background', [{ type: 'slide.update', props: { background: { ...(presentation.slides[presentation.slideIndex]?.background || {}), type: 'image', image: { src: element.src, size: 'cover' } } } }], { historyKey: `image-background-${element.id}` })}><ThemeIcon /> {t('foundation.editor.image.setAsBackground')}</InspectorButton>

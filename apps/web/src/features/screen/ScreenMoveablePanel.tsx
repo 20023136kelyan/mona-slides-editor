@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 
 import CloseIcon from '~icons/icon-park-outline/close'
 
+import { Button } from '@/components/ui/button'
+
 const Z_INDEX_KEY = '__screen_panel_z_index__'
 const ACTIVE_PANELS_KEY = '__screen_panel_active_count__'
 const Z_INDEX_BASE = 900
@@ -23,6 +25,7 @@ export function ScreenMoveablePanel({
   minWidth = 20,
   moveable = true,
   onClose,
+  onEscape,
   resizeable = false,
   title = '',
   top = 10,
@@ -40,6 +43,7 @@ export function ScreenMoveablePanel({
   minWidth?: number
   moveable?: boolean
   onClose?: () => void
+  onEscape?: () => void
   resizeable?: boolean
   title?: string
   top?: number
@@ -173,8 +177,18 @@ export function ScreenMoveablePanel({
       }
       startMove(event)
     }
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || !onEscape) return
+      event.preventDefault()
+      event.stopPropagation()
+      onEscape()
+    }
     panel.addEventListener('mousedown', handleMouseDown)
-    return () => panel.removeEventListener('mousedown', handleMouseDown)
+    panel.addEventListener('keydown', handleKeyDown)
+    return () => {
+      panel.removeEventListener('mousedown', handleMouseDown)
+      panel.removeEventListener('keydown', handleKeyDown)
+    }
   })
 
   return (
@@ -194,18 +208,18 @@ export function ScreenMoveablePanel({
       {title ? (
         <>
           <div className="mona-screen-moveable-panel-header">
-            <button aria-label={t('screen.movePanel')} className="mona-screen-moveable-panel-title" onKeyDown={moveFromKeyboard} onMouseDown={startMove} type="button">{title}</button>
-            <button aria-label={t('common.close')} className="mona-screen-moveable-panel-close" onClick={onClose} type="button"><CloseIcon /></button>
+            <Button aria-label={t('screen.movePanel')} className="mona-screen-moveable-panel-title" onKeyDown={moveFromKeyboard} onMouseDown={startMove} size={null} type="button" variant={null}>{title}</Button>
+            <Button aria-label={t('common.close')} className="mona-screen-moveable-panel-close" onClick={onClose} size={null} type="button" variant={null}><CloseIcon /></Button>
           </div>
           <div className="mona-screen-moveable-panel-content" style={contentStyle}>{children}</div>
         </>
       ) : (
         <>
-          {moveable ? <button aria-label={t('screen.movePanel')} className="mona-visually-hidden" onKeyDown={moveFromKeyboard} type="button" /> : null}
+          {moveable ? <Button aria-label={t('screen.movePanel')} className="mona-visually-hidden" onKeyDown={moveFromKeyboard} size={null} type="button" variant={null} /> : null}
           <div className="mona-screen-moveable-panel-content" style={contentStyle}>{children}</div>
         </>
       )}
-      {resizeable ? <button aria-label={t('screen.resizePanel')} className="mona-screen-moveable-panel-resizer" onKeyDown={resizeFromKeyboard} onMouseDown={startResize} type="button" /> : null}
+      {resizeable ? <Button aria-label={t('screen.resizePanel')} className="mona-screen-moveable-panel-resizer" onKeyDown={resizeFromKeyboard} onMouseDown={startResize} size={null} type="button" variant={null} /> : null}
     </div>
   )
 }

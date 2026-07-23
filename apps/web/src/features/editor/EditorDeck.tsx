@@ -7,10 +7,7 @@ import type { EditorToolbarState } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
 import type { ChartType, PPTAudioElement, PPTChartElement, PPTImageElement, PPTLatexElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, PPTVideoElement } from '@mona/presentation-core/model'
 
-import LeftChevronIcon from '~icons/icon-park-outline/left'
 
-import { Button } from '@/components/ui/button'
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { SidebarContent, SidebarHeader, SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EditorCanvas } from '@/features/editor/EditorCanvas'
@@ -82,6 +79,41 @@ interface EditorDeckProps {
   runtime?: EditorRuntime
 }
 
+// A side-panel region whose *width* animates open/closed, so the canvas (its
+// flex sibling) resizes continuously instead of snapping. The fixed-width panel
+// sits inside, clipped, so its content never squishes; the panel stays mounted
+// through the closing transition, then unmounts on transitionend.
+function CollapsiblePanelRegion({ children, className, open }: {
+  children: ReactNode
+  className: string
+  open: boolean
+}) {
+  const [rendered, setRendered] = useState(open)
+  useEffect(() => {
+    if (open) {
+      setRendered(true)
+      return undefined
+    }
+    // If width never transitions (e.g. reduced-motion / already closed), still
+    // unmount after the nominal animation window so close is not stuck.
+    const timeout = window.setTimeout(() => setRendered(false), 280)
+    return () => window.clearTimeout(timeout)
+  }, [open])
+  return (
+    <div
+      className={className}
+      data-open={open ? 'true' : undefined}
+      onTransitionEnd={event => {
+        if (event.target === event.currentTarget && event.propertyName === 'width' && !open) setRendered(false)
+      }}
+    >
+      {/* Mount immediately on open (so panel effects attach without a frame's
+          delay); keep mounted through the closing width transition. */}
+      {open || rendered ? children : null}
+    </div>
+  )
+}
+
 export function EditorDeck(props: EditorDeckProps) {
   return (
     <EditorShellProvider>
@@ -98,7 +130,6 @@ function EditorDeckContent({
   const { t } = useTranslation()
   const {
     agentOpen,
-    closeAgent,
     openAgent,
     startPresentation,
     subscribeToPresentationStart,
@@ -209,8 +240,8 @@ function EditorDeckContent({
           { key: 'elAnimation', label: t('foundation.editor.text.animation') },
         ]
   ), [session.activeElementIds.length, session.activeGroupElementId, t])
-  const openComments = useCallback(() => {
-    openTaskPanel('comments')
+  const openSpeakerNotes = useCallback(() => {
+    openTaskPanel('speakerNotes')
   }, [openTaskPanel])
   const startSlideshow = useCallback((fromCurrent: boolean) => {
     startPresentation({ fromStart: !fromCurrent })
@@ -417,6 +448,7 @@ function EditorDeckContent({
           props: {
             path: result.path,
             latex: result.latex,
+            fallbackImage: undefined,
             width: result.w,
             height: result.h,
             viewBox: [result.w, result.h],
@@ -469,7 +501,7 @@ function EditorDeckContent({
     : ''
   const secondaryTaskPanel = (
     <EditorErrorBoundary key={taskPanelRoute ?? 'closed'}>
-      <Suspense fallback={<div className="mona-agent-loading" role="status">{t('common.loading')}</div>}>
+      <Suspense fallback={<div className="mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('common.loading')}</div>}>
       {taskPanelRoute === 'speakerNotes' ? <EditorRemark runtime={runtime} /> : null}
       {taskPanelRoute === 'comments' ? <EditorCommentsPanel runtime={runtime} /> : null}
       {taskPanelRoute === 'search' ? <EditorSearchPanel runtime={runtime} /> : null}
@@ -529,31 +561,28 @@ function EditorDeckContent({
         }
       }}
     >
-      <div className="mona-editor-shell h-full min-h-0 w-full">
+      <div className="mona-editor-shell w-full">
       <EditorHeader runtime={runtime} />
-      <SidebarProvider className="mona-editor-workspace min-h-0 w-full">
+      <SidebarProvider className="mona-editor-workspace">
       <EditorRail
         activePanel={railPanel}
         activeTool={createTool}
-        agentOpen={agentOpen}
         customShapeActive={session.creatingCustomShape}
         drawingActive={session.drawingMode}
         onCreateToolChange={changeCreateTool}
         onPanelChange={changeRailPanel}
         onToggleDrawing={toggleDrawingMode}
-        onToggleAgent={agentOpen ? closeAgent : openAgent}
       />
-      <div className="mona-editor-body">
-      {drawerOpen ? (
+      <CollapsiblePanelRegion className="mona-panel-region mona-drawer-region bg-sidebar" open={drawerOpen}>
       <Suspense fallback={(
-        <div aria-label={taskPanelTitle || t('foundation.editor.inspector')} className="mona-editor-drawer mona-render-inspector mona-element-inspector mona-agent-loading" role="status">
+        <div aria-label={taskPanelTitle || t('foundation.editor.inspector')} className="mona-editor-drawer mona-agent-loading grid h-full w-72 shrink-0 place-items-center overflow-hidden text-xs text-muted-foreground" role="status">
           {t('common.loading')}
         </div>
       )}>
       <EditorRailDrawer
         activePanel={railPanel === 'properties' ? null : railPanel}
         contextualHeader={(
-          <SidebarHeader className="mona-inspector-tabs-header">
+          <SidebarHeader className="mona-inspector-tabs-header min-w-0 flex-1 border-b-0 p-0">
             <Tabs onValueChange={value => openContextualInspector(value as EditorToolbarState)} value={session.toolbarState}>
               <TabsList className="w-full">
                 {currentTabs.map(tab => <TabsTrigger className="px-1 text-xs" key={tab.key} onClick={() => openContextualInspector(tab.key)} value={tab.key}>{tab.label}</TabsTrigger>)}
@@ -587,7 +616,7 @@ function EditorDeckContent({
         <SidebarContent className="mona-inspector-content" ref={inspectorScrollRef}>
             {/* A crash in one panel resets when the user switches tab/element. */}
             <EditorErrorBoundary key={`${session.toolbarState}:${session.handleElementId ?? ''}`}>
-            <Suspense fallback={<div className="mona-agent-loading" role="status">{t('common.loading')}</div>}>
+            <Suspense fallback={<div className="mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('common.loading')}</div>}>
             {session.toolbarState === 'elStyle' && handleText ? <TextStylePanel element={handleText} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'elStyle' && handleShape ? <ShapeStylePanel element={handleShape} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'elStyle' && handleLine ? <LineStylePanel element={handleLine} presentation={presentation} runtime={runtime} /> : null}
@@ -610,22 +639,8 @@ function EditorDeckContent({
         </SidebarContent>
       </EditorRailDrawer>
       </Suspense>
-      ) : null}
-      {drawerOpen ? (
-        <Button
-          aria-label={t('foundation.editor.rail.collapse')}
-          className="mona-drawer-toggle"
-          onClick={closeDrawer}
-          size="editor-icon"
-          type="button"
-          variant="ghost"
-        >
-          <LeftChevronIcon />
-        </Button>
-      ) : null}
-      <ResizablePanelGroup className="mona-editor-resizable-workspace" orientation="horizontal">
-      <ResizablePanel defaultSize={agentOpen ? '70%' : '100%'} id="mona-editor-surface" minSize="40%">
-      <SidebarInset className="mona-editor-inset min-w-0">
+      </CollapsiblePanelRegion>
+      <SidebarInset className="mona-editor-inset" data-testid="mona-editor-surface" id="mona-editor-surface">
       {session.workspaceMode === 'page-grid' ? (
         <EditorErrorBoundary>
           <EditorPageGrid runtime={runtime} />
@@ -659,11 +674,11 @@ function EditorDeckContent({
       </EditorErrorBoundary>
         </>
       )}
+      {session.workspaceMode === 'canvas' && session.filmstripVisible ? (
       <div className="mona-editor-bottombar">
-        {session.workspaceMode === 'canvas' && session.filmstripVisible ? (
         <EditorErrorBoundary>
           <EditorThumbnails
-            onOpenNotes={openComments}
+            onOpenNotes={openSpeakerNotes}
             onOpenTransition={slideIndex => {
               runtime.focusSlide(slideIndex)
               openContextualInspector('slideAnimation')
@@ -672,28 +687,24 @@ function EditorDeckContent({
             runtime={runtime}
           />
         </EditorErrorBoundary>
-        ) : null}
-        <EditorStatusBar
-          notesVisible={railPanel === 'speakerNotes'}
-          onToggleNotes={() => toggleTaskPanel('speakerNotes')}
-          runtime={runtime}
-        />
       </div>
+      ) : null}
+      {/* Footer and filmstrip live inside the canvas column, so they flex with
+          the canvas as the sidebars open and close. */}
+      <EditorStatusBar
+        notesVisible={railPanel === 'speakerNotes'}
+        onToggleNotes={() => toggleTaskPanel('speakerNotes')}
+        runtime={runtime}
+      />
       {banner}
       </SidebarInset>
-      </ResizablePanel>
-      {agentOpen ? (
-        <>
-          <ResizableHandle aria-label={t('foundation.editor.agent.resize')} className="mona-agent-resize-handle" withHandle />
-          <ResizablePanel className="mona-agent-dock-panel" defaultSize="30%" id="mona-agent-dock" maxSize="520px" minSize="280px">
-            <Suspense fallback={<div className="mona-agent-loading" role="status">{t('foundation.editor.agent.loading')}</div>}>
-              <EditorAgentDock handoff={agentSketchHandoff} key={agentSketchHandoff?.updatedAt ?? 'text-only'} runtime={runtime} />
-            </Suspense>
-          </ResizablePanel>
-        </>
-      ) : null}
-      </ResizablePanelGroup>
-      </div>
+      <CollapsiblePanelRegion className="mona-panel-region mona-dock-region" open={agentOpen}>
+        {agentOpen ? (
+          <Suspense fallback={<aside className="mona-agent-dock mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('foundation.editor.agent.loading')}</aside>}>
+            <EditorAgentDock handoff={agentSketchHandoff} key={agentSketchHandoff?.updatedAt ?? 'text-only'} runtime={runtime} />
+          </Suspense>
+        ) : null}
+      </CollapsiblePanelRegion>
       </SidebarProvider>
       </div>
       <Suspense fallback={null}>

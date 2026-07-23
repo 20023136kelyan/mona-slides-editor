@@ -225,19 +225,18 @@ test('renames layers with F2 and restores focus on cancel and commit', async () 
   await page.getByRole('button', { name: 'View', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Selection pane' }).click()
 
-  const layerButton = document.querySelector<HTMLButtonElement>('.mona-selection-select')!
-  layerButton.focus()
-  layerButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'F2' }))
+  const selectLayer = page.getByRole('button', { name: 'Select Shape', exact: true })
+  await selectLayer.click({ clickCount: 2 })
   const rename = page.getByRole('textbox', { name: 'Rename Shape' })
   await rename.fill('Discarded name')
-  document.querySelector<HTMLInputElement>('.mona-selection-item input')!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+  document.querySelector<HTMLInputElement>('.mona-selection-item input')!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }))
   await new Promise(resolve => requestAnimationFrame(resolve))
   expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.name).toBeUndefined()
   expect(document.activeElement).toBe(document.querySelector('.mona-selection-select'))
 
-  document.querySelector<HTMLButtonElement>('.mona-selection-select')!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'F2' }))
+  await page.getByRole('button', { name: 'Select Shape', exact: true }).click({ clickCount: 2 })
   await page.getByRole('textbox', { name: 'Rename Shape' }).fill('Hero block')
-  document.querySelector<HTMLInputElement>('.mona-selection-item input')!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+  document.querySelector<HTMLInputElement>('.mona-selection-item input')!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' }))
   await new Promise(resolve => requestAnimationFrame(resolve))
   expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.name).toBe('Hero block')
   expect(document.activeElement?.textContent).toBe('Hero block')
@@ -377,6 +376,37 @@ test('keeps online image search inside Uploads with nested back navigation', asy
   expect(document.querySelector('.mona-image-library-panel')).toBeNull()
 })
 
+test('inserts URL media as an undoable native element from Uploads', async () => {
+  const runtime = createEditorRuntime(presentation)
+  await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} runtime={runtime} /></div>)
+
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
+  await page.getByRole('textbox', { name: 'Enter a video URL, e.g. https://example.com/video.mp4' })
+    .fill('https://example.com/mona-proof.mp4')
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+
+  expect(runtime.store.getState().presentation.slides[0]!.elements.at(-1)).toMatchObject({
+    type: 'video',
+    src: 'https://example.com/mona-proof.mp4',
+    autoplay: false,
+  })
+  expect(runtime.undo()).toBe(true)
+  expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
+
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
+  await page.getByRole('radio', { name: 'Audio' }).click()
+  await page.getByRole('textbox', { name: 'Enter an audio URL, e.g. https://example.com/audio.mp3' })
+    .fill('https://example.com/mona-proof.mp3')
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+
+  expect(runtime.store.getState().presentation.slides[0]!.elements.at(-1)).toMatchObject({
+    type: 'audio',
+    src: 'https://example.com/mona-proof.mp3',
+    autoplay: false,
+    loop: false,
+  })
+})
+
 test('restores focus to the invoking control when a task panel closes', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
   const design = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Design' })
@@ -388,21 +418,21 @@ test('restores focus to the invoking control when a task panel closes', async ()
   expect(document.activeElement).toBe(document.querySelector('[data-task-panel-route="design"]'))
 })
 
-test('opens AI as a resizable structural dock and collapses the left panel on a compact viewport', async () => {
+test('opens AI as a structural dock and collapses the left panel on a compact viewport', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><StatefulTestEditorDeck presentation={presentation} /></div>)
   const stage = document.querySelector<HTMLElement>('.mona-editor-stage')!
   const initialWidth = stage.getBoundingClientRect().width
 
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
-  await expect.element(page.getByRole('separator', { name: 'Resize AI panel' })).toBeVisible()
   expect(document.querySelector('.mona-agent-dialog')).toBeNull()
+  // The dock is a real sidebar column, so opening it pushes the canvas.
   expect(stage.getBoundingClientRect().width).toBeLessThan(initialWidth)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
   expect(document.querySelectorAll('.mona-editor-drawer')).toHaveLength(1)
-  expect(getComputedStyle(document.querySelector<HTMLElement>('.mona-editor-drawer')!).display).toBe('none')
+  expect(getComputedStyle(document.querySelector<HTMLElement>('.mona-drawer-region')!).display).toBe('none')
 
   await page.getByRole('complementary', { name: 'Mona AI' }).getByRole('button', { name: 'Close' }).click()
   expect(document.querySelector('.mona-agent-dock')).toBeNull()
@@ -548,13 +578,13 @@ test('opens a filmstrip note badge for the slide that owns the note', async () =
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={pageWorkflowPresentation} runtime={runtime} /></div>)
 
   expect(runtime.store.getState().presentation.slideIndex).toBe(0)
-  const noteButton = page.getByRole('button', { name: 'Open comments: Show slide 2, Plan' })
+  const noteButton = page.getByRole('button', { name: 'Open speaker notes: Show slide 2, Plan' })
   await expect.element(noteButton).toBeVisible()
   await noteButton.click()
 
   expect(runtime.store.getState().presentation.slideIndex).toBe(1)
-  await expect.element(page.getByRole('complementary', { name: 'Comments on slide 2' })).toBeVisible()
-  expect(document.activeElement?.getAttribute('aria-label')).toBe('Open comments: Show slide 2, Plan')
+  await expect.element(page.getByRole('complementary', { name: 'Speaker notes' })).toBeVisible()
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Open speaker notes: Show slide 2, Plan')
 })
 
 test('reorders pages from the grid with a keyboard operation available alongside drag', async () => {
@@ -634,11 +664,16 @@ test('exposes explicit insertion and transition boundaries between pages', async
 test('provides a working presentation timer with pause and reset', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={pageWorkflowPresentation} /></div>)
   await page.getByRole('button', { name: 'Timer' }).click()
+  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('05:00')
   await page.getByRole('button', { name: 'Start', exact: true }).click()
   await new Promise(resolve => setTimeout(resolve, 1050))
-  expect(document.querySelector('.mona-editor-timer output')?.textContent).not.toBe('00:00')
+  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('04:59')
 
   await page.getByRole('button', { name: 'Pause' }).click()
+  await page.getByRole('button', { name: 'Subtract one minute' }).click()
+  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('03:59')
+  await page.getByRole('button', { name: 'Add one minute' }).click()
+  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('04:59')
   await page.getByRole('button', { name: 'Reset' }).click()
-  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('00:00')
+  expect(document.querySelector('.mona-editor-timer output')?.textContent).toBe('05:00')
 })

@@ -46,7 +46,7 @@ export function EditorImageContextControls({
     <div className="mona-contextual-controls mona-contextual-image-controls">
       <div className="mona-contextual-control-row">
         <Button className="mona-contextual-control is-labeled" onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} size="editor" type="button" variant="ghost"><TailoringIcon /><span>{t('foundation.editor.image.crop')}</span></Button>
-        <input accept="image/*" aria-label={t('foundation.editor.image.replaceImage')} className="mona-visually-hidden" onChange={replaceImage} ref={inputRef} type="file" />
+        <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={inputRef} tabIndex={-1} type="file" />
         <Button className="mona-contextual-control is-labeled" onClick={() => inputRef.current?.click()} size="editor" type="button" variant="ghost"><TransformIcon /><span>{t('foundation.editor.image.replace')}</span></Button>
         <div className="mona-contextual-divider" />
         <Toggle aria-label={t('foundation.editor.shape.horizontalFlip')} className="mona-contextual-control" onPressedChange={() => update({ flipH: !element.flipH }, `image-flip-${element.id}`)} pressed={Boolean(element.flipH)}><FlipHorizontalIcon /></Toggle>

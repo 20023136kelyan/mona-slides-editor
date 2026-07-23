@@ -69,6 +69,7 @@ import { useManagedAgentStatus } from '@/features/editor/agent/managed-agent-sta
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { cn } from '@/lib/utils'
 
 interface ConversationEntry {
   id: number
@@ -105,6 +106,8 @@ const MODEL_PROVIDER_ORDER: readonly AgentProviderId[] = [
   ...(referenceAgentEnabled ? ['reference' as const] : []),
 ]
 
+const modelBadgeClass = 'inline-flex items-center rounded-[var(--radius-detail)] border border-border bg-[linear-gradient(90deg,rgb(129_161_193),rgb(125_124_155))] bg-clip-text px-1 text-[8.5px] font-extrabold tracking-[0.04em] text-transparent'
+
 const useObjectUrl = (blob: Blob | null | undefined) => {
   const url = useMemo(() => blob ? URL.createObjectURL(blob) : null, [blob])
   useEffect(() => () => {
@@ -128,17 +131,17 @@ function AgentAuthPromptForm({
 
   return (
     <form
-      className="mona-agent-auth-prompt"
+      className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-[9px]"
       onSubmit={event => {
         event.preventDefault()
         if (!answer.trim()) return
         void answerAgentAuthPrompt(providerId, prompt.id, answer).catch(() => undefined)
       }}
     >
-      <Label htmlFor={answerId}>{prompt.message}</Label>
+      <Label className="text-[10px] leading-[1.35] text-muted-foreground" htmlFor={answerId}>{prompt.message}</Label>
       {prompt.type === 'select' ? (
         <Select onValueChange={setAnswer} value={answer}>
-          <SelectTrigger aria-label={prompt.message} id={answerId}>
+          <SelectTrigger aria-label={prompt.message} className="w-full bg-background text-[11px]" id={answerId}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
@@ -176,36 +179,37 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
 
   if (status.connected) {
     return (
-      <div className="mona-agent-oauth-panel">
-        <div>
-          <span className="mona-agent-provider-status is-ready" />
-          <span>
-            <strong>{status.accountLabel || t('foundation.editor.agent.connected')}</strong>
-            <small>{status.planLabel || t('foundation.editor.agent.subscriptionReady')}</small>
+      <div className="grid gap-[9px] [&_button]:w-full [&_button_svg]:size-[13px]">
+        <div className="flex items-center gap-2">
+          <span className="size-[7px] shrink-0 rounded-[var(--radius-pill)] bg-[var(--success,#16a34a)] opacity-100" />
+          <span className="grid gap-px">
+            <strong className="text-[11px]">{status.accountLabel || t('foundation.editor.agent.connected')}</strong>
+            <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{status.planLabel || t('foundation.editor.agent.subscriptionReady')}</small>
           </span>
         </div>
         <Button disabled={status.loading} onClick={() => void disconnectAgentProvider(providerId)} size="sm" type="button" variant="outline">
           <Unplug />{t('foundation.editor.agent.disconnect')}
         </Button>
-        <small>{t('foundation.editor.agent.oauthSecurityNotice')}</small>
+        <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
       </div>
     )
   }
   return (
-    <div className="mona-agent-oauth-panel">
-      <p>{t(`foundation.editor.agent.providers.${providerId}.signInDescription`)}</p>
+    <div className="grid gap-[9px] [&_button]:w-full [&_button_svg]:size-[13px]">
+      <p className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t(`foundation.editor.agent.providers.${providerId}.signInDescription`)}</p>
       <Button disabled={status.loading} onClick={() => void connectAgentProvider(providerId).catch(() => undefined)} size="sm" type="button">
         <LogIn />{status.loading
           ? t('foundation.editor.agent.connecting')
           : t(`foundation.editor.agent.providers.${providerId}.signIn`)}
       </Button>
       {status.flow?.deviceCode ? (
-        <div className="mona-agent-device-code">
-          <span>{t('foundation.editor.agent.deviceCodeLabel')}</span>
-          <div>
-            <code>{status.flow.deviceCode.userCode}</code>
+        <div className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-[9px]">
+          <span className="text-[10px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.deviceCodeLabel')}</span>
+          <div className="flex items-center gap-1.5">
+            <code className="flex-1 rounded-[var(--radius-sm)] bg-background px-2 py-[7px] text-center text-[13px] font-bold tracking-[0.12em]">{status.flow.deviceCode.userCode}</code>
             <Button
               aria-label={t('foundation.editor.agent.copyDeviceCode')}
+              className="size-7 min-w-7"
               onClick={() => void navigator.clipboard.writeText(status.flow?.deviceCode?.userCode ?? '')}
               size="editor-icon"
               type="button"
@@ -214,7 +218,12 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
               <Clipboard />
             </Button>
           </div>
-          <a href={status.flow.deviceCode.verificationUri} rel="noreferrer" target="_blank">
+          <a
+            className="inline-flex items-center justify-center gap-[5px] text-[10px] font-semibold text-foreground no-underline hover:underline [&_svg]:size-3"
+            href={status.flow.deviceCode.verificationUri}
+            rel="noreferrer"
+            target="_blank"
+          >
             <ExternalLink />{t('foundation.editor.agent.openSignInPage')}
           </a>
         </div>
@@ -222,14 +231,14 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
       {status.flow?.prompt ? (
         <AgentAuthPromptForm key={status.flow.prompt.id} prompt={status.flow.prompt} providerId={providerId} />
       ) : null}
-      {status.flow?.message ? <p>{status.flow.message}</p> : null}
+      {status.flow?.message ? <p className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{status.flow.message}</p> : null}
       {status.flow?.status === 'pending' ? (
         <Button onClick={() => void cancelAgentAuthFlow(providerId)} size="sm" type="button" variant="ghost">
           <CircleStop />{t('common.cancel')}
         </Button>
       ) : null}
-      {status.error ? <p className="mona-agent-auth-error">{status.error}</p> : null}
-      <small>{t('foundation.editor.agent.oauthSecurityNotice')}</small>
+      {status.error ? <p className="m-0 text-[10px] leading-[1.4] text-destructive">{status.error}</p> : null}
+      <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
     </div>
   )
 }
@@ -248,7 +257,7 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
 
   return (
     <form
-      className="mona-agent-key-form"
+      className="grid gap-2.5 [&_>div]:grid [&_>div]:gap-[5px] [&_label]:text-[11px]"
       onSubmit={event => {
         event.preventDefault()
         if (apiKey.trim()) onConnect(apiKey.trim(), modelId)
@@ -256,10 +265,11 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
     >
       <div>
         <Label htmlFor={apiKeyId}>{t('foundation.editor.agent.apiKey')}</Label>
-        <div className="mona-agent-key-input">
-          <KeyRound />
+        <div className="relative">
+          <KeyRound className="pointer-events-none absolute top-1/2 left-2 z-[1] size-[13px] -translate-y-1/2 text-muted-foreground" />
           <Input
             autoComplete="off"
+            className="pl-[27px]"
             id={apiKeyId}
             onChange={event => setApiKey(event.target.value)}
             placeholder={t('foundation.editor.agent.apiKeyPlaceholder')}
@@ -280,7 +290,7 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
         </Select>
       </div>
       <Button disabled={!apiKey.trim()} size="sm" type="submit"><LogIn />{t('foundation.editor.agent.connectModel')}</Button>
-      <p>{t('foundation.editor.agent.keyMemoryNotice')}</p>
+      <p className="mt-[-2px] mr-px mb-0 ml-px text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.keyMemoryNotice')}</p>
     </form>
   )
 }
@@ -437,7 +447,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   }
 
   return (
-    <aside aria-labelledby="mona-agent-dock-title" className="mona-agent-dock">
+    <aside aria-labelledby="mona-agent-dock-title" className="mona-agent-dock" id="mona-agent-dock">
       {/* The provider Popover wraps the whole dock: its content is portaled,
           and the trigger sits inside the composer, the way current assistant
           UIs place their model picker. The root renders no DOM node. */}
@@ -452,25 +462,33 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         open={providerOpen}
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
-      <header className="mona-agent-dock-header">
-        <div className="mona-agent-dock-title">
-          <h2 id="mona-agent-dock-title">{t('foundation.editor.agent.title')}</h2>
-          <p>{t('foundation.editor.agent.scope', { slide: slideNumber })}</p>
+      <header className="flex min-h-[46px] items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
+        <div className="flex min-w-0 items-baseline gap-[7px]">
+          <h2 className="m-0 text-[13px] font-bold" id="mona-agent-dock-title">{t('foundation.editor.agent.title')}</h2>
+          <p className="m-0 overflow-hidden text-[11px] text-ellipsis whitespace-nowrap text-muted-foreground">{t('foundation.editor.agent.scope', { slide: slideNumber })}</p>
         </div>
         <Button aria-label={t('common.close')} onClick={closeAgent} size="editor-icon" type="button" variant="ghost"><X /></Button>
       </header>
-          <PopoverContent align="start" className="mona-agent-model-popover" data-editor-interactive-overlay side="top" sideOffset={8}>
+          <PopoverContent
+            aria-label={t('foundation.editor.agent.chooseProvider')}
+            align="start"
+            className="w-[min(248px,calc(100vw-24px))] max-h-[min(70vh,460px)] gap-0 overflow-y-auto p-[5px]"
+            data-editor-interactive-overlay
+            side="top"
+            sideOffset={8}
+          >
             {authView ? (
-              <div className="mona-agent-auth-view">
-                <div className="mona-agent-auth-head">
+              <div className="grid gap-2.5 p-1">
+                <div className="flex items-center gap-1.5">
                   <Button
                     aria-label={t('foundation.editor.agent.back')}
+                    className="size-[26px] [&_svg]:size-[15px]"
                     onClick={() => setAuthView(null)}
                     size="editor-icon"
                     type="button"
                     variant="ghost"
                   ><ChevronLeft /></Button>
-                  <strong>{t(`foundation.editor.agent.providers.${authView}.name`)}</strong>
+                  <strong className="text-[13px] font-bold">{t(`foundation.editor.agent.providers.${authView}.name`)}</strong>
                 </div>
                 {authView === 'openai-chatgpt' || authView === 'anthropic-claude' ? (
                   <OAuthAuthPanel providerId={authView} />
@@ -479,22 +497,23 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                   <GeminiAuthPanel defaultModelId="gemini-3.6-flash" onConnect={connectGemini} />
                 ) : null}
                 {authView === 'mona-managed' ? (
-                  <p className="mona-agent-auth-note">{t('foundation.editor.agent.managedUnavailable')}</p>
+                  <p className="m-0 text-[11px] leading-[1.45] text-muted-foreground">{t('foundation.editor.agent.managedUnavailable')}</p>
                 ) : null}
               </div>
             ) : (
               <>
-                <div className="mona-agent-model-search">
-                  <Search />
+                <div className="-mx-[5px] -mt-[5px] mb-1 flex items-center gap-1.5 border-b border-border px-[11px] py-[3px]">
+                  <Search className="size-[13px] shrink-0 text-muted-foreground" />
                   <input
                     aria-label={t('foundation.editor.agent.searchModels')}
+                    className="h-7 w-full border-0 bg-transparent p-0 text-[12.5px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus-visible:shadow-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
                     onChange={event => setModelQuery(event.target.value)}
                     placeholder={t('foundation.editor.agent.searchModels')}
                     type="search"
                     value={modelQuery}
                   />
                 </div>
-                <div className="mona-agent-model-list">
+                <div className="grid gap-px">
                   {MODEL_PROVIDER_ORDER.map(providerId => {
                     const query = modelQuery.trim().toLocaleLowerCase()
                     const models = AGENT_MODELS.filter(model => (
@@ -503,13 +522,13 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                     if (!models.length) return null
                     const ready = providerReadiness[providerId]
                     return (
-                      <div className="mona-agent-model-group" key={providerId}>
-                        <div className="mona-agent-model-group-head">
+                      <div className="grid gap-px not-first:mt-[3px]" key={providerId}>
+                        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-px text-[10px] font-semibold tracking-[0.02em] text-muted-foreground uppercase">
                           <span>{t(`foundation.editor.agent.providers.${providerId}.name`)}</span>
                           {ready ? null : (
                             <Button
                               aria-label={t('foundation.editor.agent.signInToProvider', { provider: t(`foundation.editor.agent.providers.${providerId}.name`) })}
-                              className="mona-agent-model-signin"
+                              className="h-auto min-h-0 rounded-[var(--radius-control)] px-1.5 py-px text-[10.5px] font-semibold tracking-normal text-foreground normal-case hover:bg-[rgb(15_16_21/6%)]"
                               onClick={() => setAuthView(providerId)}
                               size="sm"
                               type="button"
@@ -522,16 +541,20 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                           return (
                             <Button
                               aria-label={ready ? model.name : t('foundation.editor.agent.modelLockedHint', { model: model.name })}
-                              className={`mona-agent-model-option${ready ? '' : ' is-locked'}${active ? ' is-active' : ''}`}
+                              className={cn(
+                                'h-[30px] w-full justify-between gap-[9px] rounded-[var(--radius-control)] px-2 text-left text-[12.5px] text-foreground hover:bg-[rgb(15_16_21/6%)] [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+                                active && 'bg-[rgb(15_16_21/8%)] font-semibold [&_svg]:text-foreground',
+                                !ready && 'text-muted-foreground',
+                              )}
                               key={model.id}
                               onClick={() => selectModel(model)}
                               size="editor"
                               type="button"
                               variant="ghost"
                             >
-                              <span className="mona-agent-model-option-name">
+                              <span className="inline-flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap">
                                 {model.name}
-                                {model.badge === 'max' ? <span className="mona-agent-model-badge">MAX</span> : null}
+                                {model.badge === 'max' ? <span className={modelBadgeClass}>MAX</span> : null}
                               </span>
                               {active ? <Check /> : ready ? null : <Lock />}
                             </Button>
@@ -541,89 +564,100 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                     )
                   })}
                   {AGENT_MODELS.every(model => modelQuery.trim() && !model.name.toLocaleLowerCase().includes(modelQuery.trim().toLocaleLowerCase()))
-                    ? <p className="mona-agent-model-empty">{t('foundation.editor.agent.noModels')}</p>
+                    ? <p className="my-2.5 text-center text-xs text-muted-foreground">{t('foundation.editor.agent.noModels')}</p>
                     : null}
                 </div>
               </>
             )}
           </PopoverContent>
 
-      <ScrollArea className="mona-agent-conversation">
-        <div className="mona-agent-thread" aria-live="polite">
+      <ScrollArea className="mona-agent-conversation min-h-0">
+        <div aria-live="polite" className="flex min-h-full flex-1 flex-col gap-2.5 p-3">
           {!entries.length && !candidate && !handoff ? (
-            <div className="mona-agent-empty-state">
-              <span className="mona-agent-empty-icon"><Bot /></span>
-              <h3>{t('foundation.editor.agent.emptyTitle')}</h3>
-              <p>{t('foundation.editor.agent.emptyDescription')}</p>
+            <div className="flex min-h-full flex-1 flex-col items-center justify-center px-2.5 py-7 text-center">
+              <span className="mb-3.5 flex size-11 items-center justify-center rounded-[var(--radius-action)] bg-[rgb(15_16_21/6%)] text-[rgb(16_18_25/70%)] [&_svg]:size-[22px]"><Bot /></span>
+              <h3 className="m-0 text-[15px] font-[750]">{t('foundation.editor.agent.emptyTitle')}</h3>
+              <p className="mt-[7px] mb-0 max-w-[290px] text-xs leading-normal text-muted-foreground">{t('foundation.editor.agent.emptyDescription')}</p>
             </div>
           ) : null}
 
           {handoff && attachmentVisible && handoffUrl ? (
-            <div className="mona-agent-sketch-handoff">
-              <div className="mona-agent-sketch-heading">
-                <div>
-                  <strong>{t('foundation.editor.agent.sketchAttached')}</strong>
-                  <span>{t('foundation.editor.agent.sketchElements', {
+            <div className="m-0 grid gap-2.5 rounded-[var(--radius-overlay)] border border-border bg-muted p-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="grid gap-0.5">
+                  <strong className="text-xs">{t('foundation.editor.agent.sketchAttached')}</strong>
+                  <span className="text-[10px] text-muted-foreground">{t('foundation.editor.agent.sketchElements', {
                     count: handoff.scene.elements.filter(element => element.isDeleted !== true).length,
                   })}</span>
                 </div>
                 <Button aria-label={t('foundation.editor.agent.removeSketch')} onClick={() => setAttachmentVisible(false)} size="editor-icon" type="button" variant="ghost"><X /></Button>
               </div>
-              <img alt={t('foundation.editor.agent.sketchPreview')} src={handoffUrl} />
+              <img alt={t('foundation.editor.agent.sketchPreview')} className="w-full rounded-[var(--radius-surface)] border border-border bg-white object-contain" src={handoffUrl} />
             </div>
           ) : null}
 
           {entries.map(entry => (
-            <div className={`mona-agent-message is-${entry.role}`} key={entry.id}>
-              <p>{entry.text}</p>
+            <div
+              className={cn(
+                'flex max-w-full',
+                entry.role === 'user' && 'max-w-[88%] self-end',
+              )}
+              key={entry.id}
+            >
+              <p className={cn(
+                'm-0 text-[12.5px] leading-[1.55] whitespace-pre-wrap',
+                entry.role === 'user' && 'rounded-[var(--radius-overlay)] bg-[rgb(15_16_21/6%)] px-3 py-2',
+                entry.role === 'agent' && 'text-[rgb(16_18_25/88%)]',
+                entry.role === 'error' && 'rounded-[var(--radius-overlay)] bg-[color-mix(in_oklab,var(--destructive)_7%,var(--background))] px-3 py-2 text-destructive',
+              )}>{entry.text}</p>
             </div>
           ))}
 
           {progress ? (
-            <output className="mona-agent-progress">
-              <span className="mona-agent-progress-spinner" />
-              <div>
-                <strong>{t(`foundation.editor.agent.progress.${progress}`)}</strong>
-                <small>{t('foundation.editor.agent.progress.detail')}</small>
+            <output className="flex items-center gap-2.5 rounded-[var(--radius-overlay)] bg-[rgb(15_16_21/4%)] px-3 py-2.5">
+              <span className="mona-agent-progress-spinner size-[15px] shrink-0 rounded-[var(--radius-pill)] border-2 border-border border-t-foreground" />
+              <div className="grid gap-0.5">
+                <strong className="text-[11.5px]">{t(`foundation.editor.agent.progress.${progress}`)}</strong>
+                <small className="text-[9.5px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.progress.detail')}</small>
               </div>
             </output>
           ) : null}
 
           {candidate && candidate.preview.ok ? (
-            <article className="mona-agent-candidate">
-              <header>
-                <span><Sparkles /></span>
-                <div>
-                  <strong>{candidate.explanation}</strong>
-                  <small>{candidate.providerLabel}</small>
+            <article className="overflow-hidden rounded-[var(--radius-overlay)] border border-border bg-background shadow-[0_8px_26px_rgb(15_23_42/7%)]">
+              <header className="flex items-start gap-[9px] border-b border-border p-[11px]">
+                <span className="grid size-[25px] shrink-0 place-items-center rounded-[var(--radius-action)] bg-muted text-foreground [&_svg]:size-3.5"><Sparkles /></span>
+                <div className="grid min-w-0 gap-0.5">
+                  <strong className="text-xs leading-[1.4]">{candidate.explanation}</strong>
+                  <small className="text-[10px] text-muted-foreground">{candidate.providerLabel}</small>
                 </div>
               </header>
               {beforeUrl || afterUrl ? (
-                <div className="mona-agent-preview-comparison">
+                <div className="grid grid-cols-2 gap-px bg-border">
                   {beforeUrl ? (
-                    <figure>
-                      <img alt={t('foundation.editor.agent.beforePreview')} src={beforeUrl} />
-                      <figcaption>{t('foundation.editor.agent.before')}</figcaption>
+                    <figure className="relative m-0 min-w-0 bg-muted">
+                      <img alt={t('foundation.editor.agent.beforePreview')} className="block aspect-video w-full bg-white object-contain" src={beforeUrl} />
+                      <figcaption className="absolute right-[5px] bottom-[5px] rounded-[var(--radius-pill)] bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.before')}</figcaption>
                     </figure>
                   ) : null}
                   {afterUrl ? (
-                    <figure>
-                      <img alt={t('foundation.editor.agent.afterPreview')} src={afterUrl} />
-                      <figcaption>{t('foundation.editor.agent.after')}</figcaption>
+                    <figure className="relative m-0 min-w-0 bg-muted">
+                      <img alt={t('foundation.editor.agent.afterPreview')} className="block aspect-video w-full bg-white object-contain" src={afterUrl} />
+                      <figcaption className="absolute right-[5px] bottom-[5px] rounded-[var(--radius-pill)] bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.after')}</figcaption>
                     </figure>
                   ) : null}
                 </div>
               ) : null}
-              <div className="mona-agent-operation-summary">
-                <span>{t('foundation.editor.agent.summary.created', { count: candidate.summary.createdElements })}</span>
-                <span>{t('foundation.editor.agent.summary.updated', { count: candidate.summary.updatedElements })}</span>
-                <span>{t('foundation.editor.agent.summary.removed', { count: candidate.summary.deletedElements })}</span>
+              <div className="flex flex-wrap gap-[5px] px-2.5 pt-[9px] pb-1">
+                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.created', { count: candidate.summary.createdElements })}</span>
+                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.updated', { count: candidate.summary.updatedElements })}</span>
+                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.removed', { count: candidate.summary.deletedElements })}</span>
               </div>
-              <details>
-                <summary><Code2 />{t('foundation.editor.agent.viewProgram')}</summary>
-                <pre><code>{candidate.code}</code></pre>
+              <details className="mx-2.5 mt-[5px] mb-2.5 rounded-[var(--radius-control)] border border-border">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-[7px] text-[10px] text-muted-foreground [&::-webkit-details-marker]:hidden [&_svg]:size-3"><Code2 />{t('foundation.editor.agent.viewProgram')}</summary>
+                <pre className="m-0 max-h-[200px] overflow-auto border-t border-border bg-muted p-[9px] text-[9px] leading-[1.45] whitespace-pre-wrap"><code>{candidate.code}</code></pre>
               </details>
-              <footer>
+              <footer className="flex justify-end gap-[7px] border-t border-border px-2.5 py-[9px] [&_svg]:size-[13px]">
                 <Button onClick={() => setCandidate(null)} size="sm" type="button" variant="outline">
                   {t('foundation.editor.agent.discard')}
                 </Button>
@@ -635,19 +669,19 @@ export function EditorAgentDock({ handoff = null, runtime }: {
           ) : null}
 
           {appliedCandidate ? (
-            <div className="mona-agent-applied">
-              <Check />
-              <span>{t('foundation.editor.agent.appliedSummary')}</span>
-              <Button onClick={undoApplied} size="sm" type="button" variant="outline"><RotateCcw />{t('foundation.editor.agent.undo')}</Button>
+            <div className="flex items-center gap-[7px] rounded-[var(--radius-overlay)] border border-border px-[9px] py-2 text-[10.5px]">
+              <Check className="size-3.5 text-[var(--success,#16a34a)]" />
+              <span className="min-w-0 flex-1">{t('foundation.editor.agent.appliedSummary')}</span>
+              <Button className="[&_svg]:size-3" onClick={undoApplied} size="sm" type="button" variant="outline"><RotateCcw />{t('foundation.editor.agent.undo')}</Button>
             </div>
           ) : null}
           <div ref={endRef} />
         </div>
       </ScrollArea>
 
-      <footer className="mona-agent-composer">
+      <footer className="px-3 pt-1 pb-2.5">
         <form
-          className="mona-agent-composer-field"
+          className="overflow-hidden rounded-[calc(var(--radius-overlay)+4px)] border border-border bg-card shadow-[0_6px_18px_-6px_rgb(21_30_130/14%),0_2px_5px_-2px_rgb(21_30_130/8%)] focus-within:border-ring focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_18%,transparent)]"
           onSubmit={event => {
             event.preventDefault()
             void submit()
@@ -655,6 +689,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         >
           <Textarea
             aria-label={t('foundation.editor.agent.composerLabel')}
+            className="max-h-[220px] min-h-[50px] field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-[13px] leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none"
             disabled={busy}
             onChange={event => setDraft(event.target.value)}
             onKeyDown={event => {
@@ -668,21 +703,21 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             rows={2}
             value={draft}
           />
-          <div className="mona-agent-composer-actions">
+          <div className="flex min-h-10 items-center gap-1.5 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-[15px]">
             <PopoverTrigger asChild>
               <Button
                 aria-label={t('foundation.editor.agent.chooseProvider')}
-                className="mona-agent-model-trigger"
+                className="h-[26px] min-w-0 gap-[5px] rounded-[var(--radius-control)] px-1 text-[12.5px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
                 size="sm"
                 type="button"
                 variant="ghost"
               >
-                <span className="mona-agent-model-label">{activeModel.name}</span>
-                {activeModel.badge === 'max' ? <span className="mona-agent-model-badge">MAX</span> : null}
+                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{activeModel.name}</span>
+                {activeModel.badge === 'max' ? <span className={modelBadgeClass}>MAX</span> : null}
                 <ChevronDown />
               </Button>
             </PopoverTrigger>
-            <div className="mona-agent-composer-tools">
+            <div className="ml-auto flex items-center gap-1.5">
               <Button
                 aria-label={t('foundation.editor.agent.attach')}
                 disabled={!handoff}
@@ -694,9 +729,22 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 <Paperclip />
               </Button>
               {busy ? (
-                <Button aria-label={t('foundation.editor.agent.cancel')} className="mona-agent-send is-stop" onClick={() => abortRef.current?.abort()} size="editor-icon" type="button" variant="outline"><CircleStop /></Button>
+                <Button
+                  aria-label={t('foundation.editor.agent.cancel')}
+                  className="size-[30px] shrink-0 rounded-[var(--radius-pill)] border-[rgb(16_18_25/20%)] p-0 [&_svg]:stroke-[2.4]"
+                  onClick={() => abortRef.current?.abort()}
+                  size="editor-icon"
+                  type="button"
+                  variant="outline"
+                ><CircleStop /></Button>
               ) : (
-                <Button aria-label={t('foundation.editor.agent.send')} className="mona-agent-send" disabled={!draft.trim() || !providerReady} size="editor-icon" type="submit"><ArrowUp /></Button>
+                <Button
+                  aria-label={t('foundation.editor.agent.send')}
+                  className="size-[30px] shrink-0 rounded-[var(--radius-pill)] p-0 disabled:bg-muted disabled:opacity-100 disabled:[&_svg]:text-muted-foreground [&_svg]:stroke-[2.4]"
+                  disabled={!draft.trim() || !providerReady}
+                  size="editor-icon"
+                  type="submit"
+                ><ArrowUp /></Button>
               )}
             </div>
           </div>
@@ -704,12 +752,12 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         {/* Prompt starters live under the input, the way current assistant
             UIs surface them — only while the thread is still empty. */}
         {!entries.length && !candidate && !handoff && !progress ? (
-          <div className="mona-agent-suggestions" ref={suggestionsRef}>
+          <div className="mona-agent-suggestions mt-2 flex flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" ref={suggestionsRef}>
             {(['improve', 'rewrite', 'visualize'] as const).map(suggestion => {
               const SuggestionIcon = SUGGESTION_ICONS[suggestion]
               return (
                 <Button
-                  className="mona-agent-chip"
+                  className="h-7 shrink-0 gap-1.5 rounded-[var(--radius-control)] border-0 bg-transparent px-2 text-xs font-medium whitespace-nowrap text-muted-foreground hover:bg-[rgb(15_16_21/5%)] hover:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground"
                   key={suggestion}
                   onClick={() => {
                     setDraft(t(`foundation.editor.agent.suggestions.${suggestion}`))
@@ -726,7 +774,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             })}
           </div>
         ) : (
-          <p className="mona-agent-composer-notice">{providerReady
+          <p className="mt-[7px] mr-0.5 mb-0 ml-0.5 text-center text-[10px] leading-[1.4] text-muted-foreground">{providerReady
             ? t('foundation.editor.agent.reviewNotice')
             : t('foundation.editor.agent.connectionRequired')}</p>
         )}

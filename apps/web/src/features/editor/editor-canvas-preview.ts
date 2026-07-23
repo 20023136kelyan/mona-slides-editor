@@ -11,7 +11,14 @@ import {
   type InteractionRect,
   type ResizeHandle,
 } from '@mona/editor-interactions/geometry'
-import { createPresentationId, SHAPE_PATH_FORMULAS, type PresentationCommand } from '@mona/presentation-core'
+import {
+  createPresentationId,
+  detachElementTreeSources,
+  flattenElementTree,
+  remapElementTreeIds,
+  SHAPE_PATH_FORMULAS,
+  type PresentationCommand,
+} from '@mona/presentation-core'
 import type { PPTElement, PPTImageElement, PPTLineElement, PPTShapeElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
@@ -472,14 +479,15 @@ export const duplicatePreviewElements = (
   detachFromGroup = false,
 ): PPTElement[] => {
   const groupIds = new Map<string, string>()
-  return structuredClone(source).map(element => {
+  const duplicates = remapElementTreeIds(source, createPresentationId).elements
+  detachElementTreeSources(duplicates)
+  for (const element of flattenElementTree(duplicates)) {
     if (element.groupId && !groupIds.has(element.groupId)) groupIds.set(element.groupId, createPresentationId())
-    return {
-      ...element,
-      id: createPresentationId(),
-      groupId: detachFromGroup ? undefined : element.groupId ? groupIds.get(element.groupId) : undefined,
-    } as PPTElement
-  })
+  }
+  for (const element of flattenElementTree(duplicates)) {
+    element.groupId = detachFromGroup ? undefined : element.groupId ? groupIds.get(element.groupId) : undefined
+  }
+  return duplicates
 }
 
 export const materializeDuplicatePreview = (

@@ -1,15 +1,16 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 
+import { editorActions } from '@mona/editor-state'
 import { validateImportedSlides, type PresentationCommand } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
-import { sanitizeSlides } from '@/lib/deck-sanitizer'
+import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
 
 import { decryptNativePresentation } from '@/features/editor/editor-file-format'
 import { loadGoogleFonts } from '@/features/editor/editor-fonts'
 import { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
-import type { ParsedPptxPresentation } from '@/features/editor/editor-pptx-import'
+import type { PowerPointImportStage } from '@/features/editor/editor-pptx-worker-client'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
 
@@ -18,6 +19,7 @@ export type ImportFileType = 'json' | 'native' | 'pptx'
 export interface ImportRequestDetail {
   files: FileList | File[]
   options?: { cover?: boolean; fixedViewport?: boolean }
+  signal?: AbortSignal
   type: ImportFileType
 }
 
@@ -48,30 +50,46 @@ const isEmptyPresentation = (runtime: EditorRuntime) => {
   return slides.length === 1 && slides[0]?.elements.length === 0
 }
 
+const resetDocumentInteractionState = (runtime: EditorRuntime) => {
+  runtime.store.dispatch(editorActions.selectionChanged([]))
+  runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([]))
+  runtime.store.dispatch(editorActions.hiddenElementsChanged([]))
+  runtime.store.dispatch(editorActions.cropElementChanged(null))
+  runtime.store.dispatch(editorActions.activeToolChanged(null))
+  runtime.store.dispatch(editorActions.creatingCustomShapeChanged(false))
+  runtime.store.dispatch(editorActions.drawingModeChanged(false))
+}
+
 const replaceImportedPresentation = ({
-  cover,
   height,
   runtime,
   slides,
   theme,
   title,
   width,
-}: SerializedPresentation & { cover: boolean; runtime: EditorRuntime }) => {
+}: SerializedPresentation & { runtime: EditorRuntime }) => {
   const presentation = runtime.store.getState().presentation
-  const commands: PresentationCommand[] = []
-  if (cover) commands.push({ type: 'slide.focus', index: 0 })
+  const commands: PresentationCommand[] = [
+    { type: 'presentation.source-packages.replace', sourcePackages: [] },
+    { type: 'slide.focus', index: 0 },
+  ]
   commands.push({ type: 'presentation.slides.replace', slides, theme: theme ?? {} })
-  if (cover && title) commands.push({ type: 'presentation.title.set', fallbackTitle: title, title })
+  if (title !== undefined) commands.push({ type: 'presentation.title.set', fallbackTitle: '', title })
   const ratio = getImportedAspectRatio(width ?? 0, height ?? 0)
   if (ratio !== presentation.viewportRatio) commands.push({ type: 'presentation.viewport-ratio.set', ratio })
   if (width) commands.push({ type: 'presentation.viewport-size.set', size: width })
-  runtime.commit('Import presentation', commands, { recordHistory: false })
+  if (!runtime.commit('Import presentation', commands, { recordHistory: false })) {
+    throw new Error('Imported presentation was rejected')
+  }
+  resetDocumentInteractionState(runtime)
   runtime.recordHistorySnapshot('import-file')
 }
 
 const applySerializedPresentation = (runtime: EditorRuntime, serialized: SerializedPresentation, cover: boolean) => {
-  if (cover || isEmptyPresentation(runtime)) replaceImportedPresentation({ ...serialized, cover, runtime })
-  else runtime.insertImportedSlides(serialized.slides)
+  if (cover || isEmptyPresentation(runtime)) replaceImportedPresentation({ ...serialized, runtime })
+  else if (runtime.insertImportedSlides(serialized.slides).length !== serialized.slides.length) {
+    throw new Error('Imported slides were rejected')
+  }
 }
 
 
@@ -94,12 +112,21 @@ const importSerialized = async (runtime: EditorRuntime, file: File, type: 'json'
   applySerializedPresentation(runtime, serialized, cover)
 }
 
-const importPptx = async (runtime: EditorRuntime, file: File, t: TFunction, options: NonNullable<ImportRequestDetail['options']>) => {
-  const [{ parse }, { convertParsedPptxSlides }] = await Promise.all([
-    import('pptxtojson'),
+const importPptx = async (
+  runtime: EditorRuntime,
+  file: File,
+  t: TFunction,
+  options: NonNullable<ImportRequestDetail['options']>,
+  signal: AbortSignal,
+  onProgress: (stage: PowerPointImportStage) => void,
+) => {
+  const [{ convertParsedPptxPresentation }, { parsePowerPointPackage }] = await Promise.all([
     import('@/features/editor/editor-pptx-import'),
+    import('@/features/editor/editor-pptx-worker-client'),
   ])
-  const parsed = await parse(await readArrayBuffer(file), { audioMode: 'blob', imageMode: 'base64', videoMode: 'blob' }) as ParsedPptxPresentation
+  const bytes = await readArrayBuffer(file)
+  if (signal.aborted) throw Object.assign(new Error('PowerPoint import was cancelled'), { name: 'AbortError' })
+  const { backing, parsed } = await parsePowerPointPackage(bytes, file.name, { onProgress, signal })
   if (parsed.usedFonts.length) loadGoogleFonts(parsed.usedFonts)
   const presentation = runtime.store.getState().presentation
   const width = parsed.size.width
@@ -108,26 +135,63 @@ const importPptx = async (runtime: EditorRuntime, file: File, t: TFunction, opti
   const importedTheme = { ...presentation.theme, themeColors: parsed.themeColors }
   // The converter builds HTML out of pptx XML text runs, so its output goes
   // through the same sanitizer as directly imported markup.
-  const slides = sanitizeSlides(convertParsedPptxSlides({
+  const conversion = convertParsedPptxPresentation({
     coordinateLabel: number => t('chartData.coordinate', { number }),
     parsed,
     ratio,
+    sourceManifest: backing.manifest,
+    sourcePackage: backing.reference,
     theme: importedTheme,
-  }))
-  const commands: PresentationCommand[] = [{ type: 'presentation.theme.update', props: { themeColors: parsed.themeColors } }]
-  if (!options.fixedViewport) commands.push({ type: 'presentation.viewport-size.set', size: width * ratio })
-  runtime.commit('Import PowerPoint setup', commands, { recordHistory: false })
-  if (options.cover || isEmptyPresentation(runtime)) {
-    const latest = runtime.store.getState().presentation
-    const replace: PresentationCommand[] = []
-    if (options.cover) replace.push({ type: 'slide.focus', index: 0 })
-    replace.push({ type: 'presentation.slides.replace', slides })
-    const aspectRatio = getImportedAspectRatio(width, height)
-    if (aspectRatio !== latest.viewportRatio) replace.push({ type: 'presentation.viewport-ratio.set', ratio: aspectRatio })
-    runtime.commit('Import PowerPoint', replace, { recordHistory: false })
-    runtime.recordHistorySnapshot('import-file')
+  })
+  const slides = sanitizeSlides(conversion.slides)
+  const sourceReference = {
+    ...sanitizePowerPointPackageReference(conversion.sourcePackage ?? backing.reference),
+    importReport: conversion.report,
   }
-  else runtime.insertImportedSlides(slides)
+  const retainedBacking = {
+    ...backing,
+    manifest: {
+      ...backing.manifest,
+      importReport: conversion.report,
+    },
+    reference: sourceReference,
+  }
+  const replacing = options.cover || isEmptyPresentation(runtime)
+  const sourcePackages = replacing
+    ? [sourceReference]
+    : [
+        ...(presentation.sourcePackages ?? []).filter(source => source.packageId !== sourceReference.packageId),
+        sourceReference,
+      ]
+  const previousPackageIds = (presentation.sourcePackages ?? []).map(source => source.packageId)
+  await runtime.pptxBackingStore.persist(retainedBacking)
+  const commands: PresentationCommand[] = [
+    { type: 'presentation.source-packages.replace', sourcePackages },
+    { type: 'presentation.theme.update', props: { themeColors: parsed.themeColors } },
+  ]
+  if (!options.fixedViewport) commands.push({ type: 'presentation.viewport-size.set', size: width * ratio })
+  try {
+    if (replacing) {
+      const latest = runtime.store.getState().presentation
+      const replace: PresentationCommand[] = [...commands, { type: 'slide.focus', index: 0 }]
+      replace.push({ type: 'presentation.slides.replace', slides })
+      const aspectRatio = getImportedAspectRatio(width, height)
+      if (aspectRatio !== latest.viewportRatio) replace.push({ type: 'presentation.viewport-ratio.set', ratio: aspectRatio })
+      if (!runtime.commit('Import PowerPoint', replace, { recordHistory: false })) {
+        throw new Error('Imported PowerPoint was rejected')
+      }
+      resetDocumentInteractionState(runtime)
+      runtime.recordHistorySnapshot('import-file')
+    }
+    else if (runtime.insertImportedSlides(slides, commands).length !== slides.length) {
+      throw new Error('Imported PowerPoint was rejected')
+    }
+    await runtime.pptxBackingStore.retain(sourcePackages.map(source => source.packageId))
+  }
+  catch (error) {
+    await runtime.pptxBackingStore.retain(previousPackageIds).catch(() => {})
+    throw error
+  }
 }
 
 export function useEditorImport(
@@ -136,31 +200,56 @@ export function useEditorImport(
   notify: EditorNotificationService['notify'],
 ) {
   const [importing, setImporting] = useState(false)
+  const [importStage, setImportStage] = useState<PowerPointImportStage | null>(null)
+  const importInFlightRef = useRef(false)
+  const activeImportControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => {
+    activeImportControllerRef.current?.abort()
+  }, [])
 
   const importFiles = useCallback(async (request: ImportRequestDetail) => {
+    if (importInFlightRef.current) return
     const file = request.files[0]
     if (!file) return
+    const controller = new AbortController()
+    activeImportControllerRef.current = controller
+    const abortFromRequest = () => controller.abort()
+    request.signal?.addEventListener('abort', abortFromRequest, { once: true })
+    if (request.signal?.aborted) controller.abort()
+    importInFlightRef.current = true
+    setImporting(true)
     const cover = request.options?.cover ?? false
     try {
       if (request.type === 'pptx') {
-        setImporting(true)
         await importPptx(runtime, file, t, {
           cover,
           fixedViewport: request.options?.fixedViewport ?? false,
-        })
+        }, controller.signal, setImportStage)
       }
-      else await importSerialized(runtime, file, request.type, cover)
+      else {
+        if (controller.signal.aborted) throw Object.assign(new Error('Import was cancelled'), { name: 'AbortError' })
+        await importSerialized(runtime, file, request.type, cover)
+      }
     }
-    catch {
-      notify({ text: t('runtime.fileParseFailed'), type: 'error' })
+    catch (error) {
+      if (!(error instanceof Error) || error.name !== 'AbortError') {
+        notify({ text: t('runtime.fileParseFailed'), type: 'error' })
+      }
     }
     finally {
-      if (request.type === 'pptx') setImporting(false)
+      request.signal?.removeEventListener('abort', abortFromRequest)
+      if (activeImportControllerRef.current === controller) activeImportControllerRef.current = null
+      importInFlightRef.current = false
+      setImporting(false)
+      setImportStage(null)
     }
   }, [notify, runtime, t])
 
   return {
+    cancelImport: () => activeImportControllerRef.current?.abort(),
     importFiles,
+    importStage,
     importing,
   }
 }

@@ -24,7 +24,7 @@ import {
   EditorApplicationProvider,
 } from '@/features/editor/services/EditorApplicationProvider'
 import { EditorNotificationViewport } from '@/features/editor/services/EditorNotificationViewport'
-import type { EditorApplication } from '@/features/editor/services/editor-application'
+import type { EditorApplication, StartPresentationOptions } from '@/features/editor/services/editor-application'
 import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { isMobileUserAgent } from '@/features/mobile/mobile-device'
@@ -92,6 +92,7 @@ export function FoundationPage() {
   const [agentDockOpen, setAgentDockOpen] = useState(false)
   const audienceMode = new URLSearchParams(window.location.search).get('mode') === 'audience'
   const [screening, setScreening] = useState(audienceMode)
+  const [presentationLaunch, setPresentationLaunch] = useState<Pick<StartPresentationOptions, 'autoPlay' | 'viewMode'>>({})
   const presentationStartListenersRef = useRef(new Set<() => void>())
   const agentReturnFocusRef = useRef<HTMLElement | null>(null)
   const exportReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -140,7 +141,7 @@ export function FoundationPage() {
     presentationStartListenersRef.current.add(listener)
     return () => presentationStartListenersRef.current.delete(listener)
   }, [])
-  const startPresentation = useCallback(({ fromStart }: { fromStart: boolean }) => {
+  const startPresentation = useCallback(({ autoPlay = false, fromStart, viewMode = 'base' }: StartPresentationOptions) => {
     if (document.activeElement instanceof HTMLElement) {
       presentationReturnFocusRef.current = document.activeElement
     }
@@ -153,6 +154,7 @@ export function FoundationPage() {
     // Portaled editor surfaces must never float over the presentation.
     setExportType(null)
     setAgentDockOpen(false)
+    setPresentationLaunch({ autoPlay, viewMode })
     // Fullscreen remains in the synchronous user-gesture call stack.
     const root = document.documentElement
     if (root.requestFullscreen) void root.requestFullscreen().catch(() => {})
@@ -251,7 +253,7 @@ export function FoundationPage() {
       {documentTitle}
       {audienceMode ? (
         <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
-          <EditorErrorBoundary><ScreenView onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
+          <EditorErrorBoundary><ScreenView initialAutoPlay={presentationLaunch.autoPlay} initialViewMode={presentationLaunch.viewMode} onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
         </Suspense>
       ) : isMobileUserAgent() ? (
         <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
@@ -285,7 +287,7 @@ export function FoundationPage() {
           </Activity>
           {screening ? (
             <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
-              <EditorErrorBoundary><ScreenView onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
+              <EditorErrorBoundary><ScreenView initialAutoPlay={presentationLaunch.autoPlay} initialViewMode={presentationLaunch.viewMode} onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
             </Suspense>
           ) : null}
         </>

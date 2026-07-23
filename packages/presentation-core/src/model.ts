@@ -1,3 +1,5 @@
+import type { PowerPointElementSource, PowerPointSlideSource } from './source'
+
 export const enum ShapePathFormulasKeys {
   ROUND_RECT = 'roundRect',
   ROUND_RECT_DIAGONAL = 'roundRectDiagonal',
@@ -32,6 +34,8 @@ export const enum ElementTypes {
   LATEX = 'latex',
   VIDEO = 'video',
   AUDIO = 'audio',
+  GROUP = 'group',
+  OPAQUE = 'opaque',
 }
 
 /**
@@ -52,6 +56,12 @@ export interface Gradient {
   type: GradientType
   colors: GradientColor[]
   rotate: number
+}
+
+export interface PatternFill {
+  backgroundColor: string
+  foregroundColor: string
+  patternType: string
 }
 
 export type LineStyleType = 'solid' | 'dashed' | 'dotted'
@@ -131,7 +141,7 @@ export type TextAlignVertical = 'top' | 'middle' | 'bottom'
  *
  * name?: 元素名
  */
-interface PPTBaseElement {
+export interface PPTBaseElement {
   id: string
   left: number
   top: number
@@ -142,6 +152,7 @@ interface PPTBaseElement {
   rotate: number
   link?: PPTElementLink
   name?: string
+  source?: PowerPointElementSource
 }
 
 
@@ -303,6 +314,7 @@ export interface PPTImageElement extends PPTBaseElement {
   radius?: number
   colorMask?: string
   imageType?: ImageType
+  opacity?: number
 }
 
 /**
@@ -383,6 +395,7 @@ export interface PPTShapeElement extends PPTBaseElement {
   fill: string
   gradient?: Gradient
   pattern?: string
+  powerPointPattern?: PatternFill
   outline?: PPTElementOutline
   opacity?: number
   flipH?: boolean
@@ -444,8 +457,26 @@ export interface PPTLineElement extends Omit<PPTBaseElement, 'height' | 'rotate'
 export type ChartType = 'bar' | 'column' | 'line' | 'pie' | 'ring' | 'area' | 'radar' | 'scatter'
 
 export interface ChartOptions {
+  categoryAxisTitle?: string
+  gapWidth?: number
+  holeSize?: number
+  legendPosition?: 'bottom' | 'left' | 'right' | 'top'
   lineSmooth?: boolean
+  marker?: boolean
+  maximumValue?: number
+  minimumValue?: number
+  overlap?: number
+  percentStacked?: boolean
+  showCategoryName?: boolean
+  showDataLabels?: boolean
+  showLegend?: boolean
+  showMajorGridlines?: boolean
+  showSeriesName?: boolean
+  showValue?: boolean
+  seriesTypes?: ChartType[]
   stack?: boolean
+  title?: string
+  valueAxisTitle?: string
 }
 
 export interface ChartData {
@@ -537,6 +568,7 @@ export interface TableCellStyle {
  * style?: 单元格样式
  */
 export interface TableCell {
+  borders?: Partial<Record<'bottom' | 'left' | 'right' | 'top', PPTElementOutline>>
   id: string
   colspan: number
   rowspan: number
@@ -587,6 +619,7 @@ export interface PPTTableElement extends PPTBaseElement {
   colWidths: number[]
   cellMinHeight: number
   data: TableCell[][]
+  rowHeights?: number[]
 }
 
 
@@ -615,6 +648,7 @@ export interface PPTLatexElement extends PPTBaseElement {
   strokeWidth: number
   viewBox: [number, number]
   fixedRatio: boolean
+  fallbackImage?: string
 }
 
 /**
@@ -665,8 +699,49 @@ export interface PPTAudioElement extends PPTBaseElement {
   ext?: string
 }
 
+/**
+ * A native semantic group. Child geometry is expressed in the group's local
+ * coordinate space. coordinateWidth/coordinateHeight retain that coordinate
+ * space when the group itself is resized.
+ *
+ * groupId remains supported separately for Mona's legacy flat grouping model.
+ */
+export interface PPTGroupElement extends PPTBaseElement {
+  type: 'group'
+  elements: PPTElement[]
+  coordinateWidth: number
+  coordinateHeight: number
+  flipH?: boolean
+  flipV?: boolean
+  semanticType?: 'diagram' | 'group'
+}
 
-export type PPTElement = PPTTextElement | PPTImageElement | PPTShapeElement | PPTLineElement | PPTChartElement | PPTTableElement | PPTLatexElement | PPTVideoElement | PPTAudioElement
+/**
+ * A source-backed PowerPoint object that Mona cannot interpret semantically
+ * yet. It remains selectable and transformable while the original package
+ * bytes and OOXML identity stay available for future native patching/export.
+ */
+export interface PPTOpaqueElement extends PPTBaseElement {
+  type: 'opaque'
+  opaqueType: string
+  label?: string
+  preview?: string
+  relationshipIds?: string[]
+  reason?: string
+}
+
+export type PPTElement =
+  | PPTTextElement
+  | PPTImageElement
+  | PPTShapeElement
+  | PPTLineElement
+  | PPTChartElement
+  | PPTTableElement
+  | PPTLatexElement
+  | PPTVideoElement
+  | PPTAudioElement
+  | PPTGroupElement
+  | PPTOpaqueElement
 
 export type AnimationType = 'in' | 'out' | 'attention'
 export type AnimationTrigger = 'click' | 'meantime' | 'auto'
@@ -695,8 +770,8 @@ export interface PPTAnimation {
   trigger: AnimationTrigger
 }
 
-export type SlideBackgroundType = 'solid' | 'image' | 'gradient'
-export type SlideBackgroundImageSize = 'cover' | 'contain' | 'repeat'
+export type SlideBackgroundType = 'solid' | 'image' | 'gradient' | 'pattern'
+export type SlideBackgroundImageSize = 'cover' | 'contain' | 'repeat' | 'stretch'
 export interface SlideBackgroundImage {
   src: string
   size: SlideBackgroundImageSize,
@@ -718,6 +793,7 @@ export interface SlideBackground {
   color?: string
   image?: SlideBackgroundImage
   gradient?: Gradient
+  pattern?: PatternFill
 }
 
 
@@ -778,6 +854,7 @@ export interface Slide {
   turningMode?: TurningMode
   sectionTag?: SectionTag
   type?: SlideType
+  source?: PowerPointSlideSource
 }
 
 /**

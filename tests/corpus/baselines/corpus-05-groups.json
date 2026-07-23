@@ -2,16 +2,17 @@
   "fixture": "corpus-05-groups.pptx",
   "imported": {
     "elementTypes": {
+      "group": 3,
       "shape": 6,
       "text": 2
     },
-    "elements": 8,
-    "groupedElements": 0,
-    "groups": 0,
+    "elements": 11,
+    "groupedElements": 7,
+    "groups": 3,
     "hyperlinks": 0,
     "lockedElements": 0,
     "notesSlides": 0,
-    "rotatedElements": 3,
+    "rotatedElements": 1,
     "slides": 1,
     "title": "Untitled presentation",
     "viewportRatio": 0.5625,
@@ -19,7 +20,7 @@
   },
   "parserGaps": {
     "nativeChartsNotEditable": 0,
-    "nativeGroupsNotRepresented": 3,
+    "nativeGroupsNotRepresented": 0,
     "nativeSmartArtNotEditable": 0,
     "nativeTableCountDifference": 0,
     "notesSlideCountDifference": 0

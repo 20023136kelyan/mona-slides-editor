@@ -176,23 +176,24 @@ test('supports grouped selection, create gestures, context settings, clipboard, 
   await canvas.press('Control+z')
   await expect.poll(() => page.locator('.mona-render-stage [data-element-id]').count()).toBe(elementCount + 2)
 
-  // Deselect on blank stage: derive the point from the live stage box — the
-  // chrome around the stage (context bar, status bar) changes its height.
-  const canvasBox = await canvas.boundingBox()
-  await canvas.click({ position: { x: 450, y: canvasBox!.height - 30 } })
+  // Deselect on the slide's blank top-right corner. The filmstrip can float
+  // over the lower stage/slide at compact heights, so lower coordinates are
+  // intentionally not safe pointer targets.
+  const slide = page.locator('.mona-editor-slide-canvas')
+  const deselectSlideBox = await slide.boundingBox()
+  await slide.click({ position: { x: deselectSlideBox!.width - 20, y: 20 } })
   await page.keyboard.press('r')
   await expect(canvas).toHaveAttribute('data-active-tool', 'shape')
-  const slide = page.locator('.mona-editor-slide-canvas')
   const slideBox = await slide.boundingBox()
   const beforeCreate = await page.locator('.mona-render-stage [data-element-id]').count()
-  await page.mouse.move(slideBox!.x + 25, slideBox!.y + slideBox!.height - 65)
+  await page.mouse.move(slideBox!.x + 10, slideBox!.y + 10)
   await page.mouse.down()
-  await page.mouse.move(slideBox!.x + 125, slideBox!.y + slideBox!.height - 20, { steps: 3 })
+  await page.mouse.move(slideBox!.x + 45, slideBox!.y + 40, { steps: 3 })
   await page.mouse.up()
   await expect.poll(() => page.locator('.mona-render-stage [data-element-id]').count()).toBe(beforeCreate + 1)
   await expect(canvas).toHaveAttribute('data-active-tool', 'select')
 
-  const blankCanvasPoint = { x: slideBox!.width - 20, y: slideBox!.height - 20 }
+  const blankCanvasPoint = { x: slideBox!.width - 20, y: 20 }
   await slide.click({ button: 'right', position: blankCanvasPoint })
   await expect(page.getByRole('menu', { name: 'Canvas menu' })).toBeVisible()
   await page.getByRole('menuitem', { name: 'Grid lines' }).hover()

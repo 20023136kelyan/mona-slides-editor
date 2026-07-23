@@ -1,6 +1,6 @@
 # Mona release hardening record
 
-Last reviewed: 2026-07-23
+Last reviewed: 2026-07-24
 
 This file records the security and stability decisions that are easy to lose
 when looking only at a package-manager vulnerability count. It is not a claim

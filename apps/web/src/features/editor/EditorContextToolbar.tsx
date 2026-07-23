@@ -97,7 +97,7 @@ export function EditorContextToolbar({
     <div
       aria-label={t('foundation.editor.inspector')}
       aria-keyshortcuts="Control+F1 Meta+F1"
-      className="mona-editor-contextbar"
+      className="mona-editor-contextbar absolute top-5 right-0 left-0 z-30 flex min-w-0 items-center gap-2.5 bg-transparent px-3 pointer-events-none"
       data-contextual-mode={capabilities.mode}
       data-selection-kind={capabilities.selectionKind}
       onKeyDown={moveToolbarFocus}
@@ -105,8 +105,8 @@ export function EditorContextToolbar({
       role="toolbar"
       tabIndex={-1}
     >
-      <div className="mona-contextual-command-lane">
-        <div className="mona-contextual-toolbar-group">
+      <div className="mona-contextual-command-lane flex min-w-0 flex-1 items-center justify-start overflow-visible">
+        <div className="mona-contextual-toolbar-group pointer-events-auto mx-auto flex h-10 w-max max-w-full flex-none items-center overflow-x-auto rounded-[var(--radius-overlay)] bg-white px-1.5 shadow-[0_0_0_0.5px_rgb(64_79_109/7%),0_2px_5px_0_rgb(21_30_130/12%),0_6px_12px_0_rgb(21_30_130/6%)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ContextualPrimaryControls context={context} />
           <ContextualDeepActions capabilities={capabilities} onOpenInspector={onOpenInspector} />
         </div>

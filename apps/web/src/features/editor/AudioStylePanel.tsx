@@ -13,20 +13,20 @@ export function AudioStylePanel({ element, runtime }: { element: PPTAudioElement
   }])
   return (
     <div className="mona-audio-style-panel">
-      <div className="mona-panel-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.media.iconColor')}</div>
-        <div className="mona-panel-row-control">
+      <div className="flex w-full items-center mb-2.5">
+        <div className="w-[48%] text-xs">{t('foundation.editor.media.iconColor')}</div>
+        <div className="w-[52%] [&>*]:w-full">
           <InspectorColorButton ariaLabel={t('foundation.editor.media.iconColor')} color={element.color} onChange={color => update({ color })} />
         </div>
       </div>
       <div className="mona-panel-row mona-media-switch-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.media.autoplay')}</div>
+        <div className="w-[48%] text-xs">{t('foundation.editor.media.autoplay')}</div>
         <div className="mona-panel-row-control mona-panel-switch-wrapper">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.autoplay')} checked={element.autoplay} onChange={autoplay => update({ autoplay })} />
         </div>
       </div>
       <div className="mona-panel-row mona-media-switch-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.media.loop')}</div>
+        <div className="w-[48%] text-xs">{t('foundation.editor.media.loop')}</div>
         <div className="mona-panel-row-control mona-panel-switch-wrapper">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.loop')} checked={element.loop} onChange={loop => update({ loop })} />
         </div>

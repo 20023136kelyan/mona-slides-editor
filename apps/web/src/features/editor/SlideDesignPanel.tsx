@@ -376,12 +376,12 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
         </div>
       ) : null}
       <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyBackgroundAll')} onClick={applyBackgroundAll} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyBackgroundAll')}</InspectorButton></div>
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <div className="mona-design-row-full"><InspectorSelect ariaLabel={t('designPanel.customCanvas')} onChange={value => {
         if (value === 'custom') setViewportOpen(true); else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { historyKey: 'slide-design-viewport' }) 
       }} options={ratioOptions} value={ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'} /></div>
       <div className="mona-design-canvas-size">{canvasSize}</div>
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <div className="mona-design-title"><span>{t('designPanel.globalTheme')}</span><Button className="mona-design-more" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
       <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
       <DesignRow label={`${t('common.fontColor')}:`}><InspectorColorButton ariaLabel={t('common.fontColor')} color={presentation.theme.fontColor} onChange={fontColor => updateTheme({ fontColor })} /></DesignRow>
@@ -401,7 +401,7 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyThemeAll')} onClick={() => runtime.commit('Apply theme to all slides', [{ type: 'presentation.slides.replace', slides: applyThemeToSlides(presentation.slides, presentation.theme, more) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyThemeAll')}</InspectorButton></div>
       <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyFontAll')} onClick={() => runtime.commit('Apply font to all slides', [{ type: 'presentation.slides.replace', slides: applyFontToSlides(presentation.slides, presentation.theme.fontName) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyFontAll')}</InspectorButton></div>
       <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.extractTheme')} onClick={() => setThemeExtractOpen(true)} style={{ width: '100%' }}><PaletteIcon /> {t('designPanel.extractTheme')}</InspectorButton></div>
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <div className="mona-design-title">{t('designPanel.presetThemes')}</div>
       <div className="mona-preset-theme-list">
         {PRESET_THEMES.map((preset, index) => (

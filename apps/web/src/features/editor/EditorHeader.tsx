@@ -15,6 +15,8 @@ import {
   LoaderCircle,
   MessageSquare,
   MonitorPlay,
+  PanelsTopLeft,
+  Play,
   Redo2,
   Search,
   Settings,
@@ -55,11 +57,13 @@ import { InspectorSelect } from '@/features/editor/EditorInspectorPrimitives'
 import type { ExportDialogType } from '@/features/editor/EditorExportDialog'
 import type { DeckPersistenceSnapshot } from '@/features/editor/editor-persistence'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import type { StartPresentationOptions } from '@/features/editor/services/editor-application'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorShell } from '@/features/editor/shell/editor-shell'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { LOCALES, isSupportedLocale, setLocale, type SupportedLocale } from '@/i18n'
 import { LEGACY_NATIVE_FILE_EXTENSION } from '@/lib/legacy-compatibility'
+import { cn } from '@/lib/utils'
 
 type OpenPopover = 'file' | 'view' | 'tools' | 'screen' | 'save' | 'settings' | null
 
@@ -72,6 +76,8 @@ const EMPTY_PERSISTENCE_SNAPSHOT: DeckPersistenceSnapshot = {
 }
 const subscribeToNothing = () => () => {}
 const getEmptyPersistenceSnapshot = () => EMPTY_PERSISTENCE_SNAPSHOT
+
+const headerMenuItemClass = 'flex w-full min-w-[120px] items-center gap-2.5 whitespace-nowrap rounded-[var(--radius-control)] px-2 py-2 text-[13px] min-h-10 [&_svg]:size-[17px] [&_svg]:text-muted-foreground'
 
 function HeaderMenuItem({
   disabled = false,
@@ -90,13 +96,13 @@ function HeaderMenuItem({
 }) {
   return (
     <DropdownMenuItem
-      className="mona-header-popover-menu-item"
+      className={headerMenuItemClass}
       disabled={disabled}
       onSelect={onSelect}
       variant={variant}
     >
       {icon}
-      <span className="mona-header-menu-label">{label}</span>
+      <span className="relative top-px flex-1">{label}</span>
       {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
     </DropdownMenuItem>
   )
@@ -108,7 +114,6 @@ function HeaderMenu({
   menu,
   open,
   onOpenChange,
-  onTriggerKeyDown,
   triggerRef,
 }: {
   children: ReactNode
@@ -116,15 +121,19 @@ function HeaderMenu({
   menu: Exclude<OpenPopover, null>
   open: OpenPopover
   onOpenChange: (menu: Exclude<OpenPopover, null>, open: boolean) => void
-  onTriggerKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void
   triggerRef?: Ref<HTMLButtonElement>
 }) {
   return (
     <DropdownMenu onOpenChange={value => onOpenChange(menu, value)} open={open === menu}>
       <DropdownMenuTrigger asChild>
-        <Button className="mona-header-menu-trigger" data-header-menu-trigger onKeyDown={onTriggerKeyDown} ref={triggerRef} size="editor" variant="ghost">{label}</Button>
+        <Button
+          className="mona-header-menu-trigger h-10 min-h-10 min-w-10 rounded-[var(--radius-action)] px-2.5 text-[13px] text-foreground hover:bg-foreground/[0.06] data-[state=open]:bg-foreground/[0.08] max-[1160px]:px-1.5 max-[680px]:px-1"
+          ref={triggerRef}
+          size="editor"
+          variant="ghost"
+        >{label}</Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="mona-header-popover mona-header-menu-content" sideOffset={6}>
+      <DropdownMenuContent align="start" className="min-w-60 rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={6}>
         {children}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -137,6 +146,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
     agentOpen,
     closeAgent,
     importFiles,
+    importing,
     openAgent,
     openExport,
     persistence,
@@ -160,7 +170,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
   const titleInputRef = useRef<HTMLInputElement>(null)
   const titleCancelledRef = useRef(false)
   const fileMenuTriggerRef = useRef<HTMLButtonElement>(null)
-  const menuBarRef = useRef<HTMLElement>(null)
+  const menuBarRef = useRef<HTMLDivElement>(null)
   const pptxInputRef = useRef<HTMLInputElement>(null)
   const jsonInputRef = useRef<HTMLInputElement>(null)
   const nativeInputRef = useRef<HTMLInputElement>(null)
@@ -174,10 +184,20 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
   const setMenuOpen = (menu: Exclude<OpenPopover, null>, open: boolean) => {
     setOpenPopover(current => open ? menu : current === menu ? null : current)
   }
-  const moveMenuFocus = (event: KeyboardEvent<HTMLButtonElement>) => {
+  const moveMenuFocus = (event: KeyboardEvent<HTMLElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'End', 'Home'].includes(event.key)) return
-    const current = event.currentTarget
-    const triggers = Array.from(menuBarRef.current?.querySelectorAll<HTMLButtonElement>('[data-header-menu-trigger]') ?? [])
+    if (
+      event.target === titleInputRef.current
+      && editingTitle
+      && (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End')
+    ) return
+    const current = (event.target as HTMLElement).closest<HTMLElement>('button, input')
+    if (!current) return
+    const triggers = Array.from(
+      menuBarRef.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input.mona-editor-header-title-input',
+      ) ?? [],
+    ).filter(control => control.offsetParent !== null)
     const index = triggers.indexOf(current)
     if (index === -1 || !triggers.length) return
     event.preventDefault()
@@ -254,8 +274,11 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
     requestAnimationFrame(() => fileMenuTriggerRef.current?.focus())
   }
 
-  const requestScreen = (fromStart: boolean) => {
-    startPresentation({ fromStart })
+  const requestScreen = (
+    fromStart: boolean,
+    options: Omit<StartPresentationOptions, 'fromStart'> = {},
+  ) => {
+    startPresentation({ fromStart, ...options })
     setOpenPopover(null)
   }
 
@@ -285,36 +308,44 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
   return (
     <>
       <a
-        className="mona-skip-link"
+        className="mona-skip-link fixed top-2 left-2 z-[6000] rounded-[var(--radius-control)] bg-foreground px-3.5 py-2.5 text-[13px] font-bold text-background opacity-0 pointer-events-none -translate-y-[150%] transition-[transform,opacity] duration-120 focus:opacity-100 focus:pointer-events-auto focus:translate-y-0 focus:outline-2 focus:outline-ring focus:outline-offset-2"
         href="#mona-editor-canvas"
         onClick={event => {
           event.preventDefault()
           document.getElementById('mona-editor-canvas')?.focus()
         }}
       >{t('header.skipToCanvas')}</a>
-      <header aria-label={t('header.editorHeader')} className="mona-editor-header">
-        <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left">
-          <div aria-label="Mona" className="mona-header-wordmark">
-            <img alt="" aria-hidden="true" className="mona-header-logo" src="/favicon.svg" />
+      <header aria-label={t('header.editorHeader')} role="banner">
+      <div
+        aria-label={t('header.menuBar')}
+        className="mona-editor-header relative grid h-14 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center border-b border-border bg-background px-3 text-foreground leading-normal select-none max-[1160px]:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] max-[1160px]:px-2 max-[900px]:grid-cols-[max-content_minmax(0,1fr)_max-content] max-[680px]:px-1"
+        onKeyDown={moveMenuFocus}
+        ref={menuBarRef}
+        role="menubar"
+        tabIndex={-1}
+      >
+        <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left m-0 flex min-w-0 items-center gap-1.5 border-0 p-0 justify-self-start max-[900px]:gap-0">
+          <div aria-label="Mona" className="mr-2.5 flex flex-none items-center gap-2 text-lg font-bold tracking-tight text-foreground max-[1160px]:mr-1.5 max-[680px]:hidden">
+            <img alt="" aria-hidden="true" className="size-5 flex-none" src="/favicon.svg" />
             <span>Mona</span>
           </div>
-          <nav aria-label={t('header.menuBar')} className="mona-header-menubar" ref={menuBarRef}>
-            <input accept="application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-label={t('header.importPptx')} className="mona-visually-hidden" onChange={event => requestImport('pptx', event)} ref={pptxInputRef} type="file" />
-            <input accept=".json" aria-label={t('header.importJson')} className="mona-visually-hidden" onChange={event => requestImport('json', event)} ref={jsonInputRef} type="file" />
-            <input accept={`.mona,${LEGACY_NATIVE_FILE_EXTENSION}`} aria-label={t('header.importNative')} className="mona-visually-hidden" onChange={event => requestImport('native', event)} ref={nativeInputRef} type="file" />
-            <HeaderMenu label={t('header.menuFile')} menu="file" onOpenChange={setMenuOpen} onTriggerKeyDown={moveMenuFocus} open={openPopover} triggerRef={fileMenuTriggerRef}>
-              <HeaderMenuItem icon={<FilePlus2 />} label={t('header.newPresentation')} onSelect={() => setResetDialogOpen(true)} />
-              <DropdownMenuSeparator className="mona-header-divider" />
-              <HeaderMenuItem icon={<FileType2 />} label={t('header.importPptx')} onSelect={() => pptxInputRef.current?.click()} />
-              <HeaderMenuItem icon={<FileArchive />} label={t('header.importNative')} onSelect={() => nativeInputRef.current?.click()} />
-              <HeaderMenuItem icon={<FileJson />} label={t('header.importJson')} onSelect={() => jsonInputRef.current?.click()} />
-              <DropdownMenuSeparator className="mona-header-divider" />
+          <nav aria-label={t('header.menuBar')} className="flex min-w-0 items-center gap-px">
+            <input accept="application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-hidden="true" hidden onChange={event => requestImport('pptx', event)} ref={pptxInputRef} tabIndex={-1} type="file" />
+            <input accept=".json" aria-hidden="true" hidden onChange={event => requestImport('json', event)} ref={jsonInputRef} tabIndex={-1} type="file" />
+            <input accept={`.mona,${LEGACY_NATIVE_FILE_EXTENSION}`} aria-hidden="true" hidden onChange={event => requestImport('native', event)} ref={nativeInputRef} tabIndex={-1} type="file" />
+            <HeaderMenu label={t('header.menuFile')} menu="file" onOpenChange={setMenuOpen} open={openPopover} triggerRef={fileMenuTriggerRef}>
+              <HeaderMenuItem disabled={importing} icon={<FilePlus2 />} label={t('header.newPresentation')} onSelect={() => setResetDialogOpen(true)} />
+              <DropdownMenuSeparator className="my-1.5 bg-border" />
+              <HeaderMenuItem disabled={importing} icon={<FileType2 />} label={t('header.importPptx')} onSelect={() => pptxInputRef.current?.click()} />
+              <HeaderMenuItem disabled={importing} icon={<FileArchive />} label={t('header.importNative')} onSelect={() => nativeInputRef.current?.click()} />
+              <HeaderMenuItem disabled={importing} icon={<FileJson />} label={t('header.importJson')} onSelect={() => jsonInputRef.current?.click()} />
+              <DropdownMenuSeparator className="my-1.5 bg-border" />
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="mona-header-popover-menu-item">
+                <DropdownMenuSubTrigger className={headerMenuItemClass}>
                   <Download />
-                  <span className="mona-header-menu-label">{t('header.exportFile')}</span>
+                  <span className="relative top-px flex-1">{t('header.exportFile')}</span>
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="mona-header-popover mona-header-export-submenu">
+                <DropdownMenuSubContent className="min-w-[210px] rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]">
                   <HeaderMenuItem icon={<FileSliders />} label={t('header.exportPptx')} onSelect={() => requestExport('pptx')} />
                   <HeaderMenuItem icon={<FileType2 />} label={t('header.exportPdf')} onSelect={() => requestExport('pdf')} />
                   <HeaderMenuItem icon={<Image />} label={t('header.exportImage')} onSelect={() => requestExport('image')} />
@@ -323,53 +354,56 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             </HeaderMenu>
-            <HeaderMenu label={t('header.menuView')} menu="view" onOpenChange={setMenuOpen} onTriggerKeyDown={moveMenuFocus} open={openPopover}>
+            <HeaderMenu label={t('header.menuView')} menu="view" onOpenChange={setMenuOpen} open={openPopover}>
               <HeaderMenuItem icon={<MessageSquare />} label={t('foundation.editor.canvasTool.comments')} onSelect={() => openTaskPanel('comments')} />
               <HeaderMenuItem icon={<FileSliders />} label={t('foundation.editor.canvasTool.selectionPane')} onSelect={() => openTaskPanel('layers')} />
-              <DropdownMenuSeparator className="mona-header-divider" />
+              <DropdownMenuSeparator className="my-1.5 bg-border" />
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromBeginning')} onSelect={() => requestScreen(true)} shortcut="F5" />
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromCurrentSlide')} onSelect={() => requestScreen(false)} shortcut="⇧F5" />
             </HeaderMenu>
-            <HeaderMenu label={t('header.menuTools')} menu="tools" onOpenChange={setMenuOpen} onTriggerKeyDown={moveMenuFocus} open={openPopover}>
+            <HeaderMenu label={t('header.menuTools')} menu="tools" onOpenChange={setMenuOpen} open={openPopover}>
               <HeaderMenuItem icon={<Search />} label={t('foundation.editor.canvasTool.findReplace')} onSelect={() => openTaskPanel('search')} shortcut="⌃F" />
               <HeaderMenuItem icon={<FileSliders />} label={t('header.markSlideTypes')} onSelect={() => openTaskPanel('semantics')} />
-              <DropdownMenuSeparator className="mona-header-divider" />
+              <DropdownMenuSeparator className="my-1.5 bg-border" />
               <HeaderMenuItem icon={<Settings />} label={t('header.keyboardShortcuts')} onSelect={() => {
                 setOpenPopover(null)
                 setHotkeysOpen(true)
               }} />
             </HeaderMenu>
           </nav>
-          <div aria-hidden="true" className="mona-header-divider-bar" />
-          <Button aria-label={t('foundation.editor.canvasTool.undo')} className="mona-editor-header-item" disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="editor-icon" title={t('foundation.editor.canvasTool.undo')} variant="ghost"><Undo2 className="mona-editor-header-icon" /></Button>
-          <Button aria-label={t('foundation.editor.canvasTool.redo')} className="mona-editor-header-item" disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="editor-icon" title={t('foundation.editor.canvasTool.redo')} variant="ghost"><Redo2 className="mona-editor-header-icon" /></Button>
+          <div aria-hidden="true" className="mx-1.5 h-5 w-px flex-none bg-border max-[900px]:mx-0.5" />
+          <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 className="text-foreground/80" /></Button>
+          <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 className="text-foreground/80" /></Button>
           {persistence ? <Popover onOpenChange={open => setMenuOpen('save', open)} open={openPopover === 'save'}>
             <PopoverTrigger asChild>
               <Button
                 aria-label={saveLabel}
-                className={`mona-header-save-status is-${persistenceSnapshot.status}`}
+                className={cn(
+                  'h-10 min-w-10 gap-1.5 px-2 text-xs font-medium text-muted-foreground max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden',
+                  persistenceSnapshot.status === 'error' && 'text-destructive',
+                )}
                 size="sm"
                 variant="ghost"
               >
-                {persistenceSnapshot.status === 'saving' ? <LoaderCircle className="animate-spin" /> : persistenceSnapshot.status === 'error' ? <CircleAlert /> : <Check />}
+                {persistenceSnapshot.status === 'saving' ? <LoaderCircle className="size-3.5 animate-spin" /> : persistenceSnapshot.status === 'error' ? <CircleAlert className="size-3.5" /> : <Check className="size-3.5" />}
                 <span aria-live="polite">{saveLabel}</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="mona-header-popover mona-save-status-popover" sideOffset={8}>
-              <div className="mona-save-status-title">{saveLabel}</div>
-              <p>{persistenceSnapshot.status === 'error' ? persistenceSnapshot.error : t('header.localSaveDescription')}</p>
-              {savedAt ? <p>{t('header.lastSavedAt', { time: savedAt })}</p> : null}
+            <PopoverContent aria-label={saveLabel} align="start" className="w-[280px] rounded-[var(--radius-overlay)] p-3.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
+              <div className="text-sm font-bold text-foreground">{saveLabel}</div>
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{persistenceSnapshot.status === 'error' ? persistenceSnapshot.error : t('header.localSaveDescription')}</p>
+              {savedAt ? <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{t('header.lastSavedAt', { time: savedAt })}</p> : null}
               {persistenceSnapshot.status === 'error' ? (
-                <Button onClick={() => void persistence.retry()} size="sm" variant="outline">{t('header.retrySave')}</Button>
+                <Button className="mt-3" onClick={() => void persistence.retry()} size="sm" variant="outline">{t('header.retrySave')}</Button>
               ) : null}
             </PopoverContent>
           </Popover> : null}
         </fieldset>
 
-        <div className="mona-editor-header-center">
+        <div className="mona-editor-header-center w-full min-w-0 px-4 max-[900px]:px-1">
           <Input
             aria-label={t('header.presentationTitle')}
-            className="mona-editor-header-title-input"
+            className="mona-editor-header-title-input h-10 w-full rounded-[var(--radius-control)] border border-transparent bg-transparent px-3 text-center text-sm font-semibold text-foreground text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text placeholder:font-medium placeholder:text-muted-foreground placeholder:opacity-100"
             onBlur={commitTitle}
             onChange={event => setTitleValue(event.target.value)}
             onFocus={beginTitleEdit}
@@ -392,45 +426,69 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
           />
         </div>
 
-        <fieldset aria-label={t('header.presentationControls')} className="mona-editor-header-right">
+        <fieldset aria-label={t('header.presentationControls')} className="mona-editor-header-right m-0 flex min-w-0 items-center gap-1.5 border-0 p-0 justify-self-end max-[900px]:gap-0">
           <Button
             aria-label={t('header.comments')}
             aria-pressed={taskPanelRoute === 'comments'}
-            className={`mona-editor-header-item${taskPanelRoute === 'comments' ? ' is-active' : ''}`}
             onClick={event => toggleTaskPanel('comments', event.currentTarget)}
-            size="editor-icon"
+            size="header-icon"
             title={t('header.comments')}
-            variant="ghost"
-          ><MessageSquare className="mona-editor-header-icon" /></Button>
+            variant="header-pill"
+          ><MessageSquare className={cn('text-foreground/80', taskPanelRoute === 'comments' && 'text-[var(--editor-selection)]')} /></Button>
           <DropdownMenu onOpenChange={open => setMenuOpen('screen', open)} open={openPopover === 'screen'}>
-            <ButtonGroup className="mona-header-screen-group">
-              <Button aria-label={t('header.startSlideshow')} className="mona-present-main" onClick={() => requestScreen(false)} size="sm" title={t('header.startSlideshow')} variant="ghost"><MonitorPlay /><span>{t('header.present')}</span></Button>
+            <ButtonGroup className="h-10 overflow-hidden rounded-[var(--radius-action)] bg-background shadow-[inset_0_0_0_1px_var(--border)] max-[900px]:mx-0.5">
+              <Button
+                aria-label={t('header.startSlideshow')}
+                className="h-full gap-1.5 rounded-none px-3 text-[13px] font-semibold text-foreground/80 hover:bg-foreground/5 hover:text-foreground max-[900px]:px-2 max-[680px]:w-10 max-[680px]:px-0 max-[680px]:[&>span]:hidden [&_svg]:size-[15px]"
+                onClick={() => requestScreen(false)}
+                size="sm"
+                title={t('header.startSlideshow')}
+                variant="ghost"
+              ><MonitorPlay /><span>{t('header.present')}</span></Button>
               <DropdownMenuTrigger asChild>
-                <Button aria-label={t('header.slideshowOptions')} className="mona-present-arrow" size="sm" variant="ghost"><ChevronDown /></Button>
+                <Button aria-label={t('header.slideshowOptions')} className="h-full w-10 rounded-none border-l border-border p-0 text-foreground/70 hover:bg-foreground/5 hover:text-foreground data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground [&_svg]:size-[15px]" size="sm" variant="ghost"><ChevronDown /></Button>
               </DropdownMenuTrigger>
             </ButtonGroup>
-            <DropdownMenuContent align="center" className="mona-header-popover mona-header-screen-menu" sideOffset={8}>
+            <DropdownMenuContent align="center" className="w-max rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromBeginning')} onSelect={() => requestScreen(true)} shortcut="F5" />
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromCurrentSlide')} onSelect={() => requestScreen(false)} shortcut="⇧F5" />
+              <HeaderMenuItem icon={<PanelsTopLeft />} label={t('screen.presenterView')} onSelect={() => requestScreen(false, { viewMode: 'presenter' })} />
+              <HeaderMenuItem icon={<Play />} label={t('screen.autoPlay')} onSelect={() => requestScreen(false, { autoPlay: true })} />
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button aria-expanded={agentOpen} aria-label={t('header.generateWithAI')} className={`mona-editor-header-item mona-header-ai-button${agentOpen ? ' is-active' : ''}`} onClick={() => {
-            if (agentOpen) closeAgent()
-            else openAgent()
-            setOpenPopover(null)
-          }} size="editor" title={t('header.generateWithAI')} variant="ghost"><Sparkles /><span>{t('header.ai')}</span></Button>
-          <Button aria-label={t('header.export')} className="mona-header-export-button" onClick={() => requestExport('pptx')} size="sm" title={t('header.export')} variant="default"><Download /><span>{t('header.export')}</span></Button>
+          <Button
+            aria-expanded={agentOpen}
+            aria-label={t('header.generateWithAI')}
+            aria-pressed={agentOpen}
+            className="max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden"
+            onClick={() => {
+              if (agentOpen) closeAgent()
+              else openAgent()
+              setOpenPopover(null)
+            }}
+            size="header-pill"
+            title={t('header.generateWithAI')}
+            variant="header-pill"
+          ><Sparkles className={cn(agentOpen && 'text-[var(--editor-selection)]')} /><span className="text-[13px] font-medium">{t('header.ai')}</span></Button>
+          <Button
+            aria-label={t('header.export')}
+            className="h-10 min-w-10 gap-1.75 rounded-[var(--radius-action)] px-3.5 max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden [&_svg]:size-4"
+            onClick={() => requestExport('pptx')}
+            size="sm"
+            title={t('header.export')}
+            variant="default"
+          ><Download /><span>{t('header.export')}</span></Button>
           <Popover onOpenChange={open => setMenuOpen('settings', open)} open={openPopover === 'settings'}>
             <PopoverTrigger asChild>
-              <Button aria-label={t('header.settings')} className="mona-editor-header-item" size="editor-icon" title={t('header.settings')} variant="ghost"><Settings className="mona-editor-header-icon" /></Button>
+              <Button aria-label={t('header.settings')} size="header-icon" title={t('header.settings')} variant="header-pill"><Settings className="text-foreground/80" /></Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="mona-header-popover mona-header-settings-menu" sideOffset={8}>
-              <div className="mona-header-settings-title"><Settings /><span>{t('header.settings')}</span></div>
-              <div className="mona-header-settings-row">
-                <span>{t('locale.language')}</span>
+            <PopoverContent aria-label={t('header.settings')} align="end" className="w-[272px] rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
+              <div className="flex items-center gap-2 border-b border-border px-0.5 pt-0.5 pb-2.5 text-sm font-bold"><Settings className="size-4" /><span>{t('header.settings')}</span></div>
+              <div className="flex items-center gap-4 pt-3">
+                <span className="flex-1 text-muted-foreground">{t('locale.language')}</span>
                 <InspectorSelect
                   ariaLabel={t('locale.language')}
-                  className="mona-header-locale-select"
+                  className="h-[30px] w-[140px] flex-none border-transparent hover:bg-muted"
                   icon={<Languages />}
                   onChange={locale => {
                     if (isSupportedLocale(locale)) void setLocale(locale)
@@ -442,6 +500,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
             </PopoverContent>
           </Popover>
         </fieldset>
+      </div>
       </header>
 
       <AlertDialog onOpenChange={open => {

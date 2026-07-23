@@ -37,10 +37,11 @@ export function EditorMediaContextControls({ element, runtime }: {
         <span aria-hidden="true" className="mona-contextual-kind-icon">{element.type === 'audio' ? <Music2 /> : <Video />}</span>
         <input
           accept={element.type === 'audio' ? 'audio/*' : 'video/*'}
-          aria-label={t('foundation.editor.contextual.replaceMedia')}
-          className="mona-visually-hidden"
+          aria-hidden="true"
+          hidden
           onChange={event => void replace(event)}
           ref={fileRef}
+          tabIndex={-1}
           type="file"
         />
         <Button className="mona-contextual-control is-labeled" onClick={() => fileRef.current?.click()} size="editor" type="button" variant="ghost">

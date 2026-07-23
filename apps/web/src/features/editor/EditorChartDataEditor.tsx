@@ -206,6 +206,10 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
                       <td className={(column === 0 && row < selectedRange[1]) || (row === 0 && column < selectedRange[0]) ? 'is-head' : ''} key={column}>
                         {row === 0 && column === 0 ? null : (
                           <input
+                            aria-label={t('foundation.editor.chartData.cell', {
+                              column: ALPHABET[column],
+                              row: row + 1,
+                            })}
                             autoComplete="off"
                             className={`mona-chart-data-item${row < selectedRange[1] && column < selectedRange[0] ? ' is-selected' : ''}`}
                             id={`mona-chart-cell-${row}-${column}`}
@@ -229,7 +233,7 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
               {t('foundation.editor.chartData.type', { type: t(`foundation.editor.chartTypes.${chartType}`) })}
               <Popover onOpenChange={setTypeMenuOpen} open={typeMenuOpen}>
                 <PopoverTrigger asChild><Button className="mona-chart-editor-change" size="xs" variant="link">{t('foundation.editor.chartData.change')}</Button></PopoverTrigger>
-                <PopoverContent align="center" className="mona-chart-type-menu is-data-editor" side="top" sideOffset={8}>
+                <PopoverContent aria-label={t('foundation.editor.chartData.change')} align="center" className="mona-chart-type-menu is-data-editor" side="top" sideOffset={8}>
                   {CHART_TYPES.map(type => <PopoverClose asChild key={type}><Button onClick={() => setChartType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button></PopoverClose>)}
                 </PopoverContent>
               </Popover>

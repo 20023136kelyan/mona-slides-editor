@@ -7,12 +7,18 @@
   line-height: normal;
   text-size-adjust: auto;
 }
+.mona-screen [data-slot="button"]:active { transform: none; }
 
 .mona-screen-base,
 .mona-screen-main-surface,
 .mona-screen-audience {
   width: 100%;
   height: 100%;
+}
+.mona-screen-main-surface:focus-visible,
+.mona-screen-presenter-slide-wrap:focus-visible {
+  outline: 3px solid var(--editor-selection);
+  outline-offset: -3px;
 }
 .mona-screen-audience { position: relative; background: #1d1d1d; }
 
@@ -196,7 +202,12 @@
   z-index: 99;
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
   background-color: #1a1a1a;
+  padding: 0;
 }
 .mona-screen-all-slides-return { height: 60px; padding: 20px 30px 0; }
 .mona-screen-all-slides-return svg { color: #fff; font-size: 36px; cursor: pointer; }
@@ -340,7 +351,20 @@
   font: inherit;
 }
 
-.mona-screen-writing-board { position: absolute; inset: 0; z-index: 10; font-size: 12px; }
+.mona-screen-writing-board {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+}
 .mona-screen-writing-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .mona-screen-writing-canvas { position: absolute; inset: 0; z-index: 8; cursor: none; }
 .mona-screen-blackboard { width: 100%; height: 100%; background-color: #0f392b; }

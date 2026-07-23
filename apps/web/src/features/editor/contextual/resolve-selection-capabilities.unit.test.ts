@@ -191,7 +191,7 @@ describe('resolveSelectionCapabilities', () => {
     })
   })
 
-  test('intersects mixed-selection capabilities and reports mixed values explicitly', () => {
+  test('composes mixed-selection capabilities and reports mixed values explicitly', () => {
     const first = shape('shape-a', { fill: '#f00', opacity: 1 })
     const second = shape('shape-b', { fill: '#0f0', opacity: 0.5 })
     const homogeneous = resolve([first, second], [first.id, second.id])
@@ -204,10 +204,20 @@ describe('resolveSelectionCapabilities', () => {
     const heterogeneous = resolve([first, image], [first.id, image.id])
     expect(heterogeneous).toMatchObject({
       selectionKind: 'mixed',
-      canFill: false,
+      canFill: true,
       canFlip: true,
       canTransparency: true,
       canGroup: true,
+    })
+    expect(heterogeneous.values.fill).toBe('#f00')
+
+    const shapeAndText = resolve([first, text], [first.id, text.id])
+    expect(shapeAndText).toMatchObject({
+      selectionKind: 'mixed',
+      canEditText: true,
+      canFill: true,
+      canStroke: true,
+      canTransparency: true,
     })
   })
 })

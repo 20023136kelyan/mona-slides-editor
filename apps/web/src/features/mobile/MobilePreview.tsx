@@ -38,6 +38,7 @@ export function MobilePreview({ changeMode, runtime }: {
               <ScaledSlide
                 fixedWidth={screenWidth - 20}
                 slide={slide}
+                sourcePackages={presentation.sourcePackages}
                 theme={presentation.theme}
                 thumbnail
                 viewportRatio={presentation.viewportRatio}

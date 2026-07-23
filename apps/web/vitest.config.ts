@@ -41,7 +41,7 @@ export default defineConfig({
           tailwindcss(),
         ],
         optimizeDeps: {
-          include: ['lodash/throttle', 'react-dom/client', 'react-router', 'tinycolor2'],
+          include: ['jszip', 'lodash/throttle', '@mona/pptx-parser', 'react-dom/client', 'react-router', 'tinycolor2'],
         },
         resolve: {
           alias: {

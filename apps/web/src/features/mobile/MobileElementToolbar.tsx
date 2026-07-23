@@ -47,7 +47,7 @@ function ColorRows({ color, label, onChange }: { color: string; label: string; o
           <PopoverTrigger asChild>
             <Button aria-label={`${label} custom`} className="mona-mobile-color is-custom" size="icon-sm" variant="ghost"><i /></Button>
           </PopoverTrigger>
-          <PopoverContent className="mona-mobile-color-popover" collisionPadding={5} side="top" sideOffset={8}>
+          <PopoverContent aria-label={`${label} custom`} className="mona-mobile-color-popover" collisionPadding={5} side="top" sideOffset={8}>
               <EditorColorPicker onChange={onChange} value={color || '#ffffff'} />
           </PopoverContent>
         </Popover>

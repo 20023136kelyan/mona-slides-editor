@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { editorActions } from '@mona/editor-state'
-import { createPresentationTransaction, type PresentationState } from '@mona/presentation-core'
+import {
+  createPresentationTransaction,
+  flattenElementTree,
+  type PresentationState,
+} from '@mona/presentation-core'
 
 import { parseEditorClipboard } from '@/features/editor/editor-clipboard'
 import { createEditorRuntime } from '@/features/editor/editor-runtime'
@@ -257,6 +261,43 @@ describe('editor runtime', () => {
     const secondIds = runtime.paste()
     const second = runtime.store.getState().presentation.slides[0]!.elements.filter(element => secondIds.includes(element.id))
     expect(second.map(element => [element.left, element.top])).toEqual([[40, 50], [180, 50]])
+  })
+
+  it('preserves native provenance only for imported originals and detaches every user-created clone', () => {
+    const importedSlide = structuredClone(presentation.slides[0]!)
+    importedSlide.source = {
+      kind: 'pptx',
+      packageId: 'package-1',
+      slidePart: 'ppt/slides/slide1.xml',
+    }
+    importedSlide.elements[0]!.source = {
+      kind: 'pptx',
+      packageId: 'package-1',
+      slidePart: 'ppt/slides/slide1.xml',
+      sourceLayer: 'slide',
+      stableId: 'package-1/ppt/slides/slide1.xml#1',
+    }
+
+    const importRuntime = createEditorRuntime(presentation)
+    const [importedId] = importRuntime.insertImportedSlides([importedSlide])
+    const retainedImport = importRuntime.store.getState().presentation.slides.find(slide => slide.id === importedId)!
+    expect(retainedImport.source).toEqual(importedSlide.source)
+    expect(retainedImport.elements[0]!.source).toEqual(importedSlide.elements[0]!.source)
+
+    const runtime = createEditorRuntime({
+      ...presentation,
+      slides: [importedSlide],
+    })
+    runtime.store.dispatch(editorActions.selectionChanged(['shape-1']))
+    const pastedIds = runtime.paste(runtime.copySelection())
+    const pasted = runtime.store.getState().presentation.slides[0]!.elements.find(element => element.id === pastedIds[0])
+    expect(importedSlide.elements[0]!.source).toBeDefined()
+    expect(pasted?.source).toBeUndefined()
+
+    const [duplicatedSlideId] = runtime.duplicateSlides()
+    const duplicate = runtime.store.getState().presentation.slides.find(slide => slide.id === duplicatedSlideId)!
+    expect(duplicate.source).toBeUndefined()
+    expect(flattenElementTree(duplicate.elements).every(element => element.source === undefined)).toBe(true)
   })
 
   it('uses the source editor-compatible encrypted payloads and remaps complete slide relationships', () => {

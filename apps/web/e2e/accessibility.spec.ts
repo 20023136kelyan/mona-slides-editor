@@ -43,9 +43,9 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await page.keyboard.press('Escape')
   await expect(elements).toBeFocused()
 
-  const ai = page.getByRole('navigation', { name: 'Editor tools' })
-    .getByRole('button', { name: 'AI', exact: true })
-  await tabTo(page, ai)
+  // The AI panel is opened from the top bar; it's no longer a tool-rail item.
+  const ai = page.getByRole('button', { name: 'Generate presentation with AI' })
+  await tabTo(page, ai, 80, 'Shift+Tab')
   await page.keyboard.press('Enter')
   const composer = page.getByRole('textbox', { name: 'Message Mona AI' })
   await expect(composer).toBeFocused()
@@ -56,7 +56,7 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await expect(ai).toBeFocused()
 
   const exportButton = page.getByRole('button', { name: 'Export', exact: true })
-  await tabTo(page, exportButton, 80, 'Shift+Tab')
+  await tabTo(page, exportButton, 20)
   await page.keyboard.press('Enter')
   const dialog = page.getByRole('dialog', { name: 'Export' })
   await expect(dialog).toBeVisible()
@@ -107,7 +107,9 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
   await expect(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
 
   const geometry = await page.evaluate(() => {
-    const drawer = document.querySelector<HTMLElement>('.mona-editor-drawer')
+    // The compact layout collapses the drawer's animating region (which also
+    // removes the drawer from layout), so check the region's display.
+    const drawer = document.querySelector<HTMLElement>('.mona-drawer-region')
     const stage = document.querySelector<HTMLElement>('.mona-editor-stage')?.getBoundingClientRect()
     const agent = document.querySelector<HTMLElement>('.mona-agent-dock')?.getBoundingClientRect()
     const headerTargets = Array.from(document.querySelectorAll<HTMLElement>('.mona-editor-header button'))
@@ -149,6 +151,94 @@ test('keeps every page-grid bulk action reachable beside the agent at compact wi
     await expect(action).toBeInViewport()
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
+})
+
+test('keeps slideshow navigation, tools, and presenter controls keyboard-safe', async ({ page }) => {
+  await page.goto('/?developmentFixture=slides')
+  const launch = page.getByRole('button', { name: 'Start slideshow (F5)' })
+  await launch.focus()
+  await launch.press('Enter')
+
+  const next = page.getByRole('button', { name: 'Next slide' })
+  const previous = page.getByRole('button', { name: 'Previous slide' })
+  await expect(next).toBeFocused()
+  await expect(previous).toBeDisabled()
+  await next.press('Enter')
+  await expect(page.getByRole('button', { name: 'View all slides' })).toHaveText('Slide 2 / 3')
+  await expect(previous).toBeEnabled()
+
+  const slideshowCanvas = page.getByRole('application', { name: 'Slideshow canvas' })
+  await slideshowCanvas.focus()
+  await slideshowCanvas.press('Shift+F10')
+  const contextMenu = page.getByRole('menu').first()
+  await expect(contextMenu.getByRole('menuitem', { name: /Previous slide/ })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(contextMenu.getByRole('menuitem', { name: /Next slide/ })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(contextMenu).toHaveCount(0)
+  await expect(slideshowCanvas).toBeFocused()
+
+  const timerTrigger = page.getByRole('button', { name: 'Timer', exact: true })
+  await timerTrigger.focus()
+  await page.waitForTimeout(250)
+  await expect(timerTrigger).toBeInViewport()
+  await timerTrigger.press('Enter')
+  const timer = page.getByRole('dialog', { name: 'Timer' })
+  await expect(timer).toBeVisible()
+  const start = timer.getByRole('button', { name: 'Start' })
+  await expect(start).toBeFocused()
+  await start.press('Enter')
+  await expect(timer.getByRole('button', { name: 'Pause' })).toBeFocused()
+  await timer.getByRole('button', { name: 'Pause' }).press('Enter')
+  const countdown = timer.getByRole('button', { name: 'Countdown' })
+  await countdown.press('Enter')
+  await expect(countdown).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'View all slides' })).toHaveText('Slide 2 / 3')
+
+  const panelBefore = await timer.boundingBox()
+  const movePanel = timer.getByRole('button', { name: /Move panel/ })
+  await movePanel.focus()
+  await movePanel.press('Shift+ArrowRight')
+  await expect.poll(async () => (await timer.boundingBox())?.x).toBe((panelBefore?.x ?? 0) + 10)
+
+  await timer.getByRole('button', { name: 'Close' }).press('Enter')
+  await expect(timer).toHaveCount(0)
+  await expect(timerTrigger).toBeFocused()
+
+  const allSlidesTrigger = page.getByRole('button', { name: 'View all slides' })
+  await allSlidesTrigger.press('Enter')
+  const allSlides = page.getByRole('dialog', { name: 'View all slides' })
+  await expect(allSlides.getByRole('button', { name: 'Close' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(allSlides).toHaveCount(0)
+  await expect(allSlidesTrigger).toBeFocused()
+
+  const penTrigger = page.getByRole('button', { name: 'Pen tools' })
+  await penTrigger.press('Enter')
+  const penTools = page.getByRole('dialog', { name: 'Pen tools' })
+  const pen = penTools.getByRole('button', { name: 'Pen', exact: true })
+  await expect(pen).toBeFocused()
+  await pen.press('Enter')
+  await expect(page.getByRole('slider', { name: 'Stroke width:' })).toBeVisible()
+  await pen.press('Enter')
+  await expect(page.getByRole('slider', { name: 'Stroke width:' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(penTools).toHaveCount(0)
+  await expect(penTrigger).toBeFocused()
+
+  const presenterTrigger = page.getByRole('button', { name: 'Presenter view' })
+  await presenterTrigger.press('Enter')
+  const presenter = page.locator('.mona-screen-presenter')
+  await expect(presenter.getByRole('button', { name: 'Standard view' })).toBeFocused()
+  const presenterTimer = presenter.getByRole('button', { name: 'Timer', exact: true })
+  await presenterTimer.press('Enter')
+  await expect(page.getByRole('dialog', { name: 'Timer' }).getByRole('button', { name: 'Start' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(presenterTimer).toBeFocused()
+
+  await presenter.getByRole('button', { name: 'End slideshow' }).press('Enter')
+  await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
+  await expect(launch).toBeFocused()
 })
 
 test('does not transiently shift selected content when guides and controls appear', async ({ page }) => {

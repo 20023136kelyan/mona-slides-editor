@@ -241,8 +241,8 @@ export function useCanvasHotkeys({
       if (now - lastZoomWheelAtRef.current < 100) return
       lastZoomWheelAtRef.current = now
       const zoom = selectCanvasZoom(runtime.store.getState())
-      if (event.deltaY > 0 && zoom >= 30) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
-      else if (event.deltaY < 0 && zoom <= 200) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
+      if (event.deltaY > 0 && zoom > 10) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
+      else if (event.deltaY < 0 && zoom < 300) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
       return
     }
     if (now - lastSlideWheelAtRef.current < 300) return

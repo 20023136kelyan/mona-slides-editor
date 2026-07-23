@@ -414,7 +414,7 @@ export function DrawingWorkspace({
                 <SlidersHorizontal />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="center" className="mona-drawing-stroke-popover" side="bottom">
+            <PopoverContent aria-label={t('foundation.editor.drawing.stroke')} align="center" className="mona-drawing-stroke-popover" side="bottom">
               <strong>{t('foundation.editor.drawing.strokeColor')}</strong>
               <div className="mona-drawing-colors">
                 {STROKE_COLORS.map(color => (
@@ -458,7 +458,7 @@ export function DrawingWorkspace({
             <PopoverTrigger asChild>
               <Button aria-label={t('foundation.editor.drawing.export')} disabled={!apiReady || !hasContent} size="editor-icon" type="button" variant="ghost"><Download /></Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="mona-drawing-export-popover" side="bottom">
+            <PopoverContent aria-label={t('foundation.editor.drawing.export')} align="end" className="mona-drawing-export-popover" side="bottom">
               <Button onClick={() => {
                 const scene = checkpoint()
                 saveAs(drawingSceneBlob(scene), `${slideId}.excalidraw`)

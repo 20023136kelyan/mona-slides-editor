@@ -740,6 +740,7 @@
     "showToolbar": "Show toolbar",
     "allSlides": "View all slides",
     "bottomThumbnails": "Show thumbnails at bottom",
+    "slideshowCanvas": "Slideshow canvas",
     "movePanel": "Move panel. Use arrow keys; hold Shift for larger steps.",
     "resizePanel": "Resize panel. Use arrow keys; hold Shift for larger steps."
   },

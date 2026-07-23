@@ -5,6 +5,7 @@ import type { PresentationState } from '@mona/presentation-core'
 
 import ArrowBackIcon from '~icons/icon-park-outline/arrow-circle-left'
 
+import { Button } from '@/components/ui/button'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 import type { ScreenPresentationController } from '@/features/screen/screen-types'
 
@@ -55,24 +56,27 @@ const Thumbnail = ({
 }) => {
   const { t } = useTranslation()
   return (
-    <button
+    <Button
       aria-current={active ? 'page' : undefined}
       aria-label={t('screen.slideNumber', { current: slideIndex + 1, total: presentation.slides.length })}
       className={`mona-screen-thumbnail${active ? ' is-active' : ''}`}
       data-slide-index={slideIndex}
       onClick={onClick}
+      size={null}
       type="button"
+      variant={null}
     >
       <ScaledSlide
         fixedWidth={size}
         slide={presentation.slides[slideIndex]!}
+        sourcePackages={presentation.sourcePackages}
         theme={presentation.theme}
         thumbnail
         viewportRatio={presentation.viewportRatio}
         viewportSize={presentation.viewportSize}
         visible={visible}
       />
-    </button>
+    </Button>
   )
 }
 
@@ -115,7 +119,7 @@ export function ScreenAllSlides({
   turnSlideToIndex: (index: number) => void
 }) {
   const { t } = useTranslation()
-  const rootRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDialogElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const slidesLoadLimit = useSlidesLoadLimit(presentation.slides.length)
   useEffect(() => {
@@ -146,8 +150,8 @@ export function ScreenAllSlides({
     return () => root.removeEventListener('keydown', keydown)
   }, [onClose])
   return (
-    <div aria-label={t('screen.allSlides')} aria-modal="true" className="mona-screen-all-slides" ref={rootRef} role="dialog">
-      <div className="mona-screen-all-slides-return"><button aria-label={t('common.close')} onClick={onClose} ref={closeRef} type="button"><ArrowBackIcon /></button></div>
+    <dialog aria-label={t('screen.allSlides')} className="mona-screen-all-slides" open ref={rootRef}>
+      <div className="mona-screen-all-slides-return"><Button aria-label={t('common.close')} onClick={onClose} ref={closeRef} size={null} type="button" variant={null}><ArrowBackIcon /></Button></div>
       <div className="mona-screen-all-slides-content">
         {presentation.slides.map((slide, index) => (
           <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => {
@@ -155,7 +159,7 @@ export function ScreenAllSlides({
           }} presentation={presentation} size={150} slideIndex={index} visible={index < slidesLoadLimit} />
         ))}
       </div>
-    </div>
+    </dialog>
   )
 }
 

@@ -1,4 +1,5 @@
-import { useRef, useState, type MouseEvent } from 'react'
+/* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- the slideshow canvas is an application focus target: Enter/arrow playback and Shift+F10 context-menu commands intentionally live on the canvas while nested slide links remain independently focusable. */
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { PresentationState } from '@mona/presentation-core'
@@ -16,6 +17,7 @@ import StopwatchIcon from '~icons/icon-park-outline/stopwatch-start'
 import LeftIcon from '~icons/custom/left'
 import RightIcon from '~icons/custom/right'
 
+import { Button } from '@/components/ui/button'
 import { ScreenContextMenu, type ScreenContextMenuItem } from '@/features/screen/ScreenContextMenu'
 import { ScreenCountdownTimer } from '@/features/screen/ScreenCountdownTimer'
 import { SCREEN_LASER_POINTER } from '@/features/screen/screen-assets'
@@ -38,6 +40,22 @@ interface CommonViewProps {
   presentation: PresentationState
 }
 
+const useReturnFocusWhenClosed = <T extends HTMLElement>(
+  open: boolean,
+  targetRef: React.RefObject<T | null>,
+) => {
+  const wasOpenRef = useRef(false)
+  useLayoutEffect(() => {
+    if (open) {
+      wasOpenRef.current = true
+      return
+    }
+    if (!wasOpenRef.current) return
+    wasOpenRef.current = false
+    targetRef.current?.focus()
+  }, [open, targetRef])
+}
+
 export function ScreenBaseView({
   controller,
   enterFullscreen,
@@ -57,22 +75,59 @@ export function ScreenBaseView({
   const [allSlidesVisible, setAllSlidesVisible] = useState(false)
   const [bottomThumbnailsVisible, setBottomThumbnailsVisible] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const allSlidesButtonRef = useRef<HTMLButtonElement>(null)
+  const nextButtonRef = useRef<HTMLButtonElement>(null)
+  const penButtonRef = useRef<HTMLButtonElement>(null)
+  const previousButtonRef = useRef<HTMLButtonElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+  const timerButtonRef = useRef<HTMLButtonElement>(null)
   const currentSlide = presentation.slides[presentation.slideIndex]!
-  const toolbarButton = (label: string, icon: React.ReactNode, onClick: () => void, active = false) => (
+  useReturnFocusWhenClosed(allSlidesVisible, allSlidesButtonRef)
+  useReturnFocusWhenClosed(writingVisible, penButtonRef)
+  useReturnFocusWhenClosed(timerVisible, timerButtonRef)
+  useReturnFocusWhenClosed(Boolean(contextMenu), surfaceRef)
+  const toolbarButton = (label: string, icon: React.ReactNode, onClick: () => void, active = false, buttonRef?: React.Ref<HTMLButtonElement>) => (
     <ScreenTooltip content={label}>
-      <button
+      <Button
         aria-label={label}
         aria-pressed={active || undefined}
         className={`mona-screen-tool-button${active ? ' is-active' : ''}`}
         onClick={onClick}
+        ref={buttonRef}
+        size={null}
         type="button"
-      >{icon}</button>
+        variant={null}
+      >{icon}</Button>
     </ScreenTooltip>
   )
+  useEffect(() => {
+    const target = presentation.slideIndex < presentation.slides.length - 1
+      ? nextButtonRef.current
+      : previousButtonRef.current
+    target?.focus()
+    // Focus is assigned only when this view mounts; slide changes retain the
+    // user's current toolbar or slide-link focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const exit = () => {
     playback.broadcastExit()
     onExit()
+  }
+  const closeAllSlides = useCallback(() => {
+    setAllSlidesVisible(false)
+  }, [])
+  const closeWriting = useCallback(() => {
+    setWritingVisible(false)
+  }, [])
+  const closeTimer = useCallback(() => {
+    setTimerVisible(false)
+  }, [])
+  const openContextMenuFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    setContextMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
   }
   const menu: ScreenContextMenuItem[] = [
     { action: 'previous', disabled: presentation.slideIndex <= 0, handler: playback.turnPrevSlide, label: t('screen.previousSlide'), shortcut: '↑ ←' },
@@ -105,29 +160,34 @@ export function ScreenBaseView({
   return (
     <div className={`mona-screen-base${playback.laserPen ? ' is-laser-pen' : ''}`} style={playback.laserPen ? { cursor: `url(${SCREEN_LASER_POINTER}) 20 20, default` } : undefined}>
       <div
+        aria-label={t('screen.slideshowCanvas')}
         className="mona-screen-main-surface"
         onContextMenu={(event: MouseEvent) => {
           event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }) 
         }}
+        onKeyDown={openContextMenuFromKeyboard}
         onTouchEnd={playback.touchEndListener}
         onTouchStart={playback.touchStartListener}
         onWheel={playback.mousewheelListener}
+        ref={surfaceRef}
+        role="application"
+        tabIndex={0}
       >
         <ScreenSlideList animationIndex={playback.animationIndex} manualExitFullscreen={manualExitFullscreen} presentation={presentation} slideHeight={slideHeight} slideWidth={slideWidth} turnSlideToId={playback.turnSlideToId} />
       </div>
-      {allSlidesVisible ? <ScreenAllSlides onClose={() => setAllSlidesVisible(false)} presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} /> : null}
-      {writingVisible ? <ScreenWritingBoard onClose={() => setWritingVisible(false)} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} /> : null}
-      {timerVisible ? <ScreenCountdownTimer onClose={() => setTimerVisible(false)} /> : null}
+      {allSlidesVisible ? <ScreenAllSlides onClose={closeAllSlides} presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} /> : null}
+      {writingVisible ? <ScreenWritingBoard onClose={closeWriting} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} /> : null}
+      {timerVisible ? <ScreenCountdownTimer onClose={closeTimer} /> : null}
       <div className="mona-screen-tools-left">
-        <button aria-label={t('screen.previousSlide')} disabled={presentation.slideIndex <= 0} onClick={() => playback.execPrev()} type="button"><LeftIcon /></button>
-        <button aria-label={t('screen.nextSlide')} disabled={presentation.slideIndex >= presentation.slides.length - 1} onClick={playback.execNext} type="button"><RightIcon /></button>
+        <Button aria-label={t('screen.previousSlide')} disabled={presentation.slideIndex <= 0} onClick={() => playback.execPrev()} ref={previousButtonRef} size={null} type="button" variant={null}><LeftIcon /></Button>
+        <Button aria-label={t('screen.nextSlide')} disabled={presentation.slideIndex >= presentation.slides.length - 1} onClick={playback.execNext} ref={nextButtonRef} size={null} type="button" variant={null}><RightIcon /></Button>
       </div>
       <div className={`mona-screen-tools-right${rightToolsVisible ? ' is-visible' : ''}`} onMouseEnter={() => setRightToolsVisible(true)} onMouseLeave={() => setRightToolsVisible(false)}>
         <div className="mona-screen-tools-right-content">
-          <button aria-label={t('screen.allSlides')} className="mona-screen-tool-button mona-screen-page-number" onClick={() => setAllSlidesVisible(true)} type="button">{t('screen.slideNumber', { current: presentation.slideIndex + 1, total: presentation.slides.length })}</button>
-          {toolbarButton(t('screen.penTools'), <PenIcon />, () => setWritingVisible(true))}
+          <Button aria-label={t('screen.allSlides')} className="mona-screen-tool-button mona-screen-page-number" onClick={() => setAllSlidesVisible(true)} ref={allSlidesButtonRef} size={null} type="button" variant={null}>{t('screen.slideNumber', { current: presentation.slideIndex + 1, total: presentation.slides.length })}</Button>
+          {toolbarButton(t('screen.penTools'), <PenIcon />, () => setWritingVisible(true), writingVisible, penButtonRef)}
           {toolbarButton(t('screen.laserPointer'), <LaserIcon />, () => playback.setLaserPen(!playback.laserPen), playback.laserPen)}
-          {toolbarButton(t('screen.timer'), <StopwatchIcon />, () => setTimerVisible(current => !current), timerVisible)}
+          {toolbarButton(t('screen.timer'), <StopwatchIcon />, () => setTimerVisible(current => !current), timerVisible, timerButtonRef)}
           {toolbarButton(t('screen.presenterView'), <ListIcon />, () => setViewMode('presenter'))}
           {toolbarButton(t('screen.audienceView'), <PeopleIcon />, openAudience)}
           {fullscreen
@@ -164,7 +224,13 @@ export function ScreenPresenterView({
   const [timerVisible, setTimerVisible] = useState(false)
   const [remarkFontSize, setRemarkFontSize] = useState(16)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const normalViewButtonRef = useRef<HTMLButtonElement>(null)
+  const penButtonRef = useRef<HTMLButtonElement>(null)
+  const timerButtonRef = useRef<HTMLButtonElement>(null)
   const currentSlide = presentation.slides[presentation.slideIndex]!
+  useReturnFocusWhenClosed(writingVisible, penButtonRef)
+  useReturnFocusWhenClosed(timerVisible, timerButtonRef)
+  useReturnFocusWhenClosed(Boolean(contextMenu), slideWrapRef)
   const remark = parseRemark(currentSlide.remark)
   const exit = () => {
     playback.broadcastExit(); onExit() 
@@ -181,41 +247,61 @@ export function ScreenPresenterView({
     { action: 'exit', handler: exit, label: t('screen.endSlideshow'), shortcut: 'ESC' },
   ]
 
-  const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void) => (
-    <button
+  const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void, buttonRef?: React.Ref<HTMLButtonElement>) => (
+    <Button
       aria-pressed={active || undefined}
       className={`mona-screen-presenter-tool${active ? ' is-active' : ''}`}
       onClick={onClick}
+      ref={buttonRef}
+      size={null}
       type="button"
-    >{icon}<span>{label}</span></button>
+      variant={null}
+    >{icon}<span>{label}</span></Button>
   )
+  useEffect(() => normalViewButtonRef.current?.focus(), [])
+  const closeWriting = useCallback(() => {
+    setWritingVisible(false)
+  }, [])
+  const closeTimer = useCallback(() => {
+    setTimerVisible(false)
+  }, [])
+  const openContextMenuFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
+    event.preventDefault()
+    const rect = event.currentTarget.getBoundingClientRect()
+    setContextMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+  }
   return (
     <div className="mona-screen-presenter">
       <div className="mona-screen-presenter-toolbar">
-        {tool(false, <ListIcon />, t('screen.normalView'), () => setViewMode('base'))}
+        {tool(false, <ListIcon />, t('screen.normalView'), () => setViewMode('base'), normalViewButtonRef)}
         {tool(false, <PeopleIcon />, t('screen.audienceView'), openAudience)}
-        {tool(writingVisible, <PenIcon />, t('screen.pen'), () => setWritingVisible(current => !current))}
+        {tool(writingVisible, <PenIcon />, t('screen.pen'), () => setWritingVisible(current => !current), penButtonRef)}
         {tool(playback.laserPen, <LaserIcon />, t('screen.laserPointer'), () => playback.setLaserPen(!playback.laserPen))}
-        {tool(timerVisible, <StopwatchIcon />, t('screen.timer'), () => setTimerVisible(current => !current))}
+        {tool(timerVisible, <StopwatchIcon />, t('screen.timer'), () => setTimerVisible(current => !current), timerButtonRef)}
         {tool(false, fullscreen ? <OffscreenIcon /> : <FullscreenIcon />, t(fullscreen ? 'screen.exitFullscreen' : 'screen.enterFullscreen'), fullscreen ? manualExitFullscreen : enterFullscreen)}
         <div className="mona-screen-presenter-divider" />
         {tool(false, <PowerIcon />, t('screen.endSlideshow'), exit)}
       </div>
       <div className="mona-screen-presenter-content">
         <div
+          aria-label={t('screen.slideshowCanvas')}
           className={`mona-screen-presenter-slide-wrap${playback.laserPen ? ' is-laser-pen' : ''}`}
           onContextMenu={event => {
             event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }) 
           }}
+          onKeyDown={openContextMenuFromKeyboard}
           onTouchEnd={playback.touchEndListener}
           onTouchStart={playback.touchStartListener}
           onWheel={playback.mousewheelListener}
           ref={slideWrapRef}
+          role="application"
           style={playback.laserPen ? { cursor: `url(${SCREEN_LASER_POINTER}) 20 20, default` } : undefined}
+          tabIndex={0}
         >
           <ScreenSlideList animationIndex={playback.animationIndex} manualExitFullscreen={manualExitFullscreen} presentation={presentation} slideHeight={slideHeight} slideWidth={slideWidth} turnSlideToId={playback.turnSlideToId} />
-          {writingVisible ? <ScreenWritingBoard left={-365} onClose={() => setWritingVisible(false)} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} top={-155} /> : null}
-          {timerVisible ? <ScreenCountdownTimer left={75} onClose={() => setTimerVisible(false)} /> : null}
+          {writingVisible ? <ScreenWritingBoard left={-365} onClose={closeWriting} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} top={-155} /> : null}
+          {timerVisible ? <ScreenCountdownTimer left={75} onClose={closeTimer} /> : null}
         </div>
         <ScreenPresenterThumbnails presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} />
       </div>
@@ -223,8 +309,8 @@ export function ScreenPresenterView({
         <div className="mona-screen-presenter-remark-header"><span>{t('screen.speakerNotes')}</span><span>P {presentation.slideIndex + 1} / {presentation.slides.length}</span></div>
         <div className={`mona-screen-presenter-remark-content ProseMirror-static${remark ? '' : ' is-empty'}`} dangerouslySetInnerHTML={{ __html: remark || t('screen.noNotes') }} style={{ fontSize: remarkFontSize }} />
         <div className="mona-screen-presenter-remark-scale">
-          <button aria-label={t('common.decrease')} disabled={remarkFontSize === 12} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))} type="button"><MinusIcon /></button>
-          <button aria-label={t('common.increase')} disabled={remarkFontSize === 40} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))} type="button"><PlusIcon /></button>
+          <Button aria-label={t('common.decrease')} disabled={remarkFontSize === 12} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))} size={null} type="button" variant={null}><MinusIcon /></Button>
+          <Button aria-label={t('common.increase')} disabled={remarkFontSize === 40} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))} size={null} type="button" variant={null}><PlusIcon /></Button>
         </div>
       </div>
       {contextMenu ? <ScreenContextMenu items={menu} onDismiss={() => setContextMenu(null)} position={contextMenu} /> : null}

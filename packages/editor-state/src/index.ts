@@ -8,6 +8,7 @@ import {
 import {
   applyPresentationTransaction,
   buildElementIndex,
+  collectElementTreeIds,
   selectCurrentSlide as selectCurrentSlideFromPresentation,
   type PresentationState,
   type PresentationTransaction,
@@ -146,7 +147,7 @@ const editorSlice = createSlice({
       state.presentation = action.payload
       state.lastAppliedTransactionId = null
       state.lastRejectedTransaction = null
-      const validElementIds = new Set(action.payload.slides.flatMap(slide => slide.elements.map(element => element.id)))
+      const validElementIds = new Set(action.payload.slides.flatMap(slide => collectElementTreeIds(slide.elements)))
       state.session.activeElementIds = state.session.activeElementIds.filter(id => validElementIds.has(id))
       if (!state.session.handleElementId || !validElementIds.has(state.session.handleElementId)) {
         state.session.handleElementId = state.session.activeElementIds.length === 1
@@ -203,7 +204,7 @@ const editorSlice = createSlice({
     canvasZoomChanged(state, action: PayloadAction<number>) {
       // the established editor's 5% commands are guarded at 30% and 200%, so one final
       // command reaches the effective extrema of 25% and 205%.
-      state.session.canvasZoom = Math.min(205, Math.max(25, action.payload))
+      state.session.canvasZoom = Math.min(300, Math.max(10, action.payload))
     },
     canvasPanChanged(state, action: PayloadAction<{ x: number; y: number }>) {
       state.session.canvasPan = action.payload

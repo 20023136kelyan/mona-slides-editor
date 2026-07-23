@@ -21,6 +21,7 @@ apps/web/src/**/__screenshots__/
 playwright-report/
 test-results/
 blob-report/
+.playwright-browsers/
 
 # Local fidelity decks may contain confidential material. Keep them outside
 # Vite's public directory so no production build can copy them by accident.

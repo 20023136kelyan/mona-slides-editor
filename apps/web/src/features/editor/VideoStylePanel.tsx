@@ -59,17 +59,17 @@ export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement
           <span className="mona-video-poster-content" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
         </Button>
       </div>
-      <div className="mona-panel-row">
+      <div className="flex w-full items-center mb-2.5">
         <Button className="mona-panel-button mona-media-full-button" onClick={setPosterFromFirstFrame} size="editor" type="button" variant="editor"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</Button>
       </div>
       {element.poster ? (
-        <div className="mona-panel-row">
+        <div className="flex w-full items-center mb-2.5">
           <Button className="mona-panel-button mona-media-full-button" onClick={() => update({ poster: '' })} size="editor" type="button" variant="editor"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</Button>
         </div>
       ) : null}
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <div className="mona-panel-row mona-media-switch-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.media.autoplay')}</div>
+        <div className="w-[48%] text-xs">{t('foundation.editor.media.autoplay')}</div>
         <div className="mona-panel-row-control mona-panel-switch-wrapper">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.autoplay')} checked={element.autoplay} onChange={autoplay => update({ autoplay })} />
         </div>

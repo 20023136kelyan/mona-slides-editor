@@ -76,7 +76,17 @@ const useFullscreenLifecycle = (onExit: () => void) => {
   return { enterFullscreen, fullscreen, manualExitFullscreen }
 }
 
-function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: EditorRuntime }) {
+function PresenterScreen({
+  initialAutoPlay = false,
+  initialViewMode = 'base',
+  onExit,
+  runtime,
+}: {
+  initialAutoPlay?: boolean
+  initialViewMode?: ScreenViewMode
+  onExit: () => void
+  runtime: EditorRuntime
+}) {
   const { notifications } = useEditorApplication()
   const sourcePresentation = useEditorSelector(runtime.store, selectPresentation)
   const presentation = useMemo(
@@ -91,13 +101,15 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
     presentation,
     setSlideIndex,
   }), [presentation, setSlideIndex])
-  const [viewMode, setViewMode] = useState<ScreenViewMode>('base')
+  const [viewMode, setViewMode] = useState<ScreenViewMode>(initialViewMode)
   const changeViewMode = (mode: ScreenViewMode) => startTransition(() => setViewMode(mode))
 
   // Playback and fullscreen state live here so toggling base/presenter view
   // keeps autoplay, loop, and animation progress. (Vue re-created them per
   // view; deliberate improvement.)
   const playback = useScreenPlayback({ controller, notify: notifications.notify })
+  const { autoPlay } = playback
+  const autoPlayLaunchedRef = useRef(false)
   const fullscreen = useFullscreenLifecycle(onExit)
   const openAudience = () => {
     fullscreen.manualExitFullscreen()
@@ -110,9 +122,18 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
   }
 
   useEffect(() => {
+    if (!initialAutoPlay || autoPlayLaunchedRef.current) return
+    autoPlayLaunchedRef.current = true
+    autoPlay()
+  }, [autoPlay, initialAutoPlay])
+
+  useEffect(() => {
     const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
     const keydown = (event: KeyboardEvent) => {
       if (event.key.toUpperCase() !== 'ESCAPE') return
+      if (event.defaultPrevented) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[role="dialog"], [role="menu"]')) return
       channel.postMessage({ type: 'EXIT' } satisfies ScreenSyncMessage)
       onExit()
     }
@@ -203,10 +224,20 @@ function AudienceScreen({ initialPresentation }: { initialPresentation: Presenta
   )
 }
 
-export function ScreenView({ onExit, runtime }: { onExit: () => void; runtime: EditorRuntime }) {
+export function ScreenView({
+  initialAutoPlay,
+  initialViewMode,
+  onExit,
+  runtime,
+}: {
+  initialAutoPlay?: boolean
+  initialViewMode?: ScreenViewMode
+  onExit: () => void
+  runtime: EditorRuntime
+}) {
   const initialPresentation = useEditorSelector(runtime.store, selectPresentation)
   const audience = new URLSearchParams(window.location.search).get('mode') === 'audience'
   return audience
     ? <div className="mona-screen"><AudienceScreen initialPresentation={initialPresentation} /></div>
-    : <PresenterScreen onExit={onExit} runtime={runtime} />
+    : <PresenterScreen initialAutoPlay={initialAutoPlay} initialViewMode={initialViewMode} onExit={onExit} runtime={runtime} />
 }

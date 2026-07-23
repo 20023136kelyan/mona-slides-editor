@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Blend, Layers3, Move, Sparkles, SwatchBook } from 'lucide-react'
+import { Blend, Bold, Italic, Layers3, Minus, Move, Plus, Sparkles, Strikethrough, SwatchBook, Type } from 'lucide-react'
 
 import FlipHorizontalIcon from '~icons/icon-park-outline/flip-horizontally'
 import FlipVerticalIcon from '~icons/icon-park-outline/flip-vertically'
@@ -20,11 +20,12 @@ import type {
   Slide,
   TableCell,
 } from '@mona/presentation-core/model'
+import type { RichTextAction } from '@mona/rich-text'
 
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
-import { InspectorPopoverButton, InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorPopoverButton, InspectorSelect, InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
 import { EditorChartContextControls } from '@/features/editor/contextual/EditorChartContextControls'
 import { EditorEquationContextControls } from '@/features/editor/contextual/EditorEquationContextControls'
 import { EditorImageContextControls } from '@/features/editor/contextual/EditorImageContextControls'
@@ -38,6 +39,7 @@ import type {
   SelectionCapabilities,
 } from '@/features/editor/contextual/resolve-selection-capabilities'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { editorFontOptions } from '@/features/editor/editor-text-options'
 
 export interface ContextualControlRegistryContext {
   capabilities: SelectionCapabilities
@@ -60,7 +62,7 @@ function ContextAction({
   onClick: () => void
 }) {
   return (
-    <Button aria-label={children} className="mona-contextual-action" onClick={onClick} size="editor" title={children} type="button" variant="ghost">
+    <Button aria-label={children} className="mona-contextual-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-action)] px-2.5 text-[13px] font-semibold whitespace-nowrap text-[rgb(16_18_25/70%)] hover:bg-[rgb(15_16_21/6%)] hover:text-[rgb(15_16_21)] [&_svg]:size-4" onClick={onClick} size="editor" title={children} type="button" variant="ghost">
       {icon}
       <span>{children}</span>
     </Button>
@@ -78,6 +80,8 @@ const elementControlRegistry: Record<ElementCapabilityKind, (context: Contextual
   chart: context => <EditorChartContextControls element={targetAs<PPTChartElement>(context)} onEditData={() => context.onEditChart(targetAs<PPTChartElement>(context).id)} runtime={context.runtime} />,
   equation: context => <EditorEquationContextControls element={targetAs<PPTLatexElement>(context)} onEdit={() => context.onEditLatex(targetAs<PPTLatexElement>(context).id)} runtime={context.runtime} />,
   media: context => <EditorMediaContextControls element={targetAs<PPTAudioElement | PPTVideoElement>(context)} runtime={context.runtime} />,
+  'native-group': () => null,
+  opaque: () => null,
 }
 
 function GroupChildControls({ context }: { context: ContextualControlRegistryContext }) {
@@ -137,6 +141,14 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
     apply(`Update selection ${axis}`, element => (
       element.type === 'image' || element.type === 'shape' ? { [axis]: next } : undefined
     ))
+  }
+  const textElements = capabilities.selectedElements.filter(element => (
+    element.type === 'text' || (element.type === 'shape' && Boolean(element.text?.content))
+  ))
+  const updateText = (action: RichTextAction) => {
+    for (const element of textElements) {
+      runtime.richText.execute(element.id, action, `contextual-multi-text-${element.id}`)
+    }
   }
   const fill = capabilities.values.fill === 'mixed' ? '#ffffff' : capabilities.values.fill ?? '#ffffff'
   const stroke = capabilities.values.stroke === 'mixed' ? '#000000' : capabilities.values.stroke ?? '#000000'
@@ -201,6 +213,54 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             ><FlipVerticalIcon /></Toggle>
           </>
         ) : null}
+        {capabilities.canEditText ? (
+          <>
+            <div className="mona-contextual-divider" />
+            <InspectorSelect
+              ariaLabel={t('foundation.editor.text.fontFamily')}
+              className="mona-contextual-font-select"
+              onChange={value => updateText({ command: 'fontname', value })}
+              options={[
+                ...(capabilities.values.fontFamily === 'mixed'
+                  ? [{ disabled: true, label: t('foundation.editor.contextual.mixed'), value: '__mixed__' }]
+                  : []),
+                { label: t('common.defaultFont'), value: '' },
+                ...editorFontOptions,
+              ]}
+              search
+              searchLabel={t('foundation.editor.text.fontSearch')}
+              value={capabilities.values.fontFamily === 'mixed' ? '__mixed__' : capabilities.values.fontFamily ?? ''}
+            />
+            <Button aria-label={t('foundation.editor.text.decreaseFont')} className="mona-contextual-control" onClick={() => updateText({ command: 'fontsize-reduce', value: '2' })} size="editor-icon" title={t('foundation.editor.text.decreaseFont')} type="button" variant="ghost"><Type /><Minus /></Button>
+            <Button aria-label={t('foundation.editor.text.increaseFont')} className="mona-contextual-control" onClick={() => updateText({ command: 'fontsize-add', value: '2' })} size="editor-icon" title={t('foundation.editor.text.increaseFont')} type="button" variant="ghost"><Type /><Plus /></Button>
+            <InspectorPopoverButton
+              ariaLabel={t('foundation.editor.contextual.textColor', { state: capabilities.values.textColor === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
+              className="mona-contextual-control is-text-color"
+              content={<EditorColorPicker onChange={value => updateText({ command: 'color', value })} value={capabilities.values.textColor === 'mixed' ? '#171717' : capabilities.values.textColor ?? '#171717'} />}
+            >
+              <Type />
+              <span className="mona-contextual-text-color">
+                <span style={{ backgroundColor: capabilities.values.textColor === 'mixed' ? 'transparent' : capabilities.values.textColor ?? '#171717' }} />
+              </span>
+            </InspectorPopoverButton>
+            {([
+              ['bold', Bold, 'bold'],
+              ['em', Italic, 'italic'],
+              ['strikethrough', Strikethrough, 'strikethrough'],
+            ] as const).map(([command, CommandIcon, label]) => (
+              <Button
+                aria-label={t(`foundation.editor.text.${label}`)}
+                className="mona-contextual-control"
+                key={command}
+                onClick={() => updateText({ command })}
+                size="editor-icon"
+                title={t(`foundation.editor.text.${label}`)}
+                type="button"
+                variant="ghost"
+              ><CommandIcon /></Button>
+            ))}
+          </>
+        ) : null}
       </div>
     </div>
   )
@@ -254,7 +314,7 @@ export function ContextualDeepActions({
   const page = capabilities.selectionKind === 'page'
   const multiple = capabilities.selectionKind === 'group' || capabilities.selectionKind === 'mixed'
   return (
-    <div className="mona-contextual-deep-actions">
+    <div className="mona-contextual-deep-actions ml-1.5 flex flex-none items-center gap-0.5 border-l border-border pl-1.5 first:ml-0 first:border-l-0 first:pl-0">
       {page ? (
         <ContextAction icon={<SwatchBook />} onClick={() => onOpenInspector('slideDesign')}>{t('foundation.editor.toolbar.design')}</ContextAction>
       ) : (

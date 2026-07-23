@@ -10,7 +10,9 @@ export function LatexElement({ element }: { element: PPTLatexElement }) {
     >
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
         <div className="mona-latex-content">
-          <svg
+          {element.fallbackImage ? (
+            <img alt={element.latex} draggable={false} height={element.height} src={element.fallbackImage} width={element.width} />
+          ) : <svg
             aria-label={element.latex}
             fill="none"
             height={element.height}
@@ -24,7 +26,7 @@ export function LatexElement({ element }: { element: PPTLatexElement }) {
             <g transform={`scale(${element.width / element.viewBox[0]}, ${element.height / element.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`}>
               <path d={element.path} />
             </g>
-          </svg>
+          </svg>}
         </div>
       </div>
     </div>

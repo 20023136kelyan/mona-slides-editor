@@ -1,6 +1,14 @@
 import type { PPTElement, Slide, SlideTemplate, SlideTheme } from './model'
+import type { PowerPointPackageReference } from './source'
 import type { PresentationState } from './state'
 import { cloneSerializable } from './state'
+import {
+  collectElementTreeIds,
+  findElementById,
+  flattenElementTree,
+  removeElementsFromTree,
+  updateElementTreeByIds,
+} from './elements'
 
 export interface RemovePropertyPayload {
   id: string
@@ -19,6 +27,7 @@ export type PresentationCommand =
   | { type: 'presentation.viewport-size.set'; size: number }
   | { type: 'presentation.viewport-ratio.set'; ratio: number }
   | { type: 'presentation.slides.replace'; slides: Slide[]; theme?: Partial<SlideTheme> }
+  | { type: 'presentation.source-packages.replace'; sourcePackages: PowerPointPackageReference[] }
   | { type: 'presentation.templates.replace'; templates: SlideTemplate[] }
   | { type: 'slide.add'; slides: Slide | Slide[] }
   | { type: 'slide.update'; props: Partial<Slide>; slideId?: string }
@@ -96,6 +105,57 @@ const changed = (
   },
 })
 
+const markPowerPointSlideDirty = (
+  state: PresentationState,
+  slide: Slide,
+  reason: PresentationCommand['type'],
+  elementIds: readonly string[] = [],
+): PresentationState => {
+  const source = slide.source
+  if (!source || !state.sourcePackages?.length) return state
+  const packageIndex = state.sourcePackages.findIndex(candidate => candidate.packageId === source.packageId)
+  if (packageIndex < 0) return state
+  const selectedIds = new Set(elementIds)
+  const allElements = flattenElementTree(slide.elements)
+  const selectedElements = allElements.filter(element => !elementIds.length || selectedIds.has(element.id))
+  const changesByPart = new Map<string, Set<string>>()
+  let hasUnresolvedSlideLocalChange = !elementIds.length
+  for (const element of selectedElements) {
+    const elementSource = element.source
+    if (!elementSource?.sourceObjectId || !elementSource.sourcePart) {
+      hasUnresolvedSlideLocalChange = true
+      continue
+    }
+    const objectIds = changesByPart.get(elementSource.sourcePart) ?? new Set<string>()
+    objectIds.add(elementSource.sourceObjectId)
+    changesByPart.set(elementSource.sourcePart, objectIds)
+  }
+  if (selectedElements.length < elementIds.length) hasUnresolvedSlideLocalChange = true
+  if (hasUnresolvedSlideLocalChange || changesByPart.size === 0) {
+    if (!changesByPart.has(source.slidePart)) changesByPart.set(source.slidePart, new Set())
+  }
+  const sourcePackages = state.sourcePackages.slice()
+  const sourcePackage = sourcePackages[packageIndex]!
+  const existingParts = sourcePackage.dirty?.parts ?? []
+  const nextParts = new Map(existingParts.map(part => [part.partPath, part]))
+  for (const [partPath, objectIds] of changesByPart) {
+    const existingPart = nextParts.get(partPath)
+    nextParts.set(partPath, {
+      objectIds: [...new Set([...(existingPart?.objectIds ?? []), ...objectIds])].sort(),
+      partPath,
+      reasons: [...new Set([...(existingPart?.reasons ?? []), reason])].sort(),
+    })
+  }
+  sourcePackages[packageIndex] = {
+    ...sourcePackage,
+    dirty: {
+      parts: [...nextParts.values()].sort((left, right) => left.partPath.localeCompare(right.partPath)),
+      revision: (sourcePackage.dirty?.revision ?? 0) + 1,
+    },
+  }
+  return { ...state, sourcePackages }
+}
+
 export const applyPresentationCommand = (
   state: PresentationState,
   command: PresentationCommand,
@@ -123,6 +183,10 @@ export const applyPresentationCommand = (
         slides: command.slides,
         theme: command.theme ? { ...state.theme, ...command.theme } : state.theme,
       }, command, command.slides.map(slide => slide.id))
+    }
+    case 'presentation.source-packages.replace': {
+      if (command.sourcePackages === state.sourcePackages) return unchanged(state, command)
+      return changed({ ...state, sourcePackages: command.sourcePackages }, command)
     }
     case 'presentation.templates.replace': {
       return changed({ ...state, templates: command.templates }, command)
@@ -152,7 +216,7 @@ export const applyPresentationCommand = (
       const slide = { ...previousSlide, ...command.props }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
-      return changed({ ...state, slides }, command, [slide.id])
+      return changed(markPowerPointSlideDirty({ ...state, slides }, previousSlide, command.type), command, [slide.id])
     }
     case 'slide.properties.remove': {
       const properties = normalizePropertyList(command.payload.property)
@@ -163,7 +227,8 @@ export const applyPresentationCommand = (
         return omitProperties(slide, properties)
       })
       if (!didChange) throw new PresentationCommandError(`Slide not found: ${command.payload.id}`)
-      return changed({ ...state, slides }, command, [command.payload.id])
+      const previousSlide = state.slides.find(slide => slide.id === command.payload.id)!
+      return changed(markPowerPointSlideDirty({ ...state, slides }, previousSlide, command.type), command, [command.payload.id])
     }
     case 'slide.delete': {
       const slideIds = Array.isArray(command.slideIds) ? command.slideIds : [command.slideIds]
@@ -203,19 +268,19 @@ export const applyPresentationCommand = (
       const slideIndex = findSlideIndex(state, command.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
-      const existingIds = new Set(currentSlide.elements.map(element => element.id))
+      const existingIds = new Set(collectElementTreeIds(currentSlide.elements))
       const additionIds = new Set<string>()
-      for (const element of additions) {
-        if (existingIds.has(element.id) || additionIds.has(element.id)) {
-          throw new PresentationCommandError(`Duplicate element id: ${element.id}`)
+      for (const elementId of collectElementTreeIds(additions)) {
+        if (existingIds.has(elementId) || additionIds.has(elementId)) {
+          throw new PresentationCommandError(`Duplicate element id: ${elementId}`)
         }
-        additionIds.add(element.id)
+        additionIds.add(elementId)
       }
       const slide = { ...currentSlide, elements: [...currentSlide.elements, ...additions] }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(
-        { ...state, slides },
+        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, additions.map(element => element.id)),
         command,
         [slide.id],
         additions.map(element => element.id),
@@ -227,16 +292,20 @@ export const applyPresentationCommand = (
       const slideIndex = findSlideIndex(state, command.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
-      const present = new Set(currentSlide.elements.map(element => element.id))
-      const missing = elementIds.find(id => !present.has(id))
+      const missing = elementIds.find(id => !findElementById(currentSlide.elements, id))
       if (missing) throw new PresentationCommandError(`Element not found: ${missing}`)
       const slide = {
         ...currentSlide,
-        elements: currentSlide.elements.filter(element => !deleted.has(element.id)),
+        elements: removeElementsFromTree(currentSlide.elements, deleted),
       }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
-      return changed({ ...state, slides }, command, [slide.id], elementIds)
+      return changed(
+        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, elementIds),
+        command,
+        [slide.id],
+        elementIds,
+      )
     }
     case 'element.update': {
       const elementIds = typeof command.payload.id === 'string'
@@ -246,33 +315,45 @@ export const applyPresentationCommand = (
       const slideIndex = findSlideIndex(state, command.payload.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Target slide not found')
-      const present = new Set(currentSlide.elements.map(element => element.id))
-      const missing = elementIds.find(id => !present.has(id))
+      const missing = elementIds.find(id => !findElementById(currentSlide.elements, id))
       if (missing) throw new PresentationCommandError(`Element not found: ${missing}`)
-      const elements = currentSlide.elements.map(element => {
-        return targetIds.has(element.id) ? { ...element, ...command.payload.props } as PPTElement : element
-      })
+      const elements = updateElementTreeByIds(
+        currentSlide.elements,
+        targetIds,
+        element => ({ ...element, ...command.payload.props }) as PPTElement,
+      )
       const slide = { ...currentSlide, elements }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
-      return changed({ ...state, slides }, command, [slide.id], elementIds)
+      return changed(
+        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, elementIds),
+        command,
+        [slide.id],
+        elementIds,
+      )
     }
     case 'element.properties.remove': {
       const properties = normalizePropertyList(command.payload.property)
       const slideIndex = findSlideIndex(state)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
-      let didChange = false
-      const elements = currentSlide.elements.map(element => {
-        if (element.id !== command.payload.id) return element
-        didChange = true
-        return omitProperties(element, properties) as PPTElement
-      })
-      if (!didChange) throw new PresentationCommandError(`Element not found: ${command.payload.id}`)
+      if (!findElementById(currentSlide.elements, command.payload.id)) {
+        throw new PresentationCommandError(`Element not found: ${command.payload.id}`)
+      }
+      const elements = updateElementTreeByIds(
+        currentSlide.elements,
+        new Set([command.payload.id]),
+        element => omitProperties(element, properties) as PPTElement,
+      )
       const slide = { ...currentSlide, elements }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
-      return changed({ ...state, slides }, command, [slide.id], [command.payload.id])
+      return changed(
+        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, [command.payload.id]),
+        command,
+        [slide.id],
+        [command.payload.id],
+      )
     }
   }
 }

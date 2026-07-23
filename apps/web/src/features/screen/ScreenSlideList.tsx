@@ -1,6 +1,11 @@
 import { useMemo, type MouseEvent } from 'react'
 
-import { selectFormattedCurrentSlideAnimations, type PresentationState, type Slide } from '@mona/presentation-core'
+import {
+  resolveSlideRenderGraph,
+  selectFormattedCurrentSlideAnimations,
+  type PPTElementLink,
+  type PresentationState,
+} from '@mona/presentation-core'
 
 import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
 import { getSlideBackgroundStyle } from '@/features/presentation-renderer/render-utils'
@@ -35,13 +40,17 @@ export function ScreenSlideList({
   turnSlideToId,
 }: ScreenSlideListProps) {
   const slides = useMemo(() => resolveTurningModes(presentation.slides), [presentation.slides])
+  const renderGraphs = useMemo(
+    () => new Map(slides.map(slide => [
+      slide.id,
+      resolveSlideRenderGraph(slide, presentation.sourcePackages),
+    ])),
+    [presentation.sourcePackages, slides],
+  )
   const currentMode = slides[presentation.slideIndex]?.turningMode
   const scale = presentation.viewportSize ? slideWidth / presentation.viewportSize : 1
 
-  const openLink = (event: MouseEvent<HTMLAnchorElement>, slide: Slide, elementId: string) => {
-    const element = slide.elements.find(candidate => candidate.id === elementId)
-    const link = element?.link
-    if (!link) return
+  const openLink = (event: MouseEvent<HTMLAnchorElement>, link: PPTElementLink) => {
     event.preventDefault()
     if (link.type === 'web') {
       manualExitFullscreen()
@@ -78,7 +87,8 @@ export function ScreenSlideList({
                   }}
                 >
                   <div className="mona-screen-slide-background" style={getSlideBackgroundStyle(slide.background)} />
-                  {slide.elements.map((element, elementIndex) => {
+                  {(renderGraphs.get(slide.id) ?? []).map(node => {
+                    const { element } = node
                     const renderer = (
                       <ElementRenderer
                         element={element}
@@ -95,7 +105,7 @@ export function ScreenSlideList({
                       color: presentation.theme.fontColor,
                       fontFamily: presentation.theme.fontName,
                       visibility: needsEntryWait(presentation, element.id, animationIndex) ? 'hidden' as const : 'visible' as const,
-                      zIndex: elementIndex + 1,
+                      zIndex: node.zIndex,
                     }
                     if (element.link) {
                       const linkBounds = element.type === 'line'
@@ -117,7 +127,7 @@ export function ScreenSlideList({
                             aria-label={element.name || element.link.target}
                             className="mona-screen-element-link"
                             href={element.link.type === 'web' ? element.link.target : `#${element.link.target}`}
-                            onClick={event => openLink(event, slide, element.id)}
+                            onClick={event => openLink(event, element.link!)}
                             rel={element.link.type === 'web' ? 'noopener noreferrer' : undefined}
                             style={{
                               height: linkBounds.height,

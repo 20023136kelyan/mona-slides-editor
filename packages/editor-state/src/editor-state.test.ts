@@ -96,9 +96,9 @@ describe('canonical editor state adapter', () => {
   it('clamps canvas zoom to the supported command extrema', () => {
     const store = createEditorStore({ presentation: createTestPresentation() })
     store.dispatch(editorActions.canvasZoomChanged(500))
-    expect(store.getState().session.canvasZoom).toBe(205)
+    expect(store.getState().session.canvasZoom).toBe(300)
     store.dispatch(editorActions.canvasZoomChanged(-500))
-    expect(store.getState().session.canvasZoom).toBe(25)
+    expect(store.getState().session.canvasZoom).toBe(10)
   })
 
   it('restores history atomically and preserves still-valid document selection', () => {

@@ -1,8 +1,8 @@
 # Mona editor implementation study
 
-**Status:** implementation blueprint, not an implementation
+**Status:** living implementation blueprint and release-evidence record
 
-**Date:** 2026-07-23
+**Date:** 2026-07-24
 
 **Scope:** map the observed Canva editor behavior and global header model onto the current Mona React codebase, end to end.
 
@@ -1460,7 +1460,7 @@ No gate should update a performance baseline merely to make a regression pass. F
 
 ## 21. Implementation status and release evidence
 
-The scoped implementation described by Gates 0–7 is present as of 2026-07-23,
+The scoped implementation described by Gates 0–7 is present as of 2026-07-24,
 and the release matrix below passes. This is not a blanket Canva-parity claim
 or a declaration that the broader Mona product is finished. A gate is only
 closed for the explicit workflows and evidence named in this document;
@@ -1483,26 +1483,46 @@ The verified scoped implementation includes:
   state for Mona-managed AI;
 - managed Wikimedia image search/import with signed results, content
   validation, and content-addressed local assets;
+- native chart-data/type editing, table creation/structural editing (including
+  merged-cell row/column guards), image crop commit/undo, URL media insertion,
+  and durable blob-backed media uploads through the existing IndexedDB media
+  capture/restore path; the table-size picker is keyboard operable and chart
+  data cells have stable accessible names;
+- a complete import/edit/export lifecycle: serialized and PPTX imports are
+  single-flight and atomically undoable, full-document imports reset stale
+  editor interaction state, appended imports clear stale selection state,
+  export filenames are safe without changing the stored document title, and
+  JSON, Mona, and editable PPTX artifacts are verified by re-reading or
+  re-importing them; corrupt input leaves the working deck unchanged, export
+  ranges and modes are named for assistive technology, and PDF printing has
+  load/error cleanup;
+- the five redistribution-safe PPTX corpus decks are executable browser
+  regressions for live slide/element types, hyperlinks, notes, grouping,
+  rotation, and viewport geometry; known chart-generator, group, and SmartArt
+  limits remain explicit in `tests/corpus/baselines` rather than being
+  represented as supported fidelity; ordinary PowerPoint groups now import as
+  actionable Mona groups, while nested group hierarchy and editable SmartArt
+  remain format-model limits;
 - working-copy persistence and legacy-namespace migration;
 - keyboard focus restoration, modal focus containment, reduced-motion
   behavior, compact-width bounds, and selection-guide stability.
 
-Release verification on 2026-07-23:
+Release verification on 2026-07-24:
 
 - type-check: passed across web, agent server, and packages;
 - lint and i18n synchronization: passed;
 - architecture audit: passed;
 - presentation core: 44 tests passed;
-- React/unit/browser components: 166 tests passed;
-- agent server: 9 tests passed;
-- Playwright editor E2E: 23 tests passed;
+- React/unit/browser components: 191 tests passed;
+- agent server: 12 tests passed;
+- Playwright editor E2E: 35 tests passed;
 - production stability: 2 tests passed, 173 listeners before and after,
-  navigation p95 25.0 ms, zero long tasks, and thumbnail DOM identity
+  navigation p95 24.4 ms, zero long tasks, and thumbnail DOM identity
   preserved;
-- memory profile after 16 agent-panel cycles: 1,003,220 bytes heap growth,
-  92 DOM nodes, and zero document growth, within the 8 MB / 250-node budgets;
-- production runtime median: editor ready 138.6 ms, FCP 56 ms, initial transfer
-  637,564 bytes, 1,943,384 decoded bytes, and 11.2 MB used JS heap;
+- memory profile after 16 agent-panel cycles: 994,012 bytes heap growth,
+  86 DOM nodes, and zero document growth, within the 8 MB / 250-node budgets;
+- production runtime median: editor ready 133.5 ms, FCP 48 ms, initial transfer
+  649,935 bytes, 1,977,303 decoded bytes, and 10 MB used JS heap;
 - cold-route feature splitting reduced initial transfer by 24.7% and decoded
   resources by 27.1% from the pre-remediation measurement. Slideshow, mobile,
   rail catalogs, inspectors, secondary panels, equation rendering, drawing,
@@ -1513,6 +1533,11 @@ Release verification on 2026-07-23:
   startup;
 - the state performance budget test passed without rewriting its stored
   baseline;
+- the distribution contains 8,009,681 bytes of JavaScript (2,796,132 bytes
+  gzip) and 61,662,888 bytes of sliced presentation fonts. The largest
+  JavaScript asset is the 1,821,047-byte font-subsetting WebAssembly chunk,
+  which remains off the cold editor route and loads with the export/subsetting
+  workflow;
 - `npm audit --omit=dev` still reports the documented 13 transitive findings
   (1 high, 12 moderate) in the two reviewed dependency families, and the
   production assets contain no Chevrotain or Langium parser implementation.

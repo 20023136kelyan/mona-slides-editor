@@ -310,11 +310,11 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
       // keyboard zoom shortcuts. Wheel zoom follows the shared modifier state.
       if (!event.ctrlKey) return
       const zoom = selectCanvasZoom(runtime.store.getState())
-      if (event.key === '-' && zoom >= 30) {
+      if (event.key === '-' && zoom > 10) {
         event.preventDefault()
         runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
       }
-      else if (event.key === '=' && zoom <= 200) {
+      else if (event.key === '=' && zoom < 300) {
         event.preventDefault()
         runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
       }
@@ -1654,6 +1654,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                 onPointerDown: event => handleElementPointerDown(event, element),
                 onPointerUp: () => runtime.shapeFormatPainter.apply(element),
               })}
+              sourcePackages={presentation.sourcePackages}
               slide={renderedSlide}
               tableEditor={element => ({
                 editable: tableEditorId === element.id,
@@ -1956,6 +1957,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
             label: t('foundation.editor.link.slideOption', { number: index + 1 }),
           }))}
           slides={presentation.slides}
+          sourcePackages={presentation.sourcePackages}
           theme={presentation.theme}
           viewportRatio={presentation.viewportRatio}
           viewportSize={presentation.viewportSize}

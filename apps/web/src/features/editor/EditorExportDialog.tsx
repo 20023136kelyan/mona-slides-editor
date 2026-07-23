@@ -27,15 +27,15 @@ export interface EditorExportActions {
   exportJson: () => void
   exportNative: (slides: Slide[]) => void
   exportPptx: (slides: Slide[], masterOverwrite: boolean, ignoreMedia: boolean) => Promise<void>
-  printPdf: (node: HTMLElement, page: { height: number; margin: number; width: number }) => void
+  printPdf: (node: HTMLElement, page: { height: number; margin: number; width: number }) => Promise<void>
 }
 
 function ExportButton({ children, className = '', onClick, primary = false }: { children: ReactNode; className?: string; onClick: () => void; primary?: boolean }) {
   return <Button className={`mona-export-button ${primary ? 'is-primary' : 'is-default'} ${className}`} onClick={onClick} size="editor" variant={primary ? 'default' : 'outline'}>{children}</Button>
 }
 
-function ExportRadioGroup({ items, onChange, value }: { items: Array<{ label: string; value: string }>; onChange: (value: string) => void; value: string }) {
-  return <ToggleGroup className="mona-export-radio-group" onValueChange={next => {
+function ExportRadioGroup({ ariaLabel, items, onChange, value }: { ariaLabel: string; items: Array<{ label: string; value: string }>; onChange: (value: string) => void; value: string }) {
+  return <ToggleGroup aria-label={ariaLabel} className="mona-export-radio-group" onValueChange={next => {
     if (next) onChange(next)
   }} spacing={0} type="single" value={value} variant="outline">{items.map(item => <ToggleGroupItem className="mona-export-radio" key={item.value} value={item.value}>{item.label}</ToggleGroupItem>)}</ToggleGroup>
 }
@@ -44,17 +44,17 @@ function ExportSwitch({ ariaLabel, checked, onChange }: { ariaLabel: string; che
   return <Switch aria-label={ariaLabel} checked={checked} className="mona-export-switch" onCheckedChange={onChange} />
 }
 
-function ExportSlider({ max, min, onChange, step, value }: { max: number; min: number; onChange: (value: number) => void; step: number; value: number }) {
-  return <Slider aria-label="slider" className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange(next[0] ?? value)} step={step} value={[value]} />
+function ExportSlider({ ariaLabel, max, min, onChange, step, value }: { ariaLabel: string; max: number; min: number; onChange: (value: number) => void; step: number; value: number }) {
+  return <Slider aria-label={ariaLabel} className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange(next[0] ?? value)} step={step} value={[value]} />
 }
 
-function ExportRangeSlider({ max, min, onChange, step, value }: { max: number; min: number; onChange: (value: [number, number]) => void; step: number; value: [number, number] }) {
-  return <Slider aria-label="range slider" className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange([next[0] ?? value[0], next[1] ?? value[1]])} step={step} value={value} />
+function ExportRangeSlider({ ariaLabel, max, min, onChange, step, value }: { ariaLabel: string; max: number; min: number; onChange: (value: [number, number]) => void; step: number; value: [number, number] }) {
+  return <Slider aria-label={ariaLabel} className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange([next[0] ?? value[0], next[1] ?? value[1]])} step={step} value={value} />
 }
 
 function HiddenSlideSurfaces({ breakEvery, className, slides, presentation }: { breakEvery?: number; className: string; slides: Slide[]; presentation: ReturnType<typeof selectPresentation> }) {
   const scale = 1600 / presentation.viewportSize
-  return <>{slides.map((slide, index) => <div className={`mona-export-thumbnail ${className}${breakEvery && (index + 1) % breakEvery === 0 ? ' break-page' : ''}`} key={slide.id} style={{ height: 1600 * presentation.viewportRatio, width: 1600 }}><div style={{ height: presentation.viewportSize * presentation.viewportRatio, transform: `scale(${scale})`, transformOrigin: '0 0', width: presentation.viewportSize }}><SlideRenderer slide={slide} theme={presentation.theme} thumbnail viewportRatio={presentation.viewportRatio} viewportSize={presentation.viewportSize} /></div></div>)}</>
+  return <>{slides.map((slide, index) => <div className={`mona-export-thumbnail ${className}${breakEvery && (index + 1) % breakEvery === 0 ? ' break-page' : ''}`} key={slide.id} style={{ height: 1600 * presentation.viewportRatio, width: 1600 }}><div style={{ height: presentation.viewportSize * presentation.viewportRatio, transform: `scale(${scale})`, transformOrigin: '0 0', width: presentation.viewportSize }}><SlideRenderer slide={slide} sourcePackages={presentation.sourcePackages} theme={presentation.theme} thumbnail viewportRatio={presentation.viewportRatio} viewportSize={presentation.viewportSize} /></div></div>)}</>
 }
 
 const selectedSlides = (slides: Slide[], current: Slide, type: RangeType, range: [number, number]) => {
@@ -84,9 +84,9 @@ function PptxExport({ actions, close, onExporting, runtime }: ExportPanelProps) 
   return <div className="mona-export-panel mona-export-pptx-panel">
     <div className="mona-export-thumbnails-view"><div ref={hiddenRef}><HiddenSlideSurfaces className="mona-export-image-pptx-thumbnail" presentation={presentation} slides={mode === 'image' ? slides : []} /></div></div>
     <div className="mona-export-configs is-wide">
-      <ExportRow label={t('export.range')}><ExportRadioGroup items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
-      <ExportRow label={t('export.mode')}><ExportRadioGroup items={[{ label: t('export.standard'), value: 'standard' }, { label: t('export.imageOnly'), value: 'image' }]} onChange={value => setMode(value as 'image' | 'standard')} value={mode} /></ExportRow>
-      {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`} marginBottom={32}><ExportRangeSlider max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
+      <ExportRow label={t('export.range')}><ExportRadioGroup ariaLabel={t('export.range')} items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
+      <ExportRow label={t('export.mode')}><ExportRadioGroup ariaLabel={t('export.mode')} items={[{ label: t('export.standard'), value: 'standard' }, { label: t('export.imageOnly'), value: 'image' }]} onChange={value => setMode(value as 'image' | 'standard')} value={mode} /></ExportRow>
+      {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`} marginBottom={32}><ExportRangeSlider ariaLabel={t('common.customRange')} max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
       {mode === 'standard' ? <>
         <ExportRow label={t('export.ignoreMedia')}><ExportSwitch ariaLabel={t('export.ignoreMedia')} checked={ignoreMedia} onChange={setIgnoreMedia} /></ExportRow>
         <ExportRow label={t('export.overwriteMaster')}><ExportSwitch ariaLabel={t('export.overwriteMaster')} checked={masterOverwrite} onChange={setMasterOverwrite} /></ExportRow>
@@ -105,8 +105,8 @@ function NativeExport({ actions, close, runtime }: ExportPanelProps) {
   const [range, setRange] = useState<[number, number]>([1, presentation.slides.length])
   const slides = selectedSlides(presentation.slides, current, rangeType, range)
   return <div className="mona-export-panel mona-export-native-panel"><div className="mona-export-configs is-wide">
-    <ExportRow label={t('export.range')}><ExportRadioGroup items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
-    {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`}><ExportRangeSlider max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
+    <ExportRow label={t('export.range')}><ExportRadioGroup ariaLabel={t('export.range')} items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
+    {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`}><ExportRangeSlider ariaLabel={t('common.customRange')} max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
     <div className="mona-export-tip">{t('export.nativeFileTip')}</div>
   </div><ExportButtons close={close} label={t('export.exportNative')} onExport={() => actions.exportNative(slides)} /></div>
 }
@@ -134,15 +134,15 @@ function ImageExport({ actions, close, onExporting, runtime }: ExportPanelProps)
     void actions.exportImage(hiddenRef.current!, format, quality, ignoreWebfont).finally(() => onExporting(false))
   }
   return <div className="mona-export-panel mona-export-image-panel"><div className="mona-export-thumbnails-view"><div ref={hiddenRef}><HiddenSlideSurfaces className="mona-export-image-thumbnail" presentation={presentation} slides={slides} /></div></div><div className="mona-export-configs is-wide">
-    <ExportRow label={t('export.format')}><ExportRadioGroup items={[{ label: 'JPEG', value: 'jpeg' }, { label: 'PNG', value: 'png' }]} onChange={value => setFormat(value as 'jpeg' | 'png')} value={format} /></ExportRow>
-    <ExportRow label={t('export.range')}><ExportRadioGroup items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
-    {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`} marginBottom={32}><ExportRangeSlider max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
-    <ExportRow label={t('export.imageQuality')}><ExportSlider max={1} min={0} onChange={setQuality} step={0.1} value={quality} /></ExportRow>
+    <ExportRow label={t('export.format')}><ExportRadioGroup ariaLabel={t('export.format')} items={[{ label: 'JPEG', value: 'jpeg' }, { label: 'PNG', value: 'png' }]} onChange={value => setFormat(value as 'jpeg' | 'png')} value={format} /></ExportRow>
+    <ExportRow label={t('export.range')}><ExportRadioGroup ariaLabel={t('export.range')} items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
+    {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`} marginBottom={32}><ExportRangeSlider ariaLabel={t('common.customRange')} max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
+    <ExportRow label={t('export.imageQuality')}><ExportSlider ariaLabel={t('export.imageQuality')} max={1} min={0} onChange={setQuality} step={0.1} value={quality} /></ExportRow>
     <ExportRow label={t('export.ignoreWebFonts')}><ExportSwitch ariaLabel={t('export.ignoreWebFonts')} checked={ignoreWebfont} onChange={setIgnoreWebfont} /></ExportRow>
   </div><ExportButtons close={close} label={t('export.exportImage')} onExport={execute} /></div>
 }
 
-function PdfExport({ actions, close, runtime }: ExportPanelProps) {
+function PdfExport({ actions, close, onExporting, runtime }: ExportPanelProps) {
   const { t } = useTranslation()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const current = presentation.slides[presentation.slideIndex]!
@@ -151,9 +151,13 @@ function PdfExport({ actions, close, runtime }: ExportPanelProps) {
   const [count, setCount] = useState(1)
   const [padding, setPadding] = useState(true)
   const slides = rangeType === 'current' ? [current] : presentation.slides
-  const execute = () => actions.printPdf(hiddenRef.current!, { width: 1600, height: 1600 * presentation.viewportRatio * (rangeType === 'all' ? count : 1), margin: padding ? 50 : 0 })
+  const execute = () => {
+    onExporting(true)
+    void actions.printPdf(hiddenRef.current!, { width: 1600, height: 1600 * presentation.viewportRatio * (rangeType === 'all' ? count : 1), margin: padding ? 50 : 0 })
+      .finally(() => onExporting(false))
+  }
   return <div className="mona-export-panel mona-export-pdf-panel"><div className="mona-export-thumbnails-view"><div ref={hiddenRef}><HiddenSlideSurfaces breakEvery={rangeType === 'all' ? count : undefined} className="mona-export-pdf-thumbnail" presentation={presentation} slides={slides} /></div></div><div className="mona-export-configs is-pdf">
-    <ExportRow label={t('export.range')}><ExportRadioGroup items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }]} onChange={value => setRangeType(value as 'all' | 'current')} value={rangeType} /></ExportRow>
+    <ExportRow label={t('export.range')}><ExportRadioGroup ariaLabel={t('export.range')} items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }]} onChange={value => setRangeType(value as 'all' | 'current')} value={rangeType} /></ExportRow>
     <ExportRow label={t('export.slidesPerPage')}><InspectorSelect ariaLabel={t('export.slidesPerPage')} onChange={value => setCount(+value)} options={[1, 2, 3].map(value => ({ label: `${value}`, value }))} value={count} /></ExportRow>
     <ExportRow label={t('export.pageMargin')}><ExportSwitch ariaLabel={t('export.pageMargin')} checked={padding} onChange={setPadding} /></ExportRow>
     <div className="mona-export-tip">{t('export.printTip')}</div>

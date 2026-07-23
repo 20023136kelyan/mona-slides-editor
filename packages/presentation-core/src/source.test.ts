@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest'
+
+import { applyPresentationCommand } from './commands'
+import type { PresentationState } from './state'
+import type { PowerPointPackageReference } from './source'
+
+const presentation = (): PresentationState => ({
+  slides: [{ elements: [], id: 'slide-1' }],
+  slideIndex: 0,
+  templates: [],
+  theme: {
+    backgroundColor: '#fff',
+    fontColor: '#111',
+    fontName: 'Arial',
+    outline: { color: '#000', style: 'solid', width: 1 },
+    shadow: { blur: 0, color: '#000', h: 0, v: 0 },
+    themeColors: [],
+  },
+  title: 'Fixture',
+  viewportRatio: 0.5625,
+  viewportSize: 1000,
+})
+
+const sourcePackage: PowerPointPackageReference = {
+  byteLength: 1024,
+  fileName: 'source.pptx',
+  kind: 'pptx',
+  packageId: 'pptx:fixture',
+  slides: [{
+    layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+    masterPart: 'ppt/slideMasters/slideMaster1.xml',
+    slidePart: 'ppt/slides/slide1.xml',
+    themePart: 'ppt/theme/theme1.xml',
+  }],
+}
+
+describe('PowerPoint source package state', () => {
+  it('attaches serializable package references without placing archive bytes in presentation history', () => {
+    const state = presentation()
+    const result = applyPresentationCommand(state, {
+      type: 'presentation.source-packages.replace',
+      sourcePackages: [sourcePackage],
+    })
+
+    expect(result.state.sourcePackages).toEqual([sourcePackage])
+    expect(result.state.slides).toBe(state.slides)
+    expect(JSON.stringify(result.state)).toContain('"packageId":"pptx:fixture"')
+    expect(JSON.stringify(result.state)).not.toContain('Uint8Array')
+  })
+
+  it('journals the exact OOXML parts and native objects touched by an element edit', () => {
+    const state: PresentationState = {
+      ...presentation(),
+      slides: [{
+        elements: [{
+          fixedRatio: true,
+          height: 100,
+          id: 'source-image',
+          left: 0,
+          rotate: 0,
+          source: {
+            kind: 'pptx',
+            nativeShapeId: '7',
+            packageId: sourcePackage.packageId,
+            slidePart: sourcePackage.slides[0]!.slidePart,
+            sourceLayer: 'slide',
+            sourceObjectId: 'pptx:fixture/ppt/slides/slide1.xml#7',
+            sourceOrder: 1,
+            sourcePart: sourcePackage.slides[0]!.slidePart,
+            stableId: 'pptx:fixture/ppt/slides/slide1.xml#7',
+          },
+          src: 'data:image/png;base64,',
+          top: 0,
+          type: 'image',
+          width: 100,
+        }, {
+          fixedRatio: true,
+          height: 100,
+          id: 'diagram-image',
+          left: 0,
+          rotate: 0,
+          source: {
+            kind: 'pptx',
+            nativeShapeId: '12',
+            packageId: sourcePackage.packageId,
+            slidePart: sourcePackage.slides[0]!.slidePart,
+            sourceLayer: 'slide',
+            sourceObjectId: 'pptx:fixture/ppt/diagrams/drawing1.xml#12',
+            sourceOrder: 2,
+            sourcePart: 'ppt/diagrams/drawing1.xml',
+            stableId: 'pptx:fixture/ppt/diagrams/drawing1.xml#12',
+          },
+          src: 'data:image/png;base64,',
+          top: 0,
+          type: 'image',
+          width: 100,
+        }],
+        id: 'slide-1',
+        source: {
+          ...sourcePackage.slides[0]!,
+          kind: 'pptx',
+          packageId: sourcePackage.packageId,
+        },
+      }],
+      sourcePackages: [sourcePackage],
+    }
+
+    const result = applyPresentationCommand(state, {
+      payload: { id: ['source-image', 'diagram-image'], props: { left: 10 } },
+      type: 'element.update',
+    })
+
+    expect(result.state.sourcePackages?.[0]?.dirty).toEqual({
+      parts: [{
+        objectIds: ['pptx:fixture/ppt/diagrams/drawing1.xml#12'],
+        partPath: 'ppt/diagrams/drawing1.xml',
+        reasons: ['element.update'],
+      }, {
+        objectIds: ['pptx:fixture/ppt/slides/slide1.xml#7'],
+        partPath: 'ppt/slides/slide1.xml',
+        reasons: ['element.update'],
+      }],
+      revision: 1,
+    })
+    expect(result.state.sourcePackages?.[0]?.dirty?.parts).toHaveLength(2)
+  })
+})

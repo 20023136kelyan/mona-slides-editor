@@ -136,9 +136,9 @@ const presets: Array<{
 
 function PropertyRow({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="mona-panel-row">
-      <div className="mona-panel-row-label">{label}</div>
-      <div className="mona-panel-row-control">{children}</div>
+    <div className="flex w-full items-center mb-2.5">
+      <div className="w-[48%] text-xs">{label}</div>
+      <div className="w-[52%] [&>*]:w-full">{children}</div>
     </div>
   )
 }
@@ -405,14 +405,14 @@ export function RichTextBaseControls({
         <InspectorButton ariaLabel={t('foundation.editor.text.decreaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-reduce' })} style={{ flex: 1 }}><FontSizeIcon />-</InspectorButton>
       </InspectorButtonGroup>
 
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.bold} ariaLabel={t('foundation.editor.text.bold')} onClick={() => execute({ command: 'bold' })} style={{ flex: 1 }}><TextBoldIcon /></InspectorButton>
         <InspectorButton active={attrs.em} ariaLabel={t('foundation.editor.text.italic')} onClick={() => execute({ command: 'em' })} style={{ flex: 1 }}><TextItalicIcon /></InspectorButton>
         <InspectorButton active={attrs.underline} ariaLabel={t('foundation.editor.text.underline')} onClick={() => execute({ command: 'underline' })} style={{ flex: 1 }}><TextUnderlineIcon /></InspectorButton>
         <InspectorButton active={attrs.strikethrough} ariaLabel={t('foundation.editor.text.strikethrough')} onClick={() => execute({ command: 'strikethrough' })} style={{ flex: 1 }}><StrikethroughIcon /></InspectorButton>
       </InspectorButtonGroup>
 
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.superscript} ariaLabel={t('foundation.editor.text.superscript')} onClick={() => execute({ command: 'superscript' })} style={{ flex: 1 }}>A²</InspectorButton>
         <InspectorButton active={attrs.subscript} ariaLabel={t('foundation.editor.text.subscript')} onClick={() => execute({ command: 'subscript' })} style={{ flex: 1 }}>A₂</InspectorButton>
         <InspectorButton active={attrs.code} ariaLabel={t('foundation.editor.text.code')} onClick={() => execute({ command: 'code' })} style={{ flex: 1 }}><CodeIcon /></InspectorButton>
@@ -433,14 +433,14 @@ export function RichTextBaseControls({
       </InspectorButtonGroup>
 
       <div className="mona-panel-divider" />
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.align === 'left'} ariaLabel={t('foundation.editor.text.alignLeft')} onClick={() => execute({ command: 'align', value: 'left' })} style={{ flex: 1 }}><AlignLeftIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'center'} ariaLabel={t('foundation.editor.text.alignCenter')} onClick={() => execute({ command: 'align', value: 'center' })} style={{ flex: 1 }}><AlignCenterIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'right'} ariaLabel={t('foundation.editor.text.alignRight')} onClick={() => execute({ command: 'align', value: 'right' })} style={{ flex: 1 }}><AlignRightIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'justify'} ariaLabel={t('foundation.editor.text.justify')} onClick={() => execute({ command: 'align', value: 'justify' })} style={{ flex: 1 }}><AlignBothIcon /></InspectorButton>
       </InspectorButtonGroup>
 
-      <div className="mona-panel-split-row">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5">
         <InspectorButtonGroup>
           <InspectorButton active={attrs.bulletList} ariaLabel={t('foundation.editor.text.bullets')} onClick={() => execute({ command: 'bulletList' })} style={{ flex: 1 }}><ListIcon /></InspectorButton>
           <ListStylePopover ariaLabel={t('foundation.editor.text.bulletStyle')} onSelect={value => execute({ command: 'bulletList', value })} options={['disc', 'circle', 'square']} roundAll />
@@ -451,7 +451,7 @@ export function RichTextBaseControls({
         </InspectorButtonGroup>
       </div>
 
-      <div className="mona-panel-split-row">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5">
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.text.decreaseIndent')} onClick={() => execute({ command: 'indent', value: '-1' })} style={{ flex: 1 }}><IndentLeftIcon /></InspectorButton>
           <IndentPopover ariaLabel={t('foundation.editor.text.decreaseFirstIndent')} onSelect={() => execute({ command: 'textIndent', value: '-1' })} />
@@ -575,14 +575,14 @@ export function TextStylePanel({
         </InspectorButton>
       </InspectorButtonGroup>
 
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.bold} ariaLabel={t('foundation.editor.text.bold')} onClick={() => execute({ command: 'bold' })} style={{ flex: 1 }}><TextBoldIcon /></InspectorButton>
         <InspectorButton active={attrs.em} ariaLabel={t('foundation.editor.text.italic')} onClick={() => execute({ command: 'em' })} style={{ flex: 1 }}><TextItalicIcon /></InspectorButton>
         <InspectorButton active={attrs.underline} ariaLabel={t('foundation.editor.text.underline')} onClick={() => execute({ command: 'underline' })} style={{ flex: 1 }}><TextUnderlineIcon /></InspectorButton>
         <InspectorButton active={attrs.strikethrough} ariaLabel={t('foundation.editor.text.strikethrough')} onClick={() => execute({ command: 'strikethrough' })} style={{ flex: 1 }}><StrikethroughIcon /></InspectorButton>
       </InspectorButtonGroup>
 
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.superscript} ariaLabel={t('foundation.editor.text.superscript')} onClick={() => execute({ command: 'superscript' })} style={{ flex: 1 }}>A²</InspectorButton>
         <InspectorButton active={attrs.subscript} ariaLabel={t('foundation.editor.text.subscript')} onClick={() => execute({ command: 'subscript' })} style={{ flex: 1 }}>A₂</InspectorButton>
         <InspectorButton active={attrs.code} ariaLabel={t('foundation.editor.text.code')} onClick={() => execute({ command: 'code' })} style={{ flex: 1 }}><CodeIcon /></InspectorButton>
@@ -603,14 +603,14 @@ export function TextStylePanel({
       </InspectorButtonGroup>
 
       <div className="mona-panel-divider" />
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.align === 'left'} ariaLabel={t('foundation.editor.text.alignLeft')} onClick={() => execute({ command: 'align', value: 'left' })} style={{ flex: 1 }}><AlignLeftIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'center'} ariaLabel={t('foundation.editor.text.alignCenter')} onClick={() => execute({ command: 'align', value: 'center' })} style={{ flex: 1 }}><AlignCenterIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'right'} ariaLabel={t('foundation.editor.text.alignRight')} onClick={() => execute({ command: 'align', value: 'right' })} style={{ flex: 1 }}><AlignRightIcon /></InspectorButton>
         <InspectorButton active={attrs.align === 'justify'} ariaLabel={t('foundation.editor.text.justify')} onClick={() => execute({ command: 'align', value: 'justify' })} style={{ flex: 1 }}><AlignBothIcon /></InspectorButton>
       </InspectorButtonGroup>
 
-      <div className="mona-panel-split-row">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5">
         <InspectorButtonGroup>
           <InspectorButton active={attrs.bulletList} ariaLabel={t('foundation.editor.text.bullets')} onClick={() => execute({ command: 'bulletList' })} style={{ flex: 1 }}><ListIcon /></InspectorButton>
           <ListStylePopover ariaLabel={t('foundation.editor.text.bulletStyle')} onSelect={value => execute({ command: 'bulletList', value })} options={['disc', 'circle', 'square']} roundAll />
@@ -621,7 +621,7 @@ export function TextStylePanel({
         </InspectorButtonGroup>
       </div>
 
-      <div className="mona-panel-split-row">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5">
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.text.decreaseIndent')} onClick={() => execute({ command: 'indent', value: '-1' })} style={{ flex: 1 }}><IndentLeftIcon /></InspectorButton>
           <IndentPopover ariaLabel={t('foundation.editor.text.decreaseFirstIndent')} onSelect={() => execute({ command: 'textIndent', value: '-1' })} />
@@ -647,18 +647,18 @@ export function TextStylePanel({
       </PropertyRow>
 
       <div className="mona-panel-divider" />
-      <div className="mona-panel-split-row is-insets">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets">
         <InspectorNumberInput ariaLabel={t('foundation.editor.text.marginTop')} label={t('foundation.editor.text.marginTop')} max={50} min={0} onChange={value => updateInset(0, value)} value={inset[0]} />
         <InspectorNumberInput ariaLabel={t('foundation.editor.text.marginBottom')} label={t('foundation.editor.text.marginBottom')} max={50} min={0} onChange={value => updateInset(2, value)} value={inset[2]} />
       </div>
-      <div className="mona-panel-split-row is-insets">
+      <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets">
         <InspectorNumberInput ariaLabel={t('foundation.editor.text.marginLeft')} label={t('foundation.editor.text.marginLeft')} max={50} min={0} onChange={value => updateInset(3, value)} value={inset[3]} />
         <InspectorNumberInput ariaLabel={t('foundation.editor.text.marginRight')} label={t('foundation.editor.text.marginRight')} max={50} min={0} onChange={value => updateInset(1, value)} value={inset[1]} />
       </div>
 
       <div className="mona-panel-divider" />
       <PropertyRow label={t('foundation.editor.text.fixedHeight')}>
-        <div className="mona-panel-switch-wrapper">
+        <div className="w-full text-right">
           <InspectorSwitch ariaLabel={t('foundation.editor.text.fixedHeight')} checked={Boolean(element.fixedHeight)} onChange={value => {
             if (value) update({ fixedHeight: true, vAlign: element.vAlign || 'top' })
             else remove(['fixedHeight', 'vAlign'])
@@ -666,7 +666,7 @@ export function TextStylePanel({
         </div>
       </PropertyRow>
       {element.fixedHeight ? (
-        <InspectorButtonGroup className="mona-panel-row-full">
+        <InspectorButtonGroup className="flex w-full items-center mb-2.5">
           {([
             ['top', AlignTopIcon, 'alignTop'],
             ['middle', AlignMiddleIcon, 'alignMiddle'],
@@ -679,7 +679,7 @@ export function TextStylePanel({
 
       <div className="mona-panel-divider" />
       <PropertyRow label={t('foundation.editor.text.enableBorder')}>
-        <div className="mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableBorder')} checked={Boolean(element.outline)} onChange={value => value ? update({ outline: presentation.theme.outline }, `element-outline-${element.id}`) : remove('outline', `element-outline-${element.id}`)} /></div>
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableBorder')} checked={Boolean(element.outline)} onChange={value => value ? update({ outline: presentation.theme.outline }, `element-outline-${element.id}`) : remove('outline', `element-outline-${element.id}`)} /></div>
       </PropertyRow>
       {element.outline ? (
         <>
@@ -691,7 +691,7 @@ export function TextStylePanel({
 
       <div className="mona-panel-divider" />
       <PropertyRow label={t('foundation.editor.text.enableShadow')}>
-        <div className="mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableShadow')} checked={Boolean(element.shadow)} onChange={value => value ? update({ shadow: presentation.theme.shadow }, `element-shadow-${element.id}`) : remove('shadow', `element-shadow-${element.id}`)} /></div>
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableShadow')} checked={Boolean(element.shadow)} onChange={value => value ? update({ shadow: presentation.theme.shadow }, `element-shadow-${element.id}`) : remove('shadow', `element-shadow-${element.id}`)} /></div>
       </PropertyRow>
       {element.shadow ? (
         <>

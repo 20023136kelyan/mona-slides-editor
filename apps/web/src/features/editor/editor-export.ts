@@ -18,6 +18,7 @@ import type {
 } from '@mona/presentation-core/model'
 
 import type { EditorExportActions } from '@/features/editor/EditorExportDialog'
+import { getExportFileStem } from '@/features/editor/editor-export-filename'
 import { encryptNativePresentation } from '@/features/editor/editor-file-format'
 import { applyPptxSlideMetadata } from '@/features/editor/editor-pptx-slide-metadata'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -289,35 +290,62 @@ function lineRange(element: PPTLineElement) {
   }
 }
 
-function printNode(node: HTMLElement, size: { height: number; margin: number; width: number }) {
-  const iframe = document.createElement('iframe')
-  Object.assign(iframe.style, { border: '0', height: '0', position: 'absolute', right: '0', top: '0', width: '0' })
-  document.body.append(iframe)
-  const frameDocument = iframe.contentDocument
-  const frameWindow = iframe.contentWindow
-  if (!frameDocument || !frameWindow) return
-  let stylesheet = ''
-  for (const sheet of document.styleSheets) {
-    try {
-      for (const rule of sheet.cssRules) stylesheet += rule.cssText
+function printNode(node: HTMLElement, size: { height: number; margin: number; title: string; width: number }) {
+  return new Promise<void>((resolve, reject) => {
+    const iframe = document.createElement('iframe')
+    Object.assign(iframe.style, { border: '0', height: '0', position: 'absolute', right: '0', top: '0', width: '0' })
+    let cleanupTimer: number | undefined
+    let loadTimer: number | undefined
+    let frameWindow: Window | null = null
+    let stylesheet = ''
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) stylesheet += rule.cssText
+      }
+      catch {
+        // Cross-origin stylesheets are intentionally skipped, matching browser print behavior.
+      }
     }
-    catch {
-      // Cross-origin stylesheets are intentionally skipped, matching browser print behavior.
+
+    const cleanup = () => {
+      if (cleanupTimer !== undefined) window.clearTimeout(cleanupTimer)
+      if (loadTimer !== undefined) window.clearTimeout(loadTimer)
+      iframe.removeEventListener('load', load)
+      frameWindow?.removeEventListener('afterprint', cleanup)
+      iframe.remove()
     }
-  }
-  frameDocument.open()
-  frameDocument.write(`<!DOCTYPE html><html><head><style>${stylesheet}html,body{height:auto;overflow:auto}@media print{@page{size:${size.width + size.margin * 2}px ${(size.height + size.margin * 2) * 1.005}px;margin:${size.margin}px;}}</style></head><body>${node.innerHTML}</body></html>`)
-  frameDocument.close()
-  const load = () => {
-    frameWindow.focus(); frameWindow.print() 
-  }
-  const cleanup = () => {
-    iframe.removeEventListener('load', load)
-    frameWindow.removeEventListener('afterprint', cleanup)
-    iframe.remove()
-  }
-  iframe.addEventListener('load', load)
-  frameWindow.addEventListener('afterprint', cleanup)
+    const fail = (error: unknown) => {
+      cleanup()
+      reject(error instanceof Error ? error : new Error('Print failed'))
+    }
+    const load = () => {
+      if (loadTimer !== undefined) window.clearTimeout(loadTimer)
+      if (!frameWindow) {
+        fail(new Error('Print frame is unavailable'))
+        return
+      }
+      try {
+        frameWindow.focus()
+        frameWindow.print()
+        resolve()
+        if (iframe.isConnected) cleanupTimer = window.setTimeout(cleanup, 60_000)
+      }
+      catch (error) {
+        fail(error)
+      }
+    }
+
+    iframe.addEventListener('load', load)
+    iframe.srcdoc = `<!DOCTYPE html><html><head><title>${xml(size.title)}</title><style>${stylesheet}html,body{height:auto;overflow:auto}@media print{@page{size:${size.width + size.margin * 2}px ${(size.height + size.margin * 2) * 1.005}px;margin:${size.margin}px;}}</style></head><body>${node.innerHTML}</body></html>`
+    document.body.append(iframe)
+    frameWindow = iframe.contentWindow
+    if (!frameWindow) {
+      fail(new Error('Print frame is unavailable'))
+      return
+    }
+    frameWindow.addEventListener('afterprint', cleanup)
+    loadTimer = window.setTimeout(() => fail(new Error('Print frame did not load')), 10_000)
+  })
 }
 
 async function exportEditablePptx(
@@ -325,6 +353,7 @@ async function exportEditablePptx(
   slides: Slide[],
   masterOverwrite: boolean,
   ignoreMedia: boolean,
+  fileStem: string,
   t: TFunction,
 ) {
   const ratioPx2Inch = 96 * (presentation.viewportSize / 960)
@@ -626,7 +655,7 @@ async function exportEditablePptx(
     }
   }
   await nextFrame()
-  await pptx.writeFile({ fileName: `${presentation.title}.pptx` })
+  await pptx.writeFile({ fileName: `${fileStem}.pptx` })
 }
 
 function exportPayload(presentation: PresentationState, slides = presentation.slides) {
@@ -642,6 +671,7 @@ function exportPayload(presentation: PresentationState, slides = presentation.sl
 export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): EditorExportActions {
   const { notifications } = useEditorApplication()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
+  const fileStem = getExportFileStem(presentation.title, t('header.untitledPresentation'))
   return useMemo(() => ({
     exportImage: async (node, format, quality, ignoreWebfont) => {
       try {
@@ -650,7 +680,7 @@ export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): Ed
         const config: ExportImageConfig = { quality, width: 1600 }
         if (ignoreWebfont) config.fontEmbedCSS = ''
         const data = await (format === 'png' ? toPng : toJpeg)(node, config)
-        saveAs(data, `${presentation.title}.${format}`)
+        saveAs(data, `${fileStem}.${format}`)
       }
       catch {
         notifications.notify({ text: t('runtime.exportImageFailed'), type: 'error' })
@@ -667,22 +697,43 @@ export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): Ed
           return toJpeg(node as HTMLElement, { quality: 1, width: 1600 })
         }))
         for (const data of images) pptx.addSlide().addImage({ data, h: presentation.viewportSize * presentation.viewportRatio / ratioPx2Inch, w: presentation.viewportSize / ratioPx2Inch, x: 0, y: 0 })
-        await pptx.writeFile({ fileName: `${presentation.title}.pptx` })
+        await pptx.writeFile({ fileName: `${fileStem}.pptx` })
       }
       catch {
         notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
-    exportJson: () => saveAs(new Blob([JSON.stringify(exportPayload(presentation))], { type: '' }), `${presentation.title}.json`),
-    exportNative: slides => saveAs(new Blob([encryptNativePresentation(JSON.stringify(exportPayload(presentation, slides)))], { type: '' }), `${presentation.title}.mona`),
+    exportJson: () => {
+      try {
+        saveAs(new Blob([JSON.stringify(exportPayload(presentation))], { type: '' }), `${fileStem}.json`)
+      }
+      catch {
+        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
+      }
+    },
+    exportNative: slides => {
+      try {
+        saveAs(new Blob([encryptNativePresentation(JSON.stringify(exportPayload(presentation, slides)))], { type: '' }), `${fileStem}.mona`)
+      }
+      catch {
+        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
+      }
+    },
     exportPptx: async (slides, masterOverwrite, ignoreMedia) => {
       try {
-        await exportEditablePptx(presentation, slides, masterOverwrite, ignoreMedia, t) 
+        await exportEditablePptx(presentation, slides, masterOverwrite, ignoreMedia, fileStem, t)
       }
       catch {
         notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
-    printPdf: printNode,
-  }), [notifications, presentation, t])
+    printPdf: async (node, page) => {
+      try {
+        await printNode(node, { ...page, title: fileStem })
+      }
+      catch {
+        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
+      }
+    },
+  }), [fileStem, notifications, presentation, t])
 }

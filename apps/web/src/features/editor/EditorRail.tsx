@@ -1,7 +1,7 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitives render divs; landmark roles are applied explicitly on them. */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, LayoutTemplate, PencilLine, Shapes, Type, Upload } from 'lucide-react'
+import { LayoutTemplate, X } from 'lucide-react'
 
 import ChartIcon from '~icons/icon-park-outline/chart-proportion'
 import ChartHistogramIcon from '~icons/icon-park-outline/chart-histogram'
@@ -28,7 +28,7 @@ import { SYMBOL_LIST } from '@mona/presentation-core/symbol-presets'
 import type { ChartType, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { LinePointMarker } from '@/features/editor/ElementStyleCommons'
@@ -37,7 +37,6 @@ import { EditorMediaInput } from '@/features/editor/EditorMediaInput'
 import { EditorTableGenerator } from '@/features/editor/EditorTableGenerator'
 import { CHART_TYPES } from '@/features/editor/editor-chart'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
-import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
 import type { EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
@@ -361,98 +360,23 @@ function TemplatePanel({ onInsertAll, onInsertOne, templates, theme }: {
 
 function DrawerAction({ children, icon, onClick }: { children: ReactNode; icon: ReactNode; onClick: () => void }) {
   return (
-    <Button className="mona-drawer-action" onClick={onClick} size="editor" type="button" variant="outline">
-      <span className="mona-drawer-action-icon">{icon}</span>
+    <Button
+      className="mona-drawer-action h-[34px] w-full justify-start gap-2 px-2.5 text-[13px]"
+      onClick={onClick}
+      size="editor"
+      type="button"
+      variant="outline"
+    >
+      <span className="mona-drawer-action-icon flex text-base [&_svg]:size-[1em]">{icon}</span>
       <span className="mona-drawer-action-label">{children}</span>
     </Button>
   )
 }
 
-export function EditorRail({
-  activePanel,
-  activeTool,
-  agentOpen,
-  customShapeActive,
-  drawingActive,
-  onCreateToolChange,
-  onPanelChange,
-  onToggleDrawing,
-  onToggleAgent,
-}: {
-  activePanel: EditorRailPanel | null
-  activeTool: EditorCreateTool | null
-  agentOpen: boolean
-  customShapeActive: boolean
-  drawingActive: boolean
-  onCreateToolChange: (tool: EditorCreateTool | null) => void
-  onPanelChange: (panel: EditorRailPanel | null, trigger?: HTMLElement | null) => void
-  onToggleDrawing: () => void
-  onToggleAgent: () => void
-}) {
-  const { t } = useTranslation()
-
-  const togglePanel = (panel: EditorRailPanel, trigger: HTMLElement) => {
-    // A previously armed text tool must not outlive its panel: switching to
-    // another pool would otherwise leave two rail items lit at once.
-    if (activePanel !== panel && activeTool?.type === 'text') onCreateToolChange(null)
-    onPanelChange(activePanel === panel ? null : panel, trigger)
-  }
-  const toggleTextPanel = (trigger: HTMLElement) => {
-    if (activePanel === 'text') {
-      onPanelChange(null, trigger)
-      if (activeTool?.type === 'text') onCreateToolChange(null)
-      return
-    }
-    onPanelChange('text', trigger)
-    onCreateToolChange({ type: 'text', key: 'text', vertical: false })
-  }
-
-  const railItems: Array<{
-    active: boolean
-    icon: ReactNode
-    key: string
-    label: string
-    onClick: (trigger: HTMLElement) => void
-  }> = [
-    { key: 'design', icon: <LayoutTemplate />, label: t('foundation.editor.rail.design'), active: activePanel === 'design', onClick: trigger => togglePanel('design', trigger) },
-    { key: 'elements', icon: <Shapes />, label: t('foundation.editor.rail.elements'), active: activePanel === 'elements' || activeTool?.type === 'shape' || activeTool?.type === 'line', onClick: trigger => togglePanel('elements', trigger) },
-    { key: 'text', icon: <Type />, label: t('foundation.editor.rail.text'), active: activePanel === 'text' || activeTool?.type === 'text', onClick: toggleTextPanel },
-    { key: 'uploads', icon: <Upload />, label: t('foundation.editor.rail.uploads'), active: activePanel === 'uploads', onClick: trigger => togglePanel('uploads', trigger) },
-    { key: 'draw', icon: <PencilLine />, label: t('foundation.editor.rail.draw'), active: drawingActive || customShapeActive, onClick: onToggleDrawing },
-    { key: 'ai', icon: <Bot />, label: t('foundation.editor.rail.ai'), active: agentOpen, onClick: onToggleAgent },
-  ]
-
-  return (
-    <Sidebar
-      aria-label={t('foundation.editor.rail.tools')}
-      className="mona-editor-rail border-r border-sidebar-border"
-      collapsible="none"
-      role="navigation"
-      side="left"
-    >
-      <SidebarContent className="mona-editor-rail-items">
-        {railItems.map(item => (
-          <Button
-            aria-label={item.label}
-            aria-pressed={item.active}
-            className={`mona-rail-item${item.active ? ' is-active' : ''}`}
-            data-task-panel-route={item.key === 'ai' || item.key === 'draw' ? undefined : item.key}
-            key={item.key}
-            onClick={event => item.onClick(event.currentTarget)}
-            onFocus={item.key === 'draw' ? prefetchDrawingWorkspace : undefined}
-            onPointerEnter={item.key === 'draw' ? prefetchDrawingWorkspace : undefined}
-            size="editor"
-            type="button"
-            variant="ghost"
-          >
-            <span className="mona-rail-item-icon">{item.icon}</span>
-            <span className="mona-rail-item-label">{item.label}</span>
-          </Button>
-        ))}
-      </SidebarContent>
-    </Sidebar>
-  )
-}
+const drawerStackClassName = 'mona-drawer-stack flex flex-col gap-2'
+const drawerHintClassName = 'mona-drawer-hint mx-0.5 mt-0.5 text-xs leading-normal text-muted-foreground'
+const drawerActionGridClassName = 'mona-drawer-action-grid grid grid-cols-2 gap-2 [&_.mona-drawer-action]:min-w-0 [&_.mona-drawer-action]:justify-start'
+const contextualDrawerHeaderClassName = 'mona-contextual-drawer-header flex min-h-10 shrink-0 items-center gap-1.5 border-b border-border pr-2 [&_.mona-inspector-tabs-header]:min-w-0 [&_.mona-inspector-tabs-header]:flex-1 [&_.mona-inspector-tabs-header]:border-b-0'
 
 export function EditorRailDrawer({
   activePanel,
@@ -524,7 +448,7 @@ export function EditorRailDrawer({
   return (
     <Sidebar
       aria-label={activePanel && panelTitle ? panelTitle : t('foundation.editor.inspector')}
-      className="mona-editor-drawer mona-render-inspector mona-element-inspector h-auto"
+      className="mona-editor-drawer w-72 shrink-0 overflow-hidden border-r border-sidebar-border"
       collapsible="none"
       onKeyDown={event => {
         if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -537,9 +461,17 @@ export function EditorRailDrawer({
     >
       {activePanel ? (
         <>
-          {/* No panel title and no close button: the open rail item names the
-              panel, and the border pill (plus Escape) is the one way out. */}
-          <SidebarContent className="mona-inspector-content mona-drawer-content" ref={poolScrollRef}>
+          {/* Extension header, from the block: title + close, border-b px-4. */}
+          <SidebarHeader className="flex flex-row items-center justify-between border-b border-sidebar-border px-4">
+            <h3 className="font-medium">{panelTitle}</h3>
+            <Button aria-label={t('foundation.editor.rail.collapse')} className="size-6 rounded-md hover:bg-sidebar-accent" onClick={onClose} size="icon-xs" type="button" variant="ghost">
+              <X className="h-4 w-4" />
+            </Button>
+          </SidebarHeader>
+          <SidebarContent
+            className="mona-inspector-content mona-drawer-content block min-h-0 has-[.mona-image-library-panel]:flex has-[.mona-image-library-panel]:overflow-hidden has-[.mona-image-library-panel]:p-0"
+            ref={poolScrollRef}
+          >
             {activePanel === 'design' ? (
               <TemplatePanel
                 onInsertAll={payload => onInsertTemplateAll(payload.slides, payload.theme ?? {})}
@@ -549,14 +481,14 @@ export function EditorRailDrawer({
               />
             ) : null}
             {activePanel === 'text' ? (
-              <div className="mona-drawer-stack">
+              <div className={drawerStackClassName}>
                 <DrawerAction icon={<TextRotationNoneIcon />} onClick={() => onCreateToolChange({ type: 'text', key: 'text', vertical: false })}>{t('foundation.editor.canvasTool.horizontalText')}</DrawerAction>
                 <DrawerAction icon={<TextRotationDownIcon />} onClick={() => onCreateToolChange({ type: 'text', key: 'text', vertical: true })}>{t('foundation.editor.canvasTool.verticalText')}</DrawerAction>
-                <p className="mona-drawer-hint">{t('foundation.editor.canvasTool.textHint')}</p>
+                <p className={drawerHintClassName}>{t('foundation.editor.canvasTool.textHint')}</p>
               </div>
             ) : null}
             {activePanel === 'elements' ? (
-              <div className="mona-drawer-stack">
+              <div className={drawerStackClassName}>
                 <ToggleGroup
                   aria-label={t('foundation.editor.rail.elementCategories')}
                   className="mona-element-category-tabs"
@@ -576,7 +508,7 @@ export function EditorRailDrawer({
                 </ToggleGroup>
                 {elementCategory === 'shapes' ? (
                   <>
-                    <div className="mona-drawer-action-grid">
+                    <div className={drawerActionGridClassName}>
                       <DrawerAction icon={<ConnectionIcon />} onClick={onOpenPathEditor}>{t('foundation.editor.canvasTool.drawPath')}</DrawerAction>
                       <DrawerAction icon={<WritingIcon />} onClick={onDrawCustomShape}>{t('foundation.editor.canvasTool.freehandShape')}</DrawerAction>
                     </div>
@@ -594,8 +526,8 @@ export function EditorRailDrawer({
               uploadView === 'library'
                 ? <EditorImageLibrary onBack={() => setUploadState({ route: 'uploads', view: 'main' })} onInsert={onInsertImageSource} />
                 : (
-                    <div className="mona-drawer-stack">
-                      <input accept="image/*" aria-label={t('foundation.editor.canvasTool.uploadImage')} className="mona-visually-hidden" onChange={selectImageFile} ref={imageInputRef} type="file" />
+                    <div className={drawerStackClassName}>
+                      <input accept="image/*" aria-hidden="true" hidden onChange={selectImageFile} ref={imageInputRef} tabIndex={-1} type="file" />
                       <DrawerAction icon={<UploadIcon />} onClick={() => imageInputRef.current?.click()}>{t('foundation.editor.canvasTool.uploadImage')}</DrawerAction>
                       <DrawerAction icon={<PictureIcon />} onClick={() => setUploadState({ route: 'uploads', view: 'library' })}>{t('foundation.editor.canvasTool.onlineImages')}</DrawerAction>
                       <EditorMediaInput onInsertAudio={onInsertAudio} onInsertVideo={onInsertVideo} />
@@ -607,10 +539,11 @@ export function EditorRailDrawer({
         </>
       ) : (
         <>
-          {/* No close button: the border pill and the rail items collapse
-              the drawer. */}
-          <div className="mona-contextual-drawer-header">
+          <div className={contextualDrawerHeaderClassName}>
             {contextualHeader}
+            <Button aria-label={t('foundation.editor.rail.collapse')} className="mona-drawer-close size-6 shrink-0 rounded-md hover:bg-sidebar-accent" onClick={onClose} size="icon-xs" type="button" variant="ghost">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
           {children}
         </>

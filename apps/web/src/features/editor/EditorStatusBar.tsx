@@ -11,12 +11,14 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Slider } from '@/components/ui/slider'
 import { EditorPageSettings } from '@/features/editor/EditorPageSettings'
+import { statusBarItemClassName } from '@/features/editor/editor-statusbar-chrome'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { cn } from '@/lib/utils'
 
-const formatElapsed = (milliseconds: number) => {
-  const totalSeconds = Math.floor(milliseconds / 1000)
+const formatTimer = (milliseconds: number) => {
+  const totalSeconds = Math.ceil(milliseconds / 1000)
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
@@ -25,16 +27,22 @@ const formatElapsed = (milliseconds: number) => {
     : [minutes, seconds].map(value => String(value).padStart(2, '0')).join(':')
 }
 
+const DEFAULT_TIMER_MS = 5 * 60 * 1000
+const clampTimer = (milliseconds: number) => Math.min(99 * 60 * 1000 + 59_000, Math.max(0, milliseconds))
+
 function EditorTimer() {
   const { t } = useTranslation()
   const [running, setRunning] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
-  const startedAtRef = useRef(0)
-  const baseElapsedRef = useRef(0)
+  const [remaining, setRemaining] = useState(DEFAULT_TIMER_MS)
+  const deadlineRef = useRef(0)
 
   useEffect(() => {
     if (!running) return undefined
-    const update = () => setElapsed(baseElapsedRef.current + performance.now() - startedAtRef.current)
+    const update = () => {
+      const next = Math.max(0, deadlineRef.current - performance.now())
+      setRemaining(next)
+      if (next <= 0) setRunning(false)
+    }
     update()
     const interval = window.setInterval(update, 250)
     return () => window.clearInterval(interval)
@@ -42,31 +50,76 @@ function EditorTimer() {
 
   const toggle = () => {
     if (running) {
-      baseElapsedRef.current = elapsed
       setRunning(false)
     }
     else {
-      startedAtRef.current = performance.now()
+      const next = remaining > 0 ? remaining : DEFAULT_TIMER_MS
+      setRemaining(next)
+      deadlineRef.current = performance.now() + next
       setRunning(true)
     }
   }
   const reset = () => {
-    baseElapsedRef.current = 0
-    setElapsed(0)
-    if (running) startedAtRef.current = performance.now()
+    setRunning(false)
+    setRemaining(DEFAULT_TIMER_MS)
   }
+  const setDuration = (milliseconds: number) => {
+    const next = clampTimer(milliseconds)
+    setRemaining(next)
+    if (running) deadlineRef.current = performance.now() + next
+  }
+  const totalSeconds = Math.ceil(remaining / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button aria-label={t('foundation.editor.statusBar.timer')} className={`mona-statusbar-item${running ? ' is-active' : ''}`} size="editor" type="button" variant="ghost">
-          <Timer /><span>{running ? formatElapsed(elapsed) : t('foundation.editor.statusBar.timer')}</span>
+        <Button aria-label={t('foundation.editor.statusBar.timer')} className={statusBarItemClassName(running)} size="editor" type="button" variant="ghost">
+          <Timer /><span>{running ? formatTimer(remaining) : t('foundation.editor.statusBar.timer')}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="mona-editor-timer" side="top" sideOffset={10}>
-        <span>{t('foundation.editor.statusBar.presentationTimer')}</span>
-        <output aria-live="off">{formatElapsed(elapsed)}</output>
-        <div>
+      <PopoverContent
+        aria-label={t('foundation.editor.statusBar.presentationTimer')}
+        align="start"
+        className="mona-editor-timer flex w-[230px] flex-col gap-2.5"
+        side="top"
+        sideOffset={10}
+      >
+        <span className="text-xs text-muted-foreground">{t('foundation.editor.statusBar.presentationTimer')}</span>
+        <div className="mona-editor-timer-adjust grid grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-1.5">
+          <Button aria-label={t('foundation.editor.statusBar.subtractMinute')} onClick={() => setDuration(remaining - 60_000)} size="editor-icon" type="button" variant="ghost">−</Button>
+          <div className="mona-editor-timer-fields grid grid-cols-[1fr_auto_1fr] items-start gap-1">
+            <label className="grid gap-0.5 text-center text-[10px] text-muted-foreground">
+              <Input
+                aria-label={t('foundation.editor.statusBar.minutes')}
+                className="h-[38px] px-1 text-center tabular-nums"
+                max={99}
+                min={0}
+                onChange={event => setDuration(Number(event.target.value) * 60_000 + seconds * 1000)}
+                type="number"
+                value={minutes}
+              />
+              <span>{t('foundation.editor.statusBar.minutesShort')}</span>
+            </label>
+            <span aria-hidden="true">:</span>
+            <label className="grid gap-0.5 text-center text-[10px] text-muted-foreground">
+              <Input
+                aria-label={t('foundation.editor.statusBar.seconds')}
+                className="h-[38px] px-1 text-center tabular-nums"
+                max={59}
+                min={0}
+                onChange={event => setDuration(minutes * 60_000 + Number(event.target.value) * 1000)}
+                type="number"
+                value={seconds}
+              />
+              <span>{t('foundation.editor.statusBar.secondsShort')}</span>
+            </label>
+          </div>
+          <Button aria-label={t('foundation.editor.statusBar.addMinute')} onClick={() => setDuration(remaining + 60_000)} size="editor-icon" type="button" variant="ghost">+</Button>
+        </div>
+        <output className="text-center text-[32px] font-[650] tracking-[-0.03em] tabular-nums" aria-live="off">{formatTimer(remaining)}</output>
+        <div className="mona-editor-timer-actions flex gap-1.5 [&_button]:flex-1">
           <Button onClick={toggle} size="sm" type="button" variant="outline">
             {running ? <Pause /> : <Play />}
             {t(running ? 'foundation.editor.statusBar.pause' : 'foundation.editor.statusBar.start')}
@@ -100,12 +153,16 @@ function PageNumberControl({
     setPageInput(String(index + 1))
   }
   return (
-    <form className="mona-page-number-control" onSubmit={event => {
-      event.preventDefault()
-      commit()
-    }}>
+    <form
+      className="mona-page-number-control flex h-7 shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-[rgb(16_18_25/70%)]"
+      onSubmit={event => {
+        event.preventDefault()
+        commit()
+      }}
+    >
       <Input
         aria-label={t('foundation.editor.statusBar.goToPage')}
+        className="h-7 w-[38px] appearance-none border-0 bg-transparent px-[3px] text-right font-semibold shadow-none [appearance:textfield] focus-visible:border-transparent focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         inputMode="numeric"
         max={total}
         min={1}
@@ -173,11 +230,11 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
     if (!rect || rect.width < 1 || rect.height < 1) return
     const widthScale = rect.width / presentation.viewportSize
     const heightScale = rect.height / (presentation.viewportSize * presentation.viewportRatio)
-    const zoom = Math.min(200, Math.max(30, Math.round(Math.max(widthScale, heightScale) / Math.min(widthScale, heightScale) * 100)))
+    const zoom = Math.min(300, Math.max(10, Math.round(Math.max(widthScale, heightScale) / Math.min(widthScale, heightScale) * 100)))
     runtime.store.dispatch(editorActions.canvasZoomChanged(zoom))
     runtime.store.dispatch(editorActions.canvasPanChanged({ x: 0, y: 0 }))
   }
-  const zoomPresets = [200, 150, 125, 100, 75, 50]
+  const zoomPresets = [300, 200, 125, 100, 75, 50, 25, 10]
   const togglePages = () => {
     if (session.workspaceMode === 'page-grid') {
       runtime.store.dispatch(editorActions.workspaceModeChanged('canvas'))
@@ -186,16 +243,25 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
     }
     runtime.store.dispatch(editorActions.filmstripVisibilityChanged(!session.filmstripVisible))
   }
+  const pagesActive = session.filmstripVisible && session.workspaceMode === 'canvas'
+  const gridActive = session.workspaceMode === 'page-grid'
+  const zoomMenuItemClass = cn(
+    'mona-canvas-tool-menu-item',
+    'flex min-w-20 justify-center rounded-[var(--radius-control)] border-0 bg-transparent px-4 py-2 text-inherit text-[#41464b] hover:bg-[#f1f1f1]',
+  )
 
   return (
-    <div className="mona-editor-statusbar" ref={rootRef}>
+    <div
+      className="mona-editor-statusbar @container flex h-[46px] flex-none items-center gap-2 bg-transparent px-3 backdrop-blur-[18px] backdrop-saturate-[1.7]"
+      ref={rootRef}
+    >
       {/* aria-labels are explicit: the visible labels disappear under the
           status bar's narrow-width container query, and the buttons must keep
           their accessible names when only icons remain. */}
       <Button
         aria-label={t('foundation.editor.statusBar.pages')}
-        aria-pressed={session.filmstripVisible && session.workspaceMode === 'canvas'}
-        className={`mona-statusbar-item${session.filmstripVisible && session.workspaceMode === 'canvas' ? ' is-active' : ''}`}
+        aria-pressed={pagesActive}
+        className={statusBarItemClassName(pagesActive)}
         onClick={togglePages}
         size="editor"
         type="button"
@@ -203,8 +269,8 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       ><FileStack /><span>{t('foundation.editor.statusBar.pages')}</span></Button>
       <Button
         aria-label={t('foundation.editor.statusBar.gridView')}
-        aria-pressed={session.workspaceMode === 'page-grid'}
-        className={`mona-statusbar-item${session.workspaceMode === 'page-grid' ? ' is-active' : ''}`}
+        aria-pressed={gridActive}
+        className={statusBarItemClassName(gridActive)}
         data-grid-view-trigger
         onClick={() => runtime.store.dispatch(editorActions.workspaceModeChanged(session.workspaceMode === 'page-grid' ? 'canvas' : 'page-grid'))}
         size="editor"
@@ -214,7 +280,7 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       <Button
         aria-label={t('foundation.editor.statusBar.notes')}
         aria-pressed={notesVisible}
-        className={`mona-statusbar-item${notesVisible ? ' is-active' : ''}`}
+        className={statusBarItemClassName(notesVisible)}
         onClick={onToggleNotes}
         size="editor"
         type="button"
@@ -224,25 +290,46 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       <EditorPageSettings key={presentation.slides[presentation.slideIndex]!.id} runtime={runtime} slide={presentation.slides[presentation.slideIndex]!} />
       <Popover>
         <PopoverTrigger asChild>
-          <Button aria-label={t('foundation.editor.statusBar.help')} className="mona-statusbar-item" size="editor" type="button" variant="ghost"><CircleHelp /><span>{t('foundation.editor.statusBar.help')}</span></Button>
+          <Button aria-label={t('foundation.editor.statusBar.help')} className={statusBarItemClassName()} size="editor" type="button" variant="ghost"><CircleHelp /><span>{t('foundation.editor.statusBar.help')}</span></Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="mona-editor-shortcuts" side="top" sideOffset={10}>
-          <strong>{t('foundation.editor.statusBar.shortcuts')}</strong>
-          <dl>
-            <div><dt>{t('foundation.editor.statusBar.present')}</dt><dd>F5</dd></div>
-            <div><dt>{t('foundation.editor.thumbnails.newSlide')}</dt><dd>Enter</dd></div>
-            <div><dt>{t('foundation.editor.contextual.duplicate')}</dt><dd>Ctrl D</dd></div>
-            <div><dt>{t('foundation.editor.action.delete')}</dt><dd>Delete</dd></div>
-            <div><dt>{t('foundation.editor.action.selectAll')}</dt><dd>Ctrl A</dd></div>
+        <PopoverContent aria-label={t('foundation.editor.statusBar.help')} align="start" className="mona-editor-shortcuts w-[250px]" side="top" sideOffset={10}>
+          <strong className="mb-2 block">{t('foundation.editor.statusBar.shortcuts')}</strong>
+          <dl className="grid gap-0.5">
+            <div className="flex min-h-[30px] items-center justify-between gap-5">
+              <dt className="text-xs text-muted-foreground">{t('foundation.editor.statusBar.present')}</dt>
+              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">F5</dd>
+            </div>
+            <div className="flex min-h-[30px] items-center justify-between gap-5">
+              <dt className="text-xs text-muted-foreground">{t('foundation.editor.thumbnails.newSlide')}</dt>
+              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Enter</dd>
+            </div>
+            <div className="flex min-h-[30px] items-center justify-between gap-5">
+              <dt className="text-xs text-muted-foreground">{t('foundation.editor.contextual.duplicate')}</dt>
+              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Ctrl D</dd>
+            </div>
+            <div className="flex min-h-[30px] items-center justify-between gap-5">
+              <dt className="text-xs text-muted-foreground">{t('foundation.editor.action.delete')}</dt>
+              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Delete</dd>
+            </div>
+            <div className="flex min-h-[30px] items-center justify-between gap-5">
+              <dt className="text-xs text-muted-foreground">{t('foundation.editor.action.selectAll')}</dt>
+              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Ctrl A</dd>
+            </div>
           </dl>
         </PopoverContent>
       </Popover>
-      <div className="mona-statusbar-spacer" />
+      <div className="mona-statusbar-spacer flex-1" />
       <Slider
         aria-label={t('foundation.editor.canvasTool.zoomIn')}
-        className="mona-statusbar-zoom-slider"
-        max={200}
-        min={30}
+        className={cn(
+          'mona-statusbar-zoom-slider',
+          'w-[110px] min-w-14 grow-0 shrink basis-auto',
+          '[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-track]]:bg-[#e2e4e9]',
+          '[&_[data-slot=slider-range]]:bg-[#b9bdc7]',
+          '[&_[data-slot=slider-thumb]]:size-[14px] [&_[data-slot=slider-thumb]]:border-[rgb(16_18_25/15%)] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-thumb]]:shadow-[0_1px_3px_rgb(0_0_0/15%)]',
+        )}
+        max={300}
+        min={10}
         onValueChange={([value]) => {
           if (value !== undefined) runtime.store.dispatch(editorActions.canvasZoomChanged(value))
         }}
@@ -251,36 +338,61 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       />
       <Popover onOpenChange={setMenuOpen} open={menuOpen}>
         <PopoverTrigger asChild>
-          <Button className="mona-canvas-zoom-text" size="editor" type="button" variant="ghost">{canvasScalePercentage}%</Button>
+          <Button
+            className="mona-canvas-zoom-text inline-block w-11 cursor-pointer p-0 text-center text-xs text-[#41464b]"
+            size="editor"
+            type="button"
+            variant="ghost"
+          >{canvasScalePercentage}%</Button>
         </PopoverTrigger>
-        <PopoverContent align="center" className="w-auto mona-canvas-tool-popover" side="top" sideOffset={10}>
-          <div className="mona-canvas-tool-menu is-zoom-menu">
+        <PopoverContent
+          aria-label={t('foundation.editor.canvasTool.zoomIn')}
+          align="center"
+          className="mona-canvas-tool-popover z-[120] w-auto rounded-[var(--radius-control)] border border-[#e5e7eb] bg-white p-2.5 text-[13px] leading-normal text-[#41464b] shadow-md"
+          side="top"
+          sideOffset={10}
+        >
+          <div className="mona-canvas-tool-menu is-zoom-menu flex flex-col gap-0.5">
             {zoomPresets.map(value => (
-              <Button className="mona-canvas-tool-menu-item" key={value} onClick={() => {
+              <Button className={zoomMenuItemClass} key={value} onClick={() => {
                 setAbsoluteScale(value)
                 setMenuOpen(false)
               }} size="editor" type="button" variant="ghost">{value}%</Button>
             ))}
-            <Button className="mona-canvas-tool-menu-item" onClick={() => {
+            <Button className={zoomMenuItemClass} onClick={() => {
               resetView()
               setMenuOpen(false)
             }} size="editor" type="button" variant="ghost">{t('foundation.editor.canvasTool.fit')}</Button>
-            <Button className="mona-canvas-tool-menu-item" onClick={() => {
+            <Button className={zoomMenuItemClass} onClick={() => {
               fillView()
               setMenuOpen(false)
             }} size="editor" type="button" variant="ghost">{t('foundation.editor.canvasTool.fill')}</Button>
           </div>
         </PopoverContent>
       </Popover>
-      <div aria-hidden="true" className="mona-zoombar-divider" />
+      <div aria-hidden="true" className="mona-zoombar-divider mx-1 h-4 w-px flex-none bg-border max-[1000px]:hidden" />
       <PageNumberControl
         current={presentation.slideIndex + 1}
         key={presentation.slideIndex}
         runtime={runtime}
         total={presentation.slides.length}
       />
-      <Button aria-label={t('foundation.editor.canvasTool.fit')} className="mona-statusbar-icon" onClick={resetView} size="editor-icon" type="button" variant="ghost"><FullScreenIcon /></Button>
-      <Button aria-label={t('foundation.editor.statusBar.present')} className="mona-statusbar-icon" onClick={() => startPresentation({ fromStart: false })} size="editor-icon" type="button" variant="ghost"><MonitorPlay /></Button>
+      <Button
+        aria-label={t('foundation.editor.canvasTool.fit')}
+        className="mona-statusbar-icon size-8 rounded-[var(--radius-action)] text-[15px] text-[rgb(16_18_25/70%)] [&_svg]:size-[15px]"
+        onClick={resetView}
+        size="editor-icon"
+        type="button"
+        variant="ghost"
+      ><FullScreenIcon /></Button>
+      <Button
+        aria-label={t('foundation.editor.statusBar.present')}
+        className="mona-statusbar-icon size-8 rounded-[var(--radius-action)] text-[15px] text-[rgb(16_18_25/70%)] [&_svg]:size-[15px]"
+        onClick={() => startPresentation({ fromStart: false })}
+        size="editor-icon"
+        type="button"
+        variant="ghost"
+      ><MonitorPlay /></Button>
     </div>
   )
 }

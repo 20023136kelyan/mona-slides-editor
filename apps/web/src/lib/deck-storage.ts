@@ -7,9 +7,10 @@ import { LEGACY_DECK_DATABASE_NAME } from '@/lib/legacy-compatibility'
 const DATABASE_NAME = 'mona'
 const DECK_STORE = 'decks'
 const MEDIA_STORE = 'media'
+const POWERPOINT_PACKAGE_STORE = 'powerpoint-packages'
 const SKETCH_STORE = 'sketches'
 const WORKING_DECK_KEY = 'working-deck'
-const DATABASE_VERSION = 2
+const DATABASE_VERSION = 3
 
 const databasePromises = new Map<string, Promise<IDBDatabase>>()
 
@@ -24,6 +25,7 @@ const openDatabase = (name: string): Promise<IDBDatabase> => {
     const database = request.result
     if (!database.objectStoreNames.contains(DECK_STORE)) database.createObjectStore(DECK_STORE)
     if (!database.objectStoreNames.contains(MEDIA_STORE)) database.createObjectStore(MEDIA_STORE)
+    if (!database.objectStoreNames.contains(POWERPOINT_PACKAGE_STORE)) database.createObjectStore(POWERPOINT_PACKAGE_STORE)
     if (!database.objectStoreNames.contains(SKETCH_STORE)) database.createObjectStore(SKETCH_STORE)
   }
   return asPromise(request)
@@ -100,6 +102,23 @@ export const deleteMediaBlob = async (key: IDBValidKey): Promise<undefined> => {
     inStore(DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.delete(key)),
     inStore(LEGACY_DECK_DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.delete(key)),
   ])
+  return undefined
+}
+
+export const readPowerPointPackage = (packageId: string): Promise<unknown> =>
+  inStore(DATABASE_NAME, POWERPOINT_PACKAGE_STORE, 'readonly', store => store.get(packageId))
+
+export const writePowerPointPackage = (packageId: string, value: unknown): Promise<IDBValidKey> =>
+  inStore(DATABASE_NAME, POWERPOINT_PACKAGE_STORE, 'readwrite', store => store.put(value, packageId))
+
+export const listPowerPointPackageIds = (): Promise<IDBValidKey[]> =>
+  inStore(DATABASE_NAME, POWERPOINT_PACKAGE_STORE, 'readonly', store => store.getAllKeys())
+
+export const deletePowerPointPackage = (packageId: IDBValidKey): Promise<undefined> =>
+  inStore(DATABASE_NAME, POWERPOINT_PACKAGE_STORE, 'readwrite', store => store.delete(packageId))
+
+export const clearPowerPointPackages = async (): Promise<undefined> => {
+  await inStore(DATABASE_NAME, POWERPOINT_PACKAGE_STORE, 'readwrite', store => store.clear())
   return undefined
 }
 

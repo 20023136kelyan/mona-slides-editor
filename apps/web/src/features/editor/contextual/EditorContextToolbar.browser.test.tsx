@@ -268,7 +268,7 @@ test('keeps a drilled group child visibly and behaviorally distinct from its par
   expect(document.querySelector('.mona-contextual-line-controls')).not.toBeNull()
 })
 
-test('intersects mixed controls, exposes mixed state, and never leaks a type-only control', async () => {
+test('composes mixed controls, exposes mixed state, and never leaks a type-only control', async () => {
   const mixed = makePresentation([
     shape('shape-a', { fill: '#f00', opacity: 1 }),
     shape('shape-b', { fill: '#0f0', opacity: 0.5 }),
@@ -278,6 +278,21 @@ test('intersects mixed controls, exposes mixed state, and never leaks a type-onl
   expect(document.querySelector('[data-mixed="true"]')).not.toBeNull()
   expect(document.querySelector('.mona-contextual-image-controls')).toBeNull()
   expect(document.querySelector('.mona-contextual-text-controls')).toBeNull()
+})
+
+test('composes shape and text controls for a heterogeneous selection', async () => {
+  const mixed = makePresentation([
+    shape('shape-a', { fill: '#f00' }),
+    { ...elements.find(element => element.id === 'text')!, id: 'text-a' },
+  ])
+  await renderToolbar({ presentation: mixed, selected: ['shape-a', 'text-a'] })
+
+  await expect.element(page.getByRole('button', { name: /Fill/ })).toBeVisible()
+  await expect.element(page.getByRole('button', { exact: true, name: 'Font' })).toBeVisible()
+  await expect.element(page.getByRole('button', { name: 'Text color' })).toBeVisible()
+  await expect.element(page.getByRole('button', { name: 'Bold' })).toBeVisible()
+  await expect.element(page.getByRole('button', { name: 'Decrease font size' })).toBeVisible()
+  await expect.element(page.getByRole('button', { name: 'Increase font size' })).toBeVisible()
 })
 
 test('commits a contextual mutation as one undoable transaction', async () => {
@@ -320,6 +335,8 @@ test('updates chart type from the contextual chart menu', async () => {
   await page.getByRole('button', { name: 'Type' }).click()
   await page.getByRole('button', { name: 'Line chart' }).click()
   expect(runtime.store.getState().presentation.slides[0]!.elements[4]).toMatchObject({ chartType: 'line' })
+  expect(runtime.undo()).toBe(true)
+  expect(runtime.store.getState().presentation.slides[0]!.elements[4]).toMatchObject({ chartType: 'bar' })
 })
 
 test('updates the selected table structure from the contextual table menu', async () => {
@@ -328,12 +345,16 @@ test('updates the selected table structure from the contextual table menu', asyn
   await page.getByRole('button', { name: 'Insert row below' }).click()
   const table = runtime.store.getState().presentation.slides[0]!.elements[5] as Extract<PPTElement, { type: 'table' }>
   expect(table.data).toHaveLength(2)
+  expect(runtime.undo()).toBe(true)
+  expect((runtime.store.getState().presentation.slides[0]!.elements[5] as Extract<PPTElement, { type: 'table' }>).data).toHaveLength(1)
 })
 
 test('updates media playback behavior on the selected media element', async () => {
   const runtime = await renderToolbar({ selected: ['media'] })
   await page.getByRole('button', { name: /Autoplay/ }).click()
   expect(runtime.store.getState().presentation.slides[0]!.elements[7]).toMatchObject({ autoplay: true })
+  expect(runtime.undo()).toBe(true)
+  expect(runtime.store.getState().presentation.slides[0]!.elements[7]).toMatchObject({ autoplay: false })
 })
 
 test('updates the explicit page target rather than an implicit empty selection', async () => {

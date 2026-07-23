@@ -97,6 +97,7 @@ export function MobilePlayer({ changeMode, runtime }: {
                   <ScaledSlide
                     fixedWidth={slideSize.width}
                     slide={slide}
+                    sourcePackages={presentation.sourcePackages}
                     theme={presentation.theme}
                     thumbnail
                     viewportRatio={presentation.viewportRatio}

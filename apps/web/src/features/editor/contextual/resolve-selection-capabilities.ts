@@ -6,6 +6,8 @@ export type ElementCapabilityKind =
   | 'image'
   | 'line'
   | 'media'
+  | 'native-group'
+  | 'opaque'
   | 'shape'
   | 'table'
   | 'text'
@@ -101,6 +103,7 @@ interface ElementCapabilityProfile {
 const elementKind = (element: PPTElement): ElementCapabilityKind => {
   if (element.type === 'latex') return 'equation'
   if (element.type === 'video' || element.type === 'audio') return 'media'
+  if (element.type === 'group') return 'native-group'
   return element.type
 }
 
@@ -127,12 +130,17 @@ const everyProfile = (
   key: keyof ElementCapabilityProfile,
 ) => elements.length > 0 && elements.every(element => profileFor(element)[key])
 
+const someProfile = (
+  elements: readonly PPTElement[],
+  key: keyof ElementCapabilityProfile,
+) => elements.some(element => profileFor(element)[key])
+
 const commonValue = <T,>(
   elements: readonly PPTElement[],
   read: (element: PPTElement) => T | undefined,
 ): CapabilityValue<T> => {
-  const values = elements.map(read)
-  if (!values.length || values.every(value => value === undefined)) return undefined
+  const values = elements.map(read).filter((value): value is T => value !== undefined)
+  if (!values.length) return undefined
   const first = values[0]
   return values.every(value => Object.is(value, first)) ? first : 'mixed'
 }
@@ -283,6 +291,10 @@ export const resolveSelectionCapabilities = (
     if (values[key] === 'mixed') mixedValues.add(key)
   }
   const effectiveElements = selectionKind === 'group-child' && targetElement ? [targetElement] : selectedElements
+  const composedSelection = selectionKind === 'group' || selectionKind === 'mixed'
+  const hasProfile = (key: keyof ElementCapabilityProfile) => (
+    composedSelection ? someProfile(effectiveElements, key) : everyProfile(effectiveElements, key)
+  )
   const textEditing = mode === 'text-edit'
   const cropping = mode === 'crop'
 
@@ -295,15 +307,15 @@ export const resolveSelectionCapabilities = (
     canEditEquation: canEdit && everyProfile(effectiveElements, 'editEquation'),
     canEditMedia: canEdit && everyProfile(effectiveElements, 'editMedia'),
     canEditTable: canEdit && everyProfile(effectiveElements, 'editTable'),
-    canEditText: canEdit && everyProfile(effectiveElements, 'editText'),
-    canFill: canEdit && everyProfile(effectiveElements, 'fill'),
-    canFlip: canEdit && everyProfile(effectiveElements, 'flip'),
+    canEditText: canEdit && hasProfile('editText'),
+    canFill: canEdit && hasProfile('fill'),
+    canFlip: canEdit && hasProfile('flip'),
     canGroup: canEdit && selectedElements.length > 1 && !grouped,
     canLink: canEdit && Boolean(targetElement) && (selectedElements.length === 1 || selectionKind === 'group-child'),
     canLock: canEdit,
     canPosition: canEdit && everyProfile(effectiveElements, 'position'),
-    canStroke: canEdit && everyProfile(effectiveElements, 'stroke'),
-    canTransparency: canEdit && everyProfile(effectiveElements, 'transparency'),
+    canStroke: canEdit && hasProfile('stroke'),
+    canTransparency: canEdit && hasProfile('transparency'),
     canUngroup: canEdit && grouped,
     mode,
     mixedValues,

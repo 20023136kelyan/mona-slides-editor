@@ -51,7 +51,7 @@ test('renders the complete native fixture and selects a slide read-only', async 
   expect(browserProblems).toEqual([])
 })
 
-test('keeps the canvas, left task panel, and resizable AI dock structurally independent on desktop', async ({ page }) => {
+test('keeps the canvas, left task panel, and AI dock structurally independent on desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/?developmentFixture=slides')
 
@@ -60,8 +60,9 @@ test('keeps the canvas, left task panel, and resizable AI dock structurally inde
 
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   await expect(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
-  await expect(page.getByRole('separator', { name: 'Resize AI panel' })).toBeVisible()
   await expect(page.locator('.mona-agent-dialog')).toHaveCount(0)
+  // The dock floats over the canvas but reserves its width, so the fitted
+  // stage shrinks to sit beside it.
   expect((await stage.boundingBox())!.width).toBeLessThan(initialStageWidth)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
@@ -74,12 +75,8 @@ test('keeps the canvas, left task panel, and resizable AI dock structurally inde
   expect(leftPanel).not.toBeNull()
   expect(canvas).not.toBeNull()
   expect(agentDock).not.toBeNull()
+  // Both panels float over the canvas, yet the fitted stage sits cleanly
+  // between them — drawer on the left, dock on the right.
   expect(leftPanel!.x + leftPanel!.width).toBeLessThanOrEqual(canvas!.x)
   expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(agentDock!.x)
-
-  const widthBeforeKeyboardResize = agentDock!.width
-  const separator = page.getByRole('separator', { name: 'Resize AI panel' })
-  await separator.focus()
-  await separator.press('ArrowLeft')
-  await expect.poll(async () => (await page.locator('.mona-agent-dock').boundingBox())!.width).not.toBe(widthBeforeKeyboardResize)
 })

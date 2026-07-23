@@ -7,6 +7,7 @@ import type {
   PPTElementShadow,
   PPTImageElement,
   PPTLineElement,
+  PatternFill,
   SlideBackground,
   TableCell,
   TableCellStyle,
@@ -26,7 +27,7 @@ export function getSlideBackgroundStyle(background?: SlideBackground): CSSProper
       backgroundImage: `url(${src})`,
       backgroundPosition: 'center',
       backgroundRepeat: size === 'repeat' ? 'repeat' : 'no-repeat',
-      backgroundSize: size === 'repeat' ? 'contain' : size || 'cover',
+      backgroundSize: size === 'repeat' ? 'contain' : size === 'stretch' ? '100% 100%' : size || 'cover',
     }
   }
 
@@ -40,7 +41,57 @@ export function getSlideBackgroundStyle(background?: SlideBackground): CSSProper
     }
   }
 
+  if (background.type === 'pattern' && background.pattern) {
+    return getPatternBackgroundStyle(background.pattern)
+  }
+
   return { backgroundColor: '#fff' }
+}
+
+export function getPatternBackgroundStyle({
+  backgroundColor,
+  foregroundColor,
+  patternType,
+}: PatternFill): CSSProperties {
+  const fine = patternType.startsWith('lt') || patternType.startsWith('nar') ? 8 : 12
+  const heavy = patternType.startsWith('dk') ? 2 : 1
+  const line = `${foregroundColor} 0 ${heavy}px, transparent ${heavy}px ${fine}px`
+  if (/^(horz|ltHorz|dkHorz|narHorz|dashHorz)$/.test(patternType)) {
+    return { backgroundColor, backgroundImage: `repeating-linear-gradient(0deg, ${line})` }
+  }
+  if (/^(vert|ltVert|dkVert|narVert|dashVert)$/.test(patternType)) {
+    return { backgroundColor, backgroundImage: `repeating-linear-gradient(90deg, ${line})` }
+  }
+  if (/^(dnDiag|ltDnDiag|dkDnDiag|wdDnDiag|dashDnDiag)$/.test(patternType)) {
+    return { backgroundColor, backgroundImage: `repeating-linear-gradient(45deg, ${line})` }
+  }
+  if (/^(upDiag|ltUpDiag|dkUpDiag|wdUpDiag|dashUpDiag)$/.test(patternType)) {
+    return { backgroundColor, backgroundImage: `repeating-linear-gradient(-45deg, ${line})` }
+  }
+  if (patternType === 'cross' || patternType.endsWith('Grid')) {
+    return {
+      backgroundColor,
+      backgroundImage: `repeating-linear-gradient(0deg, ${line}), repeating-linear-gradient(90deg, ${line})`,
+    }
+  }
+  if (patternType === 'diagCross' || patternType.endsWith('Check')) {
+    return {
+      backgroundColor,
+      backgroundImage: `repeating-linear-gradient(45deg, ${line}), repeating-linear-gradient(-45deg, ${line})`,
+    }
+  }
+  if (/dot|pct/i.test(patternType)) {
+    const size = patternType === 'pct5' ? 10 : patternType === 'pct10' ? 8 : patternType === 'pct20' ? 6 : 5
+    return {
+      backgroundColor,
+      backgroundImage: `radial-gradient(circle, ${foregroundColor} 0 ${heavy}px, transparent ${heavy}px)`,
+      backgroundSize: `${size}px ${size}px`,
+    }
+  }
+  return {
+    backgroundColor,
+    backgroundImage: `repeating-linear-gradient(45deg, ${line})`,
+  }
 }
 
 export function getShadowStyle(shadow?: PPTElementShadow): string {
@@ -305,13 +356,23 @@ export function getTableThemeColors(color?: string): [string, string] {
   return [parsed.clone().setAlpha(0.3).toRgbString(), parsed.clone().setAlpha(0.1).toRgbString()]
 }
 
-export function getTableCellStyle(outline: PPTElementOutline, style?: TableCellStyle): CSSProperties {
-  return {
+export function getTableCellStyle(outline: PPTElementOutline, style?: TableCellStyle, borders?: TableCell['borders']): CSSProperties {
+  const cellStyle: CSSProperties = {
     backgroundColor: style?.backcolor || '',
     borderStyle: outline.style,
     borderColor: outline.color,
     borderWidth: `${outline.width}px`,
   }
+  for (const [side, border] of Object.entries(borders ?? {})) {
+    if (!border) continue
+    const name = side[0]!.toUpperCase() + side.slice(1)
+    Object.assign(cellStyle, {
+      [`border${name}Color`]: border.color,
+      [`border${name}Style`]: border.style,
+      [`border${name}Width`]: `${border.width ?? 0}px`,
+    })
+  }
+  return cellStyle
 }
 
 export function getTableTextStyle(cellMinHeight: number, style?: TableCellStyle): CSSProperties {
@@ -332,5 +393,6 @@ export function getTableTextStyle(cellMinHeight: number, style?: TableCellStyle)
 }
 
 export function formatTableText(text: string): string {
+  if (/<(?:p|div|span|ul|ol|li|br)\b/i.test(text)) return text
   return text.replace(/\n/g, '</br>').replace(/ /g, '&nbsp;')
 }

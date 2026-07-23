@@ -1,10 +1,13 @@
 import type { PPTAnimation, PPTElement, Slide } from './model'
 import type { PresentationState } from './state'
+import { collectElementTreeIds, findElementById, walkElementTree } from './elements'
 
 export interface ElementLocation {
   slideId: string
   slideIndex: number
   elementIndex: number
+  elementPath: readonly number[]
+  parentElementId?: string
   element: PPTElement
 }
 
@@ -30,10 +33,13 @@ export const selectElementById = (
   elementId: string,
   slideId?: string,
 ): PPTElement | undefined => {
-  if (slideId) return selectSlideById(state, slideId)?.elements.find(element => element.id === elementId)
+  if (slideId) {
+    const slide = selectSlideById(state, slideId)
+    return slide ? findElementById(slide.elements, elementId) : undefined
+  }
 
   for (const slide of state.slides) {
-    const element = slide.elements.find(candidate => candidate.id === elementId)
+    const element = findElementById(slide.elements, elementId)
     if (element) return element
   }
   return undefined
@@ -44,8 +50,15 @@ export const buildElementIndex = (
 ): ReadonlyMap<string, ElementLocation> => {
   const index = new Map<string, ElementLocation>()
   state.slides.forEach((slide, slideIndex) => {
-    slide.elements.forEach((element, elementIndex) => {
-      index.set(element.id, { slideId: slide.id, slideIndex, elementIndex, element })
+    walkElementTree(slide.elements, ({ element, parent, path }) => {
+      index.set(element.id, {
+        element,
+        elementIndex: path[0]!,
+        elementPath: path,
+        parentElementId: parent?.id,
+        slideId: slide.id,
+        slideIndex,
+      })
     })
   })
   return index
@@ -55,7 +68,7 @@ export const selectCurrentSlideAnimations = (state: PresentationState): PPTAnima
   const currentSlide = selectCurrentSlide(state)
   if (!currentSlide?.animations) return []
 
-  const elementIds = new Set(currentSlide.elements.map(element => element.id))
+  const elementIds = new Set(collectElementTreeIds(currentSlide.elements))
   return currentSlide.animations.filter(animation => elementIds.has(animation.elId))
 }
 

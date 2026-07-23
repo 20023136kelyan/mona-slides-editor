@@ -81,7 +81,10 @@ test.beforeEach(async ({ page }) => {
       // Sandboxed agent frames intentionally have an opaque origin.
     }
   })
-  await page.goto('/?persistTest=1')
+  // Drawing persistence needs the normal working-copy loader, while the
+  // agent handoff needs a deterministic provider. Keep those fixtures
+  // independent so this test never depends on a hosted backend.
+  await page.goto('/?persistTest=1&agentFixture=reference')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   await clearSketches(page)
 })

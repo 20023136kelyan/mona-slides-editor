@@ -285,6 +285,7 @@ export const EditorPageGrid = memo(function EditorPageGrid({
               <ScaledSlide
                 fixedWidth={240}
                 slide={slide}
+                sourcePackages={presentation.sourcePackages}
                 theme={presentation.theme}
                 thumbnail
                 viewportRatio={presentation.viewportRatio}

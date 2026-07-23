@@ -740,6 +740,7 @@
     "showToolbar": "显示工具栏",
     "allSlides": "查看所有幻灯片",
     "bottomThumbnails": "触底显示缩略图",
+    "slideshowCanvas": "幻灯片放映画布",
     "movePanel": "移动面板。使用方向键，按住 Shift 可增大步长。",
     "resizePanel": "调整面板大小。使用方向键，按住 Shift 可增大步长。"
   },

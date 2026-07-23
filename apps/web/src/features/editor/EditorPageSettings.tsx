@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { statusBarItemClassName } from '@/features/editor/editor-statusbar-chrome'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 const MIN_DURATION_SECONDS = 1
@@ -64,11 +65,11 @@ export function EditorPageSettings({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button aria-label={t('foundation.editor.statusBar.pageSettings')} className="mona-statusbar-item" size="editor" type="button" variant="ghost">
+        <Button aria-label={t('foundation.editor.statusBar.pageSettings')} className={statusBarItemClassName()} size="editor" type="button" variant="ghost">
           <SlidersHorizontal /><span>{t('foundation.editor.statusBar.pageSettings')}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="mona-page-settings" side="top" sideOffset={10}>
+      <PopoverContent aria-label={t('foundation.editor.statusBar.pageSettings')} align="start" className="mona-page-settings" side="top" sideOffset={10}>
         <div className="mona-page-settings-heading">
           <strong>{t('foundation.editor.statusBar.pageSettings')}</strong>
           <span>{t('foundation.editor.thumbnails.slideCount', {

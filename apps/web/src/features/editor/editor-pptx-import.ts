@@ -1,15 +1,29 @@
 import tinycolor from 'tinycolor2'
 import { SVGPathData, SVGPathDataTransformer } from 'svg-pathdata'
-import type { BaseElement as PptxBaseElement, ChartItem, Element as PptxElement, Shape as PptxShape, Slide as ParsedSlide } from 'pptxtojson'
+import type { ChartItem, Element as PptxElement, Shape as PptxShape, Slide as ParsedSlide } from '@mona/pptx-parser'
 
-import { createPresentationId } from '@mona/presentation-core'
+import {
+  createPresentationId,
+  type PowerPointImportCapabilityReport,
+  type PowerPointImportDisposition,
+  type PowerPointImportDispositionCounts,
+  type PowerPointImportIssue,
+  type PowerPointImportReport,
+  type PowerPointElementSourceLayer,
+  type PowerPointPackageManifest,
+  type PowerPointPackageReference,
+} from '@mona/presentation-core'
 import type {
   ChartOptions,
   ChartType,
   Gradient,
   LinePoint,
+  PPTElement,
+  PPTGroupElement,
   PPTImageElement,
+  PPTLatexElement,
   PPTLineElement,
+  PPTOpaqueElement,
   PPTShapeElement,
   PPTTextElement,
   Slide,
@@ -20,6 +34,7 @@ import type {
   TextAlignVertical,
 } from '@mona/presentation-core/model'
 import { SHAPE_LIST, SHAPE_PATH_FORMULAS, type ShapePoolItem } from '@mona/presentation-core/shape-presets'
+import { renderLatex } from '@/features/editor/editor-latex'
 
 export { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
 
@@ -300,78 +315,204 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
     else defaults()
   }
   if (/curvedConnector/.test(element.shapType)) {
-    const cubic: [number, number] = [Math.abs(line.start[0] - line.end[0]) / 2, Math.abs(line.start[1] - line.end[1]) / 2]
-    line.cubic = [cubic, cubic]
+    if (element.shapType === 'curvedConnector2') {
+      line.curve = [line.end[0], line.start[1]]
+    }
+    else {
+      const middleX = (line.start[0] + line.end[0]) / 2
+      line.cubic = [[middleX, line.start[1]], [middleX, line.end[1]]]
+    }
   }
   return line
 }
 
-const flipGroupElements = (elements: PptxBaseElement[], axis: 'x' | 'y') => {
-  const minX = Math.min(...elements.map(element => element.left))
-  const maxX = Math.max(...elements.map(element => element.left + element.width))
-  const minY = Math.min(...elements.map(element => element.top))
-  const maxY = Math.max(...elements.map(element => element.top + element.height))
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
-  return elements.map(element => ({
-    ...element,
-    ...(axis === 'y' ? { left: 2 * centerX - element.left - element.width } : {}),
-    ...(axis === 'x' ? { top: 2 * centerY - element.top - element.height } : {}),
-  }))
-}
-
-const calculateRotatedPosition = (ax: number, ay: number, aw: number, ah: number, bx: number, by: number, bw: number, bh: number, ak: number, bk: number) => {
-  const radians = ak * (Math.PI / 180)
-  const cosine = Math.cos(radians)
-  const sine = Math.sin(radians)
-  const centerX = ax + aw / 2
-  const centerY = ay + ah / 2
-  const corners = [
-    { ox: bx, oy: by },
-    { ox: bx + bw, oy: by },
-    { ox: bx + bw, oy: by + bh },
-    { ox: bx, oy: by + bh },
-  ]
-  let minX = Infinity
-  let minY = Infinity
-  for (const corner of corners) {
-    const relativeX = corner.ox - aw / 2
-    const relativeY = corner.oy - ah / 2
-    const rotatedX = relativeX * cosine + relativeY * sine
-    const rotatedY = -relativeX * sine + relativeY * cosine
-    const graphicX = centerX + rotatedX
-    const graphicY = centerY + rotatedY
-    minX = Math.min(minX, graphicX)
-    minY = Math.min(minY, graphicY)
-  }
-  return { globalRotation: (bk + ak) % 360, x: minX, y: minY }
-}
-
 const slideBackground = (parsed: ParsedSlide): SlideBackground => {
   const { type, value } = parsed.fill
-  if (type === 'image') return { image: { size: 'cover', src: value.base64 }, type: 'image' }
+  if (type === 'image') return { image: { size: 'stretch', src: value.base64 }, type: 'image' }
   if (type === 'gradient') return { gradient: { colors: value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: value.rot, type: value.path === 'line' ? 'linear' : 'radial' }, type: 'gradient' }
-  if (type === 'pattern') return { color: '#fff', type: 'solid' }
+  if (type === 'pattern') {
+    return {
+      pattern: {
+        backgroundColor: value.backgroundColor,
+        foregroundColor: value.foregroundColor,
+        patternType: value.type,
+      },
+      type: 'pattern',
+    }
+  }
   return { color: value || '#fff', type: 'solid' }
 }
 
-export const convertParsedPptxSlides = ({
+const emptyDispositionCounts = (): PowerPointImportDispositionCounts => ({
+  approximated: 0,
+  dropped: 0,
+  modeled: 0,
+  opaque: 0,
+})
+
+export const convertParsedPptxPresentation = ({
   coordinateLabel,
   parsed,
   ratio,
+  sourceManifest,
+  sourcePackage,
   theme,
 }: {
   coordinateLabel: (index: number) => string
   parsed: ParsedPptxPresentation
   ratio: number
+  sourceManifest?: PowerPointPackageManifest
+  sourcePackage?: PowerPointPackageReference
   theme: SlideTheme
 }) => {
   const shapeList: ShapePoolItem[] = SHAPE_LIST.flatMap(group => group.children)
   const slides: Slide[] = []
-  for (const item of parsed.slides) {
-    const slide: Slide = { background: slideBackground(item), elements: [], id: createPresentationId(10), remark: item.note || '' }
-    const parseElements = (elements: PptxElement[]) => {
+  const packageCounts = emptyDispositionCounts()
+  const slideReports: PowerPointImportReport['slides'] = []
+  const sourceOrder = new Map(sourcePackage?.slides.map((slide, index) => [slide.slidePart, index]) ?? [])
+  const identitiesByPartAndNativeId = new Map<string, PowerPointPackageManifest['objects']>()
+  const layoutElementsByPart = new Map<string, PPTElement[]>()
+  const masterElementsByPart = new Map<string, PPTElement[]>()
+  for (const identity of sourceManifest?.objects ?? []) {
+    const key = `${identity.partPath}\0${identity.nativeId}`
+    const identities = identitiesByPartAndNativeId.get(key) ?? []
+    identities.push(identity)
+    identitiesByPartAndNativeId.set(key, identities)
+  }
+  const parsedSlides = [...parsed.slides].sort((left, right) => {
+    const leftIndex = left.sourcePart ? sourceOrder.get(left.sourcePart) : undefined
+    const rightIndex = right.sourcePart ? sourceOrder.get(right.sourcePart) : undefined
+    if (leftIndex === undefined || rightIndex === undefined) return 0
+    return leftIndex - rightIndex
+  })
+  for (const [slideIndex, item] of parsedSlides.entries()) {
+    const sourceDependency = (item.sourcePart
+      ? sourcePackage?.slides.find(slide => slide.slidePart === item.sourcePart)
+      : undefined)
+      ?? sourcePackage?.slides[slideIndex]
+    const sourceTheme = sourcePackage?.hierarchy?.themes.find(candidate => (
+      candidate.partPath === sourceDependency?.themePart
+    ))
+    const slideTheme: SlideTheme = {
+      ...theme,
+      fontName: sourceTheme?.minorLatinFont || theme.fontName,
+      themeColors: item.themeColors?.length ? item.themeColors : theme.themeColors,
+    }
+    const turningModes: Record<string, NonNullable<Slide['turningMode']>> = {
+      cover: 'slideX',
+      cube: 'slideX3D',
+      fade: 'fade',
+      pull: 'slideX',
+      push: 'slideX',
+      random: 'random',
+      reveal: 'slideX',
+      uncover: 'slideX',
+      wipe: 'slideX',
+      zoom: 'scale',
+    }
+    const slide: Slide = {
+      background: slideBackground(item),
+      ...(item.transition?.autoNextAfter && item.transition.autoNextAfter >= 1000
+        ? { durationMs: item.transition.autoNextAfter }
+        : {}),
+      elements: [],
+      hidden: item.hidden,
+      id: createPresentationId(10),
+      remark: item.note || '',
+      title: item.name,
+      turningMode: item.transition?.type ? turningModes[item.transition.type] ?? 'no' : 'no',
+    }
+    const slideCounts = emptyDispositionCounts()
+    const capabilityCounts = new Map<string, PowerPointImportCapabilityReport>()
+    const issues: PowerPointImportIssue[] = []
+    const sourceIdentityFor = (
+      element: PptxElement,
+    ) => {
+      if (!element.native) return undefined
+      const candidates = identitiesByPartAndNativeId.get(`${element.native.partPath}\0${element.native.id}`) ?? []
+      return candidates.length === 1 ? candidates[0] : undefined
+    }
+    let sourceObjectCount = 0
+    const recordOutcome = (
+      element: PptxElement,
+      sourceLayer: PowerPointElementSourceLayer,
+      disposition: PowerPointImportDisposition,
+      issue?: Pick<PowerPointImportIssue, 'code' | 'message'>,
+    ) => {
+      sourceObjectCount += 1
+      slideCounts[disposition] += 1
+      packageCounts[disposition] += 1
+      const sourceType = element.type
+      const capability = capabilityCounts.get(sourceType) ?? {
+        ...emptyDispositionCounts(),
+        sourceType,
+      }
+      capability[disposition] += 1
+      capabilityCounts.set(sourceType, capability)
+      if (issue) {
+        issues.push({
+          ...issue,
+          disposition,
+          sourceLayer,
+          sourceOrder: element.order,
+          sourceType,
+        })
+      }
+    }
+    if (sourcePackage && sourceDependency) {
+      slide.source = {
+        ...sourceDependency,
+        kind: 'pptx',
+        packageId: sourcePackage.packageId,
+      }
+    }
+    const parseElements = (
+      elements: PptxElement[],
+      sourceLayer: PowerPointElementSourceLayer,
+      groupId?: string,
+      destinationElements: PPTElement[] = slide.elements,
+    ) => {
       for (const element of elements.sort((a, b) => a.order - b.order)) {
+        const outputCountBefore = destinationElements.length
+        let disposition: PowerPointImportDisposition | undefined
+        let issue: Pick<PowerPointImportIssue, 'code' | 'message'> | undefined
+        const sourceIdentity = sourceIdentityFor(element)
+        const resolvedSourceLayer: PowerPointElementSourceLayer = sourceIdentity?.partPath === sourceDependency?.layoutPart
+          ? 'layout'
+          : sourceIdentity?.partPath === sourceDependency?.masterPart
+            ? 'master'
+            : sourceLayer
+        if (sourcePackage && sourceManifest && !sourceIdentity) {
+          issues.push({
+            code: element.native ? 'pptx.identity.not-in-manifest' : 'pptx.identity.missing',
+            disposition: 'approximated',
+            message: element.native
+              ? `Native PowerPoint object ${element.native.partPath}#${element.native.id} did not resolve to one unique package object`
+              : 'Parsed PowerPoint object did not expose a native OOXML identity and will not be eligible for exact source patching',
+            sourceLayer,
+            sourceOrder: element.order,
+            sourceType: element.type,
+          })
+        }
+        const pushElement = (destination: PPTElement) => {
+          if (groupId) destination.groupId = groupId
+          if (sourcePackage && sourceDependency && sourceIdentity) {
+            destination.source = {
+              kind: 'pptx',
+              nativeShapeId: sourceIdentity.nativeId,
+              packageId: sourcePackage.packageId,
+              placeholderIndex: sourceIdentity.placeholderIndex,
+              placeholderType: sourceIdentity.placeholderType,
+              slidePart: sourceDependency.slidePart,
+              sourceObjectId: sourceIdentity.stableId,
+              sourceLayer: resolvedSourceLayer,
+              sourceOrder: element.order,
+              sourcePart: sourceIdentity.partPath,
+              stableId: sourceIdentity.stableId,
+            }
+          }
+          destinationElements.push(destination)
+        }
         let backstop = 1
         if (element.type === 'shape' && (element.shapType === 'line' || /(straight|bent|curved)Connector/.test(element.shapType))) backstop = 0
         const originWidth = element.width || backstop
@@ -391,8 +532,8 @@ export const convertParsedPptxSlides = ({
           const metrics = getParagraphMetrics(element.content, textRatio)
           const text: PPTTextElement = {
             content: convertTextContent(element.content, textRatio),
-            defaultColor: theme.fontColor,
-            defaultFontName: theme.fontName,
+            defaultColor: slideTheme.fontColor,
+            defaultFontName: slideTheme.fontName,
             fill: element.fill?.type === 'color' ? element.fill.value : '',
             height: element.height,
             id: createPresentationId(10),
@@ -413,12 +554,13 @@ export const convertParsedPptxSlides = ({
           if (element.textInset) text.inset = [element.textInset.t, element.textInset.r, element.textInset.b, element.textInset.l]
           if (metrics.lineHeight) text.lineHeight = metrics.lineHeight
           if (metrics.margin) text.paragraphSpace = metrics.margin
-          slide.elements.push(text)
+          pushElement(text)
+          disposition = 'approximated'
         }
         else if (element.type === 'image') {
           const image: PPTImageElement = {
             fixedRatio: true, flipH: element.isFlipH, flipV: element.isFlipV, height: element.height, id: createPresentationId(10), left: element.left,
-            rotate: element.rotate, src: element.base64, top: element.top, type: 'image', width: element.width,
+            opacity: element.opacity, rotate: element.rotate, src: element.base64, top: element.top, type: 'image', width: element.width,
           }
           if (element.borderWidth) image.outline = { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) }
           const clipShapes = ['rect', 'snip1Rect', 'snip2DiagRect', 'roundRect', 'ellipse', 'triangle', 'rtTriangle', 'diamond', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'chevron', 'homePlate', 'rightArrow', 'parallelogram', 'trapezoid']
@@ -428,13 +570,72 @@ export const convertParsedPptxSlides = ({
           if (element.rect) image.clip = { range: [[element.rect.l || 0, element.rect.t || 0], [100 - (element.rect.r || 0), 100 - (element.rect.b || 0)]], shape: geometry }
           else if (element.geom) image.clip = { range: [[0, 0], [100, 100]], shape: geometry }
           if (element.link) image.link = { target: element.link, type: 'web' }
-          slide.elements.push(image)
+          if (element.shadow) image.shadow = { blur: element.shadow.blur * ratio, color: element.shadow.color, h: element.shadow.h * ratio, v: element.shadow.v * ratio }
+          if (element.filters) {
+            image.filters = {
+              ...(element.filters.brightness !== undefined ? { brightness: `${Math.max(0, 1 + element.filters.brightness) * 100}%` } : {}),
+              ...(element.filters.contrast !== undefined ? { contrast: `${Math.max(0, 1 + element.filters.contrast) * 100}%` } : {}),
+              ...(element.filters.saturation !== undefined ? { saturate: `${Math.max(0, element.filters.saturation) * 100}%` } : {}),
+            }
+          }
+          pushElement(image)
+          disposition = 'approximated'
         }
-        else if (element.type === 'math') slide.elements.push({ fixedRatio: true, height: element.height, id: createPresentationId(10), left: element.left, rotate: 0, src: element.picBase64, top: element.top, type: 'image', width: element.width })
-        else if (element.type === 'audio' && element.blob) slide.elements.push({ autoplay: false, color: theme.themeColors[0]!, fixedRatio: false, height: element.height, id: createPresentationId(10), left: element.left, loop: false, rotate: 0, src: element.blob, top: element.top, type: 'audio', width: element.width })
-        else if (element.type === 'video' && element.blob) slide.elements.push({ autoplay: false, height: element.height, id: createPresentationId(10), left: element.left, rotate: 0, src: element.blob, top: element.top, type: 'video', width: element.width })
+        else if (element.type === 'math') {
+          if (element.latex) {
+            try {
+              const rendered = renderLatex(element.latex)
+              const equation: PPTLatexElement = {
+                color: slideTheme.fontColor,
+                fallbackImage: element.picBase64 || undefined,
+                fixedRatio: true,
+                height: element.height,
+                id: createPresentationId(10),
+                latex: element.latex,
+                left: element.left,
+                path: rendered.path,
+                rotate: element.rotate ?? 0,
+                strokeWidth: 2,
+                top: element.top,
+                type: 'latex',
+                viewBox: [rendered.w, rendered.h],
+                width: element.width,
+              }
+              pushElement(equation)
+            }
+            catch {
+              pushElement({ fixedRatio: true, height: element.height, id: createPresentationId(10), left: element.left, rotate: element.rotate ?? 0, src: element.picBase64, top: element.top, type: 'image', width: element.width })
+            }
+          }
+          else {
+            pushElement({ fixedRatio: true, height: element.height, id: createPresentationId(10), left: element.left, rotate: element.rotate ?? 0, src: element.picBase64, top: element.top, type: 'image', width: element.width })
+          }
+          disposition = 'approximated'
+        }
+        else if (element.type === 'audio') {
+          const source = element.blob || (/^https?:\/\//.test(element.ref) ? element.ref : '')
+          if (source) {
+            pushElement({ autoplay: false, color: slideTheme.themeColors[0] ?? slideTheme.fontColor, fixedRatio: false, height: element.height, id: createPresentationId(10), left: element.left, loop: false, rotate: element.rotate ?? 0, src: source, top: element.top, type: 'audio', width: element.width })
+            disposition = 'approximated'
+          }
+          else {
+            disposition = 'dropped'
+            issue = { code: 'pptx.audio.missing-payload', message: 'Audio relationship could not be decoded into an importable payload' }
+          }
+        }
+        else if (element.type === 'video') {
+          const source = element.blob || (/^https?:\/\//.test(element.ref) ? element.ref : '')
+          if (source || element.posterBase64) {
+            pushElement({ autoplay: false, height: element.height, id: createPresentationId(10), left: element.left, poster: element.posterBase64, rotate: element.rotate ?? 0, src: source, top: element.top, type: 'video', width: element.width })
+            disposition = 'approximated'
+          }
+          else {
+            disposition = 'dropped'
+            issue = { code: 'pptx.video.missing-payload', message: 'Video relationship could not be decoded into an importable payload' }
+          }
+        }
         else if (element.type === 'shape') {
-          if (element.shapType === 'line' || /(straight|bent|curved)Connector/.test(element.shapType)) slide.elements.push(parseLineElement(element, ratio))
+          if (element.shapType === 'line' || /(straight|bent|curved)Connector/.test(element.shapType)) pushElement(parseLineElement(element, ratio))
           else {
             const shape = shapeList.find(candidate => candidate.pptxShapeType === element.shapType)
             const gradient: Gradient | undefined = element.fill?.type === 'gradient' ? { colors: element.fill.value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: element.fill.value.rot, type: element.fill.value.path === 'line' ? 'linear' : 'radial' } : undefined
@@ -451,8 +652,15 @@ export const convertParsedPptxSlides = ({
               outline: { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) },
               path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
               pattern: element.fill?.type === 'image' ? element.fill.value.base64 : undefined,
+              powerPointPattern: element.fill?.type === 'pattern'
+                ? {
+                    backgroundColor: element.fill.value.backgroundColor,
+                    foregroundColor: element.fill.value.foregroundColor,
+                    patternType: element.fill.value.type,
+                  }
+                : undefined,
               rotate: element.rotate,
-              text: { align: vAlignMap[element.vAlign] || 'middle', content: convertTextContent(element.content, ratio), defaultColor: theme.fontColor, defaultFontName: theme.fontName },
+              text: { align: vAlignMap[element.vAlign] || 'middle', content: convertTextContent(element.content, ratio), defaultColor: slideTheme.fontColor, defaultFontName: slideTheme.fontName },
               top: element.top,
               type: 'shape',
               viewBox: [200, 200],
@@ -514,11 +722,15 @@ export const convertParsedPptxSlides = ({
               const { maxX, maxY } = svgPathRange(destination.path)
               destination.viewBox = maxX / maxY > originWidth / originHeight ? [maxX, maxX * originHeight / originWidth] : [maxY * originWidth / originHeight, maxY]
             }
-            if (destination.path && destination.viewBox[0] && destination.viewBox[1]) slide.elements.push(destination)
+            if (destination.path && destination.viewBox[0] && destination.viewBox[1]) pushElement(destination)
+          }
+          disposition = destinationElements.length > outputCountBefore ? 'approximated' : 'dropped'
+          if (disposition === 'dropped') {
+            issue = { code: 'pptx.shape.invalid-geometry', message: 'Shape geometry could not be converted into a renderable Mona shape' }
           }
         }
         else if (element.type === 'table') {
-          const baseStyle: TableCellStyle = { color: theme.fontColor, fontname: theme.fontName }
+          const baseStyle: TableCellStyle = { color: slideTheme.fontColor, fontname: slideTheme.fontName }
           const data: TableCell[][] = element.data.map(row => row.map(cell => {
             const container = document.createElement('div')
             container.innerHTML = cell.text
@@ -527,7 +739,16 @@ export const convertParsedPptxSlides = ({
             const span = container.querySelector('span')
             const fontWeight = span?.style.fontWeight || ''
             const decoration = span?.style.textDecoration || ''
+            const borders = Object.fromEntries(Object.entries(cell.borders ?? {}).map(([side, border]) => [
+              side,
+              {
+                color: border.borderColor,
+                style: border.borderType,
+                width: +((border.borderWidth ?? 0) * ratio).toFixed(2),
+              },
+            ])) as TableCell['borders']
             return {
+              borders,
               colspan: cell.colSpan || 1,
               id: createPresentationId(10),
               rowspan: cell.rowSpan || 1,
@@ -544,7 +765,7 @@ export const convertParsedPptxSlides = ({
                 underline: decoration.includes('underline'),
                 vAlign: vAlignMap[cell.vAlign] || 'middle',
               },
-              text: container.innerText,
+              text: convertTextContent(cell.text, ratio),
             }
           }))
           const allWidth = element.colWidths.reduce((sum, width) => sum + width, 0)
@@ -563,12 +784,15 @@ export const convertParsedPptxSlides = ({
           collect(element.borders)
           for (const row of element.data) for (const cell of row) collect(cell.borders)
           const border = [...borderCounter.values()].sort((a, b) => b.count - a.count)[0]?.border
-          slide.elements.push({
+          pushElement({
             cellMinHeight: element.rowHeights[0] ? element.rowHeights[0] * ratio : 36,
             colWidths: element.colWidths.map(width => width / allWidth), data, height: element.height, id: createPresentationId(10), left: element.left,
             outline: { color: border?.borderColor || '#eeece1', style: (border?.borderType || 'solid') as 'dashed' | 'dotted' | 'solid', width: +((border?.borderWidth || 0) * ratio || 2).toFixed(2) },
-            rotate: 0, top: element.top, type: 'table', width: element.width,
+            rotate: element.rotate ?? 0,
+            rowHeights: element.rowHeights.map(height => height * ratio),
+            top: element.top, type: 'table', width: element.width,
           })
+          disposition = 'approximated'
         }
         else if (element.type === 'chart') {
           let labels: string[]
@@ -581,47 +805,239 @@ export const convertParsedPptxSlides = ({
           }
           else {
             const chartData = element.data as ChartItem[]
-            labels = Object.values(chartData[0]!.xlabels)
-            legends = chartData.map(value => value.key)
-            series = chartData.map(value => value.values.map(point => point.y))
+            const categoryIndexes = [...new Set(chartData.flatMap(value => [
+              ...Object.keys(value.xlabels),
+              ...value.values.map(point => point.x),
+            ]))].sort((left, right) => Number(left) - Number(right))
+            labels = categoryIndexes.map(index => (
+              chartData.find(value => value.xlabels[index] !== undefined)?.xlabels[index] ?? index
+            ))
+            legends = chartData.map(value => String(value.key))
+            series = chartData.map(value => {
+              const valuesByIndex = new Map(value.values.map(point => [point.x, point.y]))
+              return categoryIndexes.map(index => valuesByIndex.get(index) ?? 0)
+            })
           }
           const options: ChartOptions = {}
+          const legendPositions: Record<string, NonNullable<ChartOptions['legendPosition']>> = {
+            b: 'bottom',
+            l: 'left',
+            r: 'right',
+            t: 'top',
+            tr: 'right',
+          }
+          options.categoryAxisTitle = element.categoryAxisTitle || undefined
+          options.gapWidth = element.gapWidth !== undefined ? Number.parseFloat(element.gapWidth) : undefined
+          options.holeSize = element.holeSize !== undefined ? Number.parseFloat(element.holeSize) : undefined
+          options.legendPosition = element.legendPosition ? legendPositions[element.legendPosition] : undefined
+          options.marker = element.marker
+          options.maximumValue = Number.isFinite(element.maximumValue) ? element.maximumValue : undefined
+          options.minimumValue = Number.isFinite(element.minimumValue) ? element.minimumValue : undefined
+          options.overlap = element.overlap !== undefined ? Number.parseFloat(element.overlap) : undefined
+          options.showCategoryName = element.showCategoryName
+          options.showDataLabels = element.showDataLabels
+          options.showLegend = element.showLegend
+          options.showMajorGridlines = element.showMajorGridlines
+          options.showSeriesName = element.showSeriesName
+          options.showValue = element.showValue
+          options.title = element.title || undefined
+          options.valueAxisTitle = element.valueAxisTitle || undefined
+          const importedBarDirection = 'barDir' in element ? element.barDir : undefined
+          const mapChartType = (value: string): ChartType => {
+            if (value === 'barChart' || value === 'bar3DChart') return importedBarDirection === 'bar' ? 'column' : 'bar'
+            if (value === 'lineChart' || value === 'line3DChart') return 'line'
+            if (value === 'areaChart' || value === 'area3DChart') return 'area'
+            if (value === 'scatterChart' || value === 'bubbleChart') return 'scatter'
+            if (value === 'pieChart' || value === 'pie3DChart') return 'pie'
+            if (value === 'radarChart') return 'radar'
+            if (value === 'doughnutChart') return 'ring'
+            return 'bar'
+          }
+          if (element.seriesChartTypes?.length) {
+            options.seriesTypes = element.seriesChartTypes.map(mapChartType)
+          }
           let chartType: ChartType = 'bar'
           switch (element.chartType) {
-            case 'barChart': case 'bar3DChart': chartType = element.barDir === 'bar' ? 'column' : 'bar'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; break
-            case 'lineChart': case 'line3DChart': chartType = 'line'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; break
-            case 'areaChart': case 'area3DChart': chartType = 'area'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; break
+            case 'barChart': case 'bar3DChart': chartType = element.barDir === 'bar' ? 'column' : 'bar'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; if (element.grouping === 'percentStacked') options.percentStacked = true; break
+            case 'lineChart': case 'line3DChart': chartType = 'line'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; if (element.grouping === 'percentStacked') options.percentStacked = true; break
+            case 'areaChart': case 'area3DChart': chartType = 'area'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; if (element.grouping === 'percentStacked') options.percentStacked = true; break
             case 'scatterChart': case 'bubbleChart': chartType = 'scatter'; break
             case 'pieChart': case 'pie3DChart': chartType = 'pie'; break
             case 'radarChart': chartType = 'radar'; break
             case 'doughnutChart': chartType = 'ring'; break
           }
-          slide.elements.push({ chartType, data: { labels, legends, series }, height: element.height, id: createPresentationId(10), left: element.left, options, rotate: 0, textColor: theme.fontColor, themeColors: element.colors.length ? element.colors : theme.themeColors, top: element.top, type: 'chart', width: element.width })
+          pushElement({ chartType, data: { labels, legends, series }, height: element.height, id: createPresentationId(10), left: element.left, options, rotate: element.rotate ?? 0, textColor: slideTheme.fontColor, themeColors: element.colors.filter(Boolean).length ? element.colors.filter(Boolean) : slideTheme.themeColors, top: element.top, type: 'chart', width: element.width })
+          disposition = 'approximated'
         }
         else if (element.type === 'group') {
-          let elements = element.elements.map(child => {
-            let left = child.left + originLeft
-            let top = child.top + originTop
-            let rotate = 'rotate' in child ? child.rotate : 0
-            if (element.rotate) {
-              const result = calculateRotatedPosition(originLeft, originTop, originWidth, originHeight, child.left, child.top, child.width, child.height, element.rotate, rotate)
-              left = result.x; top = result.y; rotate = result.globalRotation
-            }
-            const next = { ...child, left, top }
-            if (element.isFlipH && 'isFlipH' in next) next.isFlipH = true
-            if (element.isFlipV && 'isFlipV' in next) next.isFlipV = true
-            if ('rotate' in next && element.rotate) next.rotate = rotate
-            return next
-          })
-          if (element.isFlipH) elements = flipGroupElements(elements, 'y')
-          if (element.isFlipV) elements = flipGroupElements(elements, 'x')
-          parseElements(elements)
+          const children: PPTElement[] = []
+          parseElements(structuredClone(element.elements), resolvedSourceLayer, undefined, children)
+          const group: PPTGroupElement = {
+            coordinateHeight: Math.max(element.height, 0.001),
+            coordinateWidth: Math.max(element.width, 0.001),
+            elements: children,
+            flipH: element.isFlipH,
+            flipV: element.isFlipV,
+            height: element.height,
+            id: createPresentationId(10),
+            left: element.left,
+            rotate: element.rotate ?? 0,
+            semanticType: 'group',
+            top: element.top,
+            type: 'group',
+            width: element.width,
+          }
+          pushElement(group)
+          disposition = children.length ? 'approximated' : 'opaque'
+          if (!children.length) {
+            issue = { code: 'pptx.group.empty-conversion', message: 'The native group is preserved, but none of its children have a semantic renderer yet' }
+          }
         }
-        else if (element.type === 'diagram') parseElements(element.elements.map(child => ({ ...child, left: child.left + originLeft, top: child.top + originTop })))
+        else if (element.type === 'diagram') {
+          const children: PPTElement[] = []
+          parseElements(structuredClone(element.elements), resolvedSourceLayer, undefined, children)
+          const diagram: PPTGroupElement = {
+            coordinateHeight: Math.max(element.height, 0.001),
+            coordinateWidth: Math.max(element.width, 0.001),
+            elements: children,
+            height: element.height,
+            id: createPresentationId(10),
+            left: element.left,
+            rotate: 0,
+            semanticType: 'diagram',
+            top: element.top,
+            type: 'group',
+            width: element.width,
+          }
+          pushElement(diagram)
+          disposition = children.length ? 'approximated' : 'opaque'
+          if (!children.length) {
+            issue = { code: 'pptx.diagram.empty-conversion', message: 'The SmartArt frame is preserved, but its diagram drawing has no renderable children' }
+          }
+        }
+        else if (element.type === 'opaque') {
+          const opaque: PPTOpaqueElement = {
+            height: element.height,
+            id: createPresentationId(10),
+            label: element.label,
+            left: element.left,
+            opaqueType: element.opaqueType,
+            reason: element.reason,
+            relationshipIds: element.relationshipIds,
+            rotate: element.rotate ?? 0,
+            top: element.top,
+            type: 'opaque',
+            width: element.width,
+          }
+          pushElement(opaque)
+          disposition = 'opaque'
+          issue = {
+            code: 'pptx.element.opaque',
+            message: element.reason || 'The original PowerPoint object is preserved without a semantic Mona renderer',
+          }
+        }
+        if (!disposition) {
+          disposition = 'dropped'
+          issue = {
+            code: 'pptx.element.unsupported',
+            message: `Unsupported PowerPoint element type: ${element.type}`,
+          }
+        }
+        recordOutcome(element, resolvedSourceLayer, disposition, issue)
       }
     }
-    parseElements([...item.elements, ...item.layoutElements])
+    if (sourceDependency?.masterPart && !masterElementsByPart.has(sourceDependency.masterPart)) {
+      const masterElements: PPTElement[] = []
+      parseElements(item.masterElements ?? [], 'master', undefined, masterElements)
+      masterElementsByPart.set(sourceDependency.masterPart, masterElements)
+    }
+    if (sourceDependency?.layoutPart && !layoutElementsByPart.has(sourceDependency.layoutPart)) {
+      const layoutElements: PPTElement[] = []
+      parseElements(item.layoutElements, 'layout', undefined, layoutElements)
+      layoutElementsByPart.set(sourceDependency.layoutPart, layoutElements)
+    }
+    parseElements(item.elements, 'slide')
     slides.push(slide)
+    slideReports.push({
+      capabilities: [...capabilityCounts.values()].sort((left, right) => left.sourceType.localeCompare(right.sourceType)),
+      counts: slideCounts,
+      issues,
+      outputElementCount: slide.elements.length
+        + (sourceDependency?.layoutPart ? layoutElementsByPart.get(sourceDependency.layoutPart)?.length ?? 0 : 0)
+        + (sourceDependency?.masterPart ? masterElementsByPart.get(sourceDependency.masterPart)?.length ?? 0 : 0),
+      slideIndex,
+      slidePart: sourceDependency?.slidePart,
+      sourceObjectCount,
+    })
   }
-  return slides
+  const report: PowerPointImportReport = {
+    counts: packageCounts,
+    packageId: sourcePackage?.packageId ?? 'pptx:untracked',
+    packageIssues: sourceManifest?.issues ?? [],
+    packageParts: {
+      preserved: sourceManifest?.parts.length ?? 0,
+      relationships: sourceManifest?.relationships.length ?? 0,
+      total: sourceManifest?.parts.length ?? 0,
+      unknown: sourceManifest?.parts.filter(part => part.kind === 'unknown').length ?? 0,
+    },
+    schemaVersion: 1,
+    slides: slideReports,
+    status: packageCounts.dropped || sourceManifest?.issues.some(issue => issue.severity === 'error')
+      ? 'complete-with-loss'
+      : packageCounts.approximated || packageCounts.opaque
+        ? 'complete-with-approximations'
+        : 'complete',
+  }
+  const baseHierarchy = sourcePackage
+    ? sourcePackage.hierarchy ?? {
+        layouts: [...new Map(sourcePackage.slides.flatMap(dependency => dependency.layoutPart
+          ? [[dependency.layoutPart, {
+              id: `${sourcePackage.packageId}/${dependency.layoutPart}`,
+              masterId: dependency.masterPart ? `${sourcePackage.packageId}/${dependency.masterPart}` : undefined,
+              objectIds: (sourceManifest?.objects ?? []).filter(object => object.partPath === dependency.layoutPart).map(object => object.stableId),
+              packageId: sourcePackage.packageId,
+              partPath: dependency.layoutPart,
+              preserve: false,
+              showMasterPlaceholderAnimations: true,
+              showMasterShapes: true,
+            }] as const]
+          : [])).values()],
+        masters: [...new Map(sourcePackage.slides.flatMap(dependency => dependency.masterPart
+          ? [[dependency.masterPart, {
+              id: `${sourcePackage.packageId}/${dependency.masterPart}`,
+              layoutIds: sourcePackage.slides
+                .filter(candidate => candidate.masterPart === dependency.masterPart && candidate.layoutPart)
+                .map(candidate => `${sourcePackage.packageId}/${candidate.layoutPart}`),
+              objectIds: (sourceManifest?.objects ?? []).filter(object => object.partPath === dependency.masterPart).map(object => object.stableId),
+              packageId: sourcePackage.packageId,
+              partPath: dependency.masterPart,
+              preserve: false,
+              themeId: dependency.themePart ? `${sourcePackage.packageId}/${dependency.themePart}` : undefined,
+            }] as const]
+          : [])).values()],
+        placeholders: [],
+        themes: [],
+      }
+    : undefined
+  const semanticSourcePackage = sourcePackage && baseHierarchy
+    ? {
+        ...sourcePackage,
+        hierarchy: {
+          ...baseHierarchy,
+          layouts: baseHierarchy.layouts.map(layout => ({
+            ...layout,
+            elements: layoutElementsByPart.get(layout.partPath) ?? [],
+          })),
+          masters: baseHierarchy.masters.map(master => ({
+            ...master,
+            elements: masterElementsByPart.get(master.partPath) ?? [],
+          })),
+        },
+      }
+    : sourcePackage
+  return { report, slides, sourcePackage: semanticSourcePackage }
 }
+
+export const convertParsedPptxSlides = (
+  options: Parameters<typeof convertParsedPptxPresentation>[0],
+): Slide[] => convertParsedPptxPresentation(options).slides

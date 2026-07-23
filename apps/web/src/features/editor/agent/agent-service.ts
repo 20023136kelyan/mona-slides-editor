@@ -1,6 +1,6 @@
 import { editorActions } from '@mona/editor-state'
 import { getMonaAgentModel } from '@mona/agent-protocol'
-import type { PresentationTransactionResult } from '@mona/presentation-core'
+import { buildElementIndex, type PresentationTransactionResult } from '@mona/presentation-core'
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
@@ -190,10 +190,14 @@ export const applyAgentCandidate = (
   }
   const state = runtime.store.getState().presentation
   const currentSlideId = state.slides[state.slideIndex]?.id
+  const elementIndex = buildElementIndex(state)
   const selectedIds = currentSlideId && candidate.summary.affectedSlideIds.includes(currentSlideId)
-    ? candidate.summary.affectedElementIds.filter(id => (
-        state.slides[state.slideIndex]?.elements.some(element => element.id === id)
-      ))
+    ? [...new Set(candidate.summary.affectedElementIds.flatMap(id => {
+        const location = elementIndex.get(id)
+        if (!location || location.slideId !== currentSlideId) return []
+        const rootId = state.slides[state.slideIndex]?.elements[location.elementPath[0]!]?.id
+        return rootId ? [rootId] : []
+      }))]
     : []
   runtime.store.dispatch(editorActions.selectionChanged(selectedIds))
   runtime.store.dispatch(editorActions.pageSelectionChanged(selectedIds.length === 0))

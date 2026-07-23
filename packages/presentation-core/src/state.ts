@@ -1,4 +1,5 @@
 import type { Slide, SlideTemplate, SlideTheme } from './model'
+import type { PowerPointPackageReference } from './source'
 
 /**
  * Exact persisted/session shape currently owned by the Vue slides store.
@@ -8,6 +9,7 @@ export interface PresentationState {
   title: string
   theme: SlideTheme
   slides: Slide[]
+  sourcePackages?: PowerPointPackageReference[]
   slideIndex: number
   viewportSize: number
   viewportRatio: number

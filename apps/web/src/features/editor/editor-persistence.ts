@@ -1,9 +1,10 @@
 import { validateImportedSlides, validatePresentationState, type PresentationState } from '@mona/presentation-core'
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
-import { sanitizeSlides } from '@/lib/deck-sanitizer'
+import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
 import {
   clearDeckSlot,
+  clearPowerPointPackages,
   clearSketchRecords,
   deleteMediaBlob,
   listMediaKeys,
@@ -19,7 +20,7 @@ import {
 // their payloads are captured alongside the deck and re-minted on restore.
 
 const SAVE_DEBOUNCE_MS = 800
-const STORAGE_VERSION = 2
+const STORAGE_VERSION = 4
 
 interface StoredDeck {
   presentation: PresentationState
@@ -92,19 +93,39 @@ export const consumeRestoredDeckFlag = (): boolean => {
 const isStoredDeck = (value: unknown): value is StoredDeck => {
   if (!value || typeof value !== 'object') return false
   const record = value as Partial<StoredDeck>
-  return (record.version === 1 || record.version === STORAGE_VERSION)
+  return (record.version === 1 || record.version === 2 || record.version === 3 || record.version === STORAGE_VERSION)
     && !!record.presentation && typeof record.presentation === 'object'
 }
 
 const migrateStoredDeck = (stored: StoredDeck): StoredDeck => {
   if (stored.version === STORAGE_VERSION) return stored
-  // Version 2 adds optional page metadata (title, hidden, durationMs). Version
-  // 1 decks require no lossy rewrite: absence is the normalized default.
+  // Version 2 added optional page metadata. Version 3 temporarily synthesized
+  // order-based PPTX provenance. Version 4 permits source patching only when a
+  // native part + cNvPr identity was captured, and removes legacy fallbacks
+  // rather than presenting them as exact PowerPoint object addresses.
   return {
     ...stored,
     presentation: {
       ...stored.presentation,
-      slides: stored.presentation.slides.map(slide => ({ ...slide })),
+      slides: stored.presentation.slides.map(slide => ({
+        ...slide,
+        elements: slide.elements.map(element => {
+          const source = element.source
+          if (!source || source.kind !== 'pptx') return element
+          if (source.nativeShapeId && source.sourceObjectId && source.sourcePart) {
+            return {
+              ...element,
+              source: {
+                ...source,
+                stableId: source.sourceObjectId,
+              },
+            }
+          }
+          const { source: _unresolvedSource, ...elementWithoutUnresolvedSource } = element
+          void _unresolvedSource
+          return elementWithoutUnresolvedSource
+        }),
+      })),
     },
     version: STORAGE_VERSION,
   }
@@ -128,14 +149,16 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
     // Stored blob: URLs are dead in this document; re-mint object URLs from
     // the captured payloads before the deck reaches the store.
     const replacements = new Map<string, string>()
-    for (const url of collectBlobUrls(migrated.presentation.slides)) {
+    for (const url of collectBlobUrls(migrated.presentation)) {
       const blob = await readMediaBlob(url).catch(() => undefined)
       if (blob instanceof Blob) replacements.set(url, URL.createObjectURL(blob))
     }
 
+    const restoredPresentation = replaceStrings(migrated.presentation, replacements)
     const presentation: PresentationState = {
-      ...migrated.presentation,
-      slides: sanitizeSlides(replaceStrings(migrated.presentation.slides, replacements)),
+      ...restoredPresentation,
+      slides: sanitizeSlides(restoredPresentation.slides),
+      sourcePackages: restoredPresentation.sourcePackages?.map(sanitizePowerPointPackageReference),
       slideIndex: Math.min(Math.max(migrated.presentation.slideIndex, 0), migrated.presentation.slides.length - 1),
     }
     if (!validatePresentationState(presentation).valid) {
@@ -152,6 +175,7 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
 
 export const discardWorkingDeck = async (): Promise<void> => {
   await clearDeckSlot().catch(() => {})
+  await clearPowerPointPackages().catch(() => {})
   await clearSketchRecords().catch(() => {})
   const keys = await listMediaKeys().catch(() => [] as IDBValidKey[])
   await Promise.all(keys.map(key => deleteMediaBlob(key).catch(() => {})))
@@ -191,7 +215,7 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
       const presentation = runtime.store.getState().presentation
       updateSnapshot({ dirty: true, error: null, status: 'saving' })
       try {
-        const referenced = collectBlobUrls(presentation.slides)
+        const referenced = collectBlobUrls(presentation)
         for (const url of referenced) {
           const existing = await readMediaBlob(url).catch(() => undefined)
           if (existing instanceof Blob) continue
@@ -202,6 +226,9 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
         await Promise.all(keys
           .filter(key => typeof key === 'string' && !referenced.has(key))
           .map(key => deleteMediaBlob(key).catch(() => {})))
+        await runtime.pptxBackingStore.retain(
+          (presentation.sourcePackages ?? []).map(source => source.packageId),
+        )
 
         const savedAt = Date.now()
         const payload: StoredDeck = { presentation, savedAt, version: STORAGE_VERSION }

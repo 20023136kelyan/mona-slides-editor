@@ -213,6 +213,35 @@ test('drives save status from persistence and confirms a fully undoable new pres
   expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
 })
 
+test('keeps the default Present action direct and exposes real presenter and autoplay modes', async () => {
+  const runtime = createEditorRuntime(presentation)
+  const launches: Parameters<EditorApplication['startPresentation']>[0][] = []
+  const application = {
+    ...createApplication(null),
+    startPresentation: (options: Parameters<EditorApplication['startPresentation']>[0]) => launches.push(options),
+  }
+  await render(
+    <div style={{ width: 1357 }}>
+      <EditorApplicationProvider value={application}>
+        <EditorShellProvider>
+          <EditorHeader runtime={runtime} />
+        </EditorShellProvider>
+      </EditorApplicationProvider>
+    </div>,
+  )
+
+  await page.getByRole('button', { name: 'Start slideshow (F5)' }).click()
+  expect(launches).toEqual([{ fromStart: false }])
+
+  await page.getByRole('button', { name: 'Slideshow options' }).click()
+  await page.getByRole('menuitem', { name: 'Presenter view' }).click()
+  expect(launches.at(-1)).toEqual({ fromStart: false, viewMode: 'presenter' })
+
+  await page.getByRole('button', { name: 'Slideshow options' }).click()
+  await page.getByRole('menuitem', { name: 'Auto-play' }).click()
+  expect(launches.at(-1)).toEqual({ autoPlay: true, fromStart: false })
+})
+
 test('keeps compact desktop header groups separate from the editable title', async () => {
   await page.viewport(600, 700)
   try {
@@ -271,20 +300,43 @@ test('names header regions and supports roving focus across document menus', asy
   )
 
   await expect.element(page.getByRole('banner', { name: 'Presentation editor header' })).toBeVisible()
+  await expect.element(page.getByRole('menubar', { name: 'Menu bar' })).toBeVisible()
   await expect.element(page.getByRole('group', { name: 'Document controls' })).toBeVisible()
   await expect.element(page.getByRole('group', { name: 'Presentation controls' })).toBeVisible()
 
   const view = page.getByRole('button', { name: 'View', exact: true })
   const tools = page.getByRole('button', { name: 'Tools', exact: true })
-  const fileElement = document.querySelector<HTMLButtonElement>('[data-header-menu-trigger]')
+  const fileElement = document.querySelector<HTMLButtonElement>('.mona-header-menu-trigger')
   expect(fileElement).not.toBeNull()
   fileElement!.focus()
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
   expect(document.activeElement?.textContent).toBe('View')
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' }))
-  expect(document.activeElement?.textContent).toBe('Tools')
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Settings')
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }))
   expect(document.activeElement?.textContent).toBe('File')
   await expect.element(view).toBeVisible()
   await expect.element(tools).toBeVisible()
+})
+
+test('disables document replacement actions while an import is in flight', async () => {
+  const runtime = createEditorRuntime(presentation)
+  const application = {
+    ...createApplication(null),
+    importing: true,
+  }
+  await render(
+    <div style={{ width: 1357 }}>
+      <EditorApplicationProvider value={application}>
+        <EditorShellProvider>
+          <EditorHeader runtime={runtime} />
+        </EditorShellProvider>
+      </EditorApplicationProvider>
+    </div>,
+  )
+
+  await page.getByRole('button', { name: 'File', exact: true }).click()
+  for (const item of ['New presentation', 'Import PowerPoint', 'Import Mona file', 'Import JSON']) {
+    await expect.element(page.getByRole('menuitem', { name: item })).toBeDisabled()
+  }
 })

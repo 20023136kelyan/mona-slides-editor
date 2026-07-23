@@ -1,6 +1,6 @@
 import { useId, type MouseEventHandler, type PointerEventHandler, type ReactNode } from 'react'
 
-import type { PPTShapeElement, ShapeText, SlideTheme } from '@mona/presentation-core/model'
+import type { PatternFill, PPTShapeElement, ShapeText, SlideTheme } from '@mona/presentation-core/model'
 
 import {
   getFlipTransform,
@@ -24,6 +24,35 @@ export interface ShapeElementEditor {
   onPointerUp: PointerEventHandler<HTMLDivElement>
 }
 
+function PowerPointPattern({ pattern }: { pattern: PatternFill }) {
+  const fine = pattern.patternType.startsWith('lt') || pattern.patternType.startsWith('nar') ? 8 : 12
+  const heavy = pattern.patternType.startsWith('dk') ? 2 : 1
+  const common = {
+    fill: 'none',
+    stroke: pattern.foregroundColor,
+    strokeWidth: heavy,
+  }
+  if (/dot|pct/i.test(pattern.patternType)) {
+    return <circle cx={fine / 2} cy={fine / 2} fill={pattern.foregroundColor} r={heavy} />
+  }
+  if (/^(horz|ltHorz|dkHorz|narHorz|dashHorz)$/.test(pattern.patternType)) {
+    return <path {...common} d={`M0 ${fine / 2} H${fine}`} />
+  }
+  if (/^(vert|ltVert|dkVert|narVert|dashVert)$/.test(pattern.patternType)) {
+    return <path {...common} d={`M${fine / 2} 0 V${fine}`} />
+  }
+  if (/^(dnDiag|ltDnDiag|dkDnDiag|wdDnDiag|dashDnDiag)$/.test(pattern.patternType)) {
+    return <path {...common} d={`M-${fine / 2} ${fine / 2} L${fine / 2} -${fine / 2} M0 ${fine} L${fine} 0 M${fine / 2} ${fine * 1.5} L${fine * 1.5} ${fine / 2}`} />
+  }
+  if (/^(upDiag|ltUpDiag|dkUpDiag|wdUpDiag|dashUpDiag)$/.test(pattern.patternType)) {
+    return <path {...common} d={`M-${fine / 2} ${fine / 2} L${fine / 2} ${fine * 1.5} M0 0 L${fine} ${fine} M${fine / 2} -${fine / 2} L${fine * 1.5} ${fine / 2}`} />
+  }
+  if (pattern.patternType === 'cross' || pattern.patternType.endsWith('Grid')) {
+    return <path {...common} d={`M0 ${fine / 2} H${fine} M${fine / 2} 0 V${fine}`} />
+  }
+  return <path {...common} d={`M0 0 L${fine} ${fine} M${fine} 0 L0 ${fine}`} />
+}
+
 function ShapeGradient({ element, svgId }: { element: PPTShapeElement; svgId: string }) {
   if (element.pattern) {
     return (
@@ -35,6 +64,15 @@ function ShapeGradient({ element, svgId }: { element: PPTShapeElement; svgId: st
         width="1"
       >
         <image height="1" href={element.pattern} preserveAspectRatio="xMidYMid slice" width="1" />
+      </pattern>
+    )
+  }
+  if (element.powerPointPattern) {
+    const fine = element.powerPointPattern.patternType.startsWith('lt') || element.powerPointPattern.patternType.startsWith('nar') ? 8 : 12
+    return (
+      <pattern height={fine} id={`${svgId}-pattern`} patternUnits="userSpaceOnUse" width={fine}>
+        <rect fill={element.powerPointPattern.backgroundColor} height={fine} width={fine} />
+        <PowerPointPattern pattern={element.powerPointPattern} />
       </pattern>
     )
   }
@@ -74,7 +112,7 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
     defaultColor: theme.fontColor,
   }
   const inset = text.inset || [10, 10, 10, 10]
-  const fill = element.pattern
+  const fill = element.pattern || element.powerPointPattern
     ? `url(#${svgId}-pattern)`
     : element.gradient
       ? `url(#${svgId}-gradient)`

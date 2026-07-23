@@ -7,8 +7,8 @@
       "text": 59
     },
     "elements": 143,
-    "groupedElements": 0,
-    "groups": 0,
+    "groupedElements": 27,
+    "groups": 3,
     "hyperlinks": 0,
     "lockedElements": 0,
     "notesSlides": 17,
@@ -20,7 +20,7 @@
   },
   "parserGaps": {
     "nativeChartsNotEditable": 0,
-    "nativeGroupsNotRepresented": 1,
+    "nativeGroupsNotRepresented": 0,
     "nativeSmartArtNotEditable": 4,
     "nativeTableCountDifference": 0,
     "notesSlideCountDifference": 0

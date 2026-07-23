@@ -155,7 +155,7 @@ export function EditorImageLibrary({ onBack, onInsert }: {
                 <PopoverTrigger asChild>
                   <Button aria-label={t('foundation.editor.imageLibrary.orientation')} className="mona-image-library-orientation" size="editor" type="button" variant="outline">{t(`foundation.editor.imageLibrary.${orientation}`)} <DownIcon /></Button>
                 </PopoverTrigger>
-                <PopoverContent className="mona-image-library-orientation-menu" side="bottom" sideOffset={8}>
+                <PopoverContent aria-label={t('foundation.editor.imageLibrary.orientation')} className="mona-image-library-orientation-menu" side="bottom" sideOffset={8}>
                   {orientations.map(value => <Button aria-pressed={value === orientation} className={value === orientation ? 'is-active' : ''} key={value} onClick={() => setImageOrientation(value)} size="sm" type="button" variant="ghost">{t(`foundation.editor.imageLibrary.${value}`)}</Button>)}
                 </PopoverContent>
               </Popover>

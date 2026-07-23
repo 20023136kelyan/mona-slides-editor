@@ -1,3 +1,9 @@
+const search = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search)
+  : null
+
 export const referenceAgentEnabled = import.meta.env.DEV
-  && typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).has('developmentFixture')
+  && Boolean(
+    search?.has('developmentFixture')
+    || search?.get('agentFixture') === 'reference',
+  )

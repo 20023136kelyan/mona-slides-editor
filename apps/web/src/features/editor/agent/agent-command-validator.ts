@@ -1,6 +1,7 @@
 import {
   applyPresentationTransaction,
   createPresentationTransaction,
+  flattenElementTree,
   type PresentationCommand,
   type PresentationState,
   type PresentationTransaction,
@@ -90,7 +91,7 @@ export const validateAgentCommands = (
       throw new Error(`Operation ${index + 1} is not allowed`)
     }
     if (command.type === 'element.add') {
-      for (const element of commandElements(command)) {
+      for (const element of flattenElementTree(commandElements(command))) {
         assertGeometry(element, `Element in operation ${index + 1}`)
         assertManagedImage(element, `Element in operation ${index + 1}`)
       }
@@ -98,7 +99,7 @@ export const validateAgentCommands = (
     if (command.type === 'slide.add') {
       for (const slide of commandSlides(command)) {
         if (!Array.isArray(slide.elements)) throw new Error(`Slide in operation ${index + 1} has no element list`)
-        for (const element of slide.elements) {
+        for (const element of flattenElementTree(slide.elements)) {
           assertGeometry(element, `Slide element in operation ${index + 1}`)
           assertManagedImage(element, `Slide element in operation ${index + 1}`)
         }
@@ -166,4 +167,3 @@ export const summarizeAgentTransaction = (
     updatedElements,
   }
 }
-

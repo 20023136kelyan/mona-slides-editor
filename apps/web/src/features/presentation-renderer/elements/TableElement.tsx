@@ -367,7 +367,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
               </colgroup>
               <tbody>
                 {element.data.map((row, rowIndex) => (
-                  <tr key={row.map(cell => cell.id).join('-')} style={{ height: element.cellMinHeight }}>
+                  <tr key={row.map(cell => cell.id).join('-')} style={{ height: element.rowHeights?.[rowIndex] ?? element.cellMinHeight }}>
                     {row.map((cell, columnIndex) => {
                       const key = tableCellKey(rowIndex, columnIndex)
                       const hidden = hiddenCells.has(key)
@@ -398,7 +398,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
                             }
                           }}
                           rowSpan={cell.rowspan}
-                          style={{ ...getTableCellStyle(element.outline, cell.style), ...(hidden ? { display: 'none' } : {}) }}
+                          style={{ ...getTableCellStyle(element.outline, cell.style, cell.borders), ...(hidden ? { display: 'none' } : {}) }}
                         >
                           {active ? (
                             <EditableCellText

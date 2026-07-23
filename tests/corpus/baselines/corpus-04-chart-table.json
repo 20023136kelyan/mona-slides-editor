@@ -2,9 +2,10 @@
   "fixture": "corpus-04-chart-table.pptx",
   "imported": {
     "elementTypes": {
+      "chart": 3,
       "table": 1
     },
-    "elements": 1,
+    "elements": 4,
     "groupedElements": 0,
     "groups": 0,
     "hyperlinks": 0,
@@ -17,7 +18,7 @@
     "viewportSize": 960
   },
   "parserGaps": {
-    "nativeChartsNotEditable": 3,
+    "nativeChartsNotEditable": 0,
     "nativeGroupsNotRepresented": 0,
     "nativeSmartArtNotEditable": 0,
     "nativeTableCountDifference": 0,

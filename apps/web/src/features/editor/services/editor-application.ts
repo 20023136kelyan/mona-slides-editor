@@ -6,7 +6,9 @@ import type { ImportRequestDetail } from '@/features/editor/editor-import'
 import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
 
 export interface StartPresentationOptions {
+  autoPlay?: boolean
   fromStart: boolean
+  viewMode?: 'base' | 'presenter'
 }
 
 export interface EditorApplication {

@@ -30,7 +30,7 @@ export function EditorChartContextControls({
         <Button className="mona-contextual-control is-labeled" onClick={onEditData} variant="ghost"><EditIcon /><span>{t('foundation.editor.chartStyle.editData')}</span></Button>
         <Popover>
           <PopoverTrigger asChild><Button className="mona-contextual-control is-labeled" variant="ghost"><ChartIcon /><span>{t('foundation.editor.chartStyle.type')}</span></Button></PopoverTrigger>
-          <PopoverContent align="center" className="mona-chart-type-menu is-contextual" sideOffset={8}>
+          <PopoverContent aria-label={t('foundation.editor.chartStyle.type')} align="center" className="mona-chart-type-menu is-contextual" sideOffset={8}>
             {CHART_TYPES.map(type => <Button key={type} onClick={() => changeType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button>)}
           </PopoverContent>
         </Popover>

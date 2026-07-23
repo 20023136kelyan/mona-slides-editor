@@ -115,13 +115,13 @@ export function TableStylePanel({
         <InspectorColorButton ariaLabel={t('foundation.editor.table.textColor')} color={attrs.color} icon={<TextIcon />} onChange={color => updateText({ color })} style={{ width: '50%' }} />
         <InspectorColorButton ariaLabel={t('foundation.editor.table.cellFill')} color={attrs.backcolor} icon={<FillIcon />} onChange={backcolor => updateText({ backcolor })} style={{ width: '50%' }} />
       </InspectorButtonGroup>
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         <InspectorButton active={attrs.bold} ariaLabel={t('foundation.editor.text.bold')} onClick={() => updateText({ bold: !attrs.bold })} style={{ flex: 1 }}><TextBoldIcon /></InspectorButton>
         <InspectorButton active={attrs.em} ariaLabel={t('foundation.editor.text.italic')} onClick={() => updateText({ em: !attrs.em })} style={{ flex: 1 }}><TextItalicIcon /></InspectorButton>
         <InspectorButton active={attrs.underline} ariaLabel={t('foundation.editor.text.underline')} onClick={() => updateText({ underline: !attrs.underline })} style={{ flex: 1 }}><TextUnderlineIcon /></InspectorButton>
         <InspectorButton active={attrs.strikethrough} ariaLabel={t('foundation.editor.text.strikethrough')} onClick={() => updateText({ strikethrough: !attrs.strikethrough })} style={{ flex: 1 }}><StrikethroughIcon /></InspectorButton>
       </InspectorButtonGroup>
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         {([
           ['left', AlignLeftIcon, 'alignLeft'],
           ['center', AlignCenterIcon, 'alignCenter'],
@@ -129,16 +129,16 @@ export function TableStylePanel({
           ['justify', AlignBothIcon, 'justify'],
         ] as const).map(([value, Icon, label]) => <InspectorButton active={attrs.align === value} ariaLabel={t(`foundation.editor.table.${label}`)} key={value} onClick={() => updateText({ align: value as TextAlign })} style={{ flex: 1 }}><Icon /></InspectorButton>)}
       </InspectorButtonGroup>
-      <InspectorButtonGroup className="mona-panel-row-full">
+      <InspectorButtonGroup className="flex w-full items-center mb-2.5">
         {([
           ['top', AlignTopIcon, 'alignTop'],
           ['middle', AlignMiddleIcon, 'alignMiddle'],
           ['bottom', AlignBottomIcon, 'alignBottom'],
         ] as const).map(([value, Icon, label]) => <InspectorButton active={attrs.vAlign === value} ariaLabel={t(`foundation.editor.table.${label}`)} key={value} onClick={() => updateText({ vAlign: value as TextAlignVertical })} style={{ flex: 1 }}><Icon /></InspectorButton>)}
       </InspectorButtonGroup>
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <ElementOutlineControls element={element} fixed presentation={presentation} runtime={runtime} />
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <PropertyRow label={t('foundation.editor.tableStyle.rowActions')}>
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addRow')} onClick={() => command('insert-row', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addRow')}</InspectorButton>
@@ -159,9 +159,9 @@ export function TableStylePanel({
           </div>}><DownIcon /></InspectorPopoverButton>
         </InspectorButtonGroup>
       </PropertyRow>
-      <div className="mona-inspector-divider" />
+      <div className="my-6 w-full border-t border-black/[0.06]" />
       <div className="mona-panel-row mona-table-theme-switch">
-        <div className="mona-panel-row-label">{t('foundation.editor.tableStyle.enableTheme')}</div>
+        <div className="w-[48%] text-xs">{t('foundation.editor.tableStyle.enableTheme')}</div>
         <div className="mona-panel-row-control mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.tableStyle.enableTheme')} checked={!!element.theme} onChange={checked => checked
           ? commit({ theme: { color: presentation.theme.themeColors[0]!, rowHeader: true, rowFooter: false, colHeader: false, colFooter: false } })
           : runtime.commit('Disable table theme', [{ type: 'element.properties.remove', payload: { id: element.id, property: 'theme' } }], { historyKey: `table-style-${element.id}` })} /></div>

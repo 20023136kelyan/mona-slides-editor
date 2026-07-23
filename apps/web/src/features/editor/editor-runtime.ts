@@ -4,6 +4,9 @@ import {
   applyPresentationTransaction,
   createPresentationId,
   createPresentationTransaction,
+  detachElementTreeSources,
+  flattenElementTree,
+  remapElementTreeIds,
   validateImportedSlides,
   type PresentationCommand,
   type PresentationState,
@@ -15,6 +18,7 @@ import type { Gradient, PPTElement, PPTElementOutline, PPTElementShadow, PPTShap
 
 import { parseEditorClipboard, serializeEditorClipboard } from '@/features/editor/editor-clipboard'
 import { getActionElementBounds } from '@/features/editor/editor-geometry'
+import { PowerPointPackageBackingStore } from '@/features/editor/editor-pptx-backing-store'
 import { sanitizeElements, sanitizeSlides } from '@/lib/deck-sanitizer'
 import {
   createEditorRichTextRuntime,
@@ -31,6 +35,7 @@ export interface CommitOptions {
 
 export interface EditorRuntime {
   readonly interaction: ReturnType<typeof createInteractionController>
+  readonly pptxBackingStore: PowerPointPackageBackingStore
   readonly richText: EditorRichTextRuntime
   readonly store: EditorStore
   readonly shapeFormatPainter: {
@@ -58,7 +63,7 @@ export interface EditorRuntime {
   getHistorySnapshot: () => string
   getHistoryState: () => { cursor: number; length: number }
   insertTemplateSlides: (slides: readonly Slide[], theme: Partial<SlideTheme>) => string[]
-  insertImportedSlides: (slides: readonly Slide[]) => string[]
+  insertImportedSlides: (slides: readonly Slide[], setupCommands?: readonly PresentationCommand[]) => string[]
   paste: (serialized?: string) => string[]
   pasteSlides: (serialized?: string) => string[]
   previewTransaction: (transaction: PresentationTransaction) => PresentationTransactionResult
@@ -102,6 +107,7 @@ const parseClipboard = (serialized: string): PPTElement[] | undefined => {
 export const createEditorRuntime = (presentation: PresentationState): EditorRuntime => {
   const store = createEditorStore({ presentation })
   const interaction = createInteractionController()
+  const pptxBackingStore = new PowerPointPackageBackingStore(presentation.sourcePackages)
   const richText = createEditorRichTextRuntime()
   // Snapshots hold REFERENCES into the store's immer-produced state, not
   // clones: RTK state is immutable (reducers copy-on-write, and immer freezes
@@ -242,16 +248,25 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     return clipboardText
   }
 
-  const remapSlides = (source: readonly Slide[]) => {
+  const remapSlides = (
+    source: readonly Slide[],
+    options: { preserveSource?: boolean } = {},
+  ) => {
+    const preserveSource = options.preserveSource ?? false
     const slideIdMap = new Map(source.map(slide => [slide.id, createPresentationId()]))
-    return structuredClone(source).map(slide => {
-      const elementIdMap = new Map(slide.elements.map(element => [element.id, createPresentationId()]))
+    return source.map(sourceSlide => {
+      const slide = structuredClone(sourceSlide)
+      const remapped = remapElementTreeIds(slide.elements, createPresentationId)
+      slide.elements = remapped.elements
+      if (!preserveSource) {
+        delete slide.source
+        detachElementTreeSources(slide.elements)
+      }
       const groupIdMap = new Map<string, string>()
-      for (const element of slide.elements) {
+      for (const element of flattenElementTree(slide.elements)) {
         if (element.groupId && !groupIdMap.has(element.groupId)) groupIdMap.set(element.groupId, createPresentationId())
       }
-      for (const element of slide.elements) {
-        element.id = elementIdMap.get(element.id)!
+      for (const element of flattenElementTree(slide.elements)) {
         if (element.groupId) element.groupId = groupIdMap.get(element.groupId)
         if (element.link?.type === 'slide') {
           const target = slideIdMap.get(element.link.target)
@@ -262,7 +277,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       if (slide.animations) {
         for (const animation of slide.animations) {
           animation.id = createPresentationId()
-          animation.elId = elementIdMap.get(animation.elId)!
+          animation.elId = remapped.idMap.get(animation.elId) ?? animation.elId
         }
       }
       slide.id = slideIdMap.get(slide.id)!
@@ -319,10 +334,10 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     if (!serialized) return []
     const source = parseClipboard(serialized)
     if (!source?.length) return []
-    const idMap = new Map<string, string>()
     const groupMap = new Map<string, string>()
-    for (const element of source) {
-      idMap.set(element.id, createPresentationId())
+    const additions = remapElementTreeIds(source, createPresentationId).elements
+    detachElementTreeSources(additions)
+    for (const element of flattenElementTree(additions)) {
       if (element.groupId && !groupMap.has(element.groupId)) groupMap.set(element.groupId, createPresentationId())
     }
     const state = store.getState()
@@ -346,13 +361,13 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       })
       if (collision) offset += 10
     } while (collision)
-    const additions = structuredClone(source).map(element => ({
-      ...element,
-      id: idMap.get(element.id)!,
-      groupId: element.groupId ? groupMap.get(element.groupId) : undefined,
-      left: element.left + offset,
-      top: element.top + offset,
-    })) as PPTElement[]
+    for (const element of flattenElementTree(additions)) {
+      if (element.groupId) element.groupId = groupMap.get(element.groupId)
+    }
+    for (const element of additions) {
+      element.left += offset
+      element.top += offset
+    }
     if (!commit('Paste elements', [{ type: 'element.add', elements: additions }], { historyKey: 'clipboard-data' })) return []
     const ids = additions.map(element => element.id)
     store.dispatch(editorActions.selectionChanged(ids))
@@ -362,6 +377,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
 
   return {
     interaction,
+    pptxBackingStore,
     richText,
     shapeFormatPainter: {
       apply: element => {
@@ -420,17 +436,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       return changed
     },
     createSlideFromTemplate: source => {
-      const slide = structuredClone(source)
-      const elementIdMap = new Map(slide.elements.map(element => [element.id, createPresentationId()]))
-      const groupIdMap = new Map<string, string>()
-      for (const element of slide.elements) {
-        if (element.groupId && !groupIdMap.has(element.groupId)) groupIdMap.set(element.groupId, createPresentationId())
-      }
-      for (const element of slide.elements) {
-        element.id = elementIdMap.get(element.id)!
-        if (element.groupId) element.groupId = groupIdMap.get(element.groupId)
-      }
-      slide.id = createPresentationId()
+      const slide = remapSlides([source])[0]!
       const changed = commit('Create slide from template', [{ type: 'slide.add', slides: slide }], { historyKey: 'slide-handler' })
       if (!changed) return null
       store.dispatch(editorActions.selectionChanged([]))
@@ -514,6 +520,10 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       const isEmptySlide = state.slides.length === 1 && state.slides[0]?.elements.length === 0
       if (isEmptySlide) {
         const slides = structuredClone([...source])
+        for (const slide of slides) {
+          delete slide.source
+          detachElementTreeSources(slide.elements)
+        }
         if (!commit('Replace empty deck with template', [{ type: 'presentation.slides.replace', slides, theme }], { historyKey: 'add-slides-or-elements' })) return []
         return slides.map(slide => slide.id)
       }
@@ -521,11 +531,14 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       if (!commit('Insert template slides', [{ type: 'slide.add', slides }], { historyKey: 'add-slides-or-elements' })) return []
       return slides.map(slide => slide.id)
     },
-    insertImportedSlides: source => {
+    insertImportedSlides: (source, setupCommands = []) => {
       if (!source.length) return []
-      const slides = remapSlides(source)
-      if (!commit('Import slides', [{ type: 'slide.add', slides }], { recordHistory: false })) return []
+      const slides = remapSlides(source, { preserveSource: true })
+      if (!commit('Import slides', [...setupCommands, { type: 'slide.add', slides }], { recordHistory: false })) return []
       store.dispatch(editorActions.selectedSlideIndexesChanged([]))
+      store.dispatch(editorActions.selectionChanged([]))
+      store.dispatch(editorActions.cropElementChanged(null))
+      store.dispatch(editorActions.pageSelectionChanged(true))
       scheduleHistorySnapshot('add-slides-or-elements')
       return slides.map(slide => slide.id)
     },

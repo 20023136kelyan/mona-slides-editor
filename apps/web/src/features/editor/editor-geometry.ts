@@ -113,6 +113,8 @@ const MINIMUM_ELEMENT_SIZE: Readonly<Record<PPTElement['type'], number>> = {
   latex: 20,
   video: 250,
   audio: 20,
+  group: 20,
+  opaque: 20,
 }
 
 export const getMinimumElementSize = (element: PPTElement) => MINIMUM_ELEMENT_SIZE[element.type]

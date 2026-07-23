@@ -232,11 +232,9 @@ export function splitTableCell(element: PPTTableElement, row: number, column: nu
 }
 
 export function canDeleteTableAxis(element: PPTTableElement) {
-  const hidden = getHiddenTableCellKeys(element.data)
-  const effectiveRows = element.data.filter((row, rowIndex) => row.some((_cell, column) => !hidden.has(tableCellKey(rowIndex, column))))
   return {
-    row: effectiveRows.length > 1,
-    column: (effectiveRows[0]?.filter((_cell, column) => !hidden.has(tableCellKey(0, column))).length ?? 0) > 1,
+    row: element.data.length > 1,
+    column: Math.max(0, ...element.data.map(row => row.length)) > 1,
   }
 }
 

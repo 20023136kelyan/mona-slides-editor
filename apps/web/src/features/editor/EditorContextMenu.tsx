@@ -9,6 +9,7 @@ import CloseOneIcon from '~icons/icon-park-solid/close-one'
 import AttentionIcon from '~icons/icon-park-solid/attention'
 
 import type { PointerPosition } from '@mona/editor-interactions'
+import type { PowerPointPackageReference } from '@mona/presentation-core'
 import type { ElementLinkType, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
@@ -251,6 +252,7 @@ export function LinkEditor({
   slideId,
   slideOptions,
   slides,
+  sourcePackages,
   theme,
   viewportRatio,
   viewportSize,
@@ -265,6 +267,7 @@ export function LinkEditor({
   slideId: string
   slideOptions: readonly LinkSlideOption[]
   slides: readonly Slide[]
+  sourcePackages?: readonly PowerPointPackageReference[]
   theme: SlideTheme
   viewportRatio: number
   viewportSize: number
@@ -320,6 +323,7 @@ export function LinkEditor({
                   <ScaledSlide
                     fixedWidth={500}
                     slide={selectedSlide}
+                    sourcePackages={sourcePackages}
                     theme={theme}
                     thumbnail
                     viewportRatio={viewportRatio}

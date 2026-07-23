@@ -25,6 +25,7 @@ export function ReadOnlyDeck({ presentation }: { presentation: PresentationState
             <ScaledSlide
               fixedWidth={120}
               slide={slide}
+              sourcePackages={presentation.sourcePackages}
               theme={presentation.theme}
               thumbnail
               viewportRatio={presentation.viewportRatio}
@@ -37,6 +38,7 @@ export function ReadOnlyDeck({ presentation }: { presentation: PresentationState
         <ScaledSlide
           key={currentSlide.id}
           slide={currentSlide}
+          sourcePackages={presentation.sourcePackages}
           theme={presentation.theme}
           viewportRatio={presentation.viewportRatio}
           viewportSize={presentation.viewportSize}

@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify'
 
 import type { PPTElement, Slide, TableCell } from '@mona/presentation-core/model'
+import type { PowerPointPackageReference } from '@mona/presentation-core'
 
 // Deck content from outside this session (imported files, foreign clipboard
 // payloads, persisted working copies) renders through dangerouslySetInnerHTML
@@ -67,6 +68,14 @@ const sanitizeTableData = (data: TableCell[][]): Patch<TableCell[][]> => {
 export const sanitizeElement = (element: PPTElement): PPTElement => {
   const diff: Record<string, unknown> = {}
 
+  if (element.type === 'group') {
+    const elements = sanitizeElements(element.elements)
+    if (elements !== element.elements) diff.elements = elements
+  }
+  if (element.type === 'opaque' && typeof element.preview === 'string') {
+    const preview = patchString(element.preview, sanitizeMediaUrl)
+    if (preview.changed) diff.preview = preview.value
+  }
   if (element.type === 'text' && typeof element.content === 'string') {
     const content = patchString(element.content, sanitizeRichHtml)
     if (content.changed) diff.content = content.value
@@ -103,6 +112,36 @@ export const sanitizeElement = (element: PPTElement): PPTElement => {
 export const sanitizeElements = (elements: PPTElement[]): PPTElement[] => {
   const next = elements.map(sanitizeElement)
   return next.some((element, index) => element !== elements[index]) ? next : elements
+}
+
+export const sanitizePowerPointPackageReference = (
+  sourcePackage: PowerPointPackageReference,
+): PowerPointPackageReference => {
+  const hierarchy = sourcePackage.hierarchy
+  if (!hierarchy) return sourcePackage
+  let changed = false
+  const sanitizeLayers = <Layer extends { background?: Slide['background']; elements?: PPTElement[] }>(
+    layers: Layer[],
+  ): Layer[] => layers.map(layer => {
+    const elements = layer.elements ? sanitizeElements(layer.elements) : layer.elements
+    let background = layer.background
+    if (background?.type === 'image' && background.image) {
+      const src = sanitizeMediaUrl(background.image.src)
+      if (src !== background.image.src) {
+        background = { ...background, image: { ...background.image, src } }
+      }
+    }
+    if (elements === layer.elements && background === layer.background) return layer
+    changed = true
+    return { ...layer, background, elements }
+  })
+  const layouts = sanitizeLayers(hierarchy.layouts)
+  const masters = sanitizeLayers(hierarchy.masters)
+  if (!changed) return sourcePackage
+  return {
+    ...sourcePackage,
+    hierarchy: { ...hierarchy, layouts, masters },
+  }
 }
 
 export const sanitizeSlide = (slide: Slide): Slide => {

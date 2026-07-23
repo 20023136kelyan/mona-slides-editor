@@ -7,11 +7,15 @@ function Slider({
   className,
   defaultValue,
   getValueLabel,
+  getThumbLabel,
   value,
   min = 0,
   max = 100,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root> & {
+  getThumbLabel?: (index: number) => string
   getValueLabel?: (value: number, index: number) => string
 }) {
   const _values = React.useMemo(
@@ -31,6 +35,8 @@ function Slider({
       value={value}
       min={min}
       max={max}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       className={cn(
         "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
         className
@@ -48,6 +54,10 @@ function Slider({
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
         <SliderPrimitive.Thumb
+          aria-label={getThumbLabel?.(index) ?? (ariaLabel
+            ? _values.length > 1 ? `${ariaLabel} ${index + 1}` : ariaLabel
+            : undefined)}
+          aria-labelledby={ariaLabel ? undefined : ariaLabelledBy}
           data-slot="slider-thumb"
           data-tooltip={getValueLabel?.(_values[index] ?? min, index)}
           key={index}

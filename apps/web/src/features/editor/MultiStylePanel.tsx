@@ -161,16 +161,16 @@ export function MultiStylePanel({
 
   return (
     <div className="mona-multi-style-panel">
-      <div className="mona-panel-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.multi.fillColor')}</div>
-        <div className="mona-panel-row-control"><InspectorColorButton ariaLabel={t('foundation.editor.multi.fillColor')} color={fill} onChange={updateFill} /></div>
+      <div className="flex w-full items-center mb-2.5">
+        <div className="w-[48%] text-xs">{t('foundation.editor.multi.fillColor')}</div>
+        <div className="w-[52%] [&>*]:w-full"><InspectorColorButton ariaLabel={t('foundation.editor.multi.fillColor')} color={fill} onChange={updateFill} /></div>
       </div>
 
       <div className="mona-panel-divider" />
 
-      <div className="mona-panel-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.multi.borderStyle')}</div>
-        <div className="mona-panel-row-control">
+      <div className="flex w-full items-center mb-2.5">
+        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderStyle')}</div>
+        <div className="w-[52%] [&>*]:w-full">
           <InspectorSelect<LineStyleType>
             ariaLabel={t('foundation.editor.multi.borderStyle')}
             onChange={style => updateOutline({ style })}
@@ -181,13 +181,13 @@ export function MultiStylePanel({
           />
         </div>
       </div>
-      <div className="mona-panel-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.multi.borderColor')}</div>
-        <div className="mona-panel-row-control"><InspectorColorButton ariaLabel={t('foundation.editor.multi.borderColor')} color={outline.color || '#000'} onChange={color => updateOutline({ color })} /></div>
+      <div className="flex w-full items-center mb-2.5">
+        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderColor')}</div>
+        <div className="w-[52%] [&>*]:w-full"><InspectorColorButton ariaLabel={t('foundation.editor.multi.borderColor')} color={outline.color || '#000'} onChange={color => updateOutline({ color })} /></div>
       </div>
-      <div className="mona-panel-row">
-        <div className="mona-panel-row-label">{t('foundation.editor.multi.borderWidth')}</div>
-        <div className="mona-panel-row-control"><InspectorNumberInput ariaLabel={t('foundation.editor.multi.borderWidth')} min={0} onChange={width => updateOutline({ width })} value={outline.width || 0} /></div>
+      <div className="flex w-full items-center mb-2.5">
+        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderWidth')}</div>
+        <div className="w-[52%] [&>*]:w-full"><InspectorNumberInput ariaLabel={t('foundation.editor.multi.borderWidth')} min={0} onChange={width => updateOutline({ width })} value={outline.width || 0} /></div>
       </div>
 
       <div className="mona-panel-divider" />

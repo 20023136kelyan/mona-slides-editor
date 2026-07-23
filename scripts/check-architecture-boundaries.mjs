@@ -86,6 +86,17 @@ for (const token of [
   if (!uiTokens.includes(token)) failures.push(`The centralized UI token ${token.slice(0, -1)} is missing.`)
 }
 
+const editorCss = read('apps/web/src/features/editor/editor.css')
+if (!editorCss.includes('geometry and direct-manipulation exceptions')) {
+  failures.push('apps/web/src/features/editor/editor.css must document that it owns geometry, not ordinary chrome skins.')
+}
+if (/\.mona-editor-header\s*\{/.test(editorCss) && /height:\s*56px/.test(editorCss.match(/\.mona-editor-header\s*\{[\s\S]*?\n\}/)?.[0] ?? '')) {
+  failures.push('apps/web/src/features/editor/editor.css still skins the header; move header chrome to Tailwind + Button variants.')
+}
+if (/\.mona-statusbar[^{\s]*\s*\{[^}]*background/.test(editorCss)) {
+  failures.push('apps/web/src/features/editor/editor.css still skins the status bar; use Tailwind status-bar recipes instead.')
+}
+
 for (const file of [
   'apps/web/src/features/editor/editor.css',
   'apps/web/src/features/mobile/mobile.css',

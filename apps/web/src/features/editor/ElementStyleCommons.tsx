@@ -26,9 +26,9 @@ import { lineStyleOptions } from '@/features/editor/editor-style-options'
 
 export function PropertyRow({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="mona-panel-row">
-      <div className="mona-panel-row-label">{label}</div>
-      <div className="mona-panel-row-control">{children}</div>
+    <div className="flex w-full items-center mb-2.5">
+      <div className="w-[48%] text-xs">{label}</div>
+      <div className="w-[52%] [&>*]:w-full">{children}</div>
     </div>
   )
 }
@@ -157,7 +157,7 @@ export function ElementOutlineControls({
     <div className="mona-element-outline-controls">
       {!fixed ? (
         <PropertyRow label={t('foundation.editor.text.enableBorder')}>
-          <div className="mona-panel-switch-wrapper">
+          <div className="w-full text-right">
             <InspectorSwitch ariaLabel={t('foundation.editor.text.enableBorder')} checked={Boolean(element.outline)} onChange={checked => checked
               ? commitUpdate(runtime, element, { outline: presentation.theme.outline } as Partial<PPTElement>, `element-outline-${element.id}`)
               : commitRemove(runtime, element, 'outline', `element-outline-${element.id}`)} />
@@ -194,7 +194,7 @@ export function ElementShadowControls({
   return (
     <div className="mona-element-shadow-controls">
       <PropertyRow label={t('foundation.editor.text.enableShadow')}>
-        <div className="mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableShadow')} checked={Boolean(element.shadow)} onChange={checked => checked
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.text.enableShadow')} checked={Boolean(element.shadow)} onChange={checked => checked
           ? commitUpdate(runtime, element, { shadow: presentation.theme.shadow } as Partial<PPTElement>, `element-shadow-${element.id}`)
           : commitRemove(runtime, element, 'shadow', `element-shadow-${element.id}`)} /></div>
       </PropertyRow>

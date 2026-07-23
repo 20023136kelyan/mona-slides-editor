@@ -47,6 +47,7 @@ export function MobileThumbnails({ className = '', runtime }: {
           <ScaledSlide
             fixedWidth={120}
             slide={slide}
+            sourcePackages={presentation.sourcePackages}
             theme={presentation.theme}
             thumbnail
             viewportRatio={presentation.viewportRatio}

@@ -51,7 +51,7 @@ export function ImageElement({ element }: { element: PPTImageElement }) {
       style={{ top: element.top, left: element.left, width: element.width, height: element.height }}
     >
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
-        <div className="mona-image-element-content" style={{ filter: shadow ? `drop-shadow(${shadow})` : '', transform: flip }}>
+        <div className="mona-image-element-content" style={{ filter: shadow ? `drop-shadow(${shadow})` : '', opacity: element.opacity, transform: flip }}>
           <ImageOutline element={element} />
           <div className="mona-image-content" style={{ clipPath: clip.style }}>
             <img

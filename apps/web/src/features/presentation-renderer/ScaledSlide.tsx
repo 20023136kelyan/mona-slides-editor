@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { resolveSlideRenderGraph, type PowerPointPackageReference } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
@@ -10,6 +11,7 @@ import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 interface ScaledSlideProps {
   fixedWidth?: number
   slide: Slide
+  sourcePackages?: readonly PowerPointPackageReference[]
   theme: SlideTheme
   thumbnail?: boolean
   viewportRatio: number
@@ -20,6 +22,7 @@ interface ScaledSlideProps {
 export function ScaledSlide({
   fixedWidth,
   slide,
+  sourcePackages = [],
   theme,
   thumbnail = false,
   viewportRatio,
@@ -46,6 +49,10 @@ export function ScaledSlide({
   }, [fixedScale, viewportRatio, viewportSize])
 
   const scale = fixedScale || responsiveScale
+  const renderGraph = useMemo(
+    () => resolveSlideRenderGraph(slide, sourcePackages),
+    [slide, sourcePackages],
+  )
   const frameStyle = fixedWidth
     ? { width: fixedWidth, height: fixedWidth * viewportRatio }
     : {
@@ -67,15 +74,16 @@ export function ScaledSlide({
           {thumbnail ? (
             <>
               <div className="mona-scaled-slide-background" style={getSlideBackgroundStyle(slide.background)} />
-              {slide.elements.map((element, index) => (
-                <div className="mona-rendered-element" key={element.id} style={{ zIndex: index + 1 }}>
-                  <ElementRenderer element={element} theme={theme} thumbnail />
+              {renderGraph.map(node => (
+                <div className="mona-rendered-element" data-pptx-layer={node.layer} key={node.element.id} style={{ zIndex: node.zIndex }}>
+                  <ElementRenderer element={node.element} theme={theme} thumbnail />
                 </div>
               ))}
             </>
           ) : (
             <SlideRenderer
               slide={slide}
+              sourcePackages={sourcePackages}
               theme={theme}
               viewportRatio={viewportRatio}
               viewportSize={viewportSize}

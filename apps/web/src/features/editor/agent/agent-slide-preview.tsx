@@ -35,6 +35,7 @@ export const renderAgentSlidePreview = async (
     root.render(
       <SlideRenderer
         slide={slide}
+        sourcePackages={presentation.sourcePackages}
         theme={presentation.theme}
         viewportRatio={presentation.viewportRatio}
         viewportSize={presentation.viewportSize}

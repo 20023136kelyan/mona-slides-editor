@@ -38,6 +38,72 @@ export function ElementRenderer({ element, mediaEditor, mediaScreen, shapeEditor
     case 'latex': return <LatexElement element={element} />
     case 'video': return <VideoElement editor={mediaEditor?.(element)} element={element} screen={mediaScreen} />
     case 'audio': return <AudioElement editor={mediaEditor?.(element)} element={element} screen={mediaScreen} />
+    case 'group': {
+      const coordinateWidth = Math.max(element.coordinateWidth || element.width, 0.001)
+      const coordinateHeight = Math.max(element.coordinateHeight || element.height, 0.001)
+      const flipX = element.flipH ? -1 : 1
+      const flipY = element.flipV ? -1 : 1
+      return (
+        <section
+          aria-label={element.name || (element.semanticType === 'diagram' ? 'PowerPoint diagram' : 'PowerPoint group')}
+          className="mona-element mona-group-element"
+          data-element-id={element.id}
+          data-element-type="group"
+          style={{
+            height: element.height,
+            left: element.left,
+            top: element.top,
+            transform: `rotate(${element.rotate}deg) scale(${flipX}, ${flipY})`,
+            width: element.width,
+          }}
+        >
+          <div
+            className="mona-group-content"
+            data-testid={`group-content-${element.id}`}
+            style={{
+              height: coordinateHeight,
+              transform: `scale(${element.width / coordinateWidth}, ${element.height / coordinateHeight})`,
+              width: coordinateWidth,
+            }}
+          >
+            {element.elements.map(child => (
+              <ElementRenderer
+                element={child}
+                key={child.id}
+                mediaScreen={mediaScreen}
+                theme={theme}
+                thumbnail={thumbnail}
+              />
+            ))}
+          </div>
+        </section>
+      )
+    }
+    case 'opaque':
+      return (
+        <figure
+          aria-label={element.label || 'Unsupported PowerPoint object'}
+          className="mona-element mona-opaque-element"
+          data-element-id={element.id}
+          data-element-type="opaque"
+          style={{
+            height: element.height,
+            left: element.left,
+            top: element.top,
+            transform: `rotate(${element.rotate}deg)`,
+            width: element.width,
+          }}
+          title={element.reason}
+        >
+          {element.preview ? (
+            <img alt="" draggable={false} src={element.preview} />
+          ) : (
+            <div className="mona-opaque-placeholder">
+              <span>{element.label || 'PowerPoint object'}</span>
+            </div>
+          )}
+        </figure>
+      )
     case 'chart':
       return (
         <EditorErrorBoundary>

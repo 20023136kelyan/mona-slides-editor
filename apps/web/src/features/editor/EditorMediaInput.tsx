@@ -52,9 +52,11 @@ export function EditorMediaInput({
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    const fileExtension = file.name.includes('.') ? file.name.split('.').pop()?.toLocaleLowerCase() : undefined
+    const ext = MEDIA_EXTENSION_BY_MIME[file.type] || fileExtension
     const payload = {
       src: URL.createObjectURL(file),
-      ...(MEDIA_EXTENSION_BY_MIME[file.type] ? { ext: MEDIA_EXTENSION_BY_MIME[file.type] } : {}),
+      ...(ext ? { ext } : {}),
     }
     if (mediaType === 'video') onInsertVideo(payload)
     else onInsertAudio(payload)
@@ -102,11 +104,13 @@ export function EditorMediaInput({
       <div className="mona-media-actions">
         <input
           accept={`${type}/*`}
-          aria-label={t(`foundation.editor.media.upload${type === 'video' ? 'Video' : 'Audio'}`)}
+          aria-hidden="true"
           className="mona-media-file-input"
+          hidden
           key={type}
           onChange={event => upload(event, type)}
           ref={type === 'video' ? videoInputRef : audioInputRef}
+          tabIndex={-1}
           type="file"
         />
         <Button className="mona-media-button" onClick={() => (type === 'video' ? videoInputRef : audioInputRef).current?.click()} size="editor" variant="outline">

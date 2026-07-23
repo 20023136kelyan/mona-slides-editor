@@ -7,6 +7,7 @@ import { Clock3, EyeOff, Sparkles } from 'lucide-react'
 
 import PlusIcon from '~icons/icon-park-outline/plus'
 import { editorActions } from '@mona/editor-state'
+import type { PowerPointPackageReference } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
@@ -114,12 +115,14 @@ function ThumbnailContextMenu({ menu, onAction, onDismiss }: {
 // priority; the filmstrip's structure around it stays live.
 const FilmstripThumbnailPreview = memo(function FilmstripThumbnailPreview({
   slide,
+  sourcePackages,
   theme,
   viewportRatio,
   viewportSize,
   visible,
 }: {
   slide: Slide
+  sourcePackages?: readonly PowerPointPackageReference[]
   theme: SlideTheme
   viewportRatio: number
   viewportSize: number
@@ -127,7 +130,7 @@ const FilmstripThumbnailPreview = memo(function FilmstripThumbnailPreview({
 }) {
   const deferredSlide = useDeferredValue(slide)
   const deferredTheme = useDeferredValue(theme)
-  return <ScaledSlide fixedWidth={128} slide={deferredSlide} theme={deferredTheme} thumbnail viewportRatio={viewportRatio} viewportSize={viewportSize} visible={visible} />
+  return <ScaledSlide fixedWidth={128} slide={deferredSlide} sourcePackages={sourcePackages} theme={deferredTheme} thumbnail viewportRatio={viewportRatio} viewportSize={viewportSize} visible={visible} />
 })
 
 export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpenNotes, onOpenTransition, onStartSlideshow }: {
@@ -543,12 +546,15 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
   return (
     <section
       aria-label={t('foundation.editor.slides')}
-      className="mona-thumbnail-rail mona-editor-filmstrip"
+      className="mona-thumbnail-rail mona-editor-filmstrip relative flex min-h-0 min-w-0 flex-none items-end justify-center px-2 pb-1"
       onContextMenu={event => openContextMenu(event, 'rail')}
       onFocus={() => setThumbnailFocus(true)}
       onMouseDown={() => setThumbnailFocus(true)}
     >
       <span aria-live="polite" className="sr-only" ref={announcementRef}>{announcement}</span>
+      {/* Pill hugs the filmstrip's content width; its ::before is the blur
+          layer (kept behind the tiles so soft edges never fade them). */}
+      <div className="mona-filmstrip-pill">
       <div className="mona-thumbnail-list" ref={listRef}>
         {presentation.slides.map((slide, index) => {
           const sectionId = slide.sectionTag?.id ?? ''
@@ -585,7 +591,7 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                       ref={sectionInputRef}
                     />
                   ) : (
-                    <button
+                    <Button
                       aria-label={t('foundation.editor.thumbnails.editSection', {
                         name: slide.sectionTag ? slide.sectionTag.title || t('foundation.editor.thumbnails.untitledSection') : t('foundation.editor.thumbnails.defaultSection'),
                       })}
@@ -598,13 +604,15 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                         event.preventDefault()
                         startSectionEdit(sectionId)
                       }}
+                      size={null}
                       type="button"
-                    ><span>{slide.sectionTag ? slide.sectionTag.title || t('foundation.editor.thumbnails.untitledSection') : t('foundation.editor.thumbnails.defaultSection')}</span></button>
+                      variant={null}
+                    ><span>{slide.sectionTag ? slide.sectionTag.title || t('foundation.editor.thumbnails.untitledSection') : t('foundation.editor.thumbnails.defaultSection')}</span></Button>
                   )}
                 </div>
               ) : null}
               <div className="mona-thumbnail-visual">
-                <button
+                <Button
                   aria-label={`${t('foundation.editor.showSlide', { number: index + 1 })}${slide.title ? `: ${slide.title}` : ''}`}
                   aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Shift+F10"
                   aria-pressed={selectedIndexes.includes(index)}
@@ -613,14 +621,16 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                   onDoubleClick={() => onStartSlideshow(true)}
                   onKeyDown={event => handleThumbnailKeyDown(event, index)}
                   onMouseDown={event => selectThumbnail(event, index)}
+                  size={null}
                   tabIndex={index === presentation.slideIndex ? 0 : -1}
                   type="button"
+                  variant={null}
                 >
-                  <FilmstripThumbnailPreview slide={slide} theme={presentation.theme} viewportRatio={presentation.viewportRatio} viewportSize={presentation.viewportSize} visible={index < slidesLoadLimit} />
-                  <div className="mona-thumbnail-label">{index + 1}</div>
-                  {slide.hidden ? <div aria-label={t('foundation.editor.statusBar.hidden')} className="mona-thumbnail-hidden-flag"><EyeOff /></div> : null}
-                  {slide.durationMs ? <div aria-label={t('foundation.editor.statusBar.duration')} className="mona-thumbnail-duration-flag"><Clock3 />{slide.durationMs / 1000}s</div> : null}
-                </button>
+                  <FilmstripThumbnailPreview slide={slide} sourcePackages={presentation.sourcePackages} theme={presentation.theme} viewportRatio={presentation.viewportRatio} viewportSize={presentation.viewportSize} visible={index < slidesLoadLimit} />
+                  <div className="mona-thumbnail-label absolute bottom-1 left-1 z-[1] rounded-[var(--radius-detail)] bg-[rgb(16_18_25/72%)] px-1 text-[10px] font-semibold leading-[14px] text-white">{index + 1}</div>
+                  {slide.hidden ? <div aria-label={t('foundation.editor.statusBar.hidden')} className="mona-thumbnail-hidden-flag absolute top-1 left-1 z-[2] inline-flex h-[18px] items-center gap-0.5 rounded-[var(--radius-control)] bg-white/92 px-1.5 text-[9px] font-semibold text-[rgb(16_18_25/70%)] shadow-[0_0_0_0.5px_rgb(16_18_25/10%)] [&_svg]:size-[11px]"><EyeOff /></div> : null}
+                  {slide.durationMs ? <div aria-label={t('foundation.editor.statusBar.duration')} className="mona-thumbnail-duration-flag absolute top-1 right-1 z-[2] inline-flex h-[18px] items-center gap-0.5 rounded-[var(--radius-control)] bg-white/92 px-1.5 text-[9px] font-semibold text-[rgb(16_18_25/70%)] shadow-[0_0_0_0.5px_rgb(16_18_25/10%)] [&_svg]:size-[11px]"><Clock3 />{slide.durationMs / 1000}s</div> : null}
+                </Button>
                 {slide.notes?.length ? (
                   <Button
                     aria-label={`${t('foundation.editor.thumbnails.notes')}: ${t('foundation.editor.showSlide', { number: index + 1 })}${slide.title ? `, ${slide.title}` : ''}`}
@@ -675,6 +685,7 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
           type="button"
           variant="outline"
         ><PlusIcon /></Button>
+      </div>
       </div>
       {menu ? <ThumbnailContextMenu menu={menu} onAction={executeMenuAction} onDismiss={dismissMenu} /> : null}
     </section>
