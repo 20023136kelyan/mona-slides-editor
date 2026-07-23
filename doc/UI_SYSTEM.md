@@ -2,6 +2,8 @@
 
 Mona uses shadcn as its application-component layer. Feature code composes components from `apps/web/src/components/ui`; it does not import Radix primitives directly. Radix remains an implementation detail of the registry components.
 
+See also [`doc/UI_ARCHITECTURE.md`](UI_ARCHITECTURE.md) for the structural map of composition, state owners, and remaining chrome debt.
+
 ## Ownership layers
 
 1. `apps/web/src/components/ui` contains official shadcn components and small Mona-wide extensions such as editor sizes, overlay class forwarding, and semantic radius tokens. Editor control density lives here as `cva` variants (for example `Button` `variant="editor"` / `size="editor"`), not as a private CSS skin.

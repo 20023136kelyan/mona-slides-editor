@@ -2,7 +2,7 @@
 
 This document tracks the editor-shell migration independently from Mona's presentation model, renderer, and editing engine. The current reference is the interaction architecture of familiar visual editors such as Canva; Mona keeps its own neutral design system, terminology, and product identity.
 
-Interaction gates below are complete for their scoped workflows. A separate chrome styling program migrates header, rail, drawer, status bar, agent dock, inspector atoms, contextual toolbar, and filmstrip skins to Tailwind v4 + native shadcn composition without changing disclosure behavior, properties, or canvas geometry. See `doc/UI_SYSTEM.md` for the chrome vs geometry ownership rule. Chrome styling ownership for the desktop shell has moved largely to Tailwind + shadcn variants; remaining `editor.css` rules are primarily document geometry, selection handles, filmstrip drag markers, and specialized overlays.
+Interaction gates below are complete for their scoped workflows. A separate chrome styling program migrates header, rail, drawer, status bar, agent dock, inspector atoms, contextual toolbar, and filmstrip skins to Tailwind v4 + native shadcn composition without changing disclosure behavior, properties, or canvas geometry. See `doc/UI_SYSTEM.md` for the chrome vs geometry ownership rule and `doc/UI_ARCHITECTURE.md` for the composition and state-ownership map. Chrome styling ownership for the desktop shell has moved largely to Tailwind + shadcn variants; remaining `editor.css` rules are primarily document geometry, selection handles, filmstrip drag markers, and specialized overlays.
 
 ## Product rule
 
