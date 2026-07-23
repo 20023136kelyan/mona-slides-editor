@@ -18,14 +18,18 @@ import type { PresentationState } from '@mona/presentation-core'
 import type { PPTElement } from '@mona/presentation-core/model'
 import round from 'lodash/round'
 
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Toggle } from '@/components/ui/toggle'
+import { EditorLayersPanel } from '@/features/editor/EditorLayersPanel'
 import {
   InspectorButton,
   InspectorButtonGroup,
   InspectorNumberInput,
 } from '@/features/editor/EditorInspectorPrimitives'
 import {
-  alignElementsToCanvasLikePptist,
-  orderElementLikePptist,
+  alignElementsToCanvas,
+  orderElement,
   type ElementOrderCommand,
   type MultiAlignmentCommand,
 } from '@/features/editor/editor-geometry'
@@ -71,12 +75,12 @@ export function ElementPositionPanel({
   }], { historyKey })
 
   const order = (command: ElementOrderCommand) => {
-    const elements = orderElementLikePptist(slide.elements, element.id, command)
+    const elements = orderElement(slide.elements, element.id, command)
     if (!elements) return
     runtime.commit('Reorder element', [{ type: 'slide.update', props: { elements } }], { historyKey })
   }
   const align = (command: MultiAlignmentCommand) => {
-    const elements = alignElementsToCanvasLikePptist({
+    const elements = alignElementsToCanvas({
       command,
       elements: slide.elements,
       selectedIds: new Set(activeElementIds),
@@ -106,7 +110,13 @@ export function ElementPositionPanel({
   }
 
   return (
-    <div className="mona-element-position-panel">
+    <Tabs className="mona-position-tabs" defaultValue="arrange">
+      <TabsList className="mona-position-tabs-list" variant="line">
+        <TabsTrigger value="arrange">{t('foundation.editor.position.arrange')}</TabsTrigger>
+        <TabsTrigger value="layers">{t('foundation.editor.position.layers')}</TabsTrigger>
+      </TabsList>
+      <TabsContent value="arrange">
+      <div className="mona-element-position-panel">
       <div className="mona-position-title">{t('foundation.editor.position.layer')}</div>
       <InspectorButtonGroup className="mona-position-row">
         <InspectorButton ariaLabel={t('foundation.editor.position.bringFront')} onClick={() => order('top')} style={{ flex: 1 }}><SendToBackIcon /> {t('foundation.editor.position.bringFront')}</InspectorButton>
@@ -161,14 +171,13 @@ export function ElementPositionPanel({
             value={width}
           />
           {['audio', 'image', 'shape'].includes(element.type) ? (
-            <button
+            <Toggle
               aria-label={fixedRatio ? t('foundation.editor.position.unlockRatio') : t('foundation.editor.position.lockRatio')}
-              aria-pressed={fixedRatio}
               className={`mona-position-icon-button${fixedRatio ? ' is-active' : ''}`}
-              onClick={() => update({ fixedRatio: !fixedRatio } as Partial<PPTElement>)}
+              onPressedChange={pressed => update({ fixedRatio: pressed } as Partial<PPTElement>)}
+              pressed={fixedRatio}
               style={{ width: '10%' }}
-              type="button"
-            >{fixedRatio ? <LockIcon /> : <UnlockIcon />}</button>
+            >{fixedRatio ? <LockIcon /> : <UnlockIcon />}</Toggle>
           ) : <div style={{ width: '10%' }} />}
           <InspectorNumberInput
             ariaLabel={t('foundation.editor.position.height')}
@@ -198,11 +207,16 @@ export function ElementPositionPanel({
           <div className="mona-position-row">
             <InspectorNumberInput ariaLabel={t('foundation.editor.position.rotation')} label={t('foundation.editor.position.rotation')} max={180} min={-180} onChange={value => update({ rotate: value } as Partial<PPTElement>)} step={5} style={{ width: '45%' }} value={rotate} />
             <div style={{ width: '7%' }} />
-            <button aria-label={t('foundation.editor.position.rotateMinus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.max(-180, Math.floor(rotate / 45) * 45 - 45) } as Partial<PPTElement>)} style={{ width: '24%' }} type="button"><RotateIcon /> -45°</button>
-            <button aria-label={t('foundation.editor.position.rotatePlus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.min(180, Math.floor(rotate / 45) * 45 + 45) } as Partial<PPTElement>)} style={{ width: '24%' }} type="button"><RotateIcon style={{ transform: 'rotateY(180deg)' }} /> +45°</button>
+            <Button aria-label={t('foundation.editor.position.rotateMinus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.max(-180, Math.floor(rotate / 45) * 45 - 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon /> -45°</Button>
+            <Button aria-label={t('foundation.editor.position.rotatePlus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.min(180, Math.floor(rotate / 45) * 45 + 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon style={{ transform: 'rotateY(180deg)' }} /> +45°</Button>
           </div>
         </>
       ) : null}
-    </div>
+      </div>
+      </TabsContent>
+      <TabsContent className="mona-position-layers" value="layers">
+        <EditorLayersPanel runtime={runtime} />
+      </TabsContent>
+    </Tabs>
   )
 }

@@ -1,6 +1,6 @@
 {
-  "ariaLabel": "Mona Slides 编辑器",
-  "errorTitle": "Mona Slides 无法打开此视图。",
+  "ariaLabel": "Mona 演示文稿编辑器",
+  "errorTitle": "Mona 无法打开此视图。",
   "errorDescription": "请重新加载页面后再试。",
   "editor": {
     "surfaceError": "此区域发生错误，演示文稿数据未受影响。",
@@ -13,10 +13,91 @@
     "slides": "幻灯片",
     "showSlide": "显示第 {{number}} 张幻灯片",
     "inspector": "属性面板",
+    "rail": {
+      "tools": "编辑器工具",
+      "templates": "模板",
+      "design": "设计",
+      "elements": "元素",
+      "text": "文本",
+      "uploads": "上传",
+      "draw": "绘图",
+      "ai": "AI",
+      "elementCategories": "元素类别",
+      "collapse": "收起面板",
+      "expand": "展开面板"
+    },
+    "taskPanels": {
+      "design": "设计",
+      "elements": "元素",
+      "text": "文本",
+      "uploads": "上传",
+      "draw": "绘图",
+      "properties": "属性",
+      "speakerNotes": "演讲者备注",
+      "comments": "幻灯片 {{number}} 的批注",
+      "search": "查找与替换",
+      "layers": "图层（{{selected}}/{{total}}）",
+      "semantics": "幻灯片类型标注"
+    },
+    "statusBar": {
+      "notes": "备注",
+      "pages": "页面",
+      "gridView": "网格视图",
+      "pageSettings": "页面设置",
+      "pageTitle": "页面标题",
+      "untitledPage": "未命名页面",
+      "hidePage": "隐藏页面",
+      "hidePageDescription": "保留在文稿中，但放映时跳过。",
+      "duration": "页面时长",
+      "manual": "手动",
+      "seconds": "秒",
+      "transition": "切换",
+      "timer": "计时器",
+      "presentationTimer": "演示计时器",
+      "pause": "暂停",
+      "start": "开始",
+      "reset": "重置",
+      "help": "帮助",
+      "shortcuts": "键盘快捷键",
+      "present": "演示",
+      "goToPage": "跳转到页面",
+      "selectedPages_one": "已选择 {{count}} 个页面",
+      "selectedPages_other": "已选择 {{count}} 个页面",
+      "showPages": "显示",
+      "hidePages": "隐藏",
+      "closeGrid": "关闭网格视图",
+      "hidden": "已隐藏",
+      "transitionBoundary": "第 {{from}} 页与第 {{to}} 页之间的切换",
+      "insertAfter": "在第 {{number}} 页后插入页面"
+    },
+    "contextual": {
+      "askMona": "询问 Mona",
+      "background": "背景",
+      "comment": "评论",
+      "duplicate": "创建副本",
+      "fill": "填充 {{state}}",
+      "fillLabel": "填充",
+      "groupChild": "正在编辑组内项目",
+      "groupSelection": "组合 · {{count}} 个项目",
+      "mixed": "混合",
+      "mixedSelection": "已选择 {{count}} 个",
+      "objectActions": "对象操作",
+      "pageBackground": "页面背景",
+      "pageActions": "页面操作",
+      "replace": "替换",
+      "replaceMedia": "替换媒体",
+      "stroke": "描边 {{state}}",
+      "strokeLabel": "描边",
+      "selectGroup": "选择父组合",
+      "transparency": "透明度 {{state}}",
+      "transparencyLabel": "透明度"
+    },
     "thumbnails": {
       "addSlide": "添加幻灯片",
       "slideCount": "第 {{current}} / {{total}} 页",
+      "slideCountShort": "{{current}} / {{total}}",
       "sectionNamePlaceholder": "输入节名称",
+      "editSection": "编辑节 {{name}}",
       "untitledSection": "无标题节",
       "defaultSection": "默认节",
       "deleteSection": "删除节",
@@ -31,9 +112,18 @@
       "fromCurrent": "从当前幻灯片开始放映",
       "menu": "幻灯片菜单",
       "sectionMenu": "节菜单",
-      "notes": "打开批注"
+      "notes": "打开批注",
+      "movedSlide": "已将{{title}}移动到第 {{position}} 位，共 {{total}} 页",
+      "movingSlide": "正在移动{{title}}。按 Escape 取消。",
+      "moveCancelled": "已取消移动幻灯片。"
     },
     "templates": {
+      "searchPlaceholder": "描述你想要的设计",
+      "generate": "生成",
+      "search": "搜索",
+      "back": "返回模板列表",
+      "meta": "演示文稿 · 共 {{count}} 页",
+      "applyAll": "应用全部 {{count}} 页",
       "all": "全部",
       "cover": "封面",
       "contents": "目录",
@@ -44,6 +134,7 @@
       "insertTemplate": "插入版式",
       "loading": "加载中...",
       "loadError": "模板加载失败",
+      "noResults": "没有与搜索匹配的模板。",
       "catalog": {
         "template_1": "赤红山川",
         "template_2": "都市蓝调",
@@ -65,7 +156,7 @@
       "commentPlaceholder": "输入批注（为{{target}}）",
       "clearSlide": "清空本页批注",
       "add": "添加批注",
-      "testUser": "测试用户"
+      "authorYou": "你"
     },
     "runtime": {
       "speakerNotesPlaceholder": "点击输入演讲者备注",
@@ -85,6 +176,11 @@
       "title": "选择（{{selected}}/{{total}}）",
       "showAll": "全部显示",
       "hideAll": "全部隐藏",
+      "selectElement": "选择{{name}}",
+      "renameElement": "重命名{{name}}",
+      "showElement": "显示{{name}}",
+      "hideElement": "隐藏{{name}}",
+      "unlockElement": "解锁{{name}}",
       "group": "组合",
       "empty": "本页无内容"
     },
@@ -106,9 +202,30 @@
       "currentImage": "当前图片类型：",
       "placeholder": "选中图片、文字或带文字的形状以标记类型。",
       "unlabeled": "未标记类型",
-      "slide": { "cover": "封面页", "contents": "目录页", "transition": "过渡页", "content": "内容页", "end": "结束页" },
-      "text": { "title": "标题", "subtitle": "副标题", "content": "正文", "item": "列表项目", "itemTitle": "列表项标题", "notes": "注释", "header": "页眉", "footer": "页脚", "partNumber": "节编号", "itemNumber": "项目编号" },
-      "image": { "pageFigure": "页面插图", "itemFigure": "项目插图", "background": "背景图" }
+      "slide": {
+        "cover": "封面页",
+        "contents": "目录页",
+        "transition": "过渡页",
+        "content": "内容页",
+        "end": "结束页"
+      },
+      "text": {
+        "title": "标题",
+        "subtitle": "副标题",
+        "content": "正文",
+        "item": "列表项目",
+        "itemTitle": "列表项标题",
+        "notes": "注释",
+        "header": "页眉",
+        "footer": "页脚",
+        "partNumber": "节编号",
+        "itemNumber": "项目编号"
+      },
+      "image": {
+        "pageFigure": "页面插图",
+        "itemFigure": "项目插图",
+        "background": "背景图"
+      }
     },
     "toolbar": {
       "design": "设计",
@@ -143,6 +260,7 @@
       "textBox": "文本框",
       "horizontalText": "横向文本框",
       "verticalText": "竖向文本框",
+      "textHint": "选择方向后，在画布上点击或拖拽以放置文本框。",
       "shape": "形状",
       "presetShapes": "预设形状",
       "drawPath": "绘制路径",
@@ -154,11 +272,13 @@
       "chart": "图表",
       "table": "表格",
       "equation": "公式",
+      "insertEquation": "插入公式",
       "media": "媒体",
       "symbol": "符号",
       "zoomOut": "缩小（Ctrl + -）",
       "zoomIn": "放大（Ctrl + =）",
       "fit": "适应屏幕",
+      "fill": "填满工作区",
       "shapeGroups": {
         "rectangles": "矩形",
         "common": "常用形状",
@@ -170,6 +290,142 @@
         "straight": "直线",
         "elbowAndCurved": "折线和曲线"
       }
+    },
+    "agent": {
+      "title": "Mona AI",
+      "loading": "正在加载 Mona AI…",
+      "scope": "正在处理第 {{slide}} 张幻灯片",
+      "connectModel": "连接模型",
+      "chooseProvider": "选择 AI 提供商",
+      "providerTitle": "AI 提供商",
+      "providerDescription": "选择 Mona 规划演示文稿编辑的方式。提供商凭据与文档引擎相互独立。",
+      "providers": {
+        "openai-chatgpt": {
+          "name": "OpenAI",
+          "description": "通过 Mona 的安全服务器连接使用符合条件的 ChatGPT 订阅。",
+          "signIn": "使用 OpenAI 登录",
+          "signInDescription": "连接拥有符合条件 ChatGPT 套餐的 OpenAI 帐户。"
+        },
+        "anthropic-claude": {
+          "name": "Anthropic",
+          "description": "通过 Mona 的安全服务器连接使用符合条件的 Claude Pro 或 Max 订阅。",
+          "signIn": "使用 Anthropic 登录",
+          "signInDescription": "连接拥有符合条件 Pro 或 Max 套餐的 Claude 帐户。"
+        },
+        "reference": {
+          "name": "参考引擎",
+          "description": "在本地验证完整编辑流程，无需调用模型。"
+        },
+        "mona-managed": {
+          "name": "Mona 托管",
+          "description": "使用 Mona 帐户调用 Mona 的托管模型服务。"
+        },
+        "google-ai-studio": {
+          "name": "Google AI Studio",
+          "description": "使用您自己的 Gemini API 密钥进行多模态幻灯片编辑。"
+        }
+      },
+      "apiKey": "Google AI Studio 密钥",
+      "apiKeyPlaceholder": "粘贴 API 密钥",
+      "model": "Gemini 模型",
+      "keyMemoryNotice": "密钥仅保存在此标签页的内存中；重新加载或切换提供商时会被清除。",
+      "connected": "帐户已连接",
+      "subscriptionReady": "订阅访问已就绪",
+      "connecting": "正在连接…",
+      "disconnect": "断开连接",
+      "deviceCodeLabel": "在提供商页面输入此一次性代码",
+      "copyDeviceCode": "复制一次性代码",
+      "openSignInPage": "打开登录页面",
+      "authPromptPlaceholder": "粘贴所需的值",
+      "continueSignIn": "继续登录",
+      "oauthSecurityNotice": "OAuth 凭据在 Mona 服务器上加密保存，绝不会暴露给编辑器或生成的演示文稿代码。",
+      "managedUnavailable": "此部署尚未配置。",
+      "emptyTitle": "你想创作什么？",
+      "emptyDescription": "让 Mona 检查、改写、排列或创建可编辑的演示文稿元素。",
+      "composerLabel": "给 Mona AI 发消息",
+      "composerPlaceholder": "描述要进行的更改…",
+      "attach": "附加上下文",
+      "send": "发送消息",
+      "cancel": "取消生成",
+      "cancelled": "已取消生成。",
+      "failed": "Mona 无法生成此编辑。",
+      "connectionRequired": "发送前请先连接 AI 提供商。",
+      "reviewNotice": "任何更改之前，Mona 都会预览并验证每项编辑。",
+      "resize": "调整 AI 面板大小",
+      "sketchInstruction": "将此草图制作成精美且可完全编辑的幻灯片。",
+      "sketchAttached": "已附加绘图",
+      "sketchElements_one": "{{count}} 个绘图元素",
+      "sketchElements_other": "{{count}} 个绘图元素",
+      "removeSketch": "移除绘图",
+      "sketchPreview": "所附绘图的预览",
+      "progress": {
+        "reading": "正在读取幻灯片",
+        "planning": "正在规划可编辑的更改",
+        "executing": "正在运行演示文稿程序",
+        "validating": "正在验证每项操作",
+        "rendering": "正在渲染建议结果",
+        "reviewing": "正在检查视觉质量",
+        "detail": "应用预览前，演示文稿不会发生改变。"
+      },
+      "before": "之前",
+      "after": "建议结果",
+      "beforePreview": "智能编辑前的当前幻灯片",
+      "afterPreview": "智能编辑后的建议幻灯片",
+      "summary": {
+        "created": "新建 {{count}} 项",
+        "updated": "更新 {{count}} 项",
+        "removed": "移除 {{count}} 项"
+      },
+      "viewProgram": "查看演示文稿程序",
+      "discard": "放弃",
+      "apply": "应用编辑",
+      "applied": "编辑已作为一个可撤销操作应用。",
+      "appliedSummary": "已应用智能编辑",
+      "undo": "撤销",
+      "undone": "已撤销智能编辑。",
+      "suggestions": {
+        "improve": "改善视觉层次",
+        "rewrite": "更清晰地改写此幻灯片",
+        "visualize": "将此内容转换为视觉效果"
+      },
+      "modelPicker": "模型",
+      "back": "返回",
+      "signInShort": "登录",
+      "modelLockedHint": "登录后使用 {{model}}",
+      "signInToProvider": "登录到 {{provider}}",
+      "searchModels": "搜索模型",
+      "noModels": "没有匹配的模型"
+    },
+    "drawing": {
+      "layer": "绘图图层",
+      "palette": "绘图工具",
+      "tools": "工具",
+      "loading": "正在加载绘图工具…",
+      "tool": {
+        "selection": "选择",
+        "reference": "引用幻灯片元素",
+        "freedraw": "绘制",
+        "rectangle": "矩形",
+        "ellipse": "椭圆",
+        "arrow": "箭头",
+        "text": "文本",
+        "eraser": "擦除"
+      },
+      "stroke": "描边",
+      "strokeColor": "描边颜色",
+      "strokeWidth": "描边宽度",
+      "undo": "撤销绘图",
+      "redo": "重做绘图",
+      "hide": "隐藏绘图",
+      "show": "显示绘图",
+      "export": "下载",
+      "downloadScene": "Excalidraw 场景",
+      "downloadPng": "PNG 图片",
+      "clear": "清除绘图",
+      "buildThis": "生成此设计",
+      "exit": "退出绘图",
+      "clearTitle": "清除此绘图？",
+      "clearDescription": "这将移除当前幻灯片上的所有绘制标记，但不会更改幻灯片内容。"
     },
     "media": {
       "video": "视频",
@@ -403,9 +659,11 @@
     },
     "imageLibrary": {
       "title": "图片库（来自 pexels.com）",
+      "back": "返回上传",
       "close": "关闭图片库",
       "searchPlaceholder": "搜索图片",
       "search": "搜索",
+      "orientation": "图片方向",
       "insert": "插入",
       "all": "全部",
       "landscape": "横向",
@@ -413,7 +671,10 @@
       "square": "正方形",
       "defaultQuery": "风景",
       "enterKeyword": "请输入搜索关键词",
-      "loading": "加载中..."
+      "loading": "加载中...",
+      "noResults": "未找到图片，请尝试其他搜索。",
+      "searchError": "无法加载图片。",
+      "retry": "重试"
     },
     "filters": {
       "blur": "模糊",
@@ -468,6 +729,7 @@
       "copy": "复制",
       "paste": "粘贴",
       "delete": "删除",
+      "close": "关闭",
       "cancel": "取消",
       "replace": "替换",
       "replaceAll": "全部替换",
@@ -475,14 +737,12 @@
       "crop": "裁剪图片",
       "ruler": "标尺",
       "grid": "切换网格",
-        "gridLines": "网格线",
+      "gridLines": "网格线",
       "gridNone": "无",
       "gridSmall": "小",
       "gridMedium": "中",
       "gridLarge": "大",
       "resetSlide": "重置当前页",
-      "bubbleMenu": "气泡菜单",
-      "bubbleMenuStatus": "气泡菜单已{{status}}",
       "enabled": "启用",
       "disabled": "禁用",
       "slideshow": "幻灯片放映",
@@ -519,6 +779,8 @@
       "selectTarget": "请先选择链接目标"
     },
     "position": {
+      "arrange": "排列",
+      "layers": "图层",
       "layer": "层级：",
       "bringFront": "置顶",
       "sendBack": "置底",
@@ -786,5 +1048,7 @@
       "styleLabel": "样式",
       "colorLabel": "颜色"
     }
-  }
+  },
+  "restoredWorkingCopy": "已恢复此浏览器中未保存的更改",
+  "startFresh": "重新开始"
 }

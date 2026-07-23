@@ -1,93 +1,301 @@
-import { lazy, startTransition, Suspense, useEffect, useState } from 'react'
+import { Activity, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLoaderData } from 'react-router'
 
+import type { EditorRootState } from '@mona/editor-state'
 import type { PresentationState } from '@mona/presentation-core'
 
+import { Button } from '@/components/ui/button'
 import { EditorDeck } from '@/features/editor/EditorDeck'
 import type { ExportDialogType } from '@/features/editor/EditorExportDialog'
+import {
+  consumeRestoredDeckFlag,
+  discardWorkingDeck,
+  initDeckPersistence,
+  isPersistenceEnabled,
+  type DeckPersistence,
+} from '@/features/editor/editor-persistence'
 import { preloadDeckFonts } from '@/features/editor/editor-font-preload'
 import { EditorFullscreenSpin } from '@/features/editor/EditorFullscreenSpin'
-import { EditorHeader } from '@/features/editor/EditorHeader'
 import { useEditorImport } from '@/features/editor/editor-import'
-import { createEditorRuntime } from '@/features/editor/editor-runtime'
+import { createEditorRuntime, type EditorRuntime } from '@/features/editor/editor-runtime'
 import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
+import {
+  EditorApplicationProvider,
+} from '@/features/editor/services/EditorApplicationProvider'
+import { EditorNotificationViewport } from '@/features/editor/services/EditorNotificationViewport'
+import type { EditorApplication } from '@/features/editor/services/editor-application'
+import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { isMobileUserAgent } from '@/features/mobile/mobile-device'
-import { MobileView } from '@/features/mobile/MobileView'
-import { ScreenView } from '@/features/screen/ScreenView'
 
 // The export stack (pptxgenjs, html-to-image) loads on first use, keeping it
 // out of the editor's critical path.
 const EditorExportFeature = lazy(async () => ({
   default: (await import('@/features/editor/EditorExportFeature')).EditorExportFeature,
 }))
+// Mobile and slideshow surfaces are mutually exclusive with the desktop
+// editor. Keeping them out of the editor route avoids parsing two complete
+// interaction systems that the current session cannot use.
+const MobileView = lazy(async () => ({
+  default: (await import('@/features/mobile/MobileView')).MobileView,
+}))
+const ScreenView = lazy(async () => ({
+  default: (await import('@/features/screen/ScreenView')).ScreenView,
+}))
+
+interface MonaTestBridge {
+  getHistoryState: EditorRuntime['getHistoryState']
+  getRichTextState: EditorRuntime['richText']['getSnapshot']
+  getShapeFormatPainterState: EditorRuntime['shapeFormatPainter']['getSnapshot']
+  getState: () => EditorRootState
+  isReady: () => boolean
+}
+
+declare global {
+  interface Window {
+    __MONA_TEST__?: MonaTestBridge
+  }
+}
+
+interface PersistenceSlot {
+  getSnapshot: () => DeckPersistence | null
+  set: (value: DeckPersistence | null) => void
+  subscribe: (listener: () => void) => () => void
+}
+
+const createPersistenceSlot = (): PersistenceSlot => {
+  let value: DeckPersistence | null = null
+  const listeners = new Set<() => void>()
+  return {
+    getSnapshot: () => value,
+    set: next => {
+      if (next === value) return
+      value = next
+      for (const listener of listeners) listener()
+    },
+    subscribe: listener => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+}
 
 export function FoundationPage() {
   const { t } = useTranslation()
   const presentation = useLoaderData() as PresentationState
   const [runtime] = useState(() => createEditorRuntime(presentation))
+  const [notifications] = useState(createEditorNotificationService)
   preloadDeckFonts(presentation)
-  const importing = useEditorImport(runtime, t)
+  const { importFiles, importing } = useEditorImport(runtime, t, notifications.notify)
   const [exportType, setExportType] = useState<ExportDialogType | null>(null)
+  const [agentDockOpen, setAgentDockOpen] = useState(false)
   const audienceMode = new URLSearchParams(window.location.search).get('mode') === 'audience'
   const [screening, setScreening] = useState(audienceMode)
-
-  useEffect(() => {
-    const openExport = (event: Event) => {
-      const detail = (event as CustomEvent<{ type?: ExportDialogType }>).detail
-      setExportType(detail?.type || 'pptx')
+  const presentationStartListenersRef = useRef(new Set<() => void>())
+  const agentReturnFocusRef = useRef<HTMLElement | null>(null)
+  const exportReturnFocusRef = useRef<HTMLElement | null>(null)
+  const presentationReturnFocusRef = useRef<HTMLElement | null>(null)
+  const closeAgent = useCallback(() => {
+    const activeElement = document.activeElement
+    const meaningfulOutsideFocus = activeElement instanceof HTMLElement
+      && activeElement !== document.body
+      && !activeElement.closest('.mona-agent-dock')
+    const shouldRestoreFocus = !meaningfulOutsideFocus
+    setAgentDockOpen(false)
+    if (shouldRestoreFocus) {
+      requestAnimationFrame(() => {
+        const returnTarget = agentReturnFocusRef.current
+        if (returnTarget?.isConnected) returnTarget.focus()
+      })
     }
-    window.addEventListener('mona:export-request', openExport)
-    return () => window.removeEventListener('mona:export-request', openExport)
   }, [])
-
-  useEffect(() => {
-    const openScreen = (event: Event) => {
-      const detail = (event as CustomEvent<{ fromStart?: boolean }>).detail
-      if (detail?.fromStart) runtime.focusSlide(0)
-      const root = document.documentElement
-      // Fullscreen must stay in the synchronous part of the user gesture.
-      if (root.requestFullscreen) void root.requestFullscreen().catch(() => {})
-      startTransition(() => setScreening(true))
+  const closeExport = useCallback(() => {
+    const activeElement = document.activeElement
+    const meaningfulOutsideFocus = activeElement instanceof HTMLElement
+      && activeElement !== document.body
+      && !activeElement.closest('[role="dialog"]')
+    const shouldRestoreFocus = !meaningfulOutsideFocus
+    setExportType(null)
+    if (shouldRestoreFocus) {
+      requestAnimationFrame(() => {
+        const returnTarget = exportReturnFocusRef.current
+        if (returnTarget?.isConnected) returnTarget.focus()
+      })
     }
-    window.addEventListener('mona:screening-request', openScreen)
-    return () => window.removeEventListener('mona:screening-request', openScreen)
+  }, [])
+  const openAgent = useCallback(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      agentReturnFocusRef.current = document.activeElement
+    }
+    setAgentDockOpen(true)
+  }, [])
+  const openExport = useCallback((type: ExportDialogType = 'pptx') => {
+    if (document.activeElement instanceof HTMLElement) {
+      exportReturnFocusRef.current = document.activeElement
+    }
+    setExportType(type)
+  }, [])
+  const subscribeToPresentationStart = useCallback((listener: () => void) => {
+    presentationStartListenersRef.current.add(listener)
+    return () => presentationStartListenersRef.current.delete(listener)
+  }, [])
+  const startPresentation = useCallback(({ fromStart }: { fromStart: boolean }) => {
+    if (document.activeElement instanceof HTMLElement) {
+      presentationReturnFocusRef.current = document.activeElement
+    }
+    for (const listener of presentationStartListenersRef.current) listener()
+    if (fromStart) {
+      const slides = runtime.store.getState().presentation.slides
+      const firstVisible = slides.findIndex(slide => !slide.hidden)
+      runtime.focusSlide(firstVisible === -1 ? 0 : firstVisible)
+    }
+    // Portaled editor surfaces must never float over the presentation.
+    setExportType(null)
+    setAgentDockOpen(false)
+    // Fullscreen remains in the synchronous user-gesture call stack.
+    const root = document.documentElement
+    if (root.requestFullscreen) void root.requestFullscreen().catch(() => {})
+    startTransition(() => setScreening(true))
   }, [runtime])
+  const exitPresentation = useCallback(() => startTransition(() => setScreening(false)), [])
+  useEffect(() => {
+    if (screening || !presentationReturnFocusRef.current) return
+    const target = presentationReturnFocusRef.current
+    presentationReturnFocusRef.current = null
+    requestAnimationFrame(() => target.focus())
+  }, [screening])
 
-  const exitScreening = () => startTransition(() => setScreening(false))
+  // Working-copy autosave. The loader already consulted the slot before this
+  // component rendered; here we only stream changes back out and surface the
+  // one-time "restored" banner with an escape hatch.
+  const [restoredBanner, setRestoredBanner] = useState(() => consumeRestoredDeckFlag())
+  const [persistenceSlot] = useState(createPersistenceSlot)
+  const persistence = useSyncExternalStore(
+    persistenceSlot.subscribe,
+    persistenceSlot.getSnapshot,
+    persistenceSlot.getSnapshot,
+  )
+  useEffect(() => {
+    if (!isPersistenceEnabled()) return undefined
+    const service = initDeckPersistence(runtime)
+    persistenceSlot.set(service)
+    return () => {
+      persistenceSlot.set(null)
+      service.stop()
+    }
+  }, [persistenceSlot, runtime])
+  const startFresh = () => {
+    void discardWorkingDeck().finally(() => {
+      window.location.replace(window.location.pathname)
+    })
+  }
+
+  // The development/test bridge lives at the page level (not inside the
+  // editor tree) so it reflects the runtime store across editor, slideshow,
+  // and hidden-<Activity> phases alike.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined
+    const bridge = Object.freeze({
+      getHistoryState: runtime.getHistoryState,
+      getRichTextState: runtime.richText.getSnapshot,
+      getShapeFormatPainterState: runtime.shapeFormatPainter.getSnapshot,
+      // Expose a serializable snapshot so browser tests observe the same data
+      // shape that crosses a JSON or process boundary.
+      getState: () => JSON.parse(JSON.stringify(runtime.store.getState())) as EditorRootState,
+      isReady: () => true,
+    } satisfies MonaTestBridge)
+    window.__MONA_TEST__ = bridge
+    return () => {
+      if (window.__MONA_TEST__ === bridge) delete window.__MONA_TEST__
+    }
+  }, [runtime])
 
   // React 19 hoists <title> into the document head, so the tab tracks the
   // presentation title reactively in every mode.
   const documentTitle = <DocumentTitle runtime={runtime} />
-
-  // Audience popups never need the editor tree at all.
-  if (audienceMode) return <>{documentTitle}<EditorErrorBoundary><ScreenView onExit={exitScreening} runtime={runtime} /></EditorErrorBoundary></>
-  if (isMobileUserAgent()) return <>{documentTitle}<MobileView runtime={runtime} /></>
-
-  // Deliberately conditional (not <Activity mode="hidden">): the gate-6
-  // slideshow contracts — like Vue — require the editor DOM to be absent
-  // while presenting (a hidden editor duplicates video/media/thumbnail nodes
-  // that the contracts and rasters locate). Revisit at quirk-retirement time.
-  if (screening) return <>{documentTitle}<EditorErrorBoundary><ScreenView onExit={exitScreening} runtime={runtime} /></EditorErrorBoundary></>
+  const application = useMemo<EditorApplication>(() => ({
+    agentOpen: agentDockOpen,
+    closeAgent,
+    closeExport,
+    exitPresentation,
+    exportType,
+    importFiles,
+    importing,
+    notifications,
+    openAgent,
+    openExport,
+    persistence,
+    presenting: screening,
+    startPresentation,
+    subscribeToPresentationStart,
+  }), [
+    agentDockOpen,
+    closeAgent,
+    closeExport,
+    exitPresentation,
+    exportType,
+    importFiles,
+    importing,
+    notifications,
+    openAgent,
+    openExport,
+    persistence,
+    screening,
+    startPresentation,
+    subscribeToPresentationStart,
+  ])
 
   return (
-    <>
+    <EditorApplicationProvider value={application}>
       {documentTitle}
-      <div
-        aria-label={t('foundation.ariaLabel')}
-        className="grid h-svh min-w-[960px] grid-rows-[40px_minmax(0,1fr)] overflow-hidden bg-muted/30"
-      >
-        <EditorHeader runtime={runtime} />
-        <EditorDeck presentation={presentation} runtime={runtime} />
-        <EditorFullscreenSpin loading={importing} tip={t('common.importing')} />
-        {exportType ? <Suspense fallback={null}><EditorExportFeature onClose={() => setExportType(null)} openType={exportType} runtime={runtime} /></Suspense> : null}
-      </div>
-    </>
+      {audienceMode ? (
+        <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
+          <EditorErrorBoundary><ScreenView onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
+        </Suspense>
+      ) : isMobileUserAgent() ? (
+        <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
+          <MobileView runtime={runtime} />
+        </Suspense>
+      ) : (
+        <>
+          {/* Quirk-retirement decision (doc/QUIRK_RETIREMENT.md): the editor
+              stays mounted-but-hidden while presenting, so exiting the slideshow
+              is instant and open panels/local drafts survive. Contracts locate
+              screen surfaces inside the screen root rather than page-wide. */}
+          <Activity mode={screening ? 'hidden' : 'visible'}>
+            <div
+              aria-label={t('foundation.ariaLabel')}
+              className="h-svh min-w-0 overflow-hidden bg-muted/30"
+            >
+              <EditorDeck
+                banner={restoredBanner ? (
+                  <output className="mona-restore-banner">
+                    <span>{t('foundation.restoredWorkingCopy')}</span>
+                    <Button className="mona-restore-banner-action" onClick={startFresh} size="sm" type="button" variant="ghost">{t('foundation.startFresh')}</Button>
+                    <Button aria-label={t('common.close')} className="mona-restore-banner-close" onClick={() => setRestoredBanner(false)} size="icon-sm" type="button" variant="ghost">×</Button>
+                  </output>
+                ) : null}
+                presentation={presentation}
+                runtime={runtime}
+              />
+              <EditorFullscreenSpin loading={importing} tip={t('common.importing')} />
+              {exportType ? <Suspense fallback={null}><EditorExportFeature onClose={closeExport} openType={exportType} runtime={runtime} /></Suspense> : null}
+            </div>
+          </Activity>
+          {screening ? (
+            <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
+              <EditorErrorBoundary><ScreenView onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
+            </Suspense>
+          ) : null}
+        </>
+      )}
+      <EditorNotificationViewport />
+    </EditorApplicationProvider>
   )
 }
 
 function DocumentTitle({ runtime }: { runtime: ReturnType<typeof createEditorRuntime> }) {
   const title = useEditorSelector(runtime.store, state => state.presentation.title)
-  return <title>{title ? `${title} - Mona Slides` : 'Mona Slides'}</title>
+  return <title>{title ? `${title} - Mona` : 'Mona'}</title>
 }

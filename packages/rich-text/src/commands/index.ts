@@ -71,7 +71,7 @@ export const executeRichTextActions = (
       setListStyle(editorView, { key: 'fontsize', value: item.value })
     }
     else if (item.command === 'fontsize-add') {
-      // PPTist selects all first, then samples the base size from the
+      // the source editor selects all first, then samples the base size from the
       // resulting selection.
       autoSelectAll(editorView)
       const fontsize = `${getFontsize(editorView) + (item.value ? Number(item.value) : 2)}px`

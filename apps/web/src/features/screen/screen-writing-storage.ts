@@ -2,8 +2,13 @@ import Dexie, { type EntityTable } from 'dexie'
 
 import { createPresentationId } from '@mona/presentation-core'
 
-const DATABASE_PREFIX = 'PPTist'
-const DISCARDED_DATABASES_KEY = 'PPTIST_DISCARDED_DB'
+import {
+  LEGACY_WRITING_DATABASE_PREFIX,
+  LEGACY_WRITING_DATABASES_KEY,
+} from '@/lib/legacy-compatibility'
+
+const DATABASE_PREFIX = 'Mona'
+const DISCARDED_DATABASES_KEY = 'MONA_DISCARDED_DB'
 const databaseId = createPresentationId(10)
 
 interface WritingBoardImage {
@@ -21,14 +26,17 @@ database.version(1).stores({
 
 const readDiscardedIds = (): string[] => {
   // A corrupt localStorage value must not abort cleanup or the unload marker.
-  try {
-    const value = localStorage.getItem(DISCARDED_DATABASES_KEY)
-    const parsed: unknown = value ? JSON.parse(value) : []
-    return Array.isArray(parsed) ? parsed.filter(entry => typeof entry === 'string') : []
+  const readKey = (key: string) => {
+    try {
+      const value = localStorage.getItem(key)
+      const parsed: unknown = value ? JSON.parse(value) : []
+      return Array.isArray(parsed) ? parsed.filter(entry => typeof entry === 'string') : []
+    }
+    catch {
+      return []
+    }
   }
-  catch {
-    return []
-  }
+  return [...new Set([...readKey(DISCARDED_DATABASES_KEY), ...readKey(LEGACY_WRITING_DATABASES_KEY)])]
 }
 
 const deleteDiscardedDatabases = async () => {
@@ -36,14 +44,15 @@ const deleteDiscardedDatabases = async () => {
   const discardedIds = readDiscardedIds()
   const names = await Dexie.getDatabaseNames()
   const discardedNames = names.filter(name => {
-    if (!name.includes(DATABASE_PREFIX)) return false
+    if (!name.startsWith(`${DATABASE_PREFIX}_`) && !name.startsWith(`${LEGACY_WRITING_DATABASE_PREFIX}_`)) return false
     const [prefix, id, time] = name.split('_')
-    if (prefix !== DATABASE_PREFIX || !id || !time) return true
+    if ((prefix !== DATABASE_PREFIX && prefix !== LEGACY_WRITING_DATABASE_PREFIX) || !id || !time) return true
     if (discardedIds.includes(id)) return true
     return now - Number(time) >= 1000 * 60 * 60 * 12
   })
   await Promise.all(discardedNames.map(name => Dexie.delete(name)))
   localStorage.removeItem(DISCARDED_DATABASES_KEY)
+  localStorage.removeItem(LEGACY_WRITING_DATABASES_KEY)
 }
 
 if (new URLSearchParams(window.location.search).get('mode') !== 'audience') void deleteDiscardedDatabases()

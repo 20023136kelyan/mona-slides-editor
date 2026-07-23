@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/no-noninteractive-element-interactions -- PPTist's full-canvas pointer surface is required for custom-shape interaction parity. */
+/* oxlint-disable jsx-a11y/no-noninteractive-element-interactions -- the full-canvas SVG is a pointer drawing surface. */
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 
@@ -148,7 +148,7 @@ export function EditorCustomShapeCreator({
       role="application"
     >
       <svg overflow="visible">
-        <path d={path} fill={closed ? 'rgba(226, 83, 77, 0.15)' : 'none'} stroke="#d14424" strokeWidth="2" />
+        <path d={path} fill={closed ? 'var(--editor-selection-soft)' : 'none'} stroke="var(--editor-selection)" strokeWidth="2" />
       </svg>
     </div>
   )

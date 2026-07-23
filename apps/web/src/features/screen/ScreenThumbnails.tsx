@@ -1,5 +1,5 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- exact PPTist thumbnail tiles are pointer-selectable divs. */
 import { useEffect, useRef, useState, type WheelEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { PresentationState } from '@mona/presentation-core'
 
@@ -7,7 +7,6 @@ import ArrowBackIcon from '~icons/icon-park-outline/arrow-circle-left'
 
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 import type { ScreenPresentationController } from '@/features/screen/screen-types'
-import { useScreenPlayback } from '@/features/screen/use-screen-playback'
 
 const scrollActiveIntoCenter = (container: HTMLElement | null) => {
   if (!container) return
@@ -53,27 +52,41 @@ const Thumbnail = ({
   size: number
   slideIndex: number
   visible: boolean
-}) => (
-  <div className={`mona-screen-thumbnail${active ? ' is-active' : ''}`} data-slide-index={slideIndex} onClick={onClick}>
-    <ScaledSlide
-      fixedWidth={size}
-      slide={presentation.slides[slideIndex]!}
-      theme={presentation.theme}
-      thumbnail
-      viewportRatio={presentation.viewportRatio}
-      viewportSize={presentation.viewportSize}
-      visible={visible}
-    />
-  </div>
-)
+}) => {
+  const { t } = useTranslation()
+  return (
+    <button
+      aria-current={active ? 'page' : undefined}
+      aria-label={t('screen.slideNumber', { current: slideIndex + 1, total: presentation.slides.length })}
+      className={`mona-screen-thumbnail${active ? ' is-active' : ''}`}
+      data-slide-index={slideIndex}
+      onClick={onClick}
+      type="button"
+    >
+      <ScaledSlide
+        fixedWidth={size}
+        slide={presentation.slides[slideIndex]!}
+        theme={presentation.theme}
+        thumbnail
+        viewportRatio={presentation.viewportRatio}
+        viewportSize={presentation.viewportSize}
+        visible={visible}
+      />
+    </button>
+  )
+}
 
 export function ScreenBottomThumbnails({
   controller,
+  turnSlideToIndex,
 }: {
   controller: ScreenPresentationController
+  // Quirk retired: the established editor's BottomThumbnails instantiated a second full
+  // playback engine (extra keydown listener + broadcast posts) just to turn
+  // slides. The bar now borrows the view's single hoisted playback.
+  turnSlideToIndex: (index: number) => void
 }) {
   const { presentation } = controller
-  const playback = useScreenPlayback({ controller })
   const ref = useRef<HTMLDivElement>(null)
   const slidesLoadLimit = useSlidesLoadLimit(presentation.slides.length)
   useScrollActiveOnChange(ref, presentation.slideIndex)
@@ -85,7 +98,7 @@ export function ScreenBottomThumbnails({
     <div className="mona-screen-bottom-thumbnails">
       <div className="mona-screen-bottom-thumbnail-list" onWheel={wheel} ref={ref}>
         {presentation.slides.map((slide, index) => (
-          <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => playback.turnSlideToIndex(index)} presentation={presentation} size={100 / presentation.viewportRatio} slideIndex={index} visible={index < slidesLoadLimit} />
+          <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => turnSlideToIndex(index)} presentation={presentation} size={100 / presentation.viewportRatio} slideIndex={index} visible={index < slidesLoadLimit} />
         ))}
       </div>
     </div>
@@ -101,10 +114,40 @@ export function ScreenAllSlides({
   presentation: PresentationState
   turnSlideToIndex: (index: number) => void
 }) {
+  const { t } = useTranslation()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
   const slidesLoadLimit = useSlidesLoadLimit(presentation.slides.length)
+  useEffect(() => {
+    closeRef.current?.focus()
+    const root = rootRef.current
+    if (!root) return undefined
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+      const controls = Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'))
+      if (!controls.length) return
+      const first = controls[0]!
+      const last = controls[controls.length - 1]!
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      }
+      else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    root.addEventListener('keydown', keydown)
+    return () => root.removeEventListener('keydown', keydown)
+  }, [onClose])
   return (
-    <div className="mona-screen-all-slides">
-      <div className="mona-screen-all-slides-return"><ArrowBackIcon onClick={onClose} /></div>
+    <div aria-label={t('screen.allSlides')} aria-modal="true" className="mona-screen-all-slides" ref={rootRef} role="dialog">
+      <div className="mona-screen-all-slides-return"><button aria-label={t('common.close')} onClick={onClose} ref={closeRef} type="button"><ArrowBackIcon /></button></div>
       <div className="mona-screen-all-slides-content">
         {presentation.slides.map((slide, index) => (
           <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => {

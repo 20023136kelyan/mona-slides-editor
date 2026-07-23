@@ -17,6 +17,9 @@ import type {
 } from '@mona/presentation-core/model'
 import { selectPresentation } from '@mona/editor-state'
 
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Toggle } from '@/components/ui/toggle'
 import { EditorGradientBar } from '@/features/editor/EditorGradientBar'
 import {
   InspectorButton,
@@ -29,6 +32,7 @@ import { EditorModal } from '@/features/editor/EditorModal'
 import { useEditorModalClose } from '@/features/editor/editor-modal-context'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { fileToDataUrl } from '@/features/editor/editor-image'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import {
   applyFontToSlides,
   applyThemeToSlides,
@@ -70,9 +74,6 @@ const lineStyleOptions: Array<{ label: string; value: LineStyleType }> = [
   { label: 'Dotted', value: 'dotted' },
 ]
 
-const formatLegacyMessage = (message: string, values: Record<string, number | string>) => Object.entries(values)
-  .reduce((result, [key, value]) => result.replaceAll(`{${key}}`, String(value)), message)
-
 function LineStylePreview({ type }: { type: LineStyleType }) {
   const dashArray = type === 'dashed' ? '10 5' : type === 'dotted' ? '3.6 3.2' : '0 0'
   return <svg aria-hidden="true" className="mona-line-style-preview" height="100%" viewBox="0 0 100 10" width="100%"><line stroke="#333" strokeDasharray={dashArray} strokeWidth="2" x1="0" x2="100" y1="5" y2="5" /></svg>
@@ -84,17 +85,18 @@ function DesignRow({ children, label, style }: { children: React.ReactNode; labe
 
 function ThemeColorListButton({ colors, onClick }: { colors: readonly string[]; onClick: () => void }) {
   return (
-    <button aria-label="Theme colors" className="mona-theme-color-list" onClick={onClick} type="button">
+    <Button aria-label="Theme colors" className="mona-theme-color-list" onClick={onClick} size="editor" type="button" variant="outline">
       <span className="mona-theme-color-blocks">
         {colors.slice(0, 12).map((color, index) => <span className="mona-theme-color-block" key={`${color}-${index}`}><span style={{ backgroundColor: color }} /></span>)}
       </span>
       <PaletteIcon className="mona-theme-color-icon" />
-    </button>
+    </Button>
   )
 }
 
 function ViewportSizeSetting({ runtime }: { runtime: EditorRuntime }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const close = useEditorModalClose()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const [width, setWidth] = useState(Math.round(presentation.viewportSize * 100) / 100)
@@ -103,13 +105,13 @@ function ViewportSizeSetting({ runtime }: { runtime: EditorRuntime }) {
   const max = 2000
   const apply = (nextWidth = width, nextHeight = height) => {
     if (nextWidth < min || nextWidth > max || nextHeight < min || nextHeight > max) {
-      window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: formatLegacyMessage(t('designPanel.sizeRangeError'), { min, max }), type: 'warning' } }))
+      notifications.notify({ text: t('designPanel.sizeRangeError', { min, max }), type: 'warning' })
       return
     }
     runtime.commit('Set custom viewport', [
       { type: 'presentation.viewport-size.set', size: nextWidth },
       { type: 'presentation.viewport-ratio.set', ratio: nextHeight / nextWidth },
-    ], { recordHistory: false })
+    ], { historyKey: 'slide-design-viewport' })
     close()
   }
   return (
@@ -117,7 +119,7 @@ function ViewportSizeSetting({ runtime }: { runtime: EditorRuntime }) {
       <div className="mona-design-modal-title">{t('designPanel.customCanvas')}</div>
       <div className="mona-viewport-setting-row"><div>{t('toolbar.width')}</div><InspectorNumberInput ariaLabel={t('toolbar.width')} max={max} min={min} onChange={setWidth} onEnter={value => apply(value, height)} value={width} /></div>
       <div className="mona-viewport-setting-row"><div>{t('toolbar.height')}</div><InspectorNumberInput ariaLabel={t('toolbar.height')} max={max} min={min} onChange={setHeight} onEnter={value => apply(width, value)} value={height} /></div>
-      <div className="mona-viewport-setting-tip">{formatLegacyMessage(t('designPanel.sizeRange'), { min, max })}</div>
+      <div className="mona-viewport-setting-tip">{t('designPanel.sizeRange', { min, max })}</div>
       <div className="mona-design-modal-buttons">
         <InspectorButton active ariaLabel={t('common.confirm')} onClick={apply}>{t('common.confirm')}</InspectorButton>
         <InspectorButton ariaLabel={t('common.cancel')} onClick={close}>{t('common.cancel')}</InspectorButton>
@@ -171,7 +173,10 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
   const confirm = () => {
     let next = colors.filter(color => color !== '#00000000')
     if (!next.length) next = ['#00000000']
-    runtime.commit('Set theme colors', [{ type: 'presentation.theme.update', props: { themeColors: next } }], { recordHistory: false })
+    runtime.commit('Set theme colors', [{
+      type: 'presentation.theme.update',
+      props: { themeColors: next },
+    }], { historyKey: 'slide-design-theme-colors' })
     close()
   }
   return (
@@ -179,8 +184,8 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
       <div className="mona-design-modal-title">{t('designPanel.editThemeColors')}</div>
       {colors.map((color, index) => (
         <div className="mona-theme-colors-row" key={index}>
-          <div className="mona-theme-colors-label" onPointerDown={event => startReorder(event, index)}>{formatLegacyMessage(t('designPanel.slideThemeColor'), { number: index + 1 })}</div>
-          <InspectorColorButton ariaLabel={formatLegacyMessage(t('designPanel.slideThemeColor'), { number: index + 1 })} color={color} onChange={value => setColors(current => current.map((item, itemIndex) => itemIndex === index ? value : item))} />
+          <div className="mona-theme-colors-label" onPointerDown={event => startReorder(event, index)}>{t('designPanel.slideThemeColor', { number: index + 1 })}</div>
+          <InspectorColorButton ariaLabel={t('designPanel.slideThemeColor', { number: index + 1 })} color={color} onChange={value => setColors(current => current.map((item, itemIndex) => itemIndex === index ? value : item))} />
         </div>
       ))}
       <InspectorButton active ariaLabel={t('common.confirm')} onClick={confirm} style={{ marginTop: 12, width: '100%' }}>{t('common.confirm')}</InspectorButton>
@@ -190,6 +195,7 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
 
 function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const close = useEditorModalClose()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const [activeTab, setActiveTab] = useState<'single' | 'all'>('single')
@@ -204,12 +210,15 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
     setStyles(nextStyles)
     setSelection({ backgroundColor: 0, fontColor: 0, fontName: 0, themeColors: nextStyles.themeColors.map((_, index) => index) })
   }
-  const updateTheme = (props: Partial<SlideTheme>) => runtime.commit('Update extracted theme', [{ type: 'presentation.theme.update', props }], { recordHistory: false })
+  const updateTheme = (props: Partial<SlideTheme>) => runtime.commit('Update extracted theme', [{
+    type: 'presentation.theme.update',
+    props,
+  }], { historyKey: 'slide-design-extracted-theme' })
   const apply = () => {
     let themeColors = styles.themeColors.filter((_, index) => selection.themeColors.includes(index))
     if (themeColors.length > 6) {
       themeColors = themeColors.slice(0, 6)
-      window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: t('designPanel.themeColorLimit'), type: 'warning' } }))
+      notifications.notify({ text: t('designPanel.themeColorLimit'), type: 'warning' })
     }
     const props: Partial<SlideTheme> = {}
     const backgroundColor = styles.backgroundColors[selection.backgroundColor]
@@ -234,10 +243,12 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
   ]
   return (
     <div className="mona-theme-extract">
-      <div className="mona-extract-tabs" role="tablist">
-        <button aria-selected={activeTab === 'single'} onClick={() => selectTab('single')} role="tab" type="button">{t('designPanel.extractCurrent')}</button>
-        <button aria-selected={activeTab === 'all'} onClick={() => selectTab('all')} role="tab" type="button">{t('designPanel.extractAll')}</button>
-      </div>
+      <Tabs onValueChange={value => selectTab(value as 'single' | 'all')} value={activeTab}>
+        <TabsList className="mona-extract-tabs">
+          <TabsTrigger value="single">{t('designPanel.extractCurrent')}</TabsTrigger>
+          <TabsTrigger value="all">{t('designPanel.extractAll')}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className="mona-extract-content">
         {optionRows.map(row => row.values.length ? (
           <div className="mona-extract-config" key={row.key}>
@@ -247,10 +258,10 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
                 {row.visual(value)}
                 <div className="mona-extract-handler">
                   <span className={selection[row.key] === index ? 'is-active' : ''}><CheckIcon /></span>
-                  <button onClick={() => setSelection(current => ({ ...current, [row.key]: index }))} type="button">{t('common.select')}</button>
-                  <button onClick={() => {
+                  <Button onClick={() => setSelection(current => ({ ...current, [row.key]: index }))} size="xs" type="button" variant="ghost">{t('common.select')}</Button>
+                  <Button onClick={() => {
                     row.apply(value); setSelection(current => ({ ...current, [row.key]: index })) 
-                  }} type="button">{t('designPanel.applyToTheme')}</button>
+                  }} size="xs" type="button" variant="ghost">{t('designPanel.applyToTheme')}</Button>
                 </div>
               </div>
             ))}
@@ -261,14 +272,13 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
             <div className="mona-extract-label">{`${t('common.themeColor')}: `}<span>({t('designPanel.excludeColorTip')})</span></div>
             <div className="mona-extract-colors">
               {styles.themeColors.map((color, index) => (
-                <button
+                <Toggle
                   aria-label={color}
-                  aria-pressed={selection.themeColors.includes(index)}
                   className={selection.themeColors.includes(index) ? '' : 'is-disabled'}
                   key={color}
-                  onClick={() => setSelection(current => ({ ...current, themeColors: current.themeColors.includes(index) ? current.themeColors.filter(item => item !== index) : [...current.themeColors, index] }))}
+                  onPressedChange={() => setSelection(current => ({ ...current, themeColors: current.themeColors.includes(index) ? current.themeColors.filter(item => item !== index) : [...current.themeColors, index] }))}
+                  pressed={selection.themeColors.includes(index)}
                   style={{ backgroundColor: color }}
-                  type="button"
                 />
               ))}
             </div>
@@ -303,7 +313,10 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
   }
   const updateGradient = (props: Partial<Gradient>) => updateBackground({ gradient: { ...background.gradient!, ...props } })
   const updateImage = (props: Partial<SlideBackgroundImage>) => updateBackground({ image: { ...background.image!, ...props } })
-  const updateTheme = (props: Partial<SlideTheme>) => runtime.commit('Update presentation theme', [{ type: 'presentation.theme.update', props }], { recordHistory: false })
+  const updateTheme = (props: Partial<SlideTheme>) => runtime.commit('Update presentation theme', [{
+    type: 'presentation.theme.update',
+    props,
+  }], { historyKey: 'slide-design-theme' })
   const applyBackgroundAll = () => runtime.commit('Apply background to all slides', [{
     type: 'presentation.slides.replace',
     slides: presentation.slides.map(candidate => ({ ...candidate, background: slide.background })),
@@ -315,7 +328,7 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       for (const candidate of slides) setSlideTheme(candidate, preset)
       commands.push({ type: 'presentation.slides.replace', slides })
     }
-    runtime.commit('Apply preset theme', commands, { historyKey, recordHistory: apply })
+    runtime.commit('Apply preset theme', commands, { historyKey })
   }
   const ratioOptions: Array<{ label: string; value: number | string }> = [
     { label: t('designPanel.wide169'), value: .5625 },
@@ -325,7 +338,7 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
     { label: t('designPanel.paperPortrait'), value: 1.41421356 },
     { label: t('common.custom'), value: 'custom' },
   ]
-  const canvasSize = formatLegacyMessage(t('designPanel.canvasSize'), { width: presentation.viewportSize, height: Math.round(presentation.viewportSize * presentation.viewportRatio * 100) / 100 })
+  const canvasSize = t('designPanel.canvasSize', { width: presentation.viewportSize, height: Math.round(presentation.viewportSize * presentation.viewportRatio * 100) / 100 })
 
   return (
     <div className="mona-slide-design-panel">
@@ -365,11 +378,11 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyBackgroundAll')} onClick={applyBackgroundAll} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyBackgroundAll')}</InspectorButton></div>
       <div className="mona-inspector-divider" />
       <div className="mona-design-row-full"><InspectorSelect ariaLabel={t('designPanel.customCanvas')} onChange={value => {
-        if (value === 'custom') setViewportOpen(true); else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { recordHistory: false }) 
+        if (value === 'custom') setViewportOpen(true); else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { historyKey: 'slide-design-viewport' }) 
       }} options={ratioOptions} value={ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'} /></div>
       <div className="mona-design-canvas-size">{canvasSize}</div>
       <div className="mona-inspector-divider" />
-      <div className="mona-design-title"><span>{t('designPanel.globalTheme')}</span><button className="mona-design-more" onClick={() => setMore(value => !value)} type="button"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</button></div>
+      <div className="mona-design-title"><span>{t('designPanel.globalTheme')}</span><Button className="mona-design-more" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
       <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
       <DesignRow label={`${t('common.fontColor')}:`}><InspectorColorButton ariaLabel={t('common.fontColor')} color={presentation.theme.fontColor} onChange={fontColor => updateTheme({ fontColor })} /></DesignRow>
       <DesignRow label={`${t('common.backgroundColor')}:`}><InspectorColorButton ariaLabel={t('common.backgroundColor')} color={presentation.theme.backgroundColor} onChange={backgroundColor => updateTheme({ backgroundColor })} /></DesignRow>
@@ -397,16 +410,16 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
               <div className="mona-preset-theme-text" style={{ color: preset.fontColor }}>{t('designPanel.sampleText')}</div>
               <div className="mona-preset-theme-colors">{preset.colors.map((color, colorIndex) => <span key={colorIndex} style={{ backgroundColor: color }} />)}</div>
               <div className="mona-preset-theme-actions">
-                <button onClick={() => applyPreset(preset)} type="button">{t('designPanel.set')}</button>
-                <button onClick={() => applyPreset(preset, true)} type="button">{t('designPanel.setAndApply')}</button>
+                <Button onClick={() => applyPreset(preset)} size="xs" type="button">{t('designPanel.set')}</Button>
+                <Button onClick={() => applyPreset(preset, true)} size="xs" type="button">{t('designPanel.setAndApply')}</Button>
               </div>
             </div>
           </div>
         ))}
       </div>
-      {themeColorsOpen ? <EditorModal onClose={() => setThemeColorsOpen(false)} open width={310}><ThemeColorsSetting runtime={runtime} /></EditorModal> : null}
-      {themeExtractOpen ? <EditorModal onClose={() => setThemeExtractOpen(false)} open width={320}><ThemeStylesExtract runtime={runtime} /></EditorModal> : null}
-      {viewportOpen ? <EditorModal onClose={() => setViewportOpen(false)} open width={300}><ViewportSizeSetting runtime={runtime} /></EditorModal> : null}
+      {themeColorsOpen ? <EditorModal onClose={() => setThemeColorsOpen(false)} open title={t('designPanel.editThemeColors')} width={310}><ThemeColorsSetting runtime={runtime} /></EditorModal> : null}
+      {themeExtractOpen ? <EditorModal onClose={() => setThemeExtractOpen(false)} open title={t('designPanel.extractTheme')} width={320}><ThemeStylesExtract runtime={runtime} /></EditorModal> : null}
+      {viewportOpen ? <EditorModal onClose={() => setViewportOpen(false)} open title={t('designPanel.customCanvas')} width={300}><ViewportSizeSetting runtime={runtime} /></EditorModal> : null}
     </div>
   )
 }

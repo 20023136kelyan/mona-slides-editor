@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import type { LinePoint, PPTLineElement } from '@mona/presentation-core/model'
 
 import {
@@ -37,6 +39,9 @@ function LineMarker({ baseSize, color, elementId, position, type }: LineMarkerPr
 }
 
 export function LineElement({ element }: { element: PPTLineElement }) {
+  // Per-instance marker ids: url(#id) resolves document-wide to the first
+  // match, and defs inside a hidden <Activity> surface do not render.
+  const svgId = useId().replace(/:/g, '')
   const width = Math.max(Math.abs(element.start[0] - element.end[0]), 24)
   const height = Math.max(Math.abs(element.start[1] - element.end[1]), 24)
   const shadow = getShadowStyle(element.shadow)
@@ -51,15 +56,15 @@ export function LineElement({ element }: { element: PPTLineElement }) {
       <div className="mona-line-content" style={{ filter: shadow ? `drop-shadow(${shadow})` : '' }}>
         <svg aria-hidden="true" height={height} overflow="visible" width={width}>
           <defs>
-            {element.points[0] ? <LineMarker baseSize={element.width} color={element.color} elementId={element.id} position="start" type={element.points[0]} /> : null}
-            {element.points[1] ? <LineMarker baseSize={element.width} color={element.color} elementId={element.id} position="end" type={element.points[1]} /> : null}
+            {element.points[0] ? <LineMarker baseSize={element.width} color={element.color} elementId={svgId} position="start" type={element.points[0]} /> : null}
+            {element.points[1] ? <LineMarker baseSize={element.width} color={element.color} elementId={svgId} position="end" type={element.points[1]} /> : null}
           </defs>
           <path d={getLineRenderPath(element)} fill="none" stroke={element.color} strokeDasharray={getLineDashArray(element)} strokeWidth={element.width} />
           <path
             d={getLinePath(element)}
             fill="none"
-            markerEnd={element.points[1] ? `url(#${element.id}-${element.points[1]}-end)` : undefined}
-            markerStart={element.points[0] ? `url(#${element.id}-${element.points[0]}-start)` : undefined}
+            markerEnd={element.points[1] ? `url(#${svgId}-${element.points[1]}-end)` : undefined}
+            markerStart={element.points[0] ? `url(#${svgId}-${element.points[0]}-start)` : undefined}
             stroke="transparent"
             strokeWidth={element.width}
           />

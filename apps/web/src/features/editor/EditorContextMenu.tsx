@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/control-has-associated-label, jsx-a11y/interactive-supports-focus, jsx-a11y/no-noninteractive-element-to-interactive-role, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- PPTist's menu DOM geometry is preserved for pixel parity; menu roles and labels still expose the surface to assistive technology. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/control-has-associated-label, jsx-a11y/interactive-supports-focus, jsx-a11y/no-noninteractive-element-to-interactive-role, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- nested canvas menus use composite menu semantics and named actions. */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -11,6 +11,11 @@ import AttentionIcon from '~icons/icon-park-solid/attention'
 import type { PointerPosition } from '@mona/editor-interactions'
 import type { ElementLinkType, Slide, SlideTheme } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 
 interface ContextMenuItem {
@@ -38,7 +43,6 @@ export interface EditorContextMenuProps {
   onAction: (action: string) => void
   onDismiss: () => void
   position: PointerPosition
-  showBubbleMenu: boolean
   showRuler: boolean
   surface: 'canvas' | 'element' | 'table-cell'
 }
@@ -56,7 +60,6 @@ export function EditorContextMenu({
   onAction,
   onDismiss,
   position,
-  showBubbleMenu,
   showRuler,
   surface,
 }: EditorContextMenuProps) {
@@ -76,7 +79,6 @@ export function EditorContextMenu({
       ],
     },
     { action: 'reset-slide', label: t('foundation.editor.action.resetSlide') },
-    { action: 'bubble-menu', label: t('foundation.editor.action.bubbleMenu'), checked: showBubbleMenu },
     { divider: true },
     { action: 'slideshow', label: t('foundation.editor.action.slideshow'), shortcut: 'F5' },
   ]
@@ -268,163 +270,49 @@ export function LinkEditor({
   viewportSize: number
 }) {
   const { t } = useTranslation()
-  const selectRef = useRef<HTMLDivElement>(null)
-  const selectCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [selectPopover, setSelectPopover] = useState<{
-    left: number
-    phase: 'open' | 'closing'
-    top: number
-    width: number
-  } | null>(null)
+  const addressInputRef = useRef<HTMLInputElement>(null)
   const selectedSlide = linkType === 'slide' ? slides.find(slide => slide.id === slideId) : undefined
   const selectedOption = slideOptions.find(option => option.id === slideId)
-  const clearSelectCloseTimer = useCallback(() => {
-    if (selectCloseTimerRef.current) clearTimeout(selectCloseTimerRef.current)
-    selectCloseTimerRef.current = null
-  }, [])
-  const selectPosition = useCallback(() => {
-    const rect = selectRef.current?.getBoundingClientRect()
-    if (!rect) return null
-    return {
-      left: Math.round(rect.left - 1),
-      top: Math.round(rect.bottom + 8),
-      width: rect.width + 2,
-    }
-  }, [])
-  const openSelect = () => {
-    const position = selectPosition()
-    if (!position) return
-    clearSelectCloseTimer()
-    setSelectPopover({ ...position, phase: 'open' })
-  }
-  const closeSelect = useCallback(() => {
-    if (!selectPopover || selectPopover.phase === 'closing') return
-    clearSelectCloseTimer()
-    setSelectPopover({ ...selectPopover, phase: 'closing' })
-    selectCloseTimerRef.current = setTimeout(() => setSelectPopover(null), 200)
-  }, [clearSelectCloseTimer, selectPopover])
-  useEffect(() => clearSelectCloseTimer, [clearSelectCloseTimer])
-  useEffect(() => {
-    if (!selectPopover || selectPopover.phase === 'closing') return
-    const handleOutsidePointer = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (selectRef.current?.contains(target) || document.querySelector('.mona-link-select-popover')?.contains(target)) return
-      closeSelect()
-    }
-    const updatePosition = () => {
-      const position = selectPosition()
-      if (position) setSelectPopover(current => current ? { ...current, ...position } : current)
-    }
-    document.addEventListener('mousedown', handleOutsidePointer)
-    window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', updatePosition, true)
-    return () => {
-      document.removeEventListener('mousedown', handleOutsidePointer)
-      window.removeEventListener('resize', updatePosition)
-      window.removeEventListener('scroll', updatePosition, true)
-    }
-  }, [closeSelect, selectPopover, selectPosition])
-  return createPortal((
-    <div
-      className="mona-link-dialog-backdrop"
-      onClick={event => {
-        if (event.target === event.currentTarget) onCancel()
-      }}
-      onKeyUp={event => {
-        event.stopPropagation()
-        if (event.key === 'Escape') onCancel()
-      }}
-      onPointerDown={event => {
-        event.stopPropagation()
-      }}
-      role="presentation"
-      tabIndex={-1}
-    >
-      <div aria-label={t('foundation.editor.link.title')} className="mona-link-dialog" role="dialog">
+  return (
+    <Dialog onOpenChange={open => {
+      if (!open) onCancel()
+    }} open>
+      <DialogContent className="mona-link-dialog" onOpenAutoFocus={event => {
+        if (linkType === 'web') {
+          event.preventDefault()
+          addressInputRef.current?.focus()
+        }
+      }} onPointerDown={event => event.stopPropagation()} overlayClassName="mona-link-dialog-backdrop" showCloseButton={false}>
+        <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.link.title')}</DialogTitle></DialogHeader>
         <form onSubmit={event => {
           event.preventDefault(); onSubmit()
         }}>
-          <div aria-label={t('foundation.editor.link.typeLabel')} className="mona-link-type-tabs" role="tablist">
-            <div
-              aria-selected={linkType === 'web'}
-              className="mona-link-type-tab"
-              onClick={() => {
-                clearSelectCloseTimer()
-                setSelectPopover(null)
-                onTypeChange('web')
-              }}
-              role="tab"
-            >
-              {t('foundation.editor.link.web')}
-            </div>
-            <div
-              aria-disabled={!slideOptions.some(option => !option.disabled)}
-              aria-selected={linkType === 'slide'}
-              className={`mona-link-type-tab${!slideOptions.some(option => !option.disabled) ? ' is-disabled' : ''}`}
-              onClick={() => {
-                if (slideOptions.some(option => !option.disabled)) onTypeChange('slide')
-              }}
-              role="tab"
-            >
-              {t('foundation.editor.link.slide')}
-            </div>
-          </div>
-          {linkType === 'web' ? (
+          <Tabs onValueChange={value => onTypeChange(value as ElementLinkType)} value={linkType}>
+            <TabsList aria-label={t('foundation.editor.link.typeLabel')} className="mona-link-type-tabs">
+              <TabsTrigger className="mona-link-type-tab" value="web">{t('foundation.editor.link.web')}</TabsTrigger>
+              <TabsTrigger className="mona-link-type-tab" disabled={!slideOptions.some(option => !option.disabled)} value="slide">{t('foundation.editor.link.slide')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="web">
             <label className="mona-link-field">
               <span className="sr-only">{t('foundation.editor.link.label')}</span>
-              <input
-                autoFocus
+              <Input
                 onChange={event => onAddressChange(event.target.value)}
                 placeholder={t('foundation.editor.link.placeholder')}
+                ref={addressInputRef}
                 type="text"
                 value={address}
               />
             </label>
-          ) : (
-            <>
+            </TabsContent>
+            <TabsContent value="slide">
               <div className="mona-link-select-wrap">
                 <span className="sr-only">{t('foundation.editor.link.slideLabel')}</span>
-                <div
-                  aria-expanded={!!selectPopover && selectPopover.phase !== 'closing'}
-                  aria-haspopup="listbox"
-                  className="mona-link-select"
-                  onClick={() => selectPopover?.phase === 'open' ? closeSelect() : openSelect()}
-                  ref={selectRef}
-                  role="button"
-                >
-                  <span className="mona-link-select-label">{selectedOption?.label ?? slideId}</span>
-                  <span aria-hidden="true" className="mona-link-select-icon">
-                    <svg height="1em" viewBox="0 0 48 48" width="1em" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M36 18L24 30L12 18" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
-                    </svg>
-                  </span>
-                </div>
-                {selectPopover ? createPortal((
-                  <div
-                    className={`mona-link-select-popover is-${selectPopover.phase}`}
-                    style={{ left: selectPopover.left, top: selectPopover.top, width: selectPopover.width }}
-                  >
-                    <div className="mona-link-select-options" role="listbox">
-                      {slideOptions.map(option => (
-                        <div
-                          aria-disabled={option.disabled || undefined}
-                          aria-selected={option.id === slideId}
-                          className={`mona-link-select-option${option.disabled ? ' is-disabled' : ''}${option.id === slideId ? ' is-selected' : ''}`}
-                          key={option.id}
-                          onClick={() => {
-                            if (option.disabled) return
-                            onSlideChange(option.id)
-                            closeSelect()
-                          }}
-                          role="option"
-                          tabIndex={option.disabled ? -1 : 0}
-                        >
-                          {option.label}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ), document.body) : null}
+                <Select onValueChange={onSlideChange} value={slideId}>
+                  <SelectTrigger aria-label={t('foundation.editor.link.slideLabel')} className="mona-link-select"><SelectValue placeholder={selectedOption?.label ?? slideId} /></SelectTrigger>
+                  <SelectContent className="mona-link-select-popover">
+                    {slideOptions.map(option => <SelectItem disabled={option.disabled} key={option.id} value={option.id}>{option.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               {selectedSlide ? (
                 <div className="mona-link-slide-preview">
@@ -439,16 +327,16 @@ export function LinkEditor({
                   />
                 </div>
               ) : null}
-            </>
-          )}
+            </TabsContent>
+          </Tabs>
           <div className="mona-link-dialog-actions">
-            <button className="is-default" onClick={onCancel} type="button">{t('foundation.editor.link.cancel')}</button>
-            <button className="is-primary" type="submit">{t('foundation.editor.link.apply')}</button>
+            <Button onClick={onCancel} size="editor" type="button" variant="outline">{t('foundation.editor.link.cancel')}</Button>
+            <Button size="editor" type="submit">{t('foundation.editor.link.apply')}</Button>
           </div>
         </form>
-      </div>
-    </div>
-  ), document.body)
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export type EditorNoticeValue = { text: string; type: 'error' | 'success' | 'warning' }

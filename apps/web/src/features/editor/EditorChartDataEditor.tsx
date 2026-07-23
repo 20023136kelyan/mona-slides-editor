@@ -1,11 +1,12 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- the source modal mask, resize handle, and span trigger DOM are preserved for parity. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- the data-grid resize handle and composite trigger use explicit pointer and keyboard behavior. */
 import { useEffect, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
 import type { ChartData, ChartType, PPTChartElement } from '@mona/presentation-core/model'
-import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CHART_TYPES } from '@/features/editor/editor-chart'
 import { parseCustomEditorClipboard } from '@/features/editor/editor-clipboard'
 import { parseHtmlTableClipboard, parsePlainTableClipboard } from '@/features/editor/editor-table'
@@ -38,7 +39,7 @@ function ChartEditorButton({ children, onClick, primary = false }: {
   onClick: () => void
   primary?: boolean
 }) {
-  return <button className={`mona-chart-editor-button is-${primary ? 'primary' : 'default'}`} onClick={onClick} type="button">{children}</button>
+  return <Button className="mona-chart-editor-button" onClick={onClick} size="editor" variant={primary ? 'default' : 'outline'}>{children}</Button>
 }
 
 export function EditorChartDataEditor({ element, onClose, onSave }: {
@@ -47,7 +48,6 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
   onSave: (payload: { data: ChartData; type: ChartType }) => void
 }) {
   const { t } = useTranslation()
-  const modalRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const [matrix, setMatrix] = useState<Matrix>(() => createMatrix(element))
   const [chartType, setChartType] = useState<ChartType>(element.chartType)
@@ -58,10 +58,6 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
   ])
   const [tempRangeSize, setTempRangeSize] = useState({ width: 0, height: 0 })
   const focusCellRef = useRef<[number, number] | null>(null)
-
-  useEffect(() => {
-    modalRef.current?.focus()
-  }, [])
 
   useEffect(() => {
     const moveNextRow = (event: KeyboardEvent) => {
@@ -175,17 +171,12 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
   const selectedWidth = selectedRange[0] * CELL_WIDTH
   const selectedHeight = selectedRange[1] * CELL_HEIGHT
 
-  return createPortal(
-    <div
-      className="mona-chart-data-modal"
-      onKeyUp={event => {
-        if (event.key === 'Escape') onClose()
-      }}
-      ref={modalRef}
-      tabIndex={-1}
-    >
-      <div className="mona-chart-data-mask" onClick={onClose} />
-      <div className="mona-chart-data-modal-content">
+  return (
+    <Dialog onOpenChange={open => {
+      if (!open) onClose()
+    }} open>
+      <DialogContent className="mona-chart-data-modal-content" overlayClassName="mona-chart-data-mask" showCloseButton={false}>
+        <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.chartStyle.editChart')}</DialogTitle></DialogHeader>
         <div className="mona-chart-data-editor" ref={rootRef}>
           <div className="mona-chart-editor-content">
             <div className="mona-chart-editor-handler">
@@ -236,14 +227,12 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
           <div className="mona-chart-editor-buttons">
             <div className="mona-chart-editor-buttons-left">
               {t('foundation.editor.chartData.type', { type: t(`foundation.editor.chartTypes.${chartType}`) })}
-              <PopoverPrimitive.Root onOpenChange={setTypeMenuOpen} open={typeMenuOpen}>
-                <PopoverPrimitive.Trigger asChild><span className="mona-chart-editor-change" role="button" tabIndex={0}>{t('foundation.editor.chartData.change')}</span></PopoverPrimitive.Trigger>
-                <PopoverPrimitive.Portal>
-                  <PopoverPrimitive.Content align="center" className="mona-chart-type-menu is-data-editor" side="top" sideOffset={8}>
-                    {CHART_TYPES.map(type => <PopoverPrimitive.Close asChild key={type}><button onClick={() => setChartType(type)} type="button">{t(`foundation.editor.chartTypes.${type}`)}</button></PopoverPrimitive.Close>)}
-                  </PopoverPrimitive.Content>
-                </PopoverPrimitive.Portal>
-              </PopoverPrimitive.Root>
+              <Popover onOpenChange={setTypeMenuOpen} open={typeMenuOpen}>
+                <PopoverTrigger asChild><Button className="mona-chart-editor-change" size="xs" variant="link">{t('foundation.editor.chartData.change')}</Button></PopoverTrigger>
+                <PopoverContent align="center" className="mona-chart-type-menu is-data-editor" side="top" sideOffset={8}>
+                  {CHART_TYPES.map(type => <PopoverClose asChild key={type}><Button onClick={() => setChartType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button></PopoverClose>)}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="mona-chart-editor-buttons-right">
               <ChartEditorButton onClick={onClose}>{t('foundation.editor.chartData.cancel')}</ChartEditorButton>
@@ -252,8 +241,7 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
             </div>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'line',
   expect: { timeout: 15_000 },
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: 'http://127.0.0.1:6174',
     colorScheme: 'light',
     locale: 'en-US',
     timezoneId: 'UTC',
@@ -26,8 +26,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5174',
-    url: 'http://127.0.0.1:5174',
+    command: 'npm run dev -- --host 127.0.0.1 --port 6174',
+    url: 'http://127.0.0.1:6174',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

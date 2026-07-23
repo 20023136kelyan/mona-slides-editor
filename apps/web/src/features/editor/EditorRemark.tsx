@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -12,14 +12,17 @@ import ListIcon from '~icons/icon-park-outline/list'
 import OrderedListIcon from '~icons/icon-park-outline/ordered-list'
 import FormatIcon from '~icons/icon-park-outline/format'
 import { createDocument, executeRichTextActions, getTextAttrs, initProsemirrorEditor, type RichTextAction, type RichTextAttrs } from '@mona/rich-text'
-import { editorActions, selectCurrentSlide } from '@mona/editor-state'
+import { editorActions, selectCurrentSlide, selectPresentation } from '@mona/editor-state'
 
+import { Button } from '@/components/ui/button'
+import { Toggle } from '@/components/ui/toggle'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 
-export function EditorRemark({ height, onHeightChange, runtime }: { height: number; onHeightChange: (height: number) => void; runtime: EditorRuntime }) {
+export function EditorRemark({ runtime }: { runtime: EditorRuntime }) {
   const { t } = useTranslation()
   const currentSlide = useEditorSelector(runtime.store, selectCurrentSlide)!
+  const presentation = useEditorSelector(runtime.store, selectPresentation)
   const mountRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<ReturnType<typeof initProsemirrorEditor> | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -38,7 +41,12 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
       timerRef.current = null
       const editor = editorRef.current
       if (!editor) return
-      runtime.commit('Edit speaker notes', [{ type: 'slide.update', slideId: latestSlideRef.current.id, props: { remark: editor.dom.innerHTML } }], { recordHistory: false })
+      const slideId = latestSlideRef.current.id
+      runtime.commit('Edit speaker notes', [{
+        type: 'slide.update',
+        slideId,
+        props: { remark: editor.dom.innerHTML },
+      }], { historyKey: `speaker-notes-${slideId}` })
     }, 300)
   }, [runtime])
 
@@ -85,7 +93,12 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
         // is recreated (locale switch) or the panel closes.
         clearTimeout(timerRef.current)
         timerRef.current = null
-        runtime.commit('Edit speaker notes', [{ type: 'slide.update', slideId: latestSlideRef.current.id, props: { remark: editor.dom.innerHTML } }], { recordHistory: false })
+        const slideId = latestSlideRef.current.id
+        runtime.commit('Edit speaker notes', [{
+          type: 'slide.update',
+          slideId,
+          props: { remark: editor.dom.innerHTML },
+        }], { historyKey: `speaker-notes-${slideId}` })
       }
       editorRef.current = null
       editor.destroy()
@@ -117,32 +130,25 @@ export function EditorRemark({ height, onHeightChange, runtime }: { height: numb
     setAttrs(getTextAttrs(editor))
     scheduleUpdate()
   }
-  const startResize = (event: MouseEvent) => {
-    const startY = event.pageY
-    const origin = height
-    document.onmousemove = moveEvent => onHeightChange(Math.max(40, Math.min(360, origin - (moveEvent.pageY - startY))))
-    document.onmouseup = () => {
-      document.onmousemove = null; document.onmouseup = null 
-    }
-  }
-
   const menu = menuPosition ? createPortal((
     <div className="mona-remark-menu" ref={menuRef} style={menuPosition}>
-      <button className={attrs?.bold ? 'is-active' : ''} onClick={() => execute({ command: 'bold' })} type="button"><BoldIcon /></button>
-      <button className={attrs?.em ? 'is-active' : ''} onClick={() => execute({ command: 'em' })} type="button"><ItalicIcon /></button>
-      <button className={attrs?.underline ? 'is-active' : ''} onClick={() => execute({ command: 'underline' })} type="button"><UnderlineIcon /></button>
-      <button className={attrs?.strikethrough ? 'is-active' : ''} onClick={() => execute({ command: 'strikethrough' })} type="button"><StrikethroughIcon /></button>
+      <Toggle aria-label={t('common.bold')} onPressedChange={() => execute({ command: 'bold' })} pressed={attrs?.bold}><BoldIcon /></Toggle>
+      <Toggle aria-label={t('common.italic')} onPressedChange={() => execute({ command: 'em' })} pressed={attrs?.em}><ItalicIcon /></Toggle>
+      <Toggle aria-label={t('common.underline')} onPressedChange={() => execute({ command: 'underline' })} pressed={attrs?.underline}><UnderlineIcon /></Toggle>
+      <Toggle aria-label={t('common.strikethrough')} onPressedChange={() => execute({ command: 'strikethrough' })} pressed={attrs?.strikethrough}><StrikethroughIcon /></Toggle>
       <label><TextIcon /><input onChange={event => execute({ command: 'color', value: event.target.value })} type="color" value={attrs?.color || '#000000'} /></label>
       <label><HighlightIcon /><input onChange={event => execute({ command: 'backcolor', value: event.target.value })} type="color" value={attrs?.backcolor || '#ffffff'} /></label>
-      <button className={attrs?.bulletList ? 'is-active' : ''} onClick={() => execute({ command: 'bulletList' })} type="button"><ListIcon /></button>
-      <button className={attrs?.orderedList ? 'is-active' : ''} onClick={() => execute({ command: 'orderedList' })} type="button"><OrderedListIcon /></button>
-      <button onClick={() => execute({ command: 'clear' })} type="button"><FormatIcon /></button>
+      <Toggle aria-label={t('common.bullets')} onPressedChange={() => execute({ command: 'bulletList' })} pressed={attrs?.bulletList}><ListIcon /></Toggle>
+      <Toggle aria-label={t('common.numbering')} onPressedChange={() => execute({ command: 'orderedList' })} pressed={attrs?.orderedList}><OrderedListIcon /></Toggle>
+      <Button aria-label={t('common.clearFormatting')} onClick={() => execute({ command: 'clear' })} size="icon" type="button" variant="ghost"><FormatIcon /></Button>
     </div>
   ), document.body) : null
 
   return (
     <div aria-label="Speaker notes" className="mona-editor-remark">
-      <div aria-hidden="true" className="mona-editor-remark-resize" onMouseDown={startResize} />
+      <div className="mona-remark-slide-label">
+        {t('foundation.editor.thumbnails.slideCount', { current: presentation.slideIndex + 1, total: presentation.slides.length })}
+      </div>
       <div className="mona-remark-editor" ref={mountRef} />
       {menu}
     </div>

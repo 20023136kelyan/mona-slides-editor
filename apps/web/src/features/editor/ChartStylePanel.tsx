@@ -1,6 +1,5 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- the source modal mask and nested delete affordance DOM are preserved for parity. */
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- theme swatches contain nested editing affordances and expose their actions explicitly. */
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import EditIcon from '~icons/icon-park-outline/edit'
@@ -9,11 +8,14 @@ import PlusIcon from '~icons/icon-park-outline/plus'
 import CloseSmallIcon from '~icons/icon-park-outline/close-small'
 import type { PresentationState } from '@mona/presentation-core'
 import type { ChartOptions, PPTChartElement } from '@mona/presentation-core/model'
-import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
-import { InspectorColorButton } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorCheckbox, InspectorColorButton } from '@/features/editor/EditorInspectorPrimitives'
 import { CHART_PRESET_THEMES } from '@/features/editor/editor-chart'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
@@ -23,13 +25,7 @@ function ChartCheckbox({ checked, children, onChange, style }: {
   onChange: (value: boolean) => void
   style?: React.CSSProperties
 }) {
-  return (
-    <label className="mona-chart-checkbox" style={style}>
-      <input checked={checked} onChange={event => onChange(event.target.checked)} type="checkbox" />
-      <span className="mona-chart-checkbox-control" />
-      <span>{children}</span>
-    </label>
-  )
+  return <InspectorCheckbox checked={checked} className="mona-chart-checkbox" onChange={onChange} style={style}>{children}</InspectorCheckbox>
 }
 
 function ChartThemeBlocks({ colors }: { colors: readonly string[] }) {
@@ -42,50 +38,40 @@ function CustomThemeModal({ colors, onClose, onSave }: {
   onSave: (colors: string[]) => void
 }) {
   const { t } = useTranslation()
-  const modalRef = useRef<HTMLDivElement>(null)
   const [themeColors, setThemeColors] = useState([...colors])
   const canAddThemeColor = themeColors.length < 10
-  useEffect(() => {
-    modalRef.current?.focus()
-  }, [])
-  return createPortal(
-    <div className="mona-chart-theme-modal" onKeyUp={event => {
-      if (event.key === 'Escape') onClose() 
-    }} ref={modalRef} tabIndex={-1}>
-      <div className="mona-chart-theme-mask" onClick={onClose} />
-      <div className="mona-chart-theme-modal-content">
+  return (
+    <Dialog onOpenChange={open => {
+      if (!open) onClose()
+    }} open>
+      <DialogContent className="mona-chart-theme-modal-content" overlayClassName="mona-chart-theme-mask" showCloseButton={false}>
         <div className="mona-chart-theme-setting">
-          <div className="mona-chart-theme-setting-title">{t('foundation.editor.chartStyle.chartThemeColors')}</div>
+          <DialogHeader><DialogTitle className="mona-chart-theme-setting-title">{t('foundation.editor.chartStyle.chartThemeColors')}</DialogTitle></DialogHeader>
           <div className="mona-chart-theme-setting-list">
             {themeColors.map((color, index) => (
               <div className="mona-chart-theme-setting-row" key={index}>
                 <div className="mona-chart-theme-setting-label">{t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })}</div>
-                <PopoverPrimitive.Root>
-                  <PopoverPrimitive.Trigger asChild>
-                    <button aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-chart-custom-color-button" type="button">
-                      <span><i style={{ backgroundColor: color }} /></span><PaletteIcon />
-                      {index ? <b aria-label={t('foundation.editor.chartStyle.deleteColor')} onClick={event => {
-                        event.stopPropagation(); setThemeColors(current => current.filter((_, colorIndex) => colorIndex !== index)) 
-                      }} role="button" tabIndex={0}><CloseSmallIcon /></b> : null}
-                    </button>
-                  </PopoverPrimitive.Trigger>
-                  <PopoverPrimitive.Portal>
-                    <PopoverPrimitive.Content className="mona-panel-popover-content" sideOffset={8}>
+                <ButtonGroup className="mona-chart-custom-color-group">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-chart-custom-color-button" variant="outline">
+                        <span><i style={{ backgroundColor: color }} /></span><PaletteIcon />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="mona-panel-popover-content" sideOffset={8}>
                       <EditorColorPicker onChange={value => setThemeColors(current => current.map((candidate, colorIndex) => colorIndex === index ? value : candidate))} value={color} />
-                    </PopoverPrimitive.Content>
-                  </PopoverPrimitive.Portal>
-                </PopoverPrimitive.Root>
+                    </PopoverContent>
+                  </Popover>
+                  {index ? <Button aria-label={t('foundation.editor.chartStyle.deleteColor')} onClick={() => setThemeColors(current => current.filter((_, colorIndex) => colorIndex !== index))} size="editor-icon" variant="outline"><CloseSmallIcon /></Button> : null}
+                </ButtonGroup>
               </div>
             ))}
-            <button className={`mona-chart-editor-button mona-chart-theme-add${canAddThemeColor ? ' is-default' : ' is-disabled'}`} onClick={() => {
-              if (canAddThemeColor) setThemeColors(current => [...current, '#00000000']) 
-            }} type="button"><PlusIcon /> {t('foundation.editor.chartStyle.addThemeColor')}</button>
+            <Button className="mona-chart-editor-button mona-chart-theme-add" disabled={!canAddThemeColor} onClick={() => setThemeColors(current => [...current, '#00000000'])} size="editor" variant="outline"><PlusIcon /> {t('foundation.editor.chartStyle.addThemeColor')}</Button>
           </div>
-          <button className="mona-chart-editor-button is-primary mona-chart-theme-confirm" onClick={() => onSave(themeColors)} type="button">{t('foundation.editor.chartData.confirm')}</button>
+          <Button className="mona-chart-editor-button mona-chart-theme-confirm" onClick={() => onSave(themeColors)} size="editor">{t('foundation.editor.chartData.confirm')}</Button>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -112,7 +98,7 @@ export function ChartStylePanel({ element, onEditData, presentation, runtime }: 
 
   return (
     <div className="mona-chart-style-panel">
-      <button className="mona-inspector-button mona-chart-edit-button" onClick={onEditData} type="button"><EditIcon /> {t('foundation.editor.chartStyle.editChart')}</button>
+      <Button className="mona-inspector-button mona-chart-edit-button" onClick={onEditData} size="editor" variant="outline"><EditIcon /> {t('foundation.editor.chartStyle.editChart')}</Button>
       <div className="mona-inspector-divider" />
       {hasStackOptions ? (
         <>
@@ -127,27 +113,25 @@ export function ChartStylePanel({ element, onEditData, presentation, runtime }: 
       <PropertyRow label={t('foundation.editor.chartStyle.axisAndText')}><InspectorColorButton ariaLabel={t('foundation.editor.chartStyle.axisAndText')} color={element.textColor || '#333'} onChange={textColor => commit({ textColor })} /></PropertyRow>
       <PropertyRow label={t('foundation.editor.chartStyle.gridColor')}><InspectorColorButton ariaLabel={t('foundation.editor.chartStyle.gridColor')} color={element.lineColor || '#e8ecf4'} onChange={lineColor => commit({ lineColor })} /></PropertyRow>
       <PropertyRow label={t('foundation.editor.chartStyle.chartTheme')}>
-        <PopoverPrimitive.Root onOpenChange={setThemesOpen} open={themesOpen}>
-          <PopoverPrimitive.Trigger asChild>
-            <button aria-label={t('foundation.editor.chartStyle.chartTheme')} className="mona-chart-theme-button" type="button"><ChartThemeBlocks colors={element.themeColors} /><PaletteIcon /></button>
-          </PopoverPrimitive.Trigger>
-          <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content align="center" className="mona-panel-popover-content mona-chart-themes-popover" collisionPadding={5} sideOffset={8}>
+        <Popover onOpenChange={setThemesOpen} open={themesOpen}>
+          <PopoverTrigger asChild>
+            <Button aria-label={t('foundation.editor.chartStyle.chartTheme')} className="mona-chart-theme-button" variant="outline"><ChartThemeBlocks colors={element.themeColors} /><PaletteIcon /></Button>
+          </PopoverTrigger>
+          <PopoverContent align="center" className="mona-panel-popover-content mona-chart-themes-popover" collisionPadding={5} sideOffset={8}>
               <div className="mona-chart-theme-label">{t('foundation.editor.chartStyle.presetChartThemes')}</div>
               <div className="mona-chart-preset-themes">
-                {CHART_PRESET_THEMES.map((colors, index) => <button className="mona-chart-preset-theme" key={index} onClick={() => setThemeColors(colors)} type="button">{colors.map(color => <span key={color} style={{ backgroundColor: color }} />)}</button>)}
+                {CHART_PRESET_THEMES.map((colors, index) => <Button className="mona-chart-preset-theme" key={index} onClick={() => setThemeColors(colors)} variant="outline">{colors.map(color => <span key={color} style={{ backgroundColor: color }} />)}</Button>)}
               </div>
               <div className="mona-chart-theme-label">{t('foundation.editor.chartStyle.slideTheme')}</div>
               <div className="mona-chart-preset-themes is-slide-theme">
-                <button className="mona-chart-preset-theme" onClick={() => setThemeColors(presentation.theme.themeColors)} type="button">{presentation.theme.themeColors.map(color => <span key={color} style={{ backgroundColor: color }} />)}</button>
+                <Button className="mona-chart-preset-theme" onClick={() => setThemeColors(presentation.theme.themeColors)} variant="outline">{presentation.theme.themeColors.map(color => <span key={color} style={{ backgroundColor: color }} />)}</Button>
               </div>
               <div className="mona-chart-theme-divider" />
-              <button className="mona-chart-editor-button is-default mona-chart-custom-theme-button" onClick={() => {
+              <Button className="mona-chart-editor-button mona-chart-custom-theme-button" onClick={() => {
                 setThemesOpen(false); setCustomThemeOpen(true) 
-              }} type="button">{t('foundation.editor.chartStyle.customColors')}</button>
-            </PopoverPrimitive.Content>
-          </PopoverPrimitive.Portal>
-        </PopoverPrimitive.Root>
+              }} size="editor" variant="outline">{t('foundation.editor.chartStyle.customColors')}</Button>
+          </PopoverContent>
+        </Popover>
       </PropertyRow>
       <div className="mona-inspector-divider" />
       <ElementOutlineControls element={element} presentation={presentation} runtime={runtime} />

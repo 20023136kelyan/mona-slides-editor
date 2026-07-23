@@ -1,32 +1,25 @@
 /* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- The slide canvas is an intentional composite application surface with managed keyboard interaction. */
 
 import {
+  lazy,
+  Suspense,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
-  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import tinycolor from 'tinycolor2'
 
-import type { InteractionSnapshot, PointerModifiers, PointerPosition } from '@mona/editor-interactions'
+import type { InteractionSnapshot, PointerPosition } from '@mona/editor-interactions'
 import {
   angleFromPoint,
   clientPointToSlide,
-  lockDeltaToDominantAxis,
-  normalizeRect,
   rectToBounds,
-  resizeBounds,
-  snapAngle,
-  snapMove,
-  type AlignmentGuide,
-  type InteractionBounds,
-  type InteractionRect,
   type ResizeHandle,
 } from '@mona/editor-interactions/geometry'
 import {
@@ -42,22 +35,20 @@ import {
   selectPresentation,
   selectShowRuler,
 } from '@mona/editor-state'
-import { createPresentationId, LINE_LIST, selectFormattedCurrentSlideAnimations, SHAPE_LIST, SHAPE_PATH_FORMULAS, type PresentationCommand } from '@mona/presentation-core'
-import type { ElementLinkType, PPTElement, PPTImageElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, Slide, SlideTheme } from '@mona/presentation-core/model'
+import { createPresentationId, selectFormattedCurrentSlideAnimations, type PresentationCommand } from '@mona/presentation-core'
+import type { ElementLinkType, PPTElement, PPTImageElement, PPTShapeElement, PPTTableElement, PPTTextElement } from '@mona/presentation-core/model'
 
-import { EditorContextMenu, EditorNoticeStack, LinkEditor } from '@/features/editor/EditorContextMenu'
+import { EditorContextMenu, LinkEditor } from '@/features/editor/EditorContextMenu'
 import { EditorRichText } from '@/features/editor/EditorRichText'
 import { EditorImageCropEditor, EditorSelectionOverlay } from '@/features/editor/EditorSelectionOverlay'
 import { EditorFloatingLinkHandler } from '@/features/editor/EditorFloatingLinkHandler'
-import { EditorFloatingTextToolbar } from '@/features/editor/EditorFloatingTextToolbar'
-import { EditorFloatingElementToolbar } from '@/features/editor/EditorFloatingElementToolbar'
-import { EditorFloatingImageToolbar } from '@/features/editor/EditorFloatingImageToolbar'
-import { EditorFloatingTableToolbar } from '@/features/editor/EditorFloatingTableToolbar'
-import { EditorFloatingChartToolbar } from '@/features/editor/EditorFloatingChartToolbar'
-import { EditorFloatingLatexToolbar } from '@/features/editor/EditorFloatingLatexToolbar'
 import { EditorCustomShapeCreator } from '@/features/editor/EditorCustomShapeCreator'
+import { EditorSelectionActions } from '@/features/editor/contextual/EditorSelectionActions'
+import { resolveSelectionCapabilities } from '@/features/editor/contextual/resolve-selection-capabilities'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
-import { parseCustomEditorClipboard } from '@/features/editor/editor-clipboard'
+import type { DrawingStore } from '@/features/editor/drawing/drawing-store'
+import { loadDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
+import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
 import {
   canDeleteTableAxis,
   deleteTableColumn,
@@ -69,181 +60,58 @@ import {
   tableCellKey,
 } from '@/features/editor/editor-table'
 import {
-  MONA_CLIPBOARD_MIME,
   type EditorRuntime,
 } from '@/features/editor/editor-runtime'
 import {
-  alignElementsToCanvasLikePptist,
-  buildSnapCandidates,
-  buildResizeSnapCandidates,
+  alignElementsToCanvas,
   buildEditorGridPath,
   canResizeSelection,
-  constrainCreateGesturePoint,
-  commitImageCropGeometry,
   getElementBounds,
   getElementsBounds,
   getImageCropGeometry,
   getGroupRotationCenter,
   getGroupRotationReference,
   getLassoSelectionIds,
-  getMinimumElementSize,
-  groupElementsLikePptist,
+  groupElements,
   getTransformBounds,
-  moveLineControlPoint,
-  moveShapeKeypoint,
-  normalizeAngle,
-  orderElementLikePptist,
-  rotateElementsAround,
+  orderElement,
   resolveCreateGestureSelection,
-  scaleElementsIntoBounds,
-  setElementLocksLikePptist,
-  snapResizePoint,
-  ungroupElementsLikePptist,
-  updateImageCropGeometry,
+  setElementLocks,
+  ungroupElements,
   type CropControlHandle,
-  type CreateGestureSelection,
-  type ImageCropGeometry,
   type LineControlHandle,
 } from '@/features/editor/editor-geometry'
-import { navigateWithSlideTransition } from '@/features/editor/editor-view-transition'
+import {
+  applyElementUpdates,
+  commitCropDraft,
+  createElementFromGesture,
+  derivePreview,
+  DRAG_ACTIVATION_DISTANCE,
+  duplicatePreviewElements,
+  EMPTY_EDITOR_SLIDE,
+  exceedsActivationDistance,
+  isTextInput,
+  legacyMousePoint,
+  pointerModifiers,
+  toCommands,
+  TRANSFORM_ACTIVATION_DISTANCE,
+  type CropDraft,
+  type GestureContext,
+} from '@/features/editor/editor-canvas-preview'
+import { EditorRulers } from '@/features/editor/EditorRulers'
+import { useCanvasClipboard } from '@/features/editor/use-canvas-clipboard'
+import { useCanvasHotkeys, writeClipboard } from '@/features/editor/use-canvas-hotkeys'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { useOptionalEditorShell } from '@/features/editor/shell/editor-shell'
 import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 
-const DRAG_ACTIVATION_DISTANCE = 5
-const TRANSFORM_ACTIVATION_DISTANCE = 0.01
-const EMPTY_EDITOR_SLIDE: Slide = { id: '__mona-empty-slide__', elements: [] }
-const MEDIA_EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
-  'audio/aac': 'aac',
-  'audio/flac': 'flac',
-  'audio/midi': 'mid',
-  'audio/mp4': 'm4a',
-  'audio/mpeg': 'mp3',
-  'audio/ogg': 'oga',
-  'audio/wav': 'wav',
-  'audio/webm': 'weba',
-  'audio/x-aiff': 'aif',
-  'audio/x-ms-wma': 'wma',
-  'video/3gpp': '3gp',
-  'video/3gpp2': '3g2',
-  'video/mp4': 'mp4',
-  'video/mpeg': 'mpeg',
-  'video/ogg': 'ogv',
-  'video/quicktime': 'mov',
-  'video/webm': 'webm',
-  'video/x-flv': 'flv',
-  'video/x-ms-wmv': 'wmv',
-  'video/x-msvideo': 'avi',
-}
+const DrawingWorkspace = lazy(() => loadDrawingWorkspace().then(module => ({
+  default: module.DrawingWorkspace,
+})))
+const subscribeToNothing = () => () => {}
+const zeroRevision = () => 0
 
-const parseTextToParagraphs = (text: string) => text
-  .replace(/[\n\r]+/g, '<br>')
-  .split('<br>')
-  .filter(Boolean)
-  .map(paragraph => `<div>${paragraph}</div>`)
-  .join('')
-
-const isPptistValidUrl = (text: string) => /^(https?:\/\/)([\w-]+\.)+[\w-]{2,}(\/[\w-./?%&=]*)?$/i.test(text)
-const isPptistImageUrl = (text: string) => (
-  /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pexels\.com\/[^\s]+\.(?:jpg|jpeg|png|svg|webp)(?:\?.*)?$/i.test(text) ||
-  /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*pptist\.cn\/[^\s]+\.(?:jpg|jpeg|png|svg|webp)(?:\?.*)?$/i.test(text)
-)
-const isSvgText = (text: string) => {
-  if (!/<svg[\s\S]*?>[\s\S]*?<\/svg>/i.test(text)) return false
-  try {
-    return new DOMParser().parseFromString(text, 'image/svg+xml').documentElement.nodeName === 'svg'
-  }
-  catch {
-    return false
-  }
-}
-
-const fileAsDataUrl = (file: File) => new Promise<string>(resolve => {
-  const reader = new FileReader()
-  reader.addEventListener('load', () => resolve(reader.result as string), { once: true })
-  reader.readAsDataURL(file)
-})
-
-const imageSize = (src: string) => new Promise<{ height: number; width: number }>((resolve, reject) => {
-  const image = new Image()
-  image.style.opacity = '0'
-  image.addEventListener('load', () => {
-    const size = { height: image.clientHeight || image.naturalHeight, width: image.clientWidth || image.naturalWidth }
-    image.remove()
-    resolve(size)
-  }, { once: true })
-  image.addEventListener('error', () => {
-    image.remove()
-    reject(new Error('Image failed to load'))
-  }, { once: true })
-  document.body.append(image)
-  image.src = src
-})
-
-const legacyMousePoint = (point: PointerPosition): PointerPosition => ({
-  x: Math.trunc(point.x),
-  y: Math.trunc(point.y),
-})
-
-const exceedsActivationDistance = (delta: PointerPosition, threshold: number) => (
-  Math.abs(delta.x) >= threshold || Math.abs(delta.y) >= threshold
-)
-
-type GestureContext =
-  | {
-      kind: 'drag'
-      elements: PPTElement[]
-      bounds: InteractionBounds
-      activationDistance: number
-      activated: boolean
-      duplicateActivated: boolean
-      duplicateElements: PPTElement[]
-      duplicateHandleElementId: string
-      duplicatePreviewReady: boolean
-      lastPreviewUpdates: ReadonlyMap<string, Partial<PPTElement>>
-      sourceHandleElementId: string
-      pendingActiveGroupElementId?: string
-      pendingToggleIds?: string[]
-    }
-  | {
-      kind: 'resize'
-      elements: PPTElement[]
-      bounds: InteractionBounds
-      fixedRatio: boolean
-      handle: ResizeHandle
-      rawDelta?: PointerPosition
-      scale: number
-    }
-  | {
-      kind: 'rotate'
-      elements: PPTElement[]
-      center: PointerPosition
-      mode: 'group' | 'single'
-      rotationReference: number | null
-      startAngle: number
-    }
-  | { kind: 'crop'; element: PPTImageElement; geometry: ImageCropGeometry; handle: CropControlHandle }
-  | { kind: 'line-point'; element: PPTElement & { type: 'line' }; handle: LineControlHandle }
-  | { kind: 'shape-keypoint'; element: PPTElement & { type: 'shape' }; index: number }
-  | { kind: 'lasso'; lastRect?: InteractionRect }
-  | { kind: 'pan'; pan: PointerPosition }
-  | {
-      kind: 'create'
-      stageOffset: PointerPosition
-      tool: EditorCreateTool
-      viewportRect: { left: number; top: number }
-      viewportScale: number
-    }
-
-interface GesturePreview {
-  createRect?: InteractionRect
-  createLinePath?: string
-  cropGeometry?: ImageCropGeometry
-  duplicateElements?: PPTElement[]
-  guides: AlignmentGuide[]
-  lasso?: InteractionRect
-  pan?: PointerPosition
-  updates: ReadonlyMap<string, Partial<PPTElement>>
-}
 
 interface ContextMenuState {
   readonly cell?: { column: number; row: number }
@@ -259,543 +127,24 @@ interface LinkEditorState {
   readonly slideId: string
 }
 
-interface EditorNoticeState {
-  readonly duration?: number
-  readonly id: number
-  readonly text: string
-  readonly type: 'error' | 'success' | 'warning'
-}
-
-interface CropDraft {
-  readonly dirty: boolean
-  readonly element: PPTImageElement
-  readonly geometry: ImageCropGeometry
-}
-
-const commitCropDraft = (runtime: EditorRuntime, draft: CropDraft | null) => {
-  if (!draft?.dirty) return false
-  return runtime.commit('Crop image', [{
-    type: 'element.update',
-    payload: {
-      id: draft.element.id,
-      props: commitImageCropGeometry(draft.element, draft.geometry),
-    },
-  }])
-}
-
-const emptyPreview = (): GesturePreview => ({ guides: [], updates: new Map() })
-
-const pointerModifiers = (event: Pick<PointerEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): PointerModifiers => ({
-  alt: event.altKey,
-  control: event.ctrlKey,
-  meta: event.metaKey,
-  shift: event.shiftKey,
-})
-
-const applyElementUpdates = (slide: Slide, updates: ReadonlyMap<string, Partial<PPTElement>>): Slide => {
-  if (!updates.size) return slide
-  return {
-    ...slide,
-    elements: slide.elements.map(element => {
-      const props = updates.get(element.id)
-      return props ? { ...element, ...props } as PPTElement : element
-    }),
-  }
-}
-
-const rotatePoint = (point: PointerPosition, center: PointerPosition, degrees: number): PointerPosition => {
-  const radians = degrees * Math.PI / 180
-  const cosine = Math.cos(radians)
-  const sine = Math.sin(radians)
-  const x = point.x - center.x
-  const y = point.y - center.y
-  return {
-    x: center.x + x * cosine - y * sine,
-    y: center.y + x * sine + y * cosine,
-  }
-}
-
-const oppositePoint = (bounds: InteractionBounds, handle: ResizeHandle): PointerPosition => ({
-  x: handle.includes('left') ? bounds.maxX : handle.includes('right') ? bounds.minX : (bounds.minX + bounds.maxX) / 2,
-  y: handle.startsWith('top') ? bounds.maxY : handle.startsWith('bottom') ? bounds.minY : (bounds.minY + bounds.maxY) / 2,
-})
-
-const resizeHandlePoint = (
-  bounds: InteractionBounds,
-  handle: ResizeHandle,
-  rotation = 0,
-): PointerPosition => {
-  const point = {
-    x: handle.includes('left') ? bounds.minX : handle.includes('right') ? bounds.maxX : (bounds.minX + bounds.maxX) / 2,
-    y: handle.startsWith('top') ? bounds.minY : handle.startsWith('bottom') ? bounds.maxY : (bounds.minY + bounds.maxY) / 2,
-  }
-  if (!rotation) return point
-  return rotatePoint(point, {
-    x: (bounds.minX + bounds.maxX) / 2,
-    y: (bounds.minY + bounds.maxY) / 2,
-  }, rotation)
-}
-
-const derivePreview = (
-  context: GestureContext | null,
-  snapshot: InteractionSnapshot,
-  slide: Slide,
-  viewportSize: number,
-  viewportRatio: number,
-): GesturePreview => {
-  if (!context || snapshot.status !== 'active') return emptyPreview()
-  if (context.kind === 'pan') {
-    return {
-      ...emptyPreview(),
-      pan: { x: context.pan.x + snapshot.delta.x, y: context.pan.y + snapshot.delta.y },
-    }
-  }
-  if (context.kind === 'lasso') {
-    // Vue keeps the last >=5px marquee when the pointer shrinks back below
-    // the threshold, and selects with it on release.
-    if (Math.abs(snapshot.delta.x) < 5 || Math.abs(snapshot.delta.y) < 5) {
-      return context.lastRect ? { ...emptyPreview(), lasso: context.lastRect } : emptyPreview()
-    }
-    const rect = normalizeRect(snapshot.origin, snapshot.pointer)
-    context.lastRect = rect
-    return { ...emptyPreview(), lasso: rect }
-  }
-  if (context.kind === 'create') {
-    const end = constrainCreateGesturePoint(context.tool.type, snapshot.origin, snapshot.pointer, snapshot.modifiers)
-    const absoluteRect = normalizeRect(snapshot.origin, end)
-    const createRect = {
-      ...absoluteRect,
-      left: absoluteRect.left - context.stageOffset.x,
-      top: absoluteRect.top - context.stageOffset.y,
-    }
-    if (context.tool.type !== 'line') return { ...emptyPreview(), createRect }
-    const startX = snapshot.origin.x === absoluteRect.left ? 0 : absoluteRect.width
-    const startY = snapshot.origin.y === absoluteRect.top ? 0 : absoluteRect.height
-    const endX = end.x === absoluteRect.left ? 0 : absoluteRect.width
-    const endY = end.y === absoluteRect.top ? 0 : absoluteRect.height
-    return {
-      ...emptyPreview(),
-      createRect,
-      createLinePath: `M${startX}, ${startY} L${endX}, ${endY}`,
-    }
-  }
-
-  if (context.kind === 'drag') {
-    // Vue latches drag activation: once the pointer exceeds the threshold the
-    // element keeps following it, even back inside the activation zone.
-    if (!context.activated) {
-      if (!exceedsActivationDistance(snapshot.delta, context.activationDistance)) return emptyPreview()
-      context.activated = true
-    }
-    const delta = snapshot.modifiers.shift ? lockDeltaToDominantAxis(snapshot.delta) : snapshot.delta
-    const excluded = new Set(context.elements.map(element => element.id))
-    const candidates = buildSnapCandidates(slide.elements, excluded, viewportSize, viewportRatio)
-    const snapped = snapMove({
-      bounds: context.bounds,
-      delta,
-      horizontalCandidates: candidates.horizontal,
-      verticalCandidates: candidates.vertical,
-    })
-    const updates = new Map<string, Partial<PPTElement>>()
-    for (const element of context.elements) {
-      updates.set(element.id, {
-        left: element.left + snapped.delta.x,
-        top: element.top + snapped.delta.y,
-      })
-    }
-    return {
-      duplicateElements: context.duplicateActivated
-        ? context.duplicatePreviewReady
-          ? materializeDuplicatePreview(context.elements, context.duplicateElements, updates)
-          : context.duplicateElements
-        : undefined,
-      guides: snapped.guides,
-      updates,
-    }
-  }
-
-  if (context.kind === 'line-point') {
-    return {
-      ...emptyPreview(),
-      updates: new Map([[context.element.id, moveLineControlPoint({
-        delta: snapshot.delta,
-        element: context.element,
-        elements: slide.elements,
-        handle: context.handle,
-        preserveControlPoints: snapshot.modifiers.control || snapshot.modifiers.meta || snapshot.modifiers.shift,
-        viewportRatio,
-        viewportSize,
-      }) as Partial<PPTElement>]]),
-    }
-  }
-
-  if (context.kind === 'shape-keypoint') {
-    return {
-      ...emptyPreview(),
-      updates: new Map([[context.element.id, moveShapeKeypoint(context.element, context.index, snapshot.delta) as Partial<PPTElement>]]),
-    }
-  }
-
-  if (context.kind === 'resize') {
-    const single = context.elements.length === 1 ? context.elements[0] : undefined
-    if (!single) {
-      const aspectRatio = (context.bounds.maxX - context.bounds.minX) /
-        Math.max(context.bounds.maxY - context.bounds.minY, 1)
-      const delta = { ...snapshot.delta }
-      if (snapshot.modifiers.control || snapshot.modifiers.meta || snapshot.modifiers.shift) {
-        if (context.handle === 'bottom-right' || context.handle === 'top-left') delta.y = delta.x / aspectRatio
-        if (context.handle === 'bottom-left' || context.handle === 'top-right') delta.y = -delta.x / aspectRatio
-      }
-      const target = { ...context.bounds }
-      if (context.handle.includes('left')) target.minX += delta.x
-      if (context.handle.includes('right')) target.maxX += delta.x
-      if (context.handle.startsWith('top')) target.minY += delta.y
-      if (context.handle.startsWith('bottom')) target.maxY += delta.y
-      return {
-        guides: [],
-        updates: scaleElementsIntoBounds(context.elements, context.bounds, target, {
-          enforceMinimumSize: false,
-          updateShapePath: false,
-        }),
-      }
-    }
-    if (single.type === 'line') return emptyPreview()
-    const rotation = single.rotate
-    const radians = rotation * Math.PI / 180
-    const corner = context.handle.includes('-')
-    const lockAspectRatio = corner && context.fixedRatio
-    const aspectRatio = (context.bounds.maxX - context.bounds.minX) /
-      Math.max(context.bounds.maxY - context.bounds.minY, 1)
-    const ratioDirection = context.handle === 'bottom-right' || context.handle === 'top-left' ? 1 : -1
-    let localDelta: { x: number; y: number } = rotation ? context.rawDelta ? {
-      x: (Math.cos(radians) * context.rawDelta.x + Math.sin(radians) * context.rawDelta.y) / context.scale,
-      y: (Math.cos(radians) * context.rawDelta.y - Math.sin(radians) * context.rawDelta.x) / context.scale,
-    } : {
-      x: Math.cos(radians) * snapshot.delta.x + Math.sin(radians) * snapshot.delta.y,
-      y: Math.cos(radians) * snapshot.delta.y - Math.sin(radians) * snapshot.delta.x,
-    } : { ...snapshot.delta }
-    if (lockAspectRatio) localDelta = { x: localDelta.x, y: ratioDirection * localDelta.x / aspectRatio }
-
-    const buildTarget = (delta: PointerPosition) => {
-      const minimumSize = getMinimumElementSize(single)
-      const minimumWidth = context.fixedRatio && aspectRatio > 1 ? minimumSize * aspectRatio : minimumSize
-      const minimumHeight = context.fixedRatio && aspectRatio < 1 ? minimumSize / aspectRatio : minimumSize
-      let next = resizeBounds(context.bounds, context.handle, delta, { minimumHeight, minimumWidth })
-      if (rotation) {
-        const originCenter = {
-          x: (context.bounds.minX + context.bounds.maxX) / 2,
-          y: (context.bounds.minY + context.bounds.maxY) / 2,
-        }
-        const targetCenter = {
-          x: (next.minX + next.maxX) / 2,
-          y: (next.minY + next.maxY) / 2,
-        }
-        const fixedOrigin = rotatePoint(oppositePoint(context.bounds, context.handle), originCenter, rotation)
-        const fixedTarget = rotatePoint(oppositePoint(next, context.handle), targetCenter, rotation)
-        const correction = { x: fixedOrigin.x - fixedTarget.x, y: fixedOrigin.y - fixedTarget.y }
-        next = {
-          minX: next.minX + correction.x,
-          maxX: next.maxX + correction.x,
-          minY: next.minY + correction.y,
-          maxY: next.maxY + correction.y,
-        }
-      }
-      return next
-    }
-
-    const sourceSingleSize = (delta: PointerPosition) => {
-      const minimumSize = getMinimumElementSize(single)
-      const minimumWidth = context.fixedRatio && aspectRatio > 1 ? minimumSize * aspectRatio : minimumSize
-      const minimumHeight = context.fixedRatio && aspectRatio < 1 ? minimumSize / aspectRatio : minimumSize
-      const width = context.handle.includes('left')
-        ? single.width - delta.x
-        : context.handle.includes('right') ? single.width + delta.x : single.width
-      const height = context.handle.startsWith('top')
-        ? single.height - delta.y
-        : context.handle.startsWith('bottom') ? single.height + delta.y : single.height
-      return { width: Math.max(minimumWidth, width), height: Math.max(minimumHeight, height) }
-    }
-
-    let target = buildTarget(localDelta)
-    let guides: AlignmentGuide[] = []
-    if (!rotation || corner) {
-      const candidates = buildResizeSnapCandidates(
-        slide.elements,
-        new Set(context.elements.map(element => element.id)),
-        viewportSize,
-        viewportRatio,
-      )
-      // Vue snaps the raw (unclamped) virtual handle position in the
-      // non-rotated branch, so snapping still engages while the element is
-      // pinned at its minimum size; the rotated branch uses the corrected
-      // geometry on both sides.
-      let handlerPoint = resizeHandlePoint(target, context.handle, rotation)
-      if (!rotation) {
-        const originPoint = resizeHandlePoint(context.bounds, context.handle)
-        handlerPoint = {
-          x: originPoint.x + (context.handle.includes('left') || context.handle.includes('right') ? localDelta.x : 0),
-          y: originPoint.y + (context.handle.startsWith('top') || context.handle.startsWith('bottom') ? localDelta.y : 0),
-        }
-      }
-      const snapped = snapResizePoint({
-        horizontalCandidates: candidates.horizontal,
-        point: {
-          x: rotation || context.handle.includes('left') || context.handle.includes('right') ? handlerPoint.x : null,
-          y: rotation || context.handle.startsWith('top') || context.handle.startsWith('bottom') ? handlerPoint.y : null,
-        },
-        verticalCandidates: candidates.vertical,
-      })
-      guides = snapped.guides
-      if (snapped.correction.x || snapped.correction.y) {
-        if (rotation) {
-          if (lockAspectRatio) {
-            const vectorX = Math.cos(radians) - Math.sin(radians) * ratioDirection / aspectRatio
-            const vectorY = Math.sin(radians) + Math.cos(radians) * ratioDirection / aspectRatio
-            if (snapped.correction.y && vectorY) localDelta.x += snapped.correction.y / vectorY
-            else if (snapped.correction.x && vectorX) localDelta.x += snapped.correction.x / vectorX
-            localDelta.y = ratioDirection * localDelta.x / aspectRatio
-          }
-          else {
-            localDelta = {
-              x: localDelta.x + Math.cos(radians) * snapped.correction.x + Math.sin(radians) * snapped.correction.y,
-              y: localDelta.y + Math.cos(radians) * snapped.correction.y - Math.sin(radians) * snapped.correction.x,
-            }
-          }
-        }
-        else {
-          localDelta = {
-            x: localDelta.x + snapped.correction.x,
-            y: localDelta.y + snapped.correction.y,
-          }
-          if (lockAspectRatio) {
-            if (snapped.correction.y) localDelta.x = localDelta.y * aspectRatio * ratioDirection
-            else localDelta.y = ratioDirection * localDelta.x / aspectRatio
-          }
-        }
-        target = buildTarget(localDelta)
-      }
-    }
-    return {
-      guides,
-      updates: scaleElementsIntoBounds(context.elements, context.bounds, target, { singleSize: sourceSingleSize(localDelta) }),
-    }
-  }
-
-  if (context.kind === 'rotate') {
-    const angle = angleFromPoint(context.center, snapshot.pointer)
-    if (context.mode === 'single') {
-      // Vue writes the snapped absolute angle directly. Going through a
-      // normalized delta would collapse -180 to +180 in persisted state.
-      return {
-        ...emptyPreview(),
-        updates: new Map([[context.elements[0]!.id, { rotate: snapAngle(angle) } as Partial<PPTElement>]]),
-      }
-    }
-    let delta = normalizeAngle(angle - context.startAngle)
-    if (context.rotationReference !== null) {
-      const target = normalizeAngle(context.rotationReference + delta)
-      delta = normalizeAngle(snapAngle(target) - context.rotationReference)
-    }
-    return { ...emptyPreview(), updates: rotateElementsAround(context.elements, context.center, delta) }
-  }
-
-  return {
-    ...emptyPreview(),
-    cropGeometry: updateImageCropGeometry({
-      delta: snapshot.delta,
-      element: context.element,
-      geometry: context.geometry,
-      handle: context.handle,
-      lockAspectRatio: snapshot.modifiers.control || snapshot.modifiers.meta || snapshot.modifiers.shift,
-    }),
-  }
-}
-
-const toCommands = (updates: ReadonlyMap<string, Partial<PPTElement>>): PresentationCommand[] => (
-  [...updates.entries()].map(([id, props]) => ({
-    type: 'element.update',
-    payload: { id, props },
-  }))
-)
-
-const isTextInput = (target: EventTarget | null) => {
-  const element = target as HTMLElement | null
-  return element?.isContentEditable || element?.tagName === 'INPUT' || element?.tagName === 'TEXTAREA' || element?.tagName === 'SELECT'
-}
-
-const duplicatePreviewElements = (
-  source: readonly PPTElement[],
-  detachFromGroup = false,
-): PPTElement[] => {
-  const groupIds = new Map<string, string>()
-  return structuredClone(source).map(element => {
-    if (element.groupId && !groupIds.has(element.groupId)) groupIds.set(element.groupId, createPresentationId())
-    return {
-      ...element,
-      id: createPresentationId(),
-      groupId: detachFromGroup ? undefined : element.groupId ? groupIds.get(element.groupId) : undefined,
-    } as PPTElement
-  })
-}
-
-const materializeDuplicatePreview = (
-  source: readonly PPTElement[],
-  duplicates: readonly PPTElement[],
-  updates: ReadonlyMap<string, Partial<PPTElement>>,
-): PPTElement[] => duplicates.map((duplicate, index) => ({
-  ...duplicate,
-  ...updates.get(source[index]!.id),
-}) as PPTElement)
-
-const createElementFromGesture = (
-  tool: EditorCreateTool,
-  selection: CreateGestureSelection,
-  viewportRect: { left: number; top: number },
-  scale: number,
-  theme: SlideTheme,
-): PPTElement => {
-  const minX = Math.min(selection.start.x, selection.end.x)
-  const minY = Math.min(selection.start.y, selection.end.y)
-  const width = Math.abs(selection.end.x - selection.start.x) / scale
-  const height = Math.abs(selection.end.y - selection.start.y) / scale
-  const left = (minX - viewportRect.left) / scale
-  const top = (minY - viewportRect.top) / scale
-  const themeColor = theme.themeColors[0] ?? '#d14424'
-  if (tool.type === 'line') {
-    const element: PPTLineElement = {
-      id: createPresentationId(),
-      type: 'line',
-      left,
-      top,
-      width: 2,
-      start: [selection.start.x === minX ? 0 : width, selection.start.y === minY ? 0 : height],
-      end: [selection.end.x === minX ? 0 : width, selection.end.y === minY ? 0 : height],
-      style: tool.data.style,
-      color: themeColor,
-      points: tool.data.points,
-    }
-    const midpoint: [number, number] = [(element.start[0] + element.end[0]) / 2, (element.start[1] + element.end[1]) / 2]
-    if (tool.data.isBroken) element.broken = midpoint
-    if (tool.data.isBroken2) element.broken2 = midpoint
-    if (tool.data.isCurve) element.curve = midpoint
-    if (tool.data.isCubic) element.cubic = [midpoint, midpoint]
-    return element
-  }
-  if (tool.type === 'text') {
-    return {
-      id: createPresentationId(),
-      type: 'text',
-      left,
-      top,
-      width,
-      // The source ProseMirror mounts an empty paragraph immediately; its
-      // ResizeObserver replaces the drawn auto-height with 24px line height
-      // plus the default 10px top and bottom insets for horizontal text. A
-      // vertical editor auto-sizes its width instead and preserves the drawn
-      // height.
-      height: tool.vertical ? height : 44,
-      rotate: 0,
-      content: '',
-      defaultFontName: theme.fontName,
-      defaultColor: theme.fontColor,
-      vertical: tool.vertical,
-    }
-  }
-  const shape: PPTShapeElement = {
-    id: createPresentationId(),
-    type: 'shape',
-    left,
-    top,
-    width,
-    height,
-    rotate: 0,
-    fixedRatio: false,
-    viewBox: tool.data.viewBox,
-    path: tool.data.path,
-    fill: themeColor,
-  }
-  if (tool.data.withborder) shape.outline = structuredClone(theme.outline)
-  if (tool.data.special) shape.special = true
-  if (tool.data.pathFormula) {
-    shape.pathFormula = tool.data.pathFormula
-    shape.viewBox = [width, height]
-    const formula = SHAPE_PATH_FORMULAS[tool.data.pathFormula]
-    if (formula.editable) {
-      shape.path = formula.formula(width, height, formula.defaultValue)
-      shape.keypoints = formula.defaultValue
-    }
-    else shape.path = formula.formula(width, height)
-  }
-  return shape
-}
-
-function EditorRulers({ frameHeight, frameWidth, height, pan, scale, selection, width }: {
-  frameHeight: number
-  frameWidth: number
-  height: number
-  pan: PointerPosition
-  scale: number
-  selection?: InteractionBounds
-  width: number
-}) {
-  const markers = Array.from({ length: 20 }, (_, index) => index + 1)
-  const markerSize = 100 * scale
-  const markerClassName = `mona-ruler-marker-100${markerSize < 36 ? ' hide' : ''}${markerSize < 72 ? ' omit' : ''}`
-  return (
-    <div aria-hidden="true" className="mona-editor-rulers">
-      <div
-        className="mona-editor-ruler is-horizontal"
-        style={{
-          left: `calc(50% - ${frameWidth / 2}px + ${pan.x}px)`,
-          width: frameWidth,
-        }}
-      >
-        {markers.map(marker => (
-          <div className={markerClassName} key={`h-marker-100-${marker}`} style={{ width: markerSize }}>
-            {marker * 100 <= width ? <span>{marker * 100}</span> : null}
-          </div>
-        ))}
-        {selection ? (
-          <i
-            className="mona-ruler-range"
-            style={{ left: selection.minX * scale, width: (selection.maxX - selection.minX) * scale }}
-          />
-        ) : null}
-      </div>
-      <div
-        className="mona-editor-ruler is-vertical"
-        style={{
-          height: frameHeight,
-          top: `calc(50% - ${frameHeight / 2}px + ${pan.y}px)`,
-        }}
-      >
-        {markers.map(marker => (
-          <div className={markerClassName} key={`v-marker-100-${marker}`} style={{ height: markerSize }}>
-            {marker * 100 <= height ? <span>{marker * 100}</span> : null}
-          </div>
-        ))}
-        {selection ? (
-          <i
-            className="mona-ruler-range"
-            style={{ height: (selection.maxY - selection.minY) * scale, top: selection.minY * scale }}
-          />
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-export function EditorCanvas({ activeCreateTool, customShapeActive, interactionProfile = 'desktop', onCreateToolChange, onCustomShapeChange, onEditChart, onEditLatex, runtime }: {
+export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore = null, interactionProfile = 'desktop', onBuildSketch, onCreateToolChange, onCustomShapeChange, onDrawingModeChange, onEditChart, onEditLatex, onSketchVisibilityChange, runtime }: {
   activeCreateTool: EditorCreateTool | null
   customShapeActive: boolean
+  drawingStore?: DrawingStore | null
   interactionProfile?: 'desktop' | 'mobile'
+  onBuildSketch?: (handoff: SketchAgentHandoff) => void
   onCreateToolChange: (tool: EditorCreateTool | null) => void
   onCustomShapeChange: (active: boolean) => void
+  onDrawingModeChange?: (active: boolean) => void
   onEditChart: (elementId: string) => void
   onEditLatex: (elementId: string) => void
+  onSketchVisibilityChange?: (visible: boolean) => void
   runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
+  const { notifications, openAgent, openExport, startPresentation, subscribeToPresentationStart } = useEditorApplication()
+  const editorShell = useOptionalEditorShell()
+  const toggleTaskPanel = editorShell?.toggleTaskPanel
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const selectedCurrentSlide = useEditorSelector(runtime.store, selectCurrentSlide)
   const currentSlide = selectedCurrentSlide ?? EMPTY_EDITOR_SLIDE
@@ -807,6 +156,11 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   const cropElementId = useEditorSelector(runtime.store, selectCropElementId)
   const gridLineSize = useEditorSelector(runtime.store, selectGridLineSize)
   const showRuler = useEditorSelector(runtime.store, selectShowRuler)
+  useSyncExternalStore(
+    drawingStore?.subscribe ?? subscribeToNothing,
+    drawingStore?.getRevision ?? zeroRevision,
+    drawingStore?.getRevision ?? zeroRevision,
+  )
   const mobileInteraction = interactionProfile === 'mobile'
   const activeTool = activeCreateTool
   const interaction = useSyncExternalStore(
@@ -819,16 +173,11 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   const canvasRef = useRef<HTMLDivElement>(null)
   const gestureRef = useRef<GestureContext | null>(null)
   const cropDraftRef = useRef<CropDraft | null>(null)
-  const noticeIdRef = useRef(0)
   const ctrlOrMetaPressedRef = useRef(false)
   const shiftPressedRef = useRef(false)
   const spacePressedRef = useRef(false)
-  const lastSlideWheelAtRef = useRef(Number.NEGATIVE_INFINITY)
-  const lastZoomWheelAtRef = useRef(Number.NEGATIVE_INFINITY)
-  // PPTist throttles undo/redo (100ms, leading) so key auto-repeat cannot
+  // the source editor throttles undo/redo (100ms, leading) so key auto-repeat cannot
   // burn through the snapshot stack.
-  const lastUndoAtRef = useRef(Number.NEGATIVE_INFINITY)
-  const lastRedoAtRef = useRef(Number.NEGATIVE_INFINITY)
   const [gestureContext, setGestureContext] = useState<GestureContext | null>(null)
   const [viewportFit, setViewportFit] = useState({ denominator: 1, dimension: 0, height: 0, width: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
@@ -842,28 +191,26 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   const [cropDraft, setCropDraft] = useState<CropDraft | null>(null)
   const [linkEditor, setLinkEditor] = useState<LinkEditorState | null>(null)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
-  const [notices, setNotices] = useState<EditorNoticeState[]>([])
 
+  // Portaled transients (context menu, link dialog) escape the hidden
+  // <Activity> wrapper during slideshows; close them when screening starts.
   useEffect(() => {
-    const handleNotice = (event: Event) => {
-      const detail = (event as CustomEvent<Omit<EditorNoticeState, 'id'> | null>).detail
-      setNotices(current => detail ? [...current, { id: ++noticeIdRef.current, ...detail }] : [])
-    }
-    window.addEventListener('mona:notice', handleNotice)
-    return () => window.removeEventListener('mona:notice', handleNotice)
-  }, [])
+    return subscribeToPresentationStart(() => {
+      setMenu(null)
+      setLinkEditor(null)
+      runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false))
+    })
+  }, [runtime, subscribeToPresentationStart])
 
   useEffect(() => {
     if (!customShapeActive) return undefined
-    const id = ++noticeIdRef.current
-    setNotices(current => [...current, {
+    const id = notifications.notify({
       duration: 0,
-      id,
       text: t('foundation.editor.drawShapeTip'),
       type: 'success',
-    }])
-    return () => setNotices(current => current.filter(notice => notice.id !== id))
-  }, [customShapeActive, t])
+    })
+    return () => notifications.dismiss(id)
+  }, [customShapeActive, notifications, t])
 
   useEffect(() => runtime.store.subscribe(() => {
     const liveSession = selectSession(runtime.store.getState())
@@ -942,24 +289,24 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
         spacePressedRef.current = true
         setIsSpacePressed(true)
       }
-      // PPTist handles Ctrl/Meta+P, F5/Shift+F5, and Ctrl+F before the
+      // the source editor handles Ctrl/Meta+P, F5/Shift+F5, and Ctrl+F before the
       // disableHotkeys guard, so they also work while a text editor has focus.
       if ((event.ctrlKey || event.metaKey) && event.key.toUpperCase() === 'P') {
         event.preventDefault()
-        window.dispatchEvent(new CustomEvent('mona:export-request', { detail: { type: 'pdf' } }))
+        openExport('pdf')
         return
       }
       if (event.key === 'F5') {
         event.preventDefault()
-        window.dispatchEvent(new CustomEvent('mona:screening-request', { detail: { fromStart: !event.shiftKey } }))
+        startPresentation({ fromStart: !event.shiftKey })
         return
       }
       if (event.ctrlKey && event.key.toUpperCase() === 'F') {
         event.preventDefault()
-        runtime.store.dispatch(editorActions.panelToggled('search'))
+        toggleTaskPanel?.('search')
         return
       }
-      // PPTist deliberately reserves only Control (not Command/Meta) for its
+      // the source editor deliberately reserves only Control (not Command/Meta) for its
       // keyboard zoom shortcuts. Wheel zoom follows the shared modifier state.
       if (!event.ctrlKey) return
       const zoom = selectCanvasZoom(runtime.store.getState())
@@ -986,7 +333,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       document.removeEventListener('keyup', resetModifierState)
       window.removeEventListener('blur', resetModifierState)
     }
-  }, [runtime])
+  }, [openExport, runtime, startPresentation, toggleTaskPanel])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1018,7 +365,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       if (commands.length) runtime.commit('Measure text elements', commands, { recordHistory: false })
     }
     const observer = new ResizeObserver(entries => {
-      // PPTist defers auto-size writes while a resize is active, then applies
+      // the source editor defers auto-size writes while a resize is active, then applies
       // the measured dimension at pointer-up. finishGesture owns that branch.
       if (gestureRef.current?.kind === 'resize') return
       const stateSlide = selectCurrentSlide(runtime.store.getState())
@@ -1032,10 +379,10 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
           ? stateSlide.elements.find(element => element.id === elementId && element.type === 'text')
           : undefined
         if (!source || !current || current.type !== 'text') continue
-        // Match PPTist's two settling paths exactly. Without an explicit
+        // Match the established editor's two settling paths exactly. Without an explicit
         // inset, its ResizeObserver persists the fractional content box plus
         // the default inset (for example 86.5). With an explicit inset, that
-        // observer update also re-triggers PPTist's inset watcher, whose final
+        // observer update also re-triggers the established editor's inset watcher, whose final
         // write is the rounded DOM offset dimension (for example 23.2 -> 23).
         const inset = current.inset || [10, 10, 10, 10]
         const measured = current.inset
@@ -1120,6 +467,23 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       !session.hiddenElementIds.includes(element.id) && element.id !== cropElementId
     )),
   }
+  const hasSketch = drawingStore?.hasSketch(currentSlide.id) ?? false
+  const showDrawingWorkspace = Boolean(drawingStore) && !mobileInteraction && (
+    session.drawingMode || (session.sketchesVisible && hasSketch)
+  )
+  const contextualCapabilities = resolveSelectionCapabilities({
+    activeElementIds,
+    activeGroupElementId: session.activeGroupElementId,
+    activeMode: session.drawingMode ? 'draw' : activeTool || customShapeActive ? 'create' : 'select',
+    cropElementId,
+    editingTextElementId: session.editingTextElementId,
+    elements: previewSlide.elements,
+    handleElementId: session.handleElementId,
+    pageSelected: session.pageSelected,
+  })
+  const contextualActionElements = contextualCapabilities.selectionKind === 'group-child' && contextualCapabilities.targetElement
+    ? [contextualCapabilities.targetElement]
+    : contextualCapabilities.selectedElements
 
   const inputPoint = (event: Pick<PointerEvent, 'clientX' | 'clientY'>): PointerPosition => (
     mobileInteraction
@@ -1130,7 +494,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   const slidePoint = (event: Pick<PointerEvent, 'clientX' | 'clientY'>) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect || !scale) return undefined
-    // PPTist's document-level MouseEvent handlers consume integer client/page
+    // the established editor's document-level MouseEvent handlers consume integer client/page
     // coordinates. PointerEvent retains sub-pixel coordinates, and preserving
     // those here changes not only the final fraction but source branches at
     // the strict 5px adsorption boundary. Quantize before converting to slide
@@ -1181,7 +545,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     const groupMemberIds = !mobileInteraction && liveElement.groupId
       ? liveSlide.elements.filter(item => item.groupId === liveElement.groupId).map(item => item.id)
       : [liveElement.id]
-    // PPTist seeds a grouped selection with the element that was actually
+    // the source editor seeds a grouped selection with the element that was actually
     // clicked, then appends the group's slide-order members and de-duplicates.
     // Selection order is observable in group operations and toolbar state.
     const groupIds = [...new Set([liveElement.id, ...groupMemberIds])]
@@ -1412,10 +776,12 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
   }
 
   const handleBlankPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('.mona-drawing-workspace')) return
     if (mobileInteraction) {
       if (event.pointerType !== 'touch' || event.button !== 0) return
       setMenu(null)
       runtime.store.dispatch(editorActions.selectionChanged([]))
+      runtime.store.dispatch(editorActions.pageSelectionChanged(true))
       window.getSelection()?.removeAllRanges()
       return
     }
@@ -1442,16 +808,19 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       // Canvas.vue receives every mousedown button. A secondary-button blank
       // press therefore clears element focus before its context menu opens.
       runtime.store.dispatch(editorActions.selectionChanged([]))
+      runtime.store.dispatch(editorActions.pageSelectionChanged(true))
       window.getSelection()?.removeAllRanges()
       return
     }
     if (spacePressedRef.current) {
       runtime.store.dispatch(editorActions.selectionChanged([]))
+      runtime.store.dispatch(editorActions.pageSelectionChanged(false))
       window.getSelection()?.removeAllRanges()
       begin(event, 'pan', { x: event.clientX, y: event.clientY }, { kind: 'pan', pan: canvasPan })
       return
     }
     runtime.store.dispatch(editorActions.selectionChanged([]))
+    runtime.store.dispatch(editorActions.pageSelectionChanged(true))
     window.getSelection()?.removeAllRanges()
     const point = slidePoint(event.nativeEvent)
     if (!point) return
@@ -1590,7 +959,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
           runtime.store.dispatch(editorActions.activeGroupElementChanged(context.pendingActiveGroupElementId))
         }
       }
-      // Quirk retired: PPTist recorded a history snapshot for sub-threshold
+      // Quirk retired: the source editor recorded a history snapshot for sub-threshold
       // moved drags even though no document field changed.
       return
     }
@@ -1639,7 +1008,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     }
     const activationDistance = context.kind === 'drag' ? context.activationDistance : TRANSFORM_ACTIVATION_DISTANCE
     if (!exceedsActivationDistance(snapshot.delta, activationDistance) || !finalUpdates.size) {
-      // Quirk retired: PPTist recorded a duplicate snapshot when the handle
+      // Quirk retired: the source editor recorded a duplicate snapshot when the handle
       // of an already-rotated element was clicked without movement.
       return
     }
@@ -1787,178 +1156,9 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     begin(event, 'resize', point, { kind: 'shape-keypoint', element: structuredClone(shape), index })
   }
 
-  const writeClipboard = async (serialized: string | undefined) => {
-    if (!serialized || !navigator.clipboard) return
-    try {
-      await navigator.clipboard.writeText(serialized)
-    }
-    catch { /* Native clipboard events and the in-memory fallback remain available. */ }
-  }
 
-  const commitPastedElement = (label: string, element: PPTElement, historyKey: 'clipboard-file' | 'clipboard-text') => {
-    if (!runtime.commit(label, [{ type: 'element.add', elements: element }], { historyKey })) return
-    runtime.store.dispatch(editorActions.selectionChanged([element.id]))
-    runtime.store.dispatch(editorActions.canvasFocusChanged(true))
-  }
+  const { handleDrop, handlePaste } = useCanvasClipboard({ presentation, runtime, shiftPressedRef })
 
-  const createTextFromClipboard = (text: string, contentIsHtml = false) => {
-    commitPastedElement('Paste text', {
-      type: 'text',
-      id: createPresentationId(10),
-      left: 0,
-      top: 0,
-      width: 600,
-      height: 50,
-      content: contentIsHtml ? text : parseTextToParagraphs(text),
-      rotate: 0,
-      defaultFontName: presentation.theme.fontName,
-      defaultColor: presentation.theme.fontColor,
-      vertical: false,
-    }, 'clipboard-text')
-  }
-
-  const createImageFromClipboard = async (src: string, historyKey: 'clipboard-file' | 'clipboard-text' = 'clipboard-text') => {
-    try {
-      let { height, width } = await imageSize(src)
-      const ratio = height / width
-      if (ratio < presentation.viewportRatio && width > presentation.viewportSize) {
-        width = presentation.viewportSize
-        height = width * ratio
-      }
-      else if (height > presentation.viewportSize * presentation.viewportRatio) {
-        height = presentation.viewportSize * presentation.viewportRatio
-        width = height / ratio
-      }
-      commitPastedElement('Paste image', {
-        type: 'image',
-        id: createPresentationId(10),
-        src,
-        width,
-        height,
-        left: (presentation.viewportSize - width) / 2,
-        top: (presentation.viewportSize * presentation.viewportRatio - height) / 2,
-        fixedRatio: true,
-        rotate: 0,
-      }, historyKey)
-    }
-    catch { /* PPTist also leaves an unreadable image paste as a no-op. */ }
-  }
-
-  const createMediaFromClipboard = (file: File) => {
-    const src = URL.createObjectURL(file)
-    const ext = MEDIA_EXTENSION_BY_MIME[file.type]
-    if (file.type.includes('video')) {
-      commitPastedElement('Paste video', {
-        type: 'video',
-        id: createPresentationId(10),
-        width: 500,
-        height: 300,
-        rotate: 0,
-        left: (presentation.viewportSize - 500) / 2,
-        top: (presentation.viewportSize * presentation.viewportRatio - 300) / 2,
-        src,
-        autoplay: false,
-        ...(ext ? { ext } : {}),
-      }, 'clipboard-file')
-    }
-    else {
-      commitPastedElement('Paste audio', {
-        type: 'audio',
-        id: createPresentationId(10),
-        width: 50,
-        height: 50,
-        rotate: 0,
-        left: (presentation.viewportSize - 50) / 2,
-        top: (presentation.viewportSize * presentation.viewportRatio - 50) / 2,
-        loop: false,
-        autoplay: false,
-        fixedRatio: true,
-        color: presentation.theme.themeColors[0]!,
-        src,
-        ...(ext ? { ext } : {}),
-      }, 'clipboard-file')
-    }
-  }
-
-  const handlePaste = (event: ClipboardEvent) => {
-    const state = runtime.store.getState().session
-    if ((!state.canvasFocus && !state.thumbnailsFocus) || state.disableHotkeys) return
-    if (!event.clipboardData) return
-    let handledFile = false
-    for (const item of event.clipboardData.items) {
-      if (item.kind !== 'file') continue
-      const file = item.getAsFile()
-      if (!file) continue
-      if (item.type.includes('image')) {
-        handledFile = true
-        void fileAsDataUrl(file).then(src => createImageFromClipboard(src, 'clipboard-file'))
-      }
-      else if (item.type.includes('video') || item.type.includes('audio')) {
-        handledFile = true
-        createMediaFromClipboard(file)
-      }
-    }
-    if (handledFile) return
-    const serialized = event.clipboardData.getData(MONA_CLIPBOARD_MIME) || event.clipboardData.getData('text/plain')
-    if (!serialized) return
-    const payload = parseCustomEditorClipboard(serialized)
-    if (typeof payload !== 'string') {
-      // PPTist treats every successfully decrypted JSON value as custom
-      // clipboard data. Unsupported object shapes are a no-op; they must not
-      // fall through and become a text element containing the ciphertext.
-      if (payload && typeof payload === 'object' && 'type' in payload) {
-        if (payload.type === 'elements') runtime.paste(serialized)
-        else if (payload.type === 'slides') runtime.pasteSlides(serialized)
-      }
-      return
-    }
-    if (!shiftPressedRef.current && isPptistImageUrl(payload)) void createImageFromClipboard(payload)
-    else if (!shiftPressedRef.current && isPptistValidUrl(payload)) {
-      createTextFromClipboard(`<a href="${payload}" title="${payload}" target="_blank">${payload}</a>`, true)
-    }
-    else if (!shiftPressedRef.current && isSvgText(payload)) {
-      void createImageFromClipboard(`data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(payload)))}`)
-    }
-    else createTextFromClipboard(payload)
-  }
-
-  // Vue's useDrop: dropped media files insert through the shared paste
-  // routing; dropped plain text becomes a 600x50 text element at the origin.
-  const handleDrop = (event: ReactDragEvent<HTMLElement>) => {
-    event.preventDefault()
-    const transfer = event.dataTransfer
-    if (!transfer || transfer.items.length === 0) return
-    let handledFile = false
-    for (const item of transfer.items) {
-      if (item.kind !== 'file') continue
-      const file = item.getAsFile()
-      if (!file) continue
-      if (item.type.includes('image')) {
-        handledFile = true
-        void fileAsDataUrl(file).then(src => createImageFromClipboard(src, 'clipboard-file'))
-      }
-      else if (item.type.includes('video') || item.type.includes('audio')) {
-        handledFile = true
-        createMediaFromClipboard(file)
-      }
-    }
-    if (handledFile) return
-    const first = transfer.items[0]
-    if (first && first.kind === 'string' && first.type === 'text/plain') {
-      first.getAsString(text => {
-        if (selectSession(runtime.store.getState()).disableHotkeys) return
-        createTextFromClipboard(text)
-      })
-    }
-  }
-
-  const nudgeSelection = (elements: readonly PPTElement[], x: number, y: number) => {
-    const commands: PresentationCommand[] = elements.map(element => ({
-      type: 'element.update',
-      payload: { id: element.id, props: { left: element.left + x, top: element.top + y } },
-    }))
-    runtime.commit('Nudge elements', commands)
-  }
 
   const deleteCurrentSelection = () => {
     const liveSession = selectSession(runtime.store.getState())
@@ -1971,6 +1171,73 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       runtime.store.dispatch(editorActions.selectionChanged([]))
       runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
     }
+    return changed
+  }
+
+  const duplicateCurrentSelection = () => {
+    const state = runtime.store.getState()
+    const liveSession = selectSession(state)
+    const slide = selectCurrentSlide(state)
+    if (!slide) return false
+    const sourceIds = liveSession.activeGroupElementId
+      ? [liveSession.activeGroupElementId]
+      : liveSession.activeElementIds
+    const source = slide.elements.filter(element => sourceIds.includes(element.id))
+    if (!source.length) return false
+    const duplicates = duplicatePreviewElements(source, Boolean(liveSession.activeGroupElementId)).map(element => ({
+      ...element,
+      left: element.left + 10,
+      top: element.top + 10,
+    })) as PPTElement[]
+    if (!runtime.commit('Duplicate elements', [{ type: 'element.add', elements: duplicates }], { historyKey: 'duplicate-elements' })) return false
+    const duplicateIds = duplicates.map(element => element.id)
+    runtime.store.dispatch(editorActions.selectionChanged(duplicateIds))
+    runtime.store.dispatch(editorActions.handleElementChanged(duplicateIds.length === 1 ? duplicateIds[0]! : null))
+    return true
+  }
+
+  const groupCurrentSelection = () => {
+    const state = runtime.store.getState()
+    const slide = selectCurrentSlide(state)
+    const ids = state.session.activeElementIds
+    if (!slide || ids.length < 2) return false
+    return runtime.commit('Group elements', [{
+      type: 'slide.update',
+      props: { elements: groupElements(slide.elements, new Set(ids), createPresentationId(10)) },
+    }])
+  }
+
+  const ungroupCurrentSelection = () => {
+    const state = runtime.store.getState()
+    const slide = selectCurrentSlide(state)
+    const ids = state.session.activeElementIds
+    if (!slide || !ids.length) return false
+    const elements = ungroupElements(slide.elements, new Set(ids))
+    if (!elements) return false
+    const changed = runtime.commit('Ungroup elements', [{ type: 'slide.update', props: { elements } }])
+    if (changed) {
+      runtime.store.dispatch(editorActions.selectionChanged(ids))
+      runtime.store.dispatch(editorActions.handleElementChanged(ids[0] ?? null))
+    }
+    return changed
+  }
+
+  const setCurrentSelectionLocked = (lock: boolean) => {
+    const state = runtime.store.getState()
+    const slide = selectCurrentSlide(state)
+    if (!slide) return false
+    const result = setElementLocks({
+      elements: slide.elements,
+      lock,
+      selectedIds: new Set(state.session.activeElementIds),
+      targetElementId: contextualCapabilities.targetElement?.id,
+    })
+    if (!result) return false
+    const changed = runtime.commit(lock ? 'Lock elements' : 'Unlock elements', [{
+      type: 'slide.update',
+      props: { elements: result.elements },
+    }])
+    if (changed) runtime.store.dispatch(editorActions.selectionChanged(result.selectedIds))
     return changed
   }
 
@@ -1994,162 +1261,19 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     if (commands.length) runtime.commit('Measure table elements', commands, { recordHistory: false })
   }
 
-  const handleKeyDown = (event: KeyboardEvent) => {
-    const liveState = runtime.store.getState()
-    const livePresentation = selectPresentation(liveState)
-    const liveSession = selectSession(liveState)
-    const liveCurrentSlide = selectCurrentSlide(liveState) ?? EMPTY_EDITOR_SLIDE
-    const liveActiveElementIds = liveSession.activeElementIds
-    const liveSelectedElements = liveCurrentSlide.elements.filter(element => liveActiveElementIds.includes(element.id))
-    const liveActiveGroupElement = liveSession.activeGroupElementId
-      ? liveCurrentSlide.elements.find(element => element.id === liveSession.activeGroupElementId)
-      : undefined
-    const liveTransformElements = liveActiveGroupElement ? [liveActiveGroupElement] : liveSelectedElements
-    if (cropElementId && event.key === 'Enter') {
-      event.preventDefault()
-      finishCropEditing(true)
-      return
-    }
-    // A shape's embedded ProseMirror can retain DOM focus after Shift-click
-    // creates a multi-selection. PPTist still handles canvas shortcuts in
-    // that state; text-input suppression applies only to an editing selection.
-    if (isTextInput(event.target) && liveActiveElementIds.length <= 1) return
-    if (!liveSession.canvasFocus && !liveSession.thumbnailsFocus) return
-    const modifier = event.ctrlKey || event.metaKey
-    const key = event.key.toLowerCase()
-    if (liveSession.disableHotkeys) return
-    if (event.key === ' ') {
-      spacePressedRef.current = true
-      setIsSpacePressed(true)
-      event.preventDefault()
-      return
-    }
-    if (modifier && key === 'a') {
-      event.preventDefault()
-      if (liveSession.canvasFocus) runtime.selectAll()
-      if (liveSession.thumbnailsFocus) runtime.selectAllSlides()
-      return
-    }
-    if (modifier && key === 'c') {
-      event.preventDefault()
-      void writeClipboard(liveSelectedElements.length
-        ? runtime.copySelection()
-        : liveSession.thumbnailsFocus ? runtime.copySlides() : undefined)
-      return
-    }
-    if (modifier && key === 'x') {
-      event.preventDefault()
-      void writeClipboard(liveSelectedElements.length
-        ? runtime.cutSelection()
-        : liveSession.thumbnailsFocus ? runtime.cutSlides() : undefined)
-      return
-    }
-    if (modifier && key === 'd') {
-      event.preventDefault()
-      if (liveSelectedElements.length) {
-        runtime.copySelection()
-        runtime.paste()
-      }
-      else if (liveSession.thumbnailsFocus) runtime.duplicateSlides()
-      return
-    }
-    if (modifier && key === 'l' && liveSelectedElements.length) {
-      event.preventDefault()
-      commitElementLockChange({
-        action: 'lock',
-        elements: liveCurrentSlide.elements,
-        selectedIds: liveActiveElementIds,
-      })
-      return
-    }
-    if (modifier && key === 'g' && liveSelectedElements.length) {
-      event.preventDefault()
-      handleContextAction(event.shiftKey ? 'ungroup' : 'group')
-      return
-    }
-    if (modifier && key === 'z') {
-      event.preventDefault()
-      if (event.timeStamp - lastUndoAtRef.current >= 100) {
-        lastUndoAtRef.current = event.timeStamp
-        runtime.undo()
-      }
-      return
-    }
-    if (modifier && key === 'y') {
-      event.preventDefault()
-      if (event.timeStamp - lastRedoAtRef.current >= 100) {
-        lastRedoAtRef.current = event.timeStamp
-        runtime.redo()
-      }
-      return
-    }
-    if (event.altKey && (key === 'f' || key === 'b')) {
-      if (liveSession.handleElementId) {
-        event.preventDefault()
-        handleContextAction(key === 'f' ? 'bring-front' : 'send-back')
-      }
-      return
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault()
-      if (liveActiveElementIds.length) deleteCurrentSelection()
-      else if (liveSession.thumbnailsFocus) runtime.deleteSlides()
-      return
-    }
-    if (event.key.startsWith('Arrow') && liveSelectedElements.length) {
-      event.preventDefault()
-      if (event.key === 'ArrowLeft') nudgeSelection(liveTransformElements, -1, 0)
-      if (event.key === 'ArrowRight') nudgeSelection(liveTransformElements, 1, 0)
-      if (event.key === 'ArrowUp') nudgeSelection(liveTransformElements, 0, -1)
-      if (event.key === 'ArrowDown') nudgeSelection(liveTransformElements, 0, 1)
-      return
-    }
-    if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !liveSelectedElements.length) {
-      event.preventDefault()
-      const index = livePresentation.slideIndex + (event.key === 'ArrowUp' ? -1 : 1)
-      if (index >= 0 && index < livePresentation.slides.length) {
-        flushCurrentTableMeasurements()
-        navigateWithSlideTransition(() => runtime.focusSlide(index))
-      }
-      return
-    }
-    if (event.key === 'PageUp' || event.key === 'PageDown') {
-      event.preventDefault()
-      const index = livePresentation.slideIndex + (event.key === 'PageUp' ? -1 : 1)
-      if (index >= 0 && index < livePresentation.slides.length) {
-        flushCurrentTableMeasurements()
-        navigateWithSlideTransition(() => runtime.focusSlide(index))
-      }
-      return
-    }
-    if (event.key === 'Enter' && liveSession.thumbnailsFocus) {
-      event.preventDefault()
-      runtime.createSlide()
-      return
-    }
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      if (!liveCurrentSlide.elements.length) return
-      const currentIndex = liveSession.handleElementId
-        ? liveCurrentSlide.elements.findIndex(element => element.id === liveSession.handleElementId)
-        : -1
-      const next = liveCurrentSlide.elements[currentIndex >= liveCurrentSlide.elements.length - 1 ? 0 : currentIndex + 1]!
-      runtime.store.dispatch(editorActions.selectionChanged([next.id]))
-      return
-    }
-    // Vue arms create tools only with editor-area (canvas) focus and without
-    // Shift or Ctrl/Meta held.
-    if (!modifier && !event.altKey && !event.shiftKey && liveSession.canvasFocus && ['r', 't', 'o', 'l'].includes(key)) {
-      const tool = key === 't'
-        ? { type: 'text', key: 'text', vertical: false } as const
-        : key === 'l'
-          ? { type: 'line', key: 'line', data: LINE_LIST[0]!.children[0]! } as const
-          : key === 'o'
-            ? { type: 'shape', key: 'ellipse', data: SHAPE_LIST.find(category => category.type === 'common')!.children[0]! } as const
-            : { type: 'shape', key: 'shape', data: SHAPE_LIST[0]!.children[0]! } as const
-      onCreateToolChange(tool)
-    }
-  }
+  const { handleKeyDown, handleWheel } = useCanvasHotkeys({
+    commitElementLockChange,
+    ctrlOrMetaPressedRef,
+    deleteCurrentSelection,
+    finishCropEditing,
+    flushCurrentTableMeasurements,
+    handleContextAction,
+    isCropping: () => Boolean(cropElementId),
+    onCreateToolChange,
+    runtime,
+    setIsSpacePressed,
+    spacePressedRef,
+  })
 
   function commitElementLockChange(input: {
     action: 'lock' | 'unlock'
@@ -2157,7 +1281,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     selectedIds: readonly string[]
     targetElementId?: string
   }) {
-    const result = setElementLocksLikePptist({
+    const result = setElementLocks({
       elements: input.elements,
       lock: input.action === 'lock',
       selectedIds: new Set(input.selectedIds),
@@ -2231,17 +1355,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     else if (action === 'ruler') runtime.store.dispatch(editorActions.rulerVisibilityChanged(!showRuler))
     else if (action === 'grid-toggle') runtime.store.dispatch(editorActions.gridLineSizeChanged(gridLineSize ? 0 : 50))
     else if (action.startsWith('grid-')) runtime.store.dispatch(editorActions.gridLineSizeChanged(Number(action.slice(5))))
-    else if (action === 'bubble-menu') {
-      const visible = !liveSession.showBubbleMenu
-      runtime.store.dispatch(editorActions.bubbleMenuVisibilityChanged(visible))
-      setNotices(current => [...current, {
-        id: ++noticeIdRef.current,
-        text: t('foundation.editor.action.bubbleMenuStatus', {
-          status: t(visible ? 'foundation.editor.action.enabled' : 'foundation.editor.action.disabled'),
-        }),
-        type: 'success',
-      }])
-    }
     else if (action === 'reset-slide') {
       const elementIds = liveCurrentSlide.elements.map(element => element.id)
       if (elementIds.length && runtime.commit('Reset slide', [{ type: 'element.delete', elementIds }])) {
@@ -2249,11 +1362,11 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       }
     }
     else if (action === 'slideshow') {
-      window.dispatchEvent(new CustomEvent('mona:screening-request', { detail: { fromStart: true } }))
+      startPresentation({ fromStart: true })
     }
     else if (action.startsWith('align-')) {
-      const command = action.slice('align-'.length) as Parameters<typeof alignElementsToCanvasLikePptist>[0]['command']
-      const elements = alignElementsToCanvasLikePptist({
+      const command = action.slice('align-'.length) as Parameters<typeof alignElementsToCanvas>[0]['command']
+      const elements = alignElementsToCanvas({
         command,
         elements: liveCurrentSlide.elements,
         selectedIds: new Set(liveActiveElementIds),
@@ -2271,16 +1384,16 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
         'send-back': 'bottom',
         'send-backward': 'down',
       } as const)[action as 'bring-front' | 'bring-forward' | 'send-back' | 'send-backward']
-      const elements = orderElementLikePptist(liveCurrentSlide.elements, orderTarget.id, command)
+      const elements = orderElement(liveCurrentSlide.elements, orderTarget.id, command)
       if (elements) runtime.commit('Reorder elements', [{ type: 'slide.update', props: { elements } }])
     }
     else if (action === 'group') {
       const selected = new Set(liveActiveElementIds)
-      const elements = groupElementsLikePptist(liveCurrentSlide.elements, selected, createPresentationId(10))
+      const elements = groupElements(liveCurrentSlide.elements, selected, createPresentationId(10))
       runtime.commit('Group elements', [{ type: 'slide.update', props: { elements } }])
     }
     else if (action === 'ungroup') {
-      const elements = ungroupElementsLikePptist(liveCurrentSlide.elements, new Set(liveActiveElementIds))
+      const elements = ungroupElements(liveCurrentSlide.elements, new Set(liveActiveElementIds))
       if (!elements) return
       const changed = runtime.commit('Ungroup elements', [{ type: 'slide.update', props: { elements } }])
       const selectedId = liveMenuElement?.id ?? liveSession.handleElementId ?? liveActiveElementIds[0]
@@ -2312,30 +1425,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
     })
   }
 
-  const handleWheel = (event: WheelEvent) => {
-    event.preventDefault()
-    if (!event.deltaY) return
-    const now = event.timeStamp
-    if (ctrlOrMetaPressedRef.current) {
-      if (now - lastZoomWheelAtRef.current < 100) return
-      lastZoomWheelAtRef.current = now
-      const zoom = selectCanvasZoom(runtime.store.getState())
-      if (event.deltaY > 0 && zoom >= 30) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom - 5))
-      else if (event.deltaY < 0 && zoom <= 200) runtime.store.dispatch(editorActions.canvasZoomChanged(zoom + 5))
-      return
-    }
-    if (now - lastSlideWheelAtRef.current < 300) return
-    lastSlideWheelAtRef.current = now
-    const { slideIndex, slides } = runtime.store.getState().presentation
-    if (event.deltaY > 0 && slideIndex < slides.length - 1) {
-      flushCurrentTableMeasurements()
-      navigateWithSlideTransition(() => runtime.focusSlide(slideIndex + 1))
-    }
-    else if (event.deltaY < 0 && slideIndex > 0) {
-      flushCurrentTableMeasurements()
-      navigateWithSlideTransition(() => runtime.focusSlide(slideIndex - 1))
-    }
-  }
 
   // useEffectEvent replaces the manual ref-mirroring pattern: the long-lived
   // native listeners below always observe the latest render's handlers.
@@ -2406,12 +1495,12 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       const linkPattern = /^(https?):\/\/[\w-]+(\.[\w-]+)+([\w-.,@?^=%&:/~+#]*[\w-@?^=%&/~+#])?$/
       if (!linkPattern.test(target)) {
         setLinkEditor({ ...linkEditor, address: '' })
-        setNotices(current => [...current, { id: ++noticeIdRef.current, text: t('foundation.editor.link.invalid'), type: 'error' }])
+        notifications.notify({ text: t('foundation.editor.link.invalid'), type: 'error' })
         return
       }
     }
     else if (!target) {
-      setNotices(current => [...current, { id: ++noticeIdRef.current, text: t('foundation.editor.link.selectTarget'), type: 'error' }])
+      notifications.notify({ text: t('foundation.editor.link.selectTarget'), type: 'error' })
       return
     }
     runtime.commit('Set element link', [{
@@ -2434,6 +1523,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
       aria-label={t('foundation.editor.canvas')}
       className={`mona-render-stage mona-editor-stage${canvasFocus ? ' has-focus' : ''}${activeTool ? ' is-creating' : ''}${isSpacePressed ? ' is-panning' : ''}`}
       data-active-tool={activeTool?.key ?? 'select'}
+      id="mona-editor-canvas"
       onDoubleClick={interactionProfile === 'mobile' ? undefined : event => {
         if ((event.target as HTMLElement).closest('[data-element-hit]')) return
         if (activeElementIds.length) return
@@ -2611,6 +1701,24 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
               viewportRatio={presentation.viewportRatio}
               viewportSize={presentation.viewportSize}
             />
+            {showDrawingWorkspace ? (
+              <Suspense fallback={<div aria-label={t('foundation.editor.drawing.loading')} className="mona-drawing-loading" />}>
+                <DrawingWorkspace
+                  active={session.drawingMode}
+                  key={currentSlide.id}
+                  onActiveChange={active => onDrawingModeChange?.(active)}
+                  onBuildThis={handoff => onBuildSketch?.(handoff)}
+                  onVisibilityChange={visible => onSketchVisibilityChange?.(visible)}
+                  referenceCount={activeElementIds.length}
+                  scale={scale}
+                  slideId={currentSlide.id}
+                  store={drawingStore!}
+                  viewportHeight={presentation.viewportSize * presentation.viewportRatio}
+                  viewportWidth={presentation.viewportSize}
+                  visible={session.sketchesVisible}
+                />
+              </Suspense>
+            ) : null}
             {cropSourceImage ? (
               <EditorImageCropEditor
                 element={cropSourceImage}
@@ -2689,26 +1797,38 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
                   )
                 })
               })() : null}
-              {!mobileInteraction && session.showBubbleMenu && (() => {
-                const targetId = session.activeGroupElementId || (activeElementIds.length === 1 ? activeElementIds[0] : null)
-                // Vue suppresses the floating toolbar for hidden elements
-                // ("hide all" keeps them selected).
-                const visibleTargetId = targetId && !session.hiddenElementIds.includes(targetId) ? targetId : null
-                const target = visibleTargetId ? currentSlide.elements.find(element => element.id === visibleTargetId) : undefined
-                return target?.type === 'text' ? (
-                  <EditorFloatingTextToolbar element={target} frameRef={frameRef} runtime={runtime} scale={scale} stageRef={stageRef} />
-                ) : target?.type === 'shape' || target?.type === 'line' ? (
-                  <EditorFloatingElementToolbar element={target} frameRef={frameRef} presentation={presentation} runtime={runtime} scale={scale} stageRef={stageRef} />
-                ) : target?.type === 'image' ? (
-                  <EditorFloatingImageToolbar element={target} frameRef={frameRef} runtime={runtime} scale={scale} stageRef={stageRef} />
-                ) : target?.type === 'table' ? (
-                  <EditorFloatingTableToolbar element={target} frameRef={frameRef} presentation={presentation} runtime={runtime} scale={scale} selectedCells={session.selectedTableCells} stageRef={stageRef} />
-                ) : target?.type === 'chart' ? (
-                  <EditorFloatingChartToolbar element={target} frameRef={frameRef} onEditData={() => onEditChart(target.id)} runtime={runtime} scale={scale} stageRef={stageRef} />
-                ) : target?.type === 'latex' ? (
-                  <EditorFloatingLatexToolbar element={target} frameRef={frameRef} onEdit={() => onEditLatex(target.id)} runtime={runtime} scale={scale} stageRef={stageRef} />
-                ) : null
-              })()}
+              {!mobileInteraction && contextualCapabilities.selectionKind !== 'empty' ? (
+                <EditorSelectionActions
+                  capabilities={contextualCapabilities}
+                  elements={contextualActionElements}
+                  frameRef={frameRef}
+                  onAskMona={openAgent}
+                  onComment={() => editorShell?.openTaskPanel('comments')}
+                  onDelete={() => {
+                    if (contextualCapabilities.selectionKind === 'page') {
+                      if (runtime.deleteSlides()) runtime.store.dispatch(editorActions.pageSelectionChanged(true))
+                    }
+                    else deleteCurrentSelection()
+                  }}
+                  onDuplicate={() => {
+                    if (contextualCapabilities.selectionKind === 'page') {
+                      if (runtime.duplicateSlides().length) runtime.store.dispatch(editorActions.pageSelectionChanged(true))
+                    }
+                    else duplicateCurrentSelection()
+                  }}
+                  onEditLink={() => {
+                    if (contextualCapabilities.targetElement) openLinkEditorFor(contextualCapabilities.targetElement)
+                  }}
+                  onGroup={groupCurrentSelection}
+                  onLock={lock => setCurrentSelectionLocked(lock)}
+                  onSelectGroup={() => runtime.store.dispatch(editorActions.activeGroupElementChanged(null))}
+                  onUngroup={ungroupCurrentSelection}
+                  scale={scale}
+                  stageRef={stageRef}
+                  viewportRatio={presentation.viewportRatio}
+                  viewportSize={presentation.viewportSize}
+                />
+              ) : null}
               {!mobileInteraction ? (() => {
                 // Vue shows an open/change/remove hyperlink bubble under the
                 // handle element whenever it carries a link.
@@ -2718,7 +1838,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
                 if (!linkElement?.link) return null
                 const toolbarTargetId = session.activeGroupElementId || (activeElementIds.length === 1 ? activeElementIds[0] : null)
                 const toolbarVisible = Boolean(
-                  session.showBubbleMenu &&
                   toolbarTargetId === linkElement.id &&
                   linkElement.type !== 'video' && linkElement.type !== 'audio',
                 )
@@ -2752,7 +1871,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
             >
               {activeTool.type === 'line' && preview.createLinePath ? (
                 <svg height={Math.max(preview.createRect.height, 24)} overflow="visible" width={Math.max(preview.createRect.width, 24)}>
-                  <path d={preview.createLinePath} fill="none" stroke="#d14424" strokeWidth="2" />
+                  <path d={preview.createLinePath} fill="none" stroke="var(--editor-selection)" strokeWidth="2" />
                 </svg>
               ) : null}
             </div>
@@ -2817,7 +1936,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
           onAction={handleContextAction}
           onDismiss={() => setMenu(null)}
           position={menu.position}
-          showBubbleMenu={session.showBubbleMenu}
           showRuler={showRuler}
           surface={menu.surface}
         />
@@ -2843,7 +1961,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, interactionP
           viewportSize={presentation.viewportSize}
         />
       ) : null}
-      <EditorNoticeStack notices={notices} onClose={id => setNotices(current => current.filter(notice => notice.id !== id))} />
       <span aria-live="polite" className="mona-editor-status">
         {activeTool
           ? t('foundation.editor.creationToolActive', { tool: t(`foundation.editor.tool.${activeTool.key}`) })

@@ -15,6 +15,8 @@ import { editorActions, selectPresentation, selectSession } from '@mona/editor-s
 import { createPresentationId } from '@mona/presentation-core'
 import type { PPTImageElement, PPTShapeElement, PPTTextElement } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { EditorCanvas } from '@/features/editor/EditorCanvas'
 import { fileToDataUrl, fitImageToPresentation, getImageSize } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -38,10 +40,10 @@ function MobileEditorHeader({ changeMode, runtime }: {
   return (
     <div className="mona-mobile-editor-header">
       <div className="mona-mobile-editor-history">
-        <button className={`mona-mobile-editor-history-item${canUndo ? '' : ' is-disabled'}`} onClick={() => runtime.undo()} type="button"><BackIcon /> {t('common.undo')}</button>
-        <button className={`mona-mobile-editor-history-item${canRedo ? '' : ' is-disabled'}`} onClick={() => runtime.redo()} type="button"><NextIcon /> {t('common.redo')}</button>
+        <Button className={`mona-mobile-editor-history-item${canUndo ? '' : ' is-disabled'}`} disabled={!canUndo} onClick={() => runtime.undo()} size="editor" type="button" variant="ghost"><BackIcon /> {t('common.undo')}</Button>
+        <Button className={`mona-mobile-editor-history-item${canRedo ? '' : ' is-disabled'}`} disabled={!canRedo} onClick={() => runtime.redo()} size="editor" type="button" variant="ghost"><NextIcon /> {t('common.redo')}</Button>
       </div>
-      <button className="mona-mobile-editor-back" onClick={() => changeMode('preview')} type="button"><LogoutIcon /> {t('mobile.exitEdit')}</button>
+      <Button className="mona-mobile-editor-back" onClick={() => changeMode('preview')} size="editor" type="button" variant="ghost"><LogoutIcon /> {t('mobile.exitEdit')}</Button>
     </div>
   )
 }
@@ -107,7 +109,7 @@ function MobileSlideToolbar({ runtime }: { runtime: EditorRuntime }) {
   return (
     <div className="mona-mobile-slide-toolbar">
       <div className="mona-mobile-remark">
-        <textarea
+        <Textarea
           aria-label={t('runtime.speakerNotesPlaceholder')}
           onChange={event => runtime.commit('Update speaker notes', [{ type: 'slide.update', props: { remark: event.target.value } }], { recordHistory: false })}
           placeholder={t('runtime.speakerNotesPlaceholder')}

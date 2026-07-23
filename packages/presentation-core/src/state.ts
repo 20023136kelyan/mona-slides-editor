@@ -2,7 +2,7 @@ import type { Slide, SlideTemplate, SlideTheme } from './model'
 
 /**
  * Exact persisted/session shape currently owned by the Vue slides store.
- * Gate 2 preserves this shape; schema redesign is deliberately out of scope.
+ * This remains the canonical serializable presentation state shape.
  */
 export interface PresentationState {
   title: string

@@ -3,6 +3,11 @@ import { useTranslation } from 'react-i18next'
 
 import UploadIcon from '~icons/icon-park-outline/upload'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
+
 const MEDIA_EXTENSION_BY_MIME: Record<string, string> = {
   'audio/aac': 'aac',
   'audio/flac': 'flac',
@@ -29,15 +34,14 @@ const MEDIA_EXTENSION_BY_MIME: Record<string, string> = {
 type MediaType = 'audio' | 'video'
 
 export function EditorMediaInput({
-  onClose,
   onInsertAudio,
   onInsertVideo,
 }: {
-  onClose: () => void
   onInsertAudio: (payload: { ext?: string; src: string }) => void
   onInsertVideo: (payload: { ext?: string; src: string }) => void
 }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const [type, setType] = useState<MediaType>('video')
   const [videoSrc, setVideoSrc] = useState('https://videos.pexels.com/video-files/29261597/12623866_640_360_24fps.mp4')
   const [audioSrc, setAudioSrc] = useState('https://freesound.org/data/previews/614/614107_11861866-lq.mp3')
@@ -59,14 +63,14 @@ export function EditorMediaInput({
   const confirm = () => {
     if (type === 'video') {
       if (!videoSrc) {
-        window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: t('foundation.editor.media.invalidVideo'), type: 'error' } }))
+        notifications.notify({ text: t('foundation.editor.media.invalidVideo'), type: 'error' })
         return
       }
       onInsertVideo({ src: videoSrc })
     }
     else {
       if (!audioSrc) {
-        window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: t('foundation.editor.media.invalidAudio'), type: 'error' } }))
+        notifications.notify({ text: t('foundation.editor.media.invalidAudio'), type: 'error' })
         return
       }
       onInsertAudio({ src: audioSrc })
@@ -75,27 +79,26 @@ export function EditorMediaInput({
 
   return (
     <div className="mona-media-input">
-      <div className="mona-media-tabs" role="tablist">
+      <ToggleGroup className="mona-media-tabs" onValueChange={value => {
+        if (value) setType(value as MediaType)
+      }} type="single" value={type}>
         {(['video', 'audio'] as const).map(value => (
-          <button
-            aria-selected={type === value}
+          <ToggleGroupItem
             className={type === value ? 'is-active' : ''}
             key={value}
-            onClick={() => setType(value)}
-            role="tab"
-            type="button"
-          >{t(`foundation.editor.media.${value}`)}</button>
+            value={value}
+          >{t(`foundation.editor.media.${value}`)}</ToggleGroupItem>
         ))}
-      </div>
-      <label className="mona-media-url-input">
-        <input
+      </ToggleGroup>
+      <div className="mona-media-url-input">
+        <Input
           aria-label={t(`foundation.editor.media.${type}Placeholder`)}
           onChange={event => type === 'video' ? setVideoSrc(event.target.value) : setAudioSrc(event.target.value)}
           placeholder={t(`foundation.editor.media.${type}Placeholder`)}
           type="text"
           value={type === 'video' ? videoSrc : audioSrc}
         />
-      </label>
+      </div>
       <div className="mona-media-actions">
         <input
           accept={`${type}/*`}
@@ -106,12 +109,11 @@ export function EditorMediaInput({
           ref={type === 'video' ? videoInputRef : audioInputRef}
           type="file"
         />
-        <button className="mona-media-button" onClick={() => (type === 'video' ? videoInputRef : audioInputRef).current?.click()} type="button">
+        <Button className="mona-media-button" onClick={() => (type === 'video' ? videoInputRef : audioInputRef).current?.click()} size="editor" variant="outline">
           <UploadIcon /> {t(`foundation.editor.media.upload${type === 'video' ? 'Video' : 'Audio'}`)}
-        </button>
+        </Button>
         <div className="mona-media-confirm-actions">
-          <button className="mona-media-button" onClick={onClose} type="button">{t('foundation.editor.media.cancel')}</button>
-          <button className="mona-media-button is-primary" onClick={confirm} type="button">{t('foundation.editor.media.confirm')}</button>
+          <Button className="mona-media-button" onClick={confirm} size="editor">{t('foundation.editor.media.confirm')}</Button>
         </div>
       </div>
     </div>

@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import type { TFunction } from 'i18next'
 
-import type { PresentationCommand } from '@mona/presentation-core'
+import { validateImportedSlides, type PresentationCommand } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
+
+import { sanitizeSlides } from '@/lib/deck-sanitizer'
 
 import { decryptNativePresentation } from '@/features/editor/editor-file-format'
 import { loadGoogleFonts } from '@/features/editor/editor-fonts'
 import { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
 import type { ParsedPptxPresentation } from '@/features/editor/editor-pptx-import'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
-import { replaceLegacyPlaceholders } from '@/lib/utils'
+import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
 
-export type ImportFileType = 'json' | 'pptist' | 'pptx'
+export type ImportFileType = 'json' | 'native' | 'pptx'
 
 export interface ImportRequestDetail {
   files: FileList | File[]
@@ -26,8 +28,6 @@ interface SerializedPresentation {
   title?: string
   width?: number
 }
-
-const notify = (text: string) => window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text, type: 'error' } }))
 
 const readText = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
@@ -75,9 +75,22 @@ const applySerializedPresentation = (runtime: EditorRuntime, serialized: Seriali
 }
 
 
-const importSerialized = async (runtime: EditorRuntime, file: File, type: 'json' | 'pptist', cover: boolean) => {
+const importSerialized = async (runtime: EditorRuntime, file: File, type: 'json' | 'native', cover: boolean) => {
   const source = await readText(file)
-  const serialized = JSON.parse(type === 'pptist' ? decryptNativePresentation(source) : source) as SerializedPresentation
+  const parsed: unknown = JSON.parse(type === 'native' ? decryptNativePresentation(source) : source)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Imported file is not a presentation envelope')
+  const envelope = parsed as Partial<SerializedPresentation> & Record<string, unknown>
+  const validation = validateImportedSlides(envelope.slides)
+  if (!validation.valid) {
+    throw new Error(`Imported slides failed validation: ${validation.issues.map(issue => issue.message).join('; ')}`)
+  }
+  const serialized: SerializedPresentation = {
+    slides: sanitizeSlides(envelope.slides as Slide[]),
+    height: typeof envelope.height === 'number' && Number.isFinite(envelope.height) ? envelope.height : undefined,
+    theme: envelope.theme && typeof envelope.theme === 'object' && !Array.isArray(envelope.theme) ? envelope.theme as Partial<SlideTheme> : undefined,
+    title: typeof envelope.title === 'string' ? envelope.title : undefined,
+    width: typeof envelope.width === 'number' && Number.isFinite(envelope.width) ? envelope.width : undefined,
+  }
   applySerializedPresentation(runtime, serialized, cover)
 }
 
@@ -93,12 +106,14 @@ const importPptx = async (runtime: EditorRuntime, file: File, t: TFunction, opti
   const height = parsed.size.height
   const ratio = options.fixedViewport ? 1000 / width : 96 / 72
   const importedTheme = { ...presentation.theme, themeColors: parsed.themeColors }
-  const slides = convertParsedPptxSlides({
-    coordinateLabel: number => replaceLegacyPlaceholders(t('chartData.coordinate'), { number }),
+  // The converter builds HTML out of pptx XML text runs, so its output goes
+  // through the same sanitizer as directly imported markup.
+  const slides = sanitizeSlides(convertParsedPptxSlides({
+    coordinateLabel: number => t('chartData.coordinate', { number }),
     parsed,
     ratio,
     theme: importedTheme,
-  })
+  }))
   const commands: PresentationCommand[] = [{ type: 'presentation.theme.update', props: { themeColors: parsed.themeColors } }]
   if (!options.fixedViewport) commands.push({ type: 'presentation.viewport-size.set', size: width * ratio })
   runtime.commit('Import PowerPoint setup', commands, { recordHistory: false })
@@ -115,28 +130,37 @@ const importPptx = async (runtime: EditorRuntime, file: File, t: TFunction, opti
   else runtime.insertImportedSlides(slides)
 }
 
-export function useEditorImport(runtime: EditorRuntime, t: TFunction) {
+export function useEditorImport(
+  runtime: EditorRuntime,
+  t: TFunction,
+  notify: EditorNotificationService['notify'],
+) {
   const [importing, setImporting] = useState(false)
 
-  useEffect(() => {
-    const handle = (event: Event) => {
-      const detail = (event as CustomEvent<ImportRequestDetail>).detail
-      const file = detail?.files?.[0]
-      if (!file) return
-      const cover = detail.options?.cover ?? false
-      if (detail.type === 'pptx') {
+  const importFiles = useCallback(async (request: ImportRequestDetail) => {
+    const file = request.files[0]
+    if (!file) return
+    const cover = request.options?.cover ?? false
+    try {
+      if (request.type === 'pptx') {
         setImporting(true)
-        void importPptx(runtime, file, t, { cover, fixedViewport: detail.options?.fixedViewport ?? false })
-          .catch(() => notify(t('runtime.fileParseFailed')))
-          .finally(() => setImporting(false))
+        await importPptx(runtime, file, t, {
+          cover,
+          fixedViewport: request.options?.fixedViewport ?? false,
+        })
       }
-      else {
-        void importSerialized(runtime, file, detail.type, cover).catch(() => notify(t('runtime.fileParseFailed')))
-      }
+      else await importSerialized(runtime, file, request.type, cover)
     }
-    window.addEventListener('mona:import-request', handle)
-    return () => window.removeEventListener('mona:import-request', handle)
-  }, [runtime, t])
+    catch {
+      notify({ text: t('runtime.fileParseFailed'), type: 'error' })
+    }
+    finally {
+      if (request.type === 'pptx') setImporting(false)
+    }
+  }, [notify, runtime, t])
 
-  return importing
+  return {
+    importFiles,
+    importing,
+  }
 }

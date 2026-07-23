@@ -6,6 +6,7 @@ import ScreenshotIcon from '~icons/icon-park-outline/screenshot-one'
 import UndoIcon from '~icons/icon-park-outline/undo'
 import type { PPTVideoElement } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
 import { InspectorSwitch } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
@@ -54,16 +55,16 @@ export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement
       <div className="mona-video-style-title">{t('foundation.editor.media.videoPoster')}</div>
       <div className="mona-video-poster-wrapper">
         <input accept="image/*" aria-label={t('foundation.editor.media.videoPoster')} className="mona-media-file-input" onChange={event => void setPoster(event)} ref={inputRef} type="file" />
-        <button className="mona-video-poster" onClick={() => inputRef.current?.click()} type="button">
+        <Button className="mona-video-poster" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
           <span className="mona-video-poster-content" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
-        </button>
+        </Button>
       </div>
       <div className="mona-panel-row">
-        <button className="mona-panel-button mona-media-full-button" onClick={setPosterFromFirstFrame} type="button"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</button>
+        <Button className="mona-panel-button mona-media-full-button" onClick={setPosterFromFirstFrame} size="editor" type="button" variant="editor"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</Button>
       </div>
       {element.poster ? (
         <div className="mona-panel-row">
-          <button className="mona-panel-button mona-media-full-button" onClick={() => update({ poster: '' })} type="button"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</button>
+          <Button className="mona-panel-button mona-media-full-button" onClick={() => update({ poster: '' })} size="editor" type="button" variant="editor"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</Button>
         </div>
       ) : null}
       <div className="mona-inspector-divider" />

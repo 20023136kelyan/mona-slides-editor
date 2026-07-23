@@ -1,0 +1,23 @@
+{
+  "name": "@mona/agent-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.81.1",
+    "@mona/agent-protocol": "0.0.0",
+    "image-size": "1.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "tsx": "4.21.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

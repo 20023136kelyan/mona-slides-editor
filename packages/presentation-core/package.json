@@ -6,8 +6,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./animation-config": "./src/animation-config.ts",
-    "./gate4-editor-fixture": "./src/gate4-editor-fixture.ts",
-    "./gate5-multi-fixture": "./src/gate5-multi-fixture.ts",
     "./latex-presets": "./src/latex-presets.ts",
     "./line-presets": "./src/line-presets.ts",
     "./model": "./src/model.ts",
@@ -20,7 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "nanoid": "5.0.7"
+    "nanoid": "5.1.16"
   },
   "devDependencies": {
     "typescript": "7.0.2",

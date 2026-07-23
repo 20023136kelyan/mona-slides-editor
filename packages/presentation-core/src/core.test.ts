@@ -10,7 +10,7 @@ import {
 } from './queries'
 import type { PresentationState } from './state'
 import { applyPresentationTransaction, createPresentationTransaction } from './transactions'
-import { validatePresentationState } from './validation'
+import { validateImportedSlides, validatePresentationState } from './validation'
 
 const shape = (id: string, left = 0): PPTShapeElement => ({
   type: 'shape',
@@ -141,5 +141,87 @@ describe('presentation core', () => {
       { animations: [animations[1]], autoNext: true },
       { animations: [animations[3]], autoNext: false },
     ])
+  })
+})
+
+describe('validateImportedSlides', () => {
+  const validSlide = () => ({
+    id: 'slide-1',
+    elements: [
+      { id: 'element-1', type: 'text', content: '<p>hi</p>', left: 0, top: 0, width: 100, height: 50 },
+      { id: 'element-2', type: 'line', left: 0, top: 0, width: 100, start: [0, 0], end: [1, 1] },
+    ],
+  })
+
+  it('accepts structurally sound slides', () => {
+    expect(validateImportedSlides([validSlide()]).valid).toBe(true)
+  })
+
+  it('accepts page metadata and rejects invalid title, hidden, and duration values', () => {
+    expect(validateImportedSlides([{
+      ...validSlide(),
+      durationMs: 45_000,
+      hidden: true,
+      title: 'Opening',
+    }]).valid).toBe(true)
+
+    for (const slide of [
+      { ...validSlide(), title: 42 },
+      { ...validSlide(), hidden: 'yes' },
+      { ...validSlide(), durationMs: 999 },
+      { ...validSlide(), durationMs: 3_600_001 },
+      { ...validSlide(), durationMs: Number.NaN },
+    ]) {
+      expect(validateImportedSlides([slide]).valid).toBe(false)
+    }
+  })
+
+  it('rejects non-arrays, empty arrays, and non-object slides', () => {
+    expect(validateImportedSlides(undefined).valid).toBe(false)
+    expect(validateImportedSlides({}).valid).toBe(false)
+    expect(validateImportedSlides([]).valid).toBe(false)
+    expect(validateImportedSlides(['slide']).valid).toBe(false)
+    expect(validateImportedSlides([null]).valid).toBe(false)
+  })
+
+  it('rejects missing ids, unknown element types, and non-finite geometry', () => {
+    expect(validateImportedSlides([{ ...validSlide(), id: '' }]).valid).toBe(false)
+    expect(validateImportedSlides([{ id: 's', elements: [{ id: 'e', type: 'iframe', left: 0, top: 0, width: 1, height: 1 }] }]).valid).toBe(false)
+    expect(validateImportedSlides([{ id: 's', elements: [{ id: 'e', type: 'text', left: Number.NaN, top: 0, width: 1, height: 1 }] }]).valid).toBe(false)
+    expect(validateImportedSlides([{ id: 's', elements: [{ id: 'e', type: 'text', left: '10', top: 0, width: 1, height: 1 }] }]).valid).toBe(false)
+    expect(validateImportedSlides([{ id: 's', elements: 'none' }]).valid).toBe(false)
+  })
+
+  it('does not require height for line elements but requires it elsewhere', () => {
+    expect(validateImportedSlides([{ id: 's', elements: [{ id: 'e', type: 'line', left: 0, top: 0, width: 1 }] }]).valid).toBe(true)
+    expect(validateImportedSlides([{ id: 's', elements: [{ id: 'e', type: 'text', left: 0, top: 0, width: 1 }] }]).valid).toBe(false)
+  })
+})
+
+describe('cross-slide element commands', () => {
+  it('targets an explicit slide and rejects missing or duplicate element identities atomically', () => {
+    const state = fixture()
+    const added = applyPresentationCommand(state, {
+      type: 'element.add',
+      slideId: 'slide-2',
+      elements: shape('agent-shape'),
+    })
+    expect(added.state.slides[0]?.elements.map(element => element.id)).toEqual(['shape-1'])
+    expect(added.state.slides[1]?.elements.map(element => element.id)).toEqual(['shape-2', 'agent-shape'])
+
+    expect(() => applyPresentationCommand(state, {
+      type: 'element.add',
+      slideId: 'slide-1',
+      elements: shape('shape-1'),
+    })).toThrow(/duplicate element id/i)
+    expect(() => applyPresentationCommand(state, {
+      type: 'element.update',
+      payload: { id: 'missing', slideId: 'slide-2', props: { left: 100 } },
+    })).toThrow(/element not found/i)
+    expect(() => applyPresentationCommand(state, {
+      type: 'element.delete',
+      slideId: 'slide-2',
+      elementIds: 'missing',
+    })).toThrow(/element not found/i)
   })
 })

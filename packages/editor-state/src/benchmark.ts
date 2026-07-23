@@ -2,7 +2,7 @@ import { createPresentationTransaction, type PresentationState } from '@mona/pre
 import { createInteractionController } from '@mona/editor-interactions'
 import { createEditorStore, editorActions } from './index'
 
-export interface Gate2BenchmarkResult {
+export interface EditorStateBenchmarkResult {
   deck: {
     slides: number
     elements: number
@@ -31,10 +31,10 @@ const percentile = (samples: number[], fraction: number) => {
   return sorted[index] ?? 0
 }
 
-export const runGate2Benchmark = (
+export const runEditorStateBenchmark = (
   presentation: PresentationState,
   options: { transactionSamples?: number; pointerSamples?: number } = {},
-): Gate2BenchmarkResult => {
+): EditorStateBenchmarkResult => {
   const transactionSamples = options.transactionSamples ?? 300
   const pointerSamples = options.pointerSamples ?? 20_000
   const store = createEditorStore({ presentation, devChecks: false })

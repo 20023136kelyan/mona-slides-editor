@@ -1,0 +1,16 @@
+{
+  "name": "@mona/test-fixtures",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./editor-interactions": "./src/editor-interactions.ts",
+    "./multi-elements": "./src/multi-elements.ts",
+    "./slideshow": "./src/slideshow.ts",
+    "./workflows": "./src/workflows.ts"
+  },
+  "dependencies": {
+    "@mona/presentation-core": "0.0.0"
+  }
+}

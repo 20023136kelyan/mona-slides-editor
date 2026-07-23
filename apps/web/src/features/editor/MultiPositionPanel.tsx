@@ -13,12 +13,12 @@ import { createPresentationId, type PresentationState } from '@mona/presentation
 
 import { InspectorButton, InspectorButtonGroup } from '@/features/editor/EditorInspectorPrimitives'
 import {
-  alignActiveElementsLikePptist,
-  alignElementsToCanvasLikePptist,
-  getMultiSelectionStateLikePptist,
-  groupElementsLikePptist,
-  uniformDisplayElementsLikePptist,
-  ungroupElementsLikePptist,
+  alignActiveElements,
+  alignElementsToCanvas,
+  getMultiSelectionState,
+  groupElements,
+  distributeElements,
+  ungroupElements,
   type MultiAlignmentCommand,
   type UniformDisplayAxis,
 } from '@/features/editor/editor-geometry'
@@ -38,7 +38,7 @@ export function MultiPositionPanel({
   const { t } = useTranslation()
   const slide = presentation.slides[presentation.slideIndex]!
   const selectedIds = new Set(activeElementIds)
-  const { canCombine, displayItemCount } = getMultiSelectionStateLikePptist(slide.elements, selectedIds)
+  const { canCombine, displayItemCount } = getMultiSelectionState(slide.elements, selectedIds)
   const commitElements = (label: string, elements: typeof slide.elements) => runtime.commit(label, [{
     type: 'slide.update',
     props: { elements },
@@ -46,8 +46,8 @@ export function MultiPositionPanel({
 
   const align = (command: MultiAlignmentCommand) => {
     const elements = canCombine
-      ? alignActiveElementsLikePptist({ command, elements: slide.elements, selectedIds })
-      : alignElementsToCanvasLikePptist({
+      ? alignActiveElements({ command, elements: slide.elements, selectedIds })
+      : alignElementsToCanvas({
         command,
         elements: slide.elements,
         selectedIds,
@@ -58,7 +58,7 @@ export function MultiPositionPanel({
   }
 
   const distribute = (axis: UniformDisplayAxis) => {
-    commitElements('Distribute selected elements', uniformDisplayElementsLikePptist({
+    commitElements('Distribute selected elements', distributeElements({
       axis,
       elements: slide.elements,
       selectedIds,
@@ -67,7 +67,7 @@ export function MultiPositionPanel({
 
   const group = () => {
     if (!canCombine) return
-    commitElements('Group elements', groupElementsLikePptist(
+    commitElements('Group elements', groupElements(
       slide.elements,
       selectedIds,
       createPresentationId(10),
@@ -76,7 +76,7 @@ export function MultiPositionPanel({
 
   const ungroup = () => {
     if (canCombine) return
-    const elements = ungroupElementsLikePptist(slide.elements, selectedIds)
+    const elements = ungroupElements(slide.elements, selectedIds)
     if (!elements) return
     if (!commitElements('Ungroup elements', elements)) return
     runtime.store.dispatch(editorActions.selectionChanged(handleElementId ? [handleElementId] : []))

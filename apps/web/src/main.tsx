@@ -9,15 +9,20 @@ import { initializeI18n } from '@/i18n'
 
 import './index.css'
 
-// PPTist arms a leave-confirmation prompt outside development so a stray
-// tab close or refresh cannot silently discard the deck.
-if (!import.meta.env.DEV) {
-  window.onbeforeunload = () => false
-}
+// The leave-confirmation prompt is owned by editor-persistence: it fires only
+// while an edit is still in flight to IndexedDB, instead of the established editor's
+// unconditional nag (the working copy makes reloads lossless).
 
-// PPTist suppresses the native context menu globally (index.html); surfaces
-// with custom menus attach their own handlers on top.
-document.oncontextmenu = event => event.preventDefault()
+// the source editor suppresses the native context menu globally (index.html); surfaces
+// with custom menus attach their own handlers on top. Native form fields are
+// exempt so title rename, link inputs, and the notes editor keep the
+// browser's paste/spellcheck menu (rich-text stays suppressed: the canvas
+// provides its own menu there).
+document.oncontextmenu = event => {
+  const target = event.target as Element | null
+  if (target?.closest('input, textarea')) return
+  event.preventDefault()
+}
 
 const bootstrap = async () => {
   await initializeI18n()

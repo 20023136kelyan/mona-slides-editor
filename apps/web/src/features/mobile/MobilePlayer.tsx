@@ -1,10 +1,11 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- The rotated full-screen mobile navigation surface intentionally mirrors PPTist's touch/click contract. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- The rotated full-screen mobile navigation surface intentionally mirrors the established editor's touch/click contract. */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import LogoutIcon from '~icons/icon-park-outline/logout'
 import { selectPresentation } from '@mona/editor-state'
 
+import { Button } from '@/components/ui/button'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { MobileThumbnails } from '@/features/mobile/MobileThumbnails'
@@ -14,7 +15,7 @@ import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 const RANDOM_TURNING_MODES = ['fade', 'slideX', 'slideY'] as const
 const resolveTurningModes = (slides: readonly import('@mona/presentation-core/model').Slide[]) => slides.map(slide => {
   let turningMode = slide.turningMode || 'slideY'
-  // PPTist intentionally resolves a fresh random transition whenever the slides collection invalidates.
+  // the source editor intentionally resolves a fresh random transition whenever the slides collection invalidates.
   // eslint-disable-next-line react-hooks/purity
   if (turningMode === 'random') turningMode = RANDOM_TURNING_MODES[Math.floor(Math.random() * RANDOM_TURNING_MODES.length)]!
   return { ...slide, turningMode }
@@ -110,7 +111,7 @@ export function MobilePlayer({ changeMode, runtime }: {
       {toolVisible ? (
         <>
           <div className="mona-mobile-player-header">
-            <button className="mona-mobile-player-back" onClick={() => changeMode('preview')} type="button"><LogoutIcon /> {t('mobile.exitPlay')}</button>
+            <Button className="mona-mobile-player-back" onClick={() => changeMode('preview')} size="editor" type="button" variant="ghost"><LogoutIcon /> {t('mobile.exitPlay')}</Button>
           </div>
           <MobileThumbnails className="mona-mobile-player-thumbnails" runtime={runtime} />
         </>

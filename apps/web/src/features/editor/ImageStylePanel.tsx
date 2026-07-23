@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- PPTist's filter preset and crop-item divs are required for exact raster parity. */
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- crop thumbnails and filter previews are composite visual controls with explicit labels. */
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -129,7 +129,7 @@ export function ImageStylePanel({ element, presentation, runtime }: {
     }
     commands.push({
       type: 'element.properties.remove',
-      // Keep PPTist's legacy `flip` removal literally. The source does not
+      // Keep the established editor's legacy `flip` removal literally. The source does not
       // clear the independent flipH / flipV flags during reset.
       payload: { id: element.id, property: ['clip', 'outline', 'flip', 'shadow', 'filters', 'colorMask', 'radius'] },
     })

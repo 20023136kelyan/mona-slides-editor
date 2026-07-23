@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- PPTist's preset div is retained for its exact anonymous-flex text layout; keyboard button semantics are implemented below. */
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- the established editor's preset div is retained for its exact anonymous-flex text layout; keyboard button semantics are implemented below. */
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,6 +42,8 @@ import type {
 } from '@mona/presentation-core/model'
 import type { RichTextAction } from '@mona/rich-text'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   InspectorButton,
   InspectorButtonGroup,
@@ -159,19 +161,21 @@ function ListStylePopover({
         <div className="mona-list-style-wrap">
           {options.map(value => (
             <InspectorPopoverClose key={value}>
-              <button
+              <Button
                 aria-label={`${ariaLabel}: ${value}`}
                 className="mona-list-style-option"
                 onClick={() => onSelect(value)}
+                size="editor"
                 style={{ listStyleType: value } as CSSProperties}
                 type="button"
+                variant="ghost"
               >
                 <ul style={{ listStyleType: value }}>
                   <li><span /></li>
                   <li><span /></li>
                   <li><span /></li>
                 </ul>
-              </button>
+              </Button>
             </InspectorPopoverClose>
           ))}
         </div>
@@ -189,9 +193,9 @@ function IndentPopover({ ariaLabel, onSelect }: { ariaLabel: string; onSelect: (
       ariaLabel={ariaLabel}
       content={(
         <InspectorPopoverClose>
-          <button className="mona-panel-popover-menu-item is-centered" onClick={onSelect} type="button">
+          <Button className="mona-panel-popover-menu-item is-centered" onClick={onSelect} size="editor" type="button" variant="ghost">
             {ariaLabel}
-          </button>
+          </Button>
         </InspectorPopoverClose>
       )}
       className="mona-popover-split-button"
@@ -230,24 +234,25 @@ function TextLinkControl({
         ariaLabel={t('foundation.editor.text.hyperlink')}
         content={(
           <form className="mona-text-link-popover" onSubmit={update}>
-            <input
+            <Input
               aria-label={t('foundation.editor.text.hyperlink')}
               onChange={event => setDraft(event.target.value)}
               placeholder={t('foundation.editor.text.hyperlinkPlaceholder')}
               value={draft}
             />
             <div className="mona-text-link-actions">
-              <button
+              <Button
                 disabled={!activeLink}
                 onClick={() => {
                   execute({ command: 'link' })
                   close()
                 }}
-                type="button"
+                size="sm"
+                variant="outline"
               >
                 {t('foundation.editor.text.remove')}
-              </button>
-              <button className="is-primary" type="submit">{t('foundation.editor.text.confirm')}</button>
+              </Button>
+              <Button size="sm" type="submit">{t('foundation.editor.text.confirm')}</Button>
             </div>
           </form>
         )}
@@ -329,14 +334,16 @@ function AIWritingControl({
               ['aiExpand', 'aiCommandExpand'],
               ['aiCondense', 'aiCommandCondense'],
             ] as const).map(([label, command]) => (
-              <button
+              <Button
                 className="mona-panel-popover-menu-item is-centered"
                 key={label}
                 onClick={() => run(t(`foundation.editor.text.${command}`))}
+                size="editor"
                 type="button"
+                variant="ghost"
               >
                 {t(`foundation.editor.text.${label}`)}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -392,10 +399,10 @@ export function RichTextBaseControls({
       </div>
 
       <InspectorButtonGroup className="mona-panel-row-full is-passive">
-        <InspectorColorButton ariaLabel={t('foundation.editor.text.textColor')} color={attrs.color} icon={<TextIcon />} onChange={value => execute({ command: 'color', value })} style={{ width: '30%' }} />
-        <InspectorColorButton ariaLabel={t('foundation.editor.text.highlight')} color={attrs.backcolor} icon={<HighlightIcon />} onChange={value => execute({ command: 'backcolor', value })} style={{ width: '30%' }} />
-        <InspectorButton ariaLabel={t('foundation.editor.text.increaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-add' })} style={{ width: '20%' }}><FontSizeIcon />+</InspectorButton>
-        <InspectorButton ariaLabel={t('foundation.editor.text.decreaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-reduce' })} style={{ width: '20%' }}><FontSizeIcon />-</InspectorButton>
+        <InspectorColorButton ariaLabel={t('foundation.editor.text.textColor')} color={attrs.color} icon={<TextIcon />} onChange={value => execute({ command: 'color', value })} style={{ flex: 1 }} />
+        <InspectorColorButton ariaLabel={t('foundation.editor.text.highlight')} color={attrs.backcolor} icon={<HighlightIcon />} onChange={value => execute({ command: 'backcolor', value })} style={{ flex: 1 }} />
+        <InspectorButton ariaLabel={t('foundation.editor.text.increaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-add' })} style={{ flex: 1 }}><FontSizeIcon />+</InspectorButton>
+        <InspectorButton ariaLabel={t('foundation.editor.text.decreaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-reduce' })} style={{ flex: 1 }}><FontSizeIcon />-</InspectorButton>
       </InspectorButtonGroup>
 
       <InspectorButtonGroup className="mona-panel-row-full">
@@ -551,19 +558,19 @@ export function TextStylePanel({
           color={attrs.color}
           icon={<TextIcon />}
           onChange={value => execute({ command: 'color', value })}
-          style={{ width: '30%' }}
+          style={{ flex: 1 }}
         />
         <InspectorColorButton
           ariaLabel={t('foundation.editor.text.highlight')}
           color={attrs.backcolor}
           icon={<HighlightIcon />}
           onChange={value => execute({ command: 'backcolor', value })}
-          style={{ width: '30%' }}
+          style={{ flex: 1 }}
         />
-        <InspectorButton ariaLabel={t('foundation.editor.text.increaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-add' })} style={{ width: '20%' }}>
+        <InspectorButton ariaLabel={t('foundation.editor.text.increaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-add' })} style={{ flex: 1 }}>
           <FontSizeIcon />+
         </InspectorButton>
-        <InspectorButton ariaLabel={t('foundation.editor.text.decreaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-reduce' })} style={{ width: '20%' }}>
+        <InspectorButton ariaLabel={t('foundation.editor.text.decreaseFont')} className="mona-font-size-button" onClick={() => execute({ command: 'fontsize-reduce' })} style={{ flex: 1 }}>
           <FontSizeIcon />-
         </InspectorButton>
       </InspectorButtonGroup>

@@ -19,10 +19,11 @@ import type {
 
 import type { EditorExportActions } from '@/features/editor/EditorExportDialog'
 import { encryptNativePresentation } from '@/features/editor/editor-file-format'
+import { applyPptxSlideMetadata } from '@/features/editor/editor-pptx-slide-metadata'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { getLinePath, getOutlineRenderStyle } from '@/features/presentation-renderer/render-utils'
-import { replaceLegacyPlaceholders } from '@/lib/utils'
 
 interface ExportImageConfig {
   fontEmbedCSS?: string
@@ -36,10 +37,6 @@ const DEFAULT_FONT_SIZE = 16
 const DASH_TYPE = { dashed: 'dash', dotted: 'sysDot', solid: 'solid' } as const
 
 const nextFrame = (delay = 200) => new Promise<void>(resolve => window.setTimeout(resolve, delay))
-
-const notify = (text: string) => {
-  window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text, type: 'error' } }))
-}
 
 function formatColor(color: string | undefined) {
   if (!color) return { alpha: 0, color: '#000000' }
@@ -55,7 +52,7 @@ function setPptxLayout(pptx: PptxGenJS, presentation: PresentationState, ratioPx
   if (presentation.viewportRatio === 0.625) pptx.layout = 'LAYOUT_16x10'
   else if (presentation.viewportRatio === 0.75) pptx.layout = 'LAYOUT_4x3'
   else {
-    const name = 'PPTIST_CUSTOM_LAYOUT'
+    const name = 'MONA_CUSTOM_LAYOUT'
     pptx.defineLayout({
       name,
       width: presentation.viewportSize / ratioPx2Inch,
@@ -336,11 +333,12 @@ async function exportEditablePptx(
   setPptxLayout(pptx, presentation, ratioPx2Inch)
   if (masterOverwrite) {
     const background = formatColor(presentation.theme.backgroundColor)
-    pptx.defineSlideMaster({ title: 'PPTIST_MASTER', background: { color: background.color, transparency: (1 - background.alpha) * 100 } })
+    pptx.defineSlideMaster({ title: 'MONA_MASTER', background: { color: background.color, transparency: (1 - background.alpha) * 100 } })
   }
 
   for (const slide of slides) {
     const output = pptx.addSlide()
+    applyPptxSlideMetadata(output, slide)
     const background = slide.background
     if (background?.type === 'image' && background.image) {
       if (isSvgImage(background.image.src)) output.addImage({ data: background.image.src, h: presentation.viewportSize * presentation.viewportRatio / ratioPx2Inch, w: presentation.viewportSize / ratioPx2Inch, x: 0, y: 0 })
@@ -507,7 +505,7 @@ async function exportEditablePptx(
         output.addShape('custGeom' as PptxGenJS.ShapeType, options)
       }
       else if (element.type === 'chart') {
-        const data = element.data.series.map((values, index) => ({ labels: element.data.labels, name: replaceLegacyPlaceholders(t('chartData.series'), { number: index + 1 }), values }))
+        const data = element.data.series.map((values, index) => ({ labels: element.data.labels, name: t('chartData.series', { number: index + 1 }), values }))
         let colors: string[]
         if (element.themeColors.length === 10) colors = element.themeColors.map(color => formatColor(color).color)
         else if (element.themeColors.length === 1) colors = tinycolor(element.themeColors[0]).analogous(10).map(color => formatColor(color.toHexString()).color)
@@ -642,6 +640,7 @@ function exportPayload(presentation: PresentationState, slides = presentation.sl
 }
 
 export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): EditorExportActions {
+  const { notifications } = useEditorApplication()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   return useMemo(() => ({
     exportImage: async (node, format, quality, ignoreWebfont) => {
@@ -654,7 +653,7 @@ export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): Ed
         saveAs(data, `${presentation.title}.${format}`)
       }
       catch {
-        notify(t('runtime.exportImageFailed'))
+        notifications.notify({ text: t('runtime.exportImageFailed'), type: 'error' })
       }
     },
     exportImagePptx: async nodes => {
@@ -671,19 +670,19 @@ export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): Ed
         await pptx.writeFile({ fileName: `${presentation.title}.pptx` })
       }
       catch {
-        notify(t('runtime.exportFailed'))
+        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
     exportJson: () => saveAs(new Blob([JSON.stringify(exportPayload(presentation))], { type: '' }), `${presentation.title}.json`),
-    exportNative: slides => saveAs(new Blob([encryptNativePresentation(JSON.stringify(exportPayload(presentation, slides)))], { type: '' }), `${presentation.title}.pptist`),
+    exportNative: slides => saveAs(new Blob([encryptNativePresentation(JSON.stringify(exportPayload(presentation, slides)))], { type: '' }), `${presentation.title}.mona`),
     exportPptx: async (slides, masterOverwrite, ignoreMedia) => {
       try {
         await exportEditablePptx(presentation, slides, masterOverwrite, ignoreMedia, t) 
       }
       catch {
-        notify(t('runtime.exportFailed')) 
+        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
     printPdf: printNode,
-  }), [presentation, t])
+  }), [notifications, presentation, t])
 }

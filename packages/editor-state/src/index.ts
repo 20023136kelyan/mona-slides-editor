@@ -22,17 +22,21 @@ export interface EditorSessionState {
   selectedSlideIndexes: number[]
   activeTool: string | null
   creatingCustomShape: boolean
-  openPanels: string[]
+  drawingMode: boolean
+  sketchesVisible: boolean
   canvasZoom: number
   canvasPan: { x: number; y: number }
   canvasDragged: boolean
   canvasFocus: boolean
+  pageSelected: boolean
+  workspaceMode: 'canvas' | 'page-grid'
+  filmstripVisible: boolean
   thumbnailsFocus: boolean
   disableHotkeys: boolean
+  editingTextElementId: string | null
   selectedTableCells: string[]
   gridLineSize: number
   showRuler: boolean
-  showBubbleMenu: boolean
   cropElementId: string | null
   toolbarState: EditorToolbarState
 }
@@ -75,17 +79,21 @@ const createSessionState = (
   selectedSlideIndexes: input.selectedSlideIndexes ?? [],
   activeTool: input.activeTool ?? null,
   creatingCustomShape: input.creatingCustomShape ?? false,
-  openPanels: input.openPanels ?? [],
+  drawingMode: input.drawingMode ?? false,
+  sketchesVisible: input.sketchesVisible ?? true,
   canvasZoom: input.canvasZoom ?? 90,
   canvasPan: input.canvasPan ?? { x: 0, y: 0 },
   canvasDragged: input.canvasDragged ?? false,
   canvasFocus: input.canvasFocus ?? false,
+  pageSelected: input.pageSelected ?? true,
+  workspaceMode: input.workspaceMode ?? 'canvas',
+  filmstripVisible: input.filmstripVisible ?? true,
   thumbnailsFocus: input.thumbnailsFocus ?? false,
   disableHotkeys: input.disableHotkeys ?? false,
+  editingTextElementId: input.editingTextElementId ?? null,
   selectedTableCells: input.selectedTableCells ?? [],
   gridLineSize: input.gridLineSize ?? 0,
   showRuler: input.showRuler ?? false,
-  showBubbleMenu: input.showBubbleMenu ?? false,
   cropElementId: input.cropElementId ?? null,
   toolbarState: input.toolbarState ?? 'slideDesign',
 })
@@ -157,6 +165,8 @@ const editorSlice = createSlice({
       state.session.handleElementId = action.payload.length === 1 ? action.payload[0] ?? null : null
       state.session.activeGroupElementId = null
       state.session.selectedTableCells = []
+      state.session.pageSelected = false
+      state.session.editingTextElementId = null
     },
     handleElementChanged(state, action: PayloadAction<string | null>) {
       state.session.handleElementId = action.payload
@@ -173,24 +183,25 @@ const editorSlice = createSlice({
     },
     activeToolChanged(state, action: PayloadAction<string | null>) {
       state.session.activeTool = action.payload
+      if (action.payload) state.session.pageSelected = false
     },
     creatingCustomShapeChanged(state, action: PayloadAction<boolean>) {
       state.session.creatingCustomShape = action.payload
     },
-    panelVisibilityChanged(state, action: PayloadAction<{ open: boolean; panel: string }>) {
-      const { open, panel } = action.payload
-      const next = state.session.openPanels.filter(item => item !== panel)
-      if (open) next.push(panel)
-      state.session.openPanels = next
+    drawingModeChanged(state, action: PayloadAction<boolean>) {
+      state.session.drawingMode = action.payload
+      state.session.creatingCustomShape = false
+      state.session.activeTool = null
+      state.session.canvasFocus = action.payload
+      state.session.pageSelected = action.payload
+        ? false
+        : state.session.activeElementIds.length === 0
     },
-    panelToggled(state, action: PayloadAction<string>) {
-      const panel = action.payload
-      state.session.openPanels = state.session.openPanels.includes(panel)
-        ? state.session.openPanels.filter(item => item !== panel)
-        : [...state.session.openPanels, panel]
+    sketchesVisibilityChanged(state, action: PayloadAction<boolean>) {
+      state.session.sketchesVisible = action.payload
     },
     canvasZoomChanged(state, action: PayloadAction<number>) {
-      // PPTist's 5% commands are guarded at 30% and 200%, so one final
+      // the established editor's 5% commands are guarded at 30% and 200%, so one final
       // command reaches the effective extrema of 25% and 205%.
       state.session.canvasZoom = Math.min(205, Math.max(25, action.payload))
     },
@@ -203,12 +214,31 @@ const editorSlice = createSlice({
     canvasFocusChanged(state, action: PayloadAction<boolean>) {
       state.session.canvasFocus = action.payload
     },
+    pageSelectionChanged(state, action: PayloadAction<boolean>) {
+      state.session.pageSelected = action.payload
+    },
+    workspaceModeChanged(state, action: PayloadAction<'canvas' | 'page-grid'>) {
+      state.session.workspaceMode = action.payload
+      state.session.drawingMode = false
+      state.session.canvasFocus = false
+      state.session.pageSelected = action.payload === 'canvas'
+      state.session.activeElementIds = []
+      state.session.handleElementId = null
+      state.session.activeGroupElementId = null
+      state.session.editingTextElementId = null
+    },
+    filmstripVisibilityChanged(state, action: PayloadAction<boolean>) {
+      state.session.filmstripVisible = action.payload
+    },
     thumbnailsFocusChanged(state, action: PayloadAction<boolean>) {
       state.session.thumbnailsFocus = action.payload
       if (!action.payload) state.session.selectedSlideIndexes = []
     },
     hotkeysDisabledChanged(state, action: PayloadAction<boolean>) {
       state.session.disableHotkeys = action.payload
+    },
+    editingTextElementChanged(state, action: PayloadAction<string | null>) {
+      state.session.editingTextElementId = action.payload
     },
     selectedTableCellsChanged(state, action: PayloadAction<string[]>) {
       state.session.selectedTableCells = action.payload
@@ -218,9 +248,6 @@ const editorSlice = createSlice({
     },
     rulerVisibilityChanged(state, action: PayloadAction<boolean>) {
       state.session.showRuler = action.payload
-    },
-    bubbleMenuVisibilityChanged(state, action: PayloadAction<boolean>) {
-      state.session.showBubbleMenu = action.payload
     },
     cropElementChanged(state, action: PayloadAction<string | null>) {
       state.session.cropElementId = action.payload

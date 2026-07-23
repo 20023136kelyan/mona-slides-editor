@@ -13,8 +13,8 @@ import type {
 } from '@mona/presentation-core/model'
 
 import {
-  alignActiveElementsLikePptist,
-  alignElementsToCanvasLikePptist,
+  alignActiveElements,
+  alignElementsToCanvas,
   buildEditorGridPath,
   buildSnapCandidates,
   buildResizeSnapCandidates,
@@ -28,21 +28,21 @@ import {
   getLassoSelectionIds,
   getLineControlPoints,
   getMinimumElementSize,
-  getMultiSelectionStateLikePptist,
+  getMultiSelectionState,
   getShapeKeypointPositions,
-  groupElementsLikePptist,
+  groupElements,
   moveLineControlPoint,
   moveShapeKeypoint,
   normalizeAngle,
-  orderElementLikePptist,
+  orderElement,
   rotateElementsAround,
   resolveCreateGestureSelection,
   scaleElementsIntoBounds,
-  setElementLocksLikePptist,
+  setElementLocks,
   snapResizePoint,
   updateImageCropGeometry,
-  ungroupElementsLikePptist,
-  uniformDisplayElementsLikePptist,
+  ungroupElements,
+  distributeElements,
 } from '@/features/editor/editor-geometry'
 
 const shape = (overrides: Partial<PPTShapeElement> = {}): PPTShapeElement => ({
@@ -101,8 +101,8 @@ const line = (overrides: Partial<PPTLineElement> = {}): PPTLineElement => ({
   ...overrides,
 })
 
-describe('Gate 4 and Gate 5 editor geometry parity contracts', () => {
-  it('preserves every Gate 5 multi-alignment and distribution source vector exactly', () => {
+describe('editor geometry contracts', () => {
+  it('preserves every multi-alignment and distribution vector exactly', () => {
     const elements: PPTElement[] = [
       shape({ id: 'rotated', left: 70, top: 65, width: 145, height: 95, rotate: 31 }),
       line({ id: 'line', left: 360, top: 90, end: [165, 48] }),
@@ -113,7 +113,7 @@ describe('Gate 4 and Gate 5 editor geometry parity contracts', () => {
     const selectedIds = new Set(elements.map(element => element.id))
     const positions = (items: PPTElement[]) => items.map(({ id, left, top }) => ({ id, left, top }))
     const align = (command: 'left' | 'horizontal' | 'right' | 'top' | 'vertical' | 'bottom') => positions(
-      alignActiveElementsLikePptist({ command, elements, selectedIds }),
+      alignActiveElements({ command, elements, selectedIds }),
     )
 
     expect(align('left')).toEqual([
@@ -159,31 +159,31 @@ describe('Gate 4 and Gate 5 editor geometry parity contracts', () => {
       { id: 'image', left: 285, top: 375 },
     ])
 
-    expect(positions(uniformDisplayElementsLikePptist({ axis: 'horizontal', elements, selectedIds }))).toEqual([
+    expect(positions(distributeElements({ axis: 'horizontal', elements, selectedIds }))).toEqual([
       { id: 'rotated', left: 70, top: 65 },
       { id: 'line', left: 440.01291126350395, top: 90 },
       { id: 'group-shape', left: 650, top: 65 },
       { id: 'group-text', left: 790, top: 120 },
       { id: 'image', left: 262.06092456131734, top: 375 },
     ])
-    expect(positions(uniformDisplayElementsLikePptist({ axis: 'vertical', elements, selectedIds }))).toEqual([
+    expect(positions(distributeElements({ axis: 'vertical', elements, selectedIds }))).toEqual([
       { id: 'rotated', left: 70, top: 64.99999999999997 },
       { id: 'line', left: 360, top: 327.54806779139705 },
       { id: 'group-shape', left: 650, top: 209.09613558279415 },
       { id: 'group-text', left: 790, top: 264.09613558279415 },
       { id: 'image', left: 285, top: 374.99999999999994 },
     ])
-    expect(getMultiSelectionStateLikePptist(elements, selectedIds)).toEqual({ canCombine: true, displayItemCount: 4 })
-    expect(getMultiSelectionStateLikePptist(elements, new Set(['group-shape', 'group-text'])))
+    expect(getMultiSelectionState(elements, selectedIds)).toEqual({ canCombine: true, displayItemCount: 4 })
+    expect(getMultiSelectionState(elements, new Set(['group-shape', 'group-text'])))
       .toEqual({ canCombine: false, displayItemCount: 1 })
   })
-  it('ports PPTist canvas alignment with its rotated-range and whole-slide clone boundary', () => {
+  it('ports the source editor canvas alignment with its rotated-range and whole-slide clone boundary', () => {
     const elements: PPTElement[] = [
       shape({ id: 'rotated', left: 80, top: 60, width: 120, height: 80, rotate: 30 }),
       line({ id: 'line', left: 300, top: 220, start: [0, 0], end: [180, 40] }),
       textElement({ id: 'untouched', left: 600, top: 300 }),
     ]
-    const aligned = alignElementsToCanvasLikePptist({
+    const aligned = alignElementsToCanvas({
       command: 'center',
       elements,
       selectedIds: new Set(['rotated', 'line']),
@@ -212,14 +212,14 @@ describe('Gate 4 and Gate 5 editor geometry parity contracts', () => {
       shape({ id: 'd' }),
     ]
     const ids = (items: readonly PPTElement[] | undefined) => items?.map(element => element.id)
-    expect(ids(orderElementLikePptist(elements, 'b', 'up'))).toEqual(['a1', 'a2', 'c1', 'c2', 'b', 'd'])
-    expect(ids(orderElementLikePptist(elements, 'b', 'down'))).toEqual(['b', 'a1', 'a2', 'c1', 'c2', 'd'])
-    expect(ids(orderElementLikePptist(elements, 'a1', 'up'))).toEqual(['b', 'a1', 'a2', 'c1', 'c2', 'd'])
-    expect(ids(orderElementLikePptist(elements, 'c1', 'down'))).toEqual(['a1', 'a2', 'c1', 'c2', 'b', 'd'])
-    expect(ids(orderElementLikePptist(elements, 'b', 'top'))).toEqual(['a1', 'a2', 'c1', 'c2', 'd', 'b'])
-    expect(ids(orderElementLikePptist(elements, 'c1', 'bottom'))).toEqual(['c1', 'c2', 'a1', 'a2', 'b', 'd'])
-    expect(orderElementLikePptist(elements, 'a1', 'down')).toBeUndefined()
-    expect(orderElementLikePptist(elements, 'd', 'up')).toBeUndefined()
+    expect(ids(orderElement(elements, 'b', 'up'))).toEqual(['a1', 'a2', 'c1', 'c2', 'b', 'd'])
+    expect(ids(orderElement(elements, 'b', 'down'))).toEqual(['b', 'a1', 'a2', 'c1', 'c2', 'd'])
+    expect(ids(orderElement(elements, 'a1', 'up'))).toEqual(['b', 'a1', 'a2', 'c1', 'c2', 'd'])
+    expect(ids(orderElement(elements, 'c1', 'down'))).toEqual(['a1', 'a2', 'c1', 'c2', 'b', 'd'])
+    expect(ids(orderElement(elements, 'b', 'top'))).toEqual(['a1', 'a2', 'c1', 'c2', 'd', 'b'])
+    expect(ids(orderElement(elements, 'c1', 'bottom'))).toEqual(['c1', 'c2', 'a1', 'a2', 'b', 'd'])
+    expect(orderElement(elements, 'a1', 'down')).toBeUndefined()
+    expect(orderElement(elements, 'd', 'up')).toBeUndefined()
   })
 
   it('ports contiguous grouping, selective ungrouping, and clicked-target unlock selection', () => {
@@ -230,18 +230,18 @@ describe('Gate 4 and Gate 5 editor geometry parity contracts', () => {
       shape({ id: 'locked-group-a', groupId: 'locked', lock: true }),
       textElement({ id: 'locked-group-b', groupId: 'locked', lock: true }),
     ]
-    const grouped = groupElementsLikePptist(elements, new Set(['a', 'b']), 'new-group')
+    const grouped = groupElements(elements, new Set(['a', 'b']), 'new-group')
     expect(grouped.map(element => element.id)).toEqual(['between', 'a', 'b', 'locked-group-a', 'locked-group-b'])
     expect(grouped.slice(1, 3).map(element => element.groupId)).toEqual(['new-group', 'new-group'])
-    const ungrouped = ungroupElementsLikePptist(grouped, new Set(['a']))!
+    const ungrouped = ungroupElements(grouped, new Set(['a']))!
     expect(ungrouped.find(element => element.id === 'a')?.groupId).toBeUndefined()
     expect(ungrouped.find(element => element.id === 'b')?.groupId).toBe('new-group')
-    expect(ungroupElementsLikePptist(elements, new Set(['a']))).toBeUndefined()
+    expect(ungroupElements(elements, new Set(['a']))).toBeUndefined()
 
-    const locked = setElementLocksLikePptist({ elements, lock: true, selectedIds: new Set(['a', 'between']) })!
+    const locked = setElementLocks({ elements, lock: true, selectedIds: new Set(['a', 'between']) })!
     expect(locked.selectedIds).toEqual([])
     expect(locked.elements.filter(element => ['a', 'between'].includes(element.id)).every(element => element.lock)).toBe(true)
-    const unlocked = setElementLocksLikePptist({ elements, lock: false, targetElementId: 'locked-group-b' })!
+    const unlocked = setElementLocks({ elements, lock: false, targetElementId: 'locked-group-b' })!
     expect(unlocked.selectedIds).toEqual(['locked-group-a', 'locked-group-b'])
     expect(unlocked.elements.slice(-2).every(element => element.lock === false)).toBe(true)
   })

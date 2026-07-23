@@ -3,7 +3,9 @@ import Utf8 from 'crypto-js/enc-utf8'
 
 import type { PPTElement, Slide } from '@mona/presentation-core/model'
 
-const PPTIST_CLIPBOARD_KEY = 'pptist'
+import { LEGACY_PRESENTATION_ENCRYPTION_KEY } from '@/lib/legacy-compatibility'
+
+const MONA_CLIPBOARD_KEY = 'mona'
 
 export type EditorClipboardPayload =
   | { data: PPTElement[]; type: 'elements' }
@@ -16,19 +18,21 @@ const isClipboardPayload = (value: unknown): value is EditorClipboardPayload => 
 }
 
 export const serializeEditorClipboard = (payload: EditorClipboardPayload): string => (
-  AES.encrypt(JSON.stringify(payload), PPTIST_CLIPBOARD_KEY).toString()
+  AES.encrypt(JSON.stringify(payload), MONA_CLIPBOARD_KEY).toString()
 )
 
 export const parseCustomEditorClipboard = (text: string): unknown => {
-  try {
-    const bytes = AES.decrypt(text, PPTIST_CLIPBOARD_KEY)
-    const decrypted = bytes.toString(Utf8)
-    return JSON.parse(decrypted) as unknown
+  for (const key of [MONA_CLIPBOARD_KEY, LEGACY_PRESENTATION_ENCRYPTION_KEY]) {
+    try {
+      const decrypted = AES.decrypt(text, key).toString(Utf8)
+      if (decrypted) return JSON.parse(decrypted) as unknown
+    }
+    catch {
+      // Try the next supported clipboard format.
+    }
   }
-  catch {
-    // Keep ordinary clipboard text byte-for-byte, matching PPTist's fallback.
-    return text
-  }
+  // Keep ordinary clipboard text byte-for-byte as the fallback.
+  return text
 }
 
 export const parseEditorClipboard = (text: string): EditorClipboardPayload | string => {

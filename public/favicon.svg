@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Transparent Background (No container or fill) -->
+
+  <!-- Tightly Spaced 3x3 Dot Grid -->
+  <g>
+    <!-- ROW 1 (Top) -->
+    <circle cx="90"  cy="90"  r="50" fill="#FFAF00" /> <!-- Light Orange -->
+    <circle cx="200" cy="90"  r="50" fill="#FFAF00" /> <!-- Light Orange -->
+    <circle cx="310" cy="90"  r="50" fill="#4A4A4A" /> <!-- Top-Right Gray Dot -->
+
+    <!-- ROW 2 (Middle) -->
+    <circle cx="90"  cy="200" r="50" fill="#FF8205" /> <!-- Orange -->
+    <circle cx="200" cy="200" r="50" fill="#FF8205" /> <!-- Orange -->
+    <circle cx="310" cy="200" r="50" fill="#FF8205" /> <!-- Orange -->
+
+    <!-- ROW 3 (Bottom) -->
+    <circle cx="90"  cy="310" r="50" fill="#E10500" /> <!-- Deep Red -->
+    <circle cx="200" cy="310" r="50" fill="#E10500" /> <!-- Deep Red -->
+    <circle cx="310" cy="310" r="50" fill="#E10500" /> <!-- Deep Red -->
+  </g>
+</svg>

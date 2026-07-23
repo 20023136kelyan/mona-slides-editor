@@ -10,6 +10,7 @@ import { editorActions } from '@mona/editor-state'
 import type { PPTShapeElement, PPTTextElement } from '@mona/presentation-core/model'
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { i18n } from '@/i18n'
 
 const normalizedEditorHtml = (value: string) => value.replace(/ style=""/g, '')
@@ -45,6 +46,7 @@ export function EditorRichText({
   onMouseDown: (event: MouseEvent) => void
   runtime: EditorRuntime
 }) {
+  const { notifications } = useEditorApplication()
   const resolvedFallbackColor = fallbackColor || (element.type === 'text' ? element.defaultColor : '#000')
   const resolvedFallbackFontName = fallbackFontName || (element.type === 'text' ? element.defaultFontName : '')
   const elementText = hostText(element, resolvedFallbackColor, resolvedFallbackFontName)
@@ -62,6 +64,7 @@ export function EditorRichText({
     fallbackColor: resolvedFallbackColor,
     fallbackFontName: resolvedFallbackFontName,
     modifierPressed,
+    notifications,
     onMouseDown,
     runtime,
   }))
@@ -74,38 +77,59 @@ export function EditorRichText({
   useLayoutEffect(() => {
     const mount = mountRef.current
     if (!mount) return undefined
+    let pendingInput: { historyKey?: string; ignoreHistory: boolean } | null = null
+    // Serialized-DOM baseline since mount/last commit. The keydown scheduler
+    // also arms on no-op keys (a lone Shift before a multi-select click), and
+    // ProseMirror re-serializes unchanged content differently from the stored
+    // markup — without this gate, the flush would "commit" that
+    // re-serialization and alter the stored document markup.
+    let lastCommittedDom: string | null = null
+    const commitInput = (ignoreHistory: boolean, historyKey?: string) => {
+      const view = editorRef.current
+      const current = readLatest()
+      if (!view) return
+      if (view.dom.innerHTML === lastCommittedDom) return
+      lastCommittedDom = view.dom.innerHTML
+      const state = current.runtime.store.getState()
+      const slide = state.presentation.slides[state.presentation.slideIndex]
+      const liveElement = slide?.elements.find(candidate => candidate.id === current.element.id)
+      if (!liveElement || (liveElement.type !== 'text' && liveElement.type !== 'shape')) return
+      const value = view.dom.innerHTML
+      const currentText = hostText(liveElement, current.fallbackColor, current.fallbackFontName)
+      if (normalizedEditorHtml(currentText.content) === normalizedEditorHtml(value)) return
+      const props = liveElement.type === 'text'
+        ? { content: value }
+        : {
+          text: {
+            align: 'middle' as const,
+            defaultFontName: current.fallbackFontName,
+            defaultColor: current.fallbackColor,
+            ...liveElement.text,
+            content: value,
+          },
+        }
+      const changed = current.runtime.commit('Edit text', [{
+        type: 'element.update',
+        payload: { id: liveElement.id, props },
+      }], ignoreHistory
+        ? { recordHistory: false }
+        : { historyKey: historyKey ?? `rich-text-${liveElement.id}` })
+      if (changed && liveElement.type === 'shape') shapeContentChangedRef.current = true
+    }
+    // Pre-action baseline: called before ProseMirror applies a keydown and
+    // before a toolbar action mutates the document, so the first arm since
+    // the last commit always snapshots the pre-change serialization.
+    const armBaseline = () => {
+      lastCommittedDom ??= editorRef.current?.dom.innerHTML ?? null
+    }
     const scheduleInput = (ignoreHistory: boolean, historyKey?: string) => {
       if (inputTimerRef.current) clearTimeout(inputTimerRef.current)
+      pendingInput = { historyKey, ignoreHistory }
       inputTimerRef.current = setTimeout(() => {
         inputTimerRef.current = null
-        const view = editorRef.current
-        const current = readLatest()
-        if (!view) return
-        const state = current.runtime.store.getState()
-        const slide = state.presentation.slides[state.presentation.slideIndex]
-        const liveElement = slide?.elements.find(candidate => candidate.id === current.element.id)
-        if (!liveElement || (liveElement.type !== 'text' && liveElement.type !== 'shape')) return
-        const value = view.dom.innerHTML
-        const currentText = hostText(liveElement, current.fallbackColor, current.fallbackFontName)
-        if (normalizedEditorHtml(currentText.content) === normalizedEditorHtml(value)) return
-        const props = liveElement.type === 'text'
-          ? { content: value }
-          : {
-            text: {
-              align: 'middle' as const,
-              defaultFontName: current.fallbackFontName,
-              defaultColor: current.fallbackColor,
-              ...liveElement.text,
-              content: value,
-            },
-          }
-        const changed = current.runtime.commit('Edit text', [{
-          type: 'element.update',
-          payload: { id: liveElement.id, props },
-        }], ignoreHistory
-          ? { recordHistory: false }
-          : { historyKey: historyKey ?? `rich-text-${liveElement.id}` })
-        if (changed && liveElement.type === 'shape') shapeContentChangedRef.current = true
+        const params = pendingInput
+        pendingInput = null
+        if (params) commitInput(params.ignoreHistory, params.historyKey)
       }, 300)
     }
     const currentAttrs = () => {
@@ -140,18 +164,28 @@ export function EditorRichText({
       handleDOMEvents: {
         blur: () => {
           readLatest().runtime.store.dispatch(editorActions.hotkeysDisabledChanged(false))
+          readLatest().runtime.store.dispatch(editorActions.editingTextElementChanged(null))
           if (readLatest().element.type === 'shape') checkEmptyShape()
           return false
         },
         focus: () => {
           const state = readLatest().runtime.store.getState().session
           const modifier = state.activeElementIds.length > 1 && readLatest().modifierPressed()
-          if (!modifier) readLatest().runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
+          if (!modifier) {
+            readLatest().runtime.store.dispatch(editorActions.hotkeysDisabledChanged(true))
+            readLatest().runtime.store.dispatch(editorActions.editingTextElementChanged(readLatest().element.id))
+          }
           return false
         },
         keydown: (_view, event) => {
+          if (event.key === 'Escape') {
+            view.dom.blur()
+            readLatest().runtime.store.dispatch(editorActions.editingTextElementChanged(null))
+            return true
+          }
           const modifier = event.ctrlKey || event.shiftKey || event.metaKey
           const key = event.key.toUpperCase()
+          armBaseline()
           scheduleInput(modifier && (key === 'Z' || key === 'Y'))
           scheduleAttrs()
           return false
@@ -175,11 +209,13 @@ export function EditorRichText({
       readLatest().element.id,
       {
         execute: (action, historyKey) => {
+          armBaseline()
           executeRichTextActions(view, action, currentAttrs(), {
             // Vue warns when the requested family has not finished loading.
-            onFontUnavailable: () => window.dispatchEvent(new CustomEvent('mona:notice', {
-              detail: { text: i18n.t('runtime.fontLoading'), type: 'warning' },
-            })),
+            onFontUnavailable: () => readLatest().notifications.notify({
+              text: i18n.t('runtime.fontLoading'),
+              type: 'warning',
+            }),
           })
           view.focus()
           scheduleInput(false, historyKey)
@@ -192,10 +228,18 @@ export function EditorRichText({
       readLatest().runtime.richText.sync(element.id)
     }
     return () => {
-      if (inputTimerRef.current) clearTimeout(inputTimerRef.current)
+      if (inputTimerRef.current) {
+        clearTimeout(inputTimerRef.current)
+        inputTimerRef.current = null
+        // This cleanup also runs when <Activity> hides the editor for a
+        // slideshow: a pending debounced edit must commit, not vanish
+        // (text typed in the last 300ms before F5 was silently lost).
+        const params = pendingInput
+        pendingInput = null
+        if (params) commitInput(params.ignoreHistory, params.historyKey)
+      }
       if (attrsTimerRef.current) clearTimeout(attrsTimerRef.current)
       if (emptyCheckTimerRef.current) clearTimeout(emptyCheckTimerRef.current)
-      inputTimerRef.current = null
       attrsTimerRef.current = null
       emptyCheckTimerRef.current = null
       unregister()
@@ -232,7 +276,7 @@ export function EditorRichText({
     wasHandleElementRef.current = isHandleElement
     if (!wasHandleElement || isHandleElement) return
     if (element.type === 'shape') {
-      // Quirk retired: PPTist recorded a second, identical snapshot when an
+      // Quirk retired: the source editor recorded a second, identical snapshot when an
       // edited shape lost handle focus. The edit's own debounced snapshot is
       // the single history boundary now.
       shapeContentChangedRef.current = false

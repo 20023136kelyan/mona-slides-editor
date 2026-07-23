@@ -1,6 +1,6 @@
 {
-  "ariaLabel": "Mona Slides editor",
-  "errorTitle": "Mona Slides could not open this view.",
+  "ariaLabel": "Mona presentation editor",
+  "errorTitle": "Mona could not open this view.",
   "errorDescription": "Reload the page and try again.",
   "editor": {
     "surfaceError": "This area ran into an error. Your presentation data is unaffected.",
@@ -13,10 +13,91 @@
     "slides": "Slides",
     "showSlide": "Show slide {{number}}",
     "inspector": "Inspector",
+    "rail": {
+      "tools": "Editor tools",
+      "templates": "Templates",
+      "design": "Design",
+      "elements": "Elements",
+      "text": "Text",
+      "uploads": "Uploads",
+      "draw": "Draw",
+      "ai": "AI",
+      "elementCategories": "Element categories",
+      "collapse": "Collapse panel",
+      "expand": "Expand panel"
+    },
+    "taskPanels": {
+      "design": "Design",
+      "elements": "Elements",
+      "text": "Text",
+      "uploads": "Uploads",
+      "draw": "Draw",
+      "properties": "Properties",
+      "speakerNotes": "Speaker notes",
+      "comments": "Comments on slide {{number}}",
+      "search": "Find and replace",
+      "layers": "Layers ({{selected}}/{{total}})",
+      "semantics": "Slide type labels"
+    },
+    "statusBar": {
+      "notes": "Notes",
+      "pages": "Pages",
+      "gridView": "Grid view",
+      "pageSettings": "Page settings",
+      "pageTitle": "Page title",
+      "untitledPage": "Untitled page",
+      "hidePage": "Hide page",
+      "hidePageDescription": "Keep it in the deck but skip it during presentation.",
+      "duration": "Page duration",
+      "manual": "Manual",
+      "seconds": "seconds",
+      "transition": "Transition",
+      "timer": "Timer",
+      "presentationTimer": "Presentation timer",
+      "pause": "Pause",
+      "start": "Start",
+      "reset": "Reset",
+      "help": "Help",
+      "shortcuts": "Keyboard shortcuts",
+      "present": "Present",
+      "goToPage": "Go to page",
+      "selectedPages_one": "{{count}} page selected",
+      "selectedPages_other": "{{count}} pages selected",
+      "showPages": "Show",
+      "hidePages": "Hide",
+      "closeGrid": "Close grid view",
+      "hidden": "Hidden",
+      "transitionBoundary": "Transition between page {{from}} and {{to}}",
+      "insertAfter": "Insert page after page {{number}}"
+    },
+    "contextual": {
+      "askMona": "Ask Mona",
+      "background": "Background",
+      "comment": "Comment",
+      "duplicate": "Duplicate",
+      "fill": "Fill {{state}}",
+      "fillLabel": "Fill",
+      "groupChild": "Editing item in group",
+      "groupSelection": "Group · {{count}} items",
+      "mixed": "Mixed",
+      "mixedSelection": "{{count}} selected",
+      "objectActions": "Object actions",
+      "pageBackground": "Page background",
+      "pageActions": "Page actions",
+      "replace": "Replace",
+      "replaceMedia": "Replace media",
+      "stroke": "Stroke {{state}}",
+      "strokeLabel": "Stroke",
+      "selectGroup": "Select parent group",
+      "transparency": "Transparency {{state}}",
+      "transparencyLabel": "Transparency"
+    },
     "thumbnails": {
       "addSlide": "Add slide",
       "slideCount": "Slide {{current}} of {{total}}",
+      "slideCountShort": "{{current}} / {{total}}",
       "sectionNamePlaceholder": "Enter section name",
+      "editSection": "Edit section {{name}}",
       "untitledSection": "Untitled section",
       "defaultSection": "Default section",
       "deleteSection": "Delete section",
@@ -31,9 +112,18 @@
       "fromCurrent": "Start from current slide",
       "menu": "Slide menu",
       "sectionMenu": "Section menu",
-      "notes": "Open comments"
+      "notes": "Open comments",
+      "movedSlide": "Moved {{title}} to position {{position}} of {{total}}",
+      "movingSlide": "Moving {{title}}. Press Escape to cancel.",
+      "moveCancelled": "Slide move cancelled."
     },
     "templates": {
+      "searchPlaceholder": "Describe your ideal design",
+      "generate": "Generate",
+      "search": "Search",
+      "back": "Back to templates",
+      "meta": "Presentation · {{count}} slides",
+      "applyAll": "Apply all {{count}} pages",
       "all": "All",
       "cover": "Cover",
       "contents": "Contents",
@@ -44,6 +134,7 @@
       "insertTemplate": "Insert layout",
       "loading": "Loading...",
       "loadError": "Could not load this template",
+      "noResults": "No templates match your search.",
       "catalog": {
         "template_1": "Crimson Landscape",
         "template_2": "Urban Blue",
@@ -65,7 +156,7 @@
       "commentPlaceholder": "Add a comment for the {{target}}",
       "clearSlide": "Clear comments on this slide",
       "add": "Add comment",
-      "testUser": "Test user"
+      "authorYou": "You"
     },
     "runtime": {
       "speakerNotesPlaceholder": "Click to add speaker notes",
@@ -85,6 +176,11 @@
       "title": "Selection ({{selected}}/{{total}})",
       "showAll": "Show all",
       "hideAll": "Hide all",
+      "selectElement": "Select {{name}}",
+      "renameElement": "Rename {{name}}",
+      "showElement": "Show {{name}}",
+      "hideElement": "Hide {{name}}",
+      "unlockElement": "Unlock {{name}}",
       "group": "Group",
       "empty": "This slide has no elements"
     },
@@ -106,9 +202,30 @@
       "currentImage": "Image type:",
       "placeholder": "Select an image, text box, or shape with text to label its type.",
       "unlabeled": "Unlabeled",
-      "slide": { "cover": "Cover", "contents": "Contents", "transition": "Section", "content": "Content", "end": "Closing" },
-      "text": { "title": "Title", "subtitle": "Subtitle", "content": "Body", "item": "List item", "itemTitle": "List item title", "notes": "Note", "header": "Header", "footer": "Footer", "partNumber": "Section number", "itemNumber": "Item number" },
-      "image": { "pageFigure": "Slide illustration", "itemFigure": "Item illustration", "background": "Background image" }
+      "slide": {
+        "cover": "Cover",
+        "contents": "Contents",
+        "transition": "Section",
+        "content": "Content",
+        "end": "Closing"
+      },
+      "text": {
+        "title": "Title",
+        "subtitle": "Subtitle",
+        "content": "Body",
+        "item": "List item",
+        "itemTitle": "List item title",
+        "notes": "Note",
+        "header": "Header",
+        "footer": "Footer",
+        "partNumber": "Section number",
+        "itemNumber": "Item number"
+      },
+      "image": {
+        "pageFigure": "Slide illustration",
+        "itemFigure": "Item illustration",
+        "background": "Background image"
+      }
     },
     "toolbar": {
       "design": "Design",
@@ -143,6 +260,7 @@
       "textBox": "Text box",
       "horizontalText": "Horizontal text box",
       "verticalText": "Vertical text box",
+      "textHint": "Choose a direction, then click or drag on the canvas to place the text box.",
       "shape": "Shape",
       "presetShapes": "Preset shapes",
       "drawPath": "Draw path",
@@ -154,11 +272,13 @@
       "chart": "Chart",
       "table": "Table",
       "equation": "Equation",
+      "insertEquation": "Insert equation",
       "media": "Media",
       "symbol": "Symbol",
       "zoomOut": "Zoom out (Ctrl + -)",
       "zoomIn": "Zoom in (Ctrl + =)",
       "fit": "Fit to screen",
+      "fill": "Fill workspace",
       "shapeGroups": {
         "rectangles": "Rectangles",
         "common": "Common shapes",
@@ -170,6 +290,142 @@
         "straight": "Straight lines",
         "elbowAndCurved": "Elbow and curved lines"
       }
+    },
+    "agent": {
+      "title": "Mona AI",
+      "loading": "Loading Mona AI…",
+      "scope": "Working with slide {{slide}}",
+      "connectModel": "Connect a model",
+      "chooseProvider": "Choose AI provider",
+      "providerTitle": "AI provider",
+      "providerDescription": "Choose how Mona plans presentation edits. Provider credentials stay separate from the document engine.",
+      "providers": {
+        "openai-chatgpt": {
+          "name": "OpenAI",
+          "description": "Use an eligible ChatGPT subscription through Mona's secure server connection.",
+          "signIn": "Sign in with OpenAI",
+          "signInDescription": "Connect the OpenAI account that owns your eligible ChatGPT plan."
+        },
+        "anthropic-claude": {
+          "name": "Anthropic",
+          "description": "Use an eligible Claude Pro or Max subscription through Mona's secure server connection.",
+          "signIn": "Sign in with Anthropic",
+          "signInDescription": "Connect the Claude account that owns your eligible Pro or Max plan."
+        },
+        "reference": {
+          "name": "Reference engine",
+          "description": "Exercises the complete editing pipeline locally without calling a model."
+        },
+        "mona-managed": {
+          "name": "Mona managed",
+          "description": "Use Mona's hosted model service with your Mona account."
+        },
+        "google-ai-studio": {
+          "name": "Google AI Studio",
+          "description": "Use your own Gemini API key for multimodal slide editing."
+        }
+      },
+      "apiKey": "Google AI Studio key",
+      "apiKeyPlaceholder": "Paste API key",
+      "model": "Gemini model",
+      "keyMemoryNotice": "The key is held only in this tab's memory and is cleared when you reload or switch providers.",
+      "connected": "Account connected",
+      "subscriptionReady": "Subscription access is ready",
+      "connecting": "Connecting…",
+      "disconnect": "Disconnect",
+      "deviceCodeLabel": "Enter this one-time code on the provider page",
+      "copyDeviceCode": "Copy one-time code",
+      "openSignInPage": "Open sign-in page",
+      "authPromptPlaceholder": "Paste the requested value",
+      "continueSignIn": "Continue sign-in",
+      "oauthSecurityNotice": "OAuth credentials remain encrypted on Mona's server and are never exposed to the editor or generated presentation code.",
+      "managedUnavailable": "Not configured on this deployment.",
+      "emptyTitle": "What should we make?",
+      "emptyDescription": "Ask Mona to inspect, rewrite, arrange, or create editable presentation elements.",
+      "composerLabel": "Message Mona AI",
+      "composerPlaceholder": "Describe a change to make…",
+      "attach": "Attach context",
+      "send": "Send message",
+      "cancel": "Cancel generation",
+      "cancelled": "Generation cancelled.",
+      "failed": "Mona could not generate this edit.",
+      "connectionRequired": "Connect an AI provider before sending.",
+      "reviewNotice": "Mona previews and validates every edit before anything changes.",
+      "resize": "Resize AI panel",
+      "sketchInstruction": "Build this sketch as a polished, fully editable slide.",
+      "sketchAttached": "Drawing attached",
+      "sketchElements_one": "{{count}} drawn element",
+      "sketchElements_other": "{{count}} drawn elements",
+      "removeSketch": "Remove drawing",
+      "sketchPreview": "Preview of the attached drawing",
+      "progress": {
+        "reading": "Reading the slide",
+        "planning": "Planning editable changes",
+        "executing": "Running the presentation program",
+        "validating": "Validating every operation",
+        "rendering": "Rendering the proposed result",
+        "reviewing": "Reviewing visual quality",
+        "detail": "The presentation remains unchanged until you apply the preview."
+      },
+      "before": "Before",
+      "after": "Proposed",
+      "beforePreview": "Current slide before the agent edit",
+      "afterPreview": "Proposed slide after the agent edit",
+      "summary": {
+        "created": "{{count}} created",
+        "updated": "{{count}} updated",
+        "removed": "{{count}} removed"
+      },
+      "viewProgram": "View presentation program",
+      "discard": "Discard",
+      "apply": "Apply edit",
+      "applied": "The edit was applied as one undoable operation.",
+      "appliedSummary": "Agent edit applied",
+      "undo": "Undo",
+      "undone": "The agent edit was undone.",
+      "suggestions": {
+        "improve": "Improve the visual hierarchy",
+        "rewrite": "Rewrite this slide more clearly",
+        "visualize": "Turn this content into a visual"
+      },
+      "modelPicker": "Model",
+      "back": "Back",
+      "signInShort": "Sign in",
+      "modelLockedHint": "Sign in to use {{model}}",
+      "signInToProvider": "Sign in to {{provider}}",
+      "searchModels": "Search models",
+      "noModels": "No models match"
+    },
+    "drawing": {
+      "layer": "Drawing layer",
+      "palette": "Drawing tools",
+      "tools": "Tools",
+      "loading": "Loading drawing tools…",
+      "tool": {
+        "selection": "Select",
+        "reference": "Reference slide elements",
+        "freedraw": "Draw",
+        "rectangle": "Rectangle",
+        "ellipse": "Ellipse",
+        "arrow": "Arrow",
+        "text": "Text",
+        "eraser": "Erase"
+      },
+      "stroke": "Stroke",
+      "strokeColor": "Stroke color",
+      "strokeWidth": "Stroke width",
+      "undo": "Undo drawing",
+      "redo": "Redo drawing",
+      "hide": "Hide drawing",
+      "show": "Show drawing",
+      "export": "Download",
+      "downloadScene": "Excalidraw scene",
+      "downloadPng": "PNG image",
+      "clear": "Clear drawing",
+      "buildThis": "Build this",
+      "exit": "Exit drawing",
+      "clearTitle": "Clear this drawing?",
+      "clearDescription": "This removes every drawn mark on the current slide. The slide content itself will not change."
     },
     "media": {
       "video": "Video",
@@ -403,9 +659,11 @@
     },
     "imageLibrary": {
       "title": "Image library (from pexels.com)",
+      "back": "Back to uploads",
       "close": "Close image library",
       "searchPlaceholder": "Search images",
       "search": "Search",
+      "orientation": "Image orientation",
       "insert": "Insert",
       "all": "All",
       "landscape": "Landscape",
@@ -413,7 +671,10 @@
       "square": "Square",
       "defaultQuery": "landscape",
       "enterKeyword": "Please enter a search keyword",
-      "loading": "Loading..."
+      "loading": "Loading...",
+      "noResults": "No images found. Try another search.",
+      "searchError": "Images could not be loaded.",
+      "retry": "Try again"
     },
     "filters": {
       "blur": "Blur",
@@ -468,6 +729,7 @@
       "copy": "Copy",
       "paste": "Paste",
       "delete": "Delete",
+      "close": "Close",
       "cancel": "Cancel",
       "replace": "Replace",
       "replaceAll": "Replace all",
@@ -481,8 +743,6 @@
       "gridMedium": "Medium",
       "gridLarge": "Large",
       "resetSlide": "Reset current slide",
-      "bubbleMenu": "Floating toolbar",
-      "bubbleMenuStatus": "Floating toolbar {{status}}",
       "enabled": "Enabled",
       "disabled": "Disabled",
       "slideshow": "Start slideshow",
@@ -519,6 +779,8 @@
       "selectTarget": "Choose a link target first"
     },
     "position": {
+      "arrange": "Arrange",
+      "layers": "Layers",
       "layer": "Layer:",
       "bringFront": "Bring to front",
       "sendBack": "Send to back",
@@ -786,5 +1048,7 @@
       "styleLabel": "Style",
       "colorLabel": "Color"
     }
-  }
+  },
+  "restoredWorkingCopy": "Restored your unsaved changes from this browser",
+  "startFresh": "Start fresh"
 }

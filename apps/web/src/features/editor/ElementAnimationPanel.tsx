@@ -19,8 +19,10 @@ import {
 import { createPresentationId, selectFormattedCurrentSlideAnimations } from '@mona/presentation-core'
 import type { AnimationTrigger, AnimationType, PPTAnimation, PPTElement } from '@mona/presentation-core/model'
 import { editorActions, selectPresentation } from '@mona/editor-state'
-import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   InspectorButton,
   InspectorNumberInput,
@@ -225,29 +227,33 @@ export function ElementAnimationPanel({
 
   const pool = (
     <div className="mona-animation-pool-popover">
-      <div className="mona-animation-pool-tabs" role="tablist">
-        {([
-          ['in', t('foundation.editor.animation.entrance')],
-          ['out', t('foundation.editor.animation.exit')],
-          ['attention', t('foundation.editor.animation.emphasis')],
-        ] as const).map(([key, label]) => (
-          <button aria-selected={activeTab === key} className={activeTab === key ? 'is-active' : ''} key={key} onClick={() => setActiveTab(key)} role="tab" style={{ '--animation-color': key === 'in' ? '#68a490' : key === 'out' ? '#d86344' : '#e8b76a' } as React.CSSProperties} type="button">{label}</button>
-        ))}
-      </div>
+      <Tabs onValueChange={value => setActiveTab(value as AnimationType)} value={activeTab}>
+        <TabsList className="mona-animation-pool-tabs">
+          {([
+            ['in', t('foundation.editor.animation.entrance')],
+            ['out', t('foundation.editor.animation.exit')],
+            ['attention', t('foundation.editor.animation.emphasis')],
+          ] as const).map(([key, label]) => (
+            <TabsTrigger key={key} style={{ '--animation-color': key === 'in' ? '#68a490' : key === 'out' ? '#d86344' : '#e8b76a' } as React.CSSProperties} value={key}>{label}</TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       <div className={`mona-animation-pool is-${activeTab}`}>
         {catalogs[activeTab].map(group => (
           <div className="mona-animation-pool-group" key={group.type}>
             <div className="mona-animation-pool-title">{t(`foundation.editor.animation.group.${group.type}`, { defaultValue: humanize(group.type) })}:</div>
             <div className="mona-animation-pool-items">
               {group.children.map(item => (
-                <button
+                <Button
                   className="mona-animation-pool-item"
                   key={item.value}
                   onClick={() => chooseEffect(activeTab, item.value)}
                   onMouseEnter={() => setHoverEffect(item.value)}
                   onMouseLeave={() => setHoverEffect('')}
+                  size="editor"
                   type="button"
-                ><span className={`${ANIMATION_CLASS_PREFIX}animated ${ANIMATION_CLASS_PREFIX}fast${hoverEffect === item.value ? ` ${ANIMATION_CLASS_PREFIX}${item.value}` : ''}`}>{t(`foundation.editor.animation.effect.${item.value}`, { defaultValue: humanize(item.value) })}</span></button>
+                  variant="ghost"
+                ><span className={`${ANIMATION_CLASS_PREFIX}animated ${ANIMATION_CLASS_PREFIX}fast${hoverEffect === item.value ? ` ${ANIMATION_CLASS_PREFIX}${item.value}` : ''}`}>{t(`foundation.editor.animation.effect.${item.value}`, { defaultValue: humanize(item.value) })}</span></Button>
               ))}
             </div>
           </div>
@@ -262,12 +268,10 @@ export function ElementAnimationPanel({
       <div className="mona-element-animation-add">
         {element ? (
           <div className="mona-animation-add-popover">
-            <PopoverPrimitive.Root onOpenChange={changeOpen} open={open && !replacementId}>
-              <PopoverPrimitive.Trigger aria-label={t('foundation.editor.animation.add')} className="mona-panel-button mona-animation-add-button" onClick={() => setReplacementId('')} type="button"><EffectsIcon />{` ${t('foundation.editor.animation.add')}`}</PopoverPrimitive.Trigger>
-              <PopoverPrimitive.Portal>
-                <PopoverPrimitive.Content align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverPrimitive.Content>
-              </PopoverPrimitive.Portal>
-            </PopoverPrimitive.Root>
+            <Popover onOpenChange={changeOpen} open={open && !replacementId}>
+              <PopoverTrigger asChild><Button aria-label={t('foundation.editor.animation.add')} className="mona-panel-button mona-animation-add-button" onClick={() => setReplacementId('')} size="editor" type="button" variant="editor"><EffectsIcon />{` ${t('foundation.editor.animation.add')}`}</Button></PopoverTrigger>
+              <PopoverContent align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
+            </Popover>
           </div>
         ) : <div className="mona-animation-tip"><ClickIcon /> {t('foundation.editor.animation.selectTip')}</div>}
       </div>
@@ -296,10 +300,10 @@ export function ElementAnimationPanel({
               <div className="mona-animation-index">{item.index}</div>
               <div className="mona-animation-text">「{item.elType}」{item.animationEffect}</div>
               <div className="mona-animation-handlers">
-                <button aria-label={t('foundation.editor.animation.preview')} onClick={event => {
+                <Button aria-label={t('foundation.editor.animation.preview')} onClick={event => {
                   event.stopPropagation(); runAnimation(item.elId, item.effect, item.duration) 
-                }} onPointerDown={event => event.stopPropagation()} type="button"><PlayIcon /></button>
-                <button
+                }} onPointerDown={event => event.stopPropagation()} size="icon-xs" type="button" variant="ghost"><PlayIcon /></Button>
+                <Button
                   aria-label={t('foundation.editor.animation.delete')}
                   onClick={event => {
                     event.stopPropagation()
@@ -311,8 +315,10 @@ export function ElementAnimationPanel({
                     event.stopPropagation()
                     deleteAnimation(item.id)
                   }}
+                  size="icon-xs"
                   type="button"
-                ><CloseIcon /></button>
+                  variant="ghost"
+                ><CloseIcon /></Button>
               </div>
             </div>
             {handleAnimations[0]?.elId === item.elId ? (
@@ -339,12 +345,12 @@ export function ElementAnimationPanel({
                   />
                 </div>
                 <div className="mona-animation-config-row">
-                  <PopoverPrimitive.Root onOpenChange={changeOpen} open={open && replacementId === item.id}>
-                    <PopoverPrimitive.Trigger aria-label={`${t('foundation.editor.animation.replace')} ${item.animationEffect}`} className="mona-panel-button" onClick={() => {
+                  <Popover onOpenChange={changeOpen} open={open && replacementId === item.id}>
+                    <PopoverTrigger asChild><Button aria-label={`${t('foundation.editor.animation.replace')} ${item.animationEffect}`} className="mona-panel-button" onClick={() => {
                       setReplacementId(item.id); changeOpen(true) 
-                    }} style={{ width: '100%' }} type="button"><SwitchIcon /> {t('foundation.editor.animation.replace')}</PopoverPrimitive.Trigger>
-                    <PopoverPrimitive.Portal><PopoverPrimitive.Content align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverPrimitive.Content></PopoverPrimitive.Portal>
-                  </PopoverPrimitive.Root>
+                    }} size="editor" style={{ width: '100%' }} type="button" variant="editor"><SwitchIcon /> {t('foundation.editor.animation.replace')}</Button></PopoverTrigger>
+                    <PopoverContent align="center" className="mona-animation-popover" collisionPadding={5} side="bottom" sideOffset={8}>{pool}</PopoverContent>
+                  </Popover>
                 </div>
               </div>
             ) : null}

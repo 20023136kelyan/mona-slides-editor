@@ -1,4 +1,4 @@
-// Port of PPTist's src/utils/font.ts: fonts used by an imported PPTX are
+// Port of the established editor's src/utils/font.ts: fonts used by an imported PPTX are
 // fetched from Google Fonts and registered under the document's ORIGINAL
 // family name (including "Family SemiBold Italic" style suffixes), so the
 // deck's font-family declarations resolve without rewriting content.

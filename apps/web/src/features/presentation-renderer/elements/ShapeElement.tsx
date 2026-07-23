@@ -1,4 +1,4 @@
-import type { MouseEventHandler, PointerEventHandler, ReactNode } from 'react'
+import { useId, type MouseEventHandler, type PointerEventHandler, type ReactNode } from 'react'
 
 import type { PPTShapeElement, ShapeText, SlideTheme } from '@mona/presentation-core/model'
 
@@ -24,12 +24,12 @@ export interface ShapeElementEditor {
   onPointerUp: PointerEventHandler<HTMLDivElement>
 }
 
-function ShapeGradient({ element }: { element: PPTShapeElement }) {
+function ShapeGradient({ element, svgId }: { element: PPTShapeElement; svgId: string }) {
   if (element.pattern) {
     return (
       <pattern
         height="1"
-        id={`mona-pattern-${element.id}`}
+        id={`${svgId}-pattern`}
         patternContentUnits="objectBoundingBox"
         patternUnits="objectBoundingBox"
         width="1"
@@ -39,7 +39,7 @@ function ShapeGradient({ element }: { element: PPTShapeElement }) {
     )
   }
   if (!element.gradient) return null
-  const id = `mona-gradient-${element.id}`
+  const id = `${svgId}-gradient`
   if (element.gradient.type === 'linear') {
     return (
       <linearGradient gradientTransform={`rotate(${element.gradient.rotate || 0},0.5,0.5)`} id={id} x1="0%" x2="100%" y1="0%" y2="0%">
@@ -59,6 +59,11 @@ function ShapeGradient({ element }: { element: PPTShapeElement }) {
 }
 
 export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
+  // SVG url(#id) references resolve to the FIRST matching id in the
+  // document, and defs inside a display:none subtree (a hidden <Activity>
+  // surface) do not render. Per-instance ids keep every mounted copy of an
+  // element self-contained.
+  const svgId = useId().replace(/:/g, '')
   const outline = getOutlineRenderStyle(element.outline)
   const shadow = getShadowStyle(element.shadow)
   const flip = getFlipTransform(element.flipH, element.flipV)
@@ -70,9 +75,9 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
   }
   const inset = text.inset || [10, 10, 10, 10]
   const fill = element.pattern
-    ? `url(#mona-pattern-${element.id})`
+    ? `url(#${svgId}-pattern)`
     : element.gradient
-      ? `url(#mona-gradient-${element.id})`
+      ? `url(#${svgId}-gradient)`
       : element.fill || 'none'
   const textStyle: SlideCSSProperties = {
     lineHeight: text.lineHeight,
@@ -108,7 +113,7 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
           tabIndex={editor ? -1 : undefined}
         >
           <svg aria-hidden="true" height={element.height} overflow="visible" width={element.width}>
-            <defs><ShapeGradient element={element} /></defs>
+            <defs><ShapeGradient element={element} svgId={svgId} /></defs>
             <g transform={`scale(${element.width / element.viewBox[0]}, ${element.height / element.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`}>
               <path
                 d={element.path}

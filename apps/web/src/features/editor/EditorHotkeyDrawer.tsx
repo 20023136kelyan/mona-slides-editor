@@ -1,8 +1,14 @@
-import { useCallback, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
 import CloseIcon from '~icons/icon-park-outline/close'
+
+import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+} from '@/components/ui/sheet'
 
 interface HotkeyGroup {
   title: string
@@ -11,40 +17,34 @@ interface HotkeyGroup {
 
 export function EditorHotkeyDrawer({ onClose, open }: { onClose: () => void; open: boolean }) {
   const { t } = useTranslation()
-  const [closing, setClosing] = useState(false)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const groups = t('hotkeys.groups', { returnObjects: true }) as unknown as HotkeyGroup[]
-  const close = useCallback(() => {
-    if (closing) return
-    setClosing(true)
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      setClosing(false)
-      onClose()
-    }, 250)
-  }, [closing, onClose])
 
-  if (!open) return null
-  return createPortal((
-    <aside aria-label={t('header.keyboardShortcuts')} className={`mona-hotkey-drawer${closing ? ' is-closing' : ''}`}>
-      <div className="mona-hotkey-drawer-header">
-        {t('header.keyboardShortcuts')}
-        <button aria-label={t('common.close')} onClick={close} type="button"><CloseIcon /></button>
-      </div>
-      <div className="mona-hotkey-drawer-content">
-        <div className="mona-hotkey-doc">
-          {groups.map(group => (
-            <div className="mona-hotkey-group" key={group.title}>
-              <div className="mona-hotkey-title">{group.title}</div>
-              {group.items.map((item, index) => (
-                <div className="mona-hotkey-item" key={`${item.label}-${item.value}-${index}`}>
-                  {item.value ? <><div className="mona-hotkey-label">{item.label}</div><div>{item.value}</div></> : <div>{item.label}</div>}
-                </div>
-              ))}
-            </div>
-          ))}
+  return (
+    <Sheet onOpenChange={next => {
+      if (!next) onClose()
+    }} open={open}>
+      <SheetContent aria-describedby={undefined} className="mona-hotkey-drawer" showCloseButton={false} side="right">
+        <div className="mona-hotkey-drawer-header">
+          <SheetTitle>{t('header.keyboardShortcuts')}</SheetTitle>
+          <SheetClose asChild>
+            <Button aria-label={t('common.close')} size="icon-xs" variant="ghost"><CloseIcon /></Button>
+          </SheetClose>
         </div>
-      </div>
-    </aside>
-  ), document.body)
+        <div className="mona-hotkey-drawer-content">
+          <div className="mona-hotkey-doc">
+            {groups.map(group => (
+              <div className="mona-hotkey-group" key={group.title}>
+                <div className="mona-hotkey-title">{group.title}</div>
+                {group.items.map((item, index) => (
+                  <div className="mona-hotkey-item" key={`${item.label}-${item.value}-${index}`}>
+                    {item.value ? <><div className="mona-hotkey-label">{item.label}</div><div>{item.value}</div></> : <div>{item.label}</div>}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
 }

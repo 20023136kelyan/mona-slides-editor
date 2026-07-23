@@ -5,20 +5,20 @@ import {
 } from '@mona/presentation-core'
 import type { Slide } from '@mona/presentation-core/model'
 
+import { isPersistenceEnabled, restoreWorkingDeck } from '@/features/editor/editor-persistence'
 import { i18n } from '@/i18n'
 
 const fetchProductionSlides = async (): Promise<Slide[]> => {
-  const response = await fetch('/mocks/slides.json')
+  const response = await fetch('/mocks/default-deck.json')
   if (!response.ok) throw new Error(`Unable to load presentation: ${response.status}`)
   return response.json() as Promise<Slide[]>
 }
 
 const loadSlides = async (request: Request): Promise<Slide[]> => {
-  // The fixture path also serves production-preview test runs (gate 7
-  // stability drives the real build with ?rendererFixture=...). The module
-  // stays a lazy chunk that ordinary sessions never fetch, and the fixture
-  // base JSON is pruned from real builds by exclude-development-fixtures.
-  if (import.meta.env.DEV || new URL(request.url).searchParams.has('rendererFixture')) {
+  // The fixture path also serves production-preview stability runs. The
+  // module stays a lazy chunk that ordinary sessions never fetch, and the
+  // fixture base JSON is pruned from real builds by exclude-development-fixtures.
+  if (import.meta.env.DEV || new URL(request.url).searchParams.has('developmentFixture')) {
     const { loadDevelopmentSlides } = await import('./load-development-slides')
     return loadDevelopmentSlides(request)
   }
@@ -27,6 +27,13 @@ const loadSlides = async (request: Request): Promise<Slide[]> => {
 }
 
 export async function loadPresentation({ request }: { request: Request }): Promise<PresentationState> {
+  // A persisted working copy takes precedence over the default deck; fixture
+  // and audience sessions never consult it (isPersistenceEnabled).
+  if (isPersistenceEnabled(new URL(request.url))) {
+    const restored = await restoreWorkingDeck()
+    if (restored) return restored
+  }
+
   const slides = await loadSlides(request)
   const presentation: PresentationState = {
     title: i18n.t('header.untitledPresentation'),

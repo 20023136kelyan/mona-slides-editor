@@ -1,4 +1,4 @@
-/** Exact 40 × 40 laser-pointer bitmap used by the PPTist slideshow. */
+/** Exact 40 × 40 laser-pointer bitmap used by the the source editor slideshow. */
 export const SCREEN_LASER_POINTER = [
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAABHNCSVQICAgIfAhkiAAACCJJREFUWIXtmLuO3MYShv/qZl9Izq',
   'wXo2BkSAtsIK+z8wwOBcOJ9C56Cr2LlThQcgBnfofVBnswXlgTaLHaIdk3dtcJOKOzd8n2MeDABRDDgKz/m+pudv0N/BN/Luj/kYSZJQBxJR8DKESU/2zuPw',

@@ -131,9 +131,9 @@ export function getSlidesThemeStyles(input: Slide | readonly Slide[], theme: Sli
             if (cell.text) {
               const percent = cell.text.length >= 10 ? 1 : cell.text.length / 10
               if (cell.style?.color) fontColorValues.push({ area: (area / cellCount) * percent, value: cell.style.color })
-              // Preserve PPTist's observable extraction quirk: font names from
-              // table cells are accumulated in the font-color bucket.
-              if (cell.style?.fontname) fontColorValues.push({ area: (area / cellCount) * percent, value: cell.style.fontname })
+              // Quirk retired: the source editor accumulated table cell font NAMES in
+              // the font-color bucket; they belong to the font-name ranking.
+              if (cell.style?.fontname) fontNameValues.push({ area: (area / cellCount) * percent, value: cell.style.fontname })
             }
           }
         }
@@ -261,7 +261,7 @@ export function themeState(theme: PresetTheme): Partial<SlideTheme> {
 }
 
 export function applyThemeToSlides(slides: readonly Slide[], theme: SlideTheme, applyAll: boolean) {
-  // PPTist deliberately clones through JSON before applying a theme. Besides
+  // the source editor deliberately clones through JSON before applying a theme. Besides
   // detaching proxies, this removes optional properties whose value is
   // `undefined`; preserving them here would make the observable document graph
   // diverge after an otherwise identical command.

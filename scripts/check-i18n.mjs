@@ -92,4 +92,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log('i18n check passed: React catalog parity and untranslated UI text are clean.')
+console.log('i18n check passed: catalog synchronization and untranslated UI text are clean.')

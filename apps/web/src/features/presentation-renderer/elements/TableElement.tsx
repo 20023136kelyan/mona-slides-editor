@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/interactive-supports-focus, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- Table cells and PPTist's transparent, pointer-only div edit mask are direct manipulation surfaces; preserving its element and focus behavior is required for exact parity. */
+/* oxlint-disable jsx-a11y/interactive-supports-focus, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- editable table cells and the transparent edit mask are direct-manipulation surfaces. */
 import {
   useCallback,
   useEffect,
@@ -85,7 +85,7 @@ function EditableCellText({
         if (!item || item.kind !== 'string') return
         if (item.type === 'text/plain') {
           item.getAsString(text => {
-            // PPTist encrypts copied elements/slides into text/plain. A table
+            // the source editor encrypts copied elements/slides into text/plain. A table
             // editor ignores those payloads instead of exposing ciphertext.
             if (typeof parseCustomEditorClipboard(text) === 'object') return
             const parsed = parsePlainTableClipboard(text)
@@ -208,7 +208,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
       measurementFrame = 0
       // WebKit reports an undelivered-notification error when the measured
       // element is synchronously resized from inside its observer callback.
-      // Defer the store write to the next frame while preserving PPTist's
+      // Defer the store write to the next frame while preserving the established editor's
       // measured content-box value.
       if (measuredHeight !== undefined) commitMeasuredHeight(measuredHeight)
     }
@@ -248,7 +248,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
       const effective = (position: [number, number]): [number, number] => {
         if (position[0] < 0 || position[1] < 0 || position[0] >= rowCount || position[1] >= columnCount) return [0, 0]
         if (!hiddenCells.has(tableCellKey(...position))) return position
-        // Preserve PPTist's merged-cell traversal, including its orthogonal
+        // Preserve the established editor's merged-cell traversal, including its orthogonal
         // fallback for hidden positions.
         return direction === 'UP' || direction === 'DOWN'
           ? effective([position[0], position[1] - 1])

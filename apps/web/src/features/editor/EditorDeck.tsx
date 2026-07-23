@@ -1,83 +1,157 @@
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitives render divs; landmark roles are applied explicitly on them. */
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { editorActions, selectCurrentSlide, selectPresentation, selectSession } from '@mona/editor-state'
-import type { EditorRootState, EditorToolbarState } from '@mona/editor-state'
+import type { EditorToolbarState } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
 import type { ChartType, PPTAudioElement, PPTChartElement, PPTImageElement, PPTLatexElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, PPTVideoElement } from '@mona/presentation-core/model'
 
+import LeftChevronIcon from '~icons/icon-park-outline/left'
+
+import { Button } from '@/components/ui/button'
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
+import { SidebarContent, SidebarHeader, SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EditorCanvas } from '@/features/editor/EditorCanvas'
-import { EditorCanvasTool } from '@/features/editor/EditorCanvasTool'
+import { EditorContextToolbar } from '@/features/editor/EditorContextToolbar'
+import { EditorHeader } from '@/features/editor/EditorHeader'
+import { EditorPageGrid } from '@/features/editor/EditorPageGrid'
+import { EditorRail } from '@/features/editor/EditorRailNavigation'
+import { EditorStatusBar } from '@/features/editor/EditorStatusBar'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
 import { fileToDataUrl, fitImageToPresentation, getImageSize } from '@/features/editor/editor-image'
 import { createTableElement } from '@/features/editor/editor-table'
 import { createChartElement } from '@/features/editor/editor-chart'
-import { createLatexElement, type LatexRenderResult } from '@/features/editor/editor-latex'
+import type { LatexRenderResult } from '@/features/editor/editor-latex'
+import { createLatexElement } from '@/features/editor/editor-latex-element'
 import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
 import { EditorThumbnails } from '@/features/editor/EditorThumbnails'
 import { EditorRemark } from '@/features/editor/EditorRemark'
-import { SlideDesignPanel } from '@/features/editor/SlideDesignPanel'
-import {
-  AudioStylePanel,
-  ChartStylePanel,
-  ElementAnimationPanel,
-  ElementPositionPanel,
-  ImageStylePanel,
-  LatexStylePanel,
-  LineStylePanel,
-  MultiPositionPanel,
-  MultiStylePanel,
-  ShapeStylePanel,
-  SlideAnimationPanel,
-  TableStylePanel,
-  TextStylePanel,
-  VideoStylePanel,
-} from '@/features/editor/EditorInspectorPanels'
-import {
-  EditorChartDataEditor,
-  EditorImageLibraryPanel,
-  EditorMarkupPanel,
-  EditorNotesPanel,
-  EditorSearchPanel,
-  EditorSelectionPanel,
-  EditorSvgPathEditor,
-  EditorSymbolPanel,
-} from '@/features/editor/EditorSecondarySurfaces'
-import { EditorLatexEditor } from '@/features/editor/EditorLatexEditor'
+import { createDrawingStore } from '@/features/editor/drawing/drawing-store'
+import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
+import { isPersistenceEnabled } from '@/features/editor/editor-persistence'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { EditorShellProvider } from '@/features/editor/shell/EditorShellProvider'
+import { useEditorShell, type EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 
-interface MonaReactTestBridge {
-  getHistoryState: EditorRuntime['getHistoryState']
-  getRichTextState: EditorRuntime['richText']['getSnapshot']
-  getShapeFormatPainterState: EditorRuntime['shapeFormatPainter']['getSnapshot']
-  getState: () => EditorRootState
-  isReady: () => boolean
-}
+const EditorAgentDock = lazy(async () => {
+  const module = await import('@/features/editor/EditorAgentDock')
+  return { default: module.EditorAgentDock }
+})
+const EditorRailDrawer = lazy(async () => ({
+  default: (await import('@/features/editor/EditorRail')).EditorRailDrawer,
+}))
 
-declare global {
-  interface Window {
-    __MONA_REACT_TEST__?: MonaReactTestBridge
-  }
-}
+// Closed task panels and modal editors do not participate in the canvas'
+// first paint. Each feature loads at its real entry point, keeping behavior
+// colocated while avoiding one monolithic desktop-editor chunk.
+// Related panels share a dynamic entry so the browser fetches one deferred
+// feature bundle instead of dozens of tiny shared icon/helper chunks.
+const loadInspectorPanels = () => import('@/features/editor/EditorInspectorPanels')
+const loadSecondarySurfaces = () => import('@/features/editor/EditorSecondarySurfaces')
+const AudioStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).AudioStylePanel }))
+const ChartStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).ChartStylePanel }))
+const ElementAnimationPanel = lazy(async () => ({ default: (await loadInspectorPanels()).ElementAnimationPanel }))
+const ElementPositionPanel = lazy(async () => ({ default: (await loadInspectorPanels()).ElementPositionPanel }))
+const ImageStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).ImageStylePanel }))
+const LatexStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).LatexStylePanel }))
+const LineStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).LineStylePanel }))
+const MultiPositionPanel = lazy(async () => ({ default: (await loadInspectorPanels()).MultiPositionPanel }))
+const MultiStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).MultiStylePanel }))
+const ShapeStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).ShapeStylePanel }))
+const SlideAnimationPanel = lazy(async () => ({ default: (await loadInspectorPanels()).SlideAnimationPanel }))
+const SlideDesignPanel = lazy(async () => ({ default: (await import('@/features/editor/SlideDesignPanel')).SlideDesignPanel }))
+const TableStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).TableStylePanel }))
+const TextStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).TextStylePanel }))
+const VideoStylePanel = lazy(async () => ({ default: (await loadInspectorPanels()).VideoStylePanel }))
+const EditorChartDataEditor = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorChartDataEditor }))
+const EditorCommentsPanel = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorCommentsPanel }))
+const EditorLatexEditor = lazy(async () => ({ default: (await import('@/features/editor/EditorLatexEditor')).EditorLatexEditor }))
+const EditorLayersPanel = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorLayersPanel }))
+const EditorSearchPanel = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorSearchPanel }))
+const EditorSemanticsPanel = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorSemanticsPanel }))
+const EditorSvgPathEditor = lazy(async () => ({ default: (await loadSecondarySurfaces()).EditorSvgPathEditor }))
 
-export function EditorDeck({
-  presentation: initialPresentation,
-  runtime: externalRuntime,
-}: {
+interface EditorDeckProps {
+  banner?: ReactNode
   presentation: PresentationState
   runtime?: EditorRuntime
-}) {
+}
+
+export function EditorDeck(props: EditorDeckProps) {
+  return (
+    <EditorShellProvider>
+      <EditorDeckContent {...props} />
+    </EditorShellProvider>
+  )
+}
+
+function EditorDeckContent({
+  banner,
+  presentation: initialPresentation,
+  runtime: externalRuntime,
+}: EditorDeckProps) {
   const { t } = useTranslation()
+  const {
+    agentOpen,
+    closeAgent,
+    openAgent,
+    startPresentation,
+    subscribeToPresentationStart,
+  } = useEditorApplication()
+  const {
+    closeTaskPanel,
+    openTaskPanel,
+    taskPanelRoute,
+    toggleTaskPanel,
+  } = useEditorShell()
   const [ownedRuntime] = useState(() => externalRuntime ?? createEditorRuntime(initialPresentation))
   const runtime = externalRuntime ?? ownedRuntime
   const [createTool, setCreateTool] = useState<EditorCreateTool | null>(null)
   const [pathEditorOpen, setPathEditorOpen] = useState(false)
-  const [imageLibraryOpen, setImageLibraryOpen] = useState(false)
   const [editingChartId, setEditingChartId] = useState<string | null>(null)
   const [latexEditorTarget, setLatexEditorTarget] = useState<{ id: string; kind: 'edit' } | { kind: 'create' } | null>(null)
-  const [symbolPanelOpen, setSymbolPanelOpen] = useState(false)
-  const [remarkHeight, setRemarkHeight] = useState(40)
+  const [agentSketchHandoff, setAgentSketchHandoff] = useState<SketchAgentHandoff | null>(null)
+  const [drawingStore] = useState(() => createDrawingStore({
+    persistenceEnabled: isPersistenceEnabled(),
+  }))
+
+  useEffect(() => {
+    void drawingStore.hydrate()
+    return () => {
+      void drawingStore.stop()
+    }
+  }, [drawingStore])
+
+  useEffect(() => {
+    let slideIds = new Set(runtime.store.getState().presentation.slides.map(slide => slide.id))
+    drawingStore.prune(slideIds)
+    return runtime.store.subscribe(() => {
+      const nextSlideIds = new Set(runtime.store.getState().presentation.slides.map(slide => slide.id))
+      if (
+        nextSlideIds.size === slideIds.size
+        && [...nextSlideIds].every(id => slideIds.has(id))
+      ) return
+      slideIds = nextSlideIds
+      drawingStore.prune(slideIds)
+    })
+  }, [drawingStore, runtime])
+
+  // Portaled modals escape the hidden <Activity> wrapper during slideshows;
+  // close them when screening starts.
+  useEffect(() => {
+    return subscribeToPresentationStart(() => {
+      setPathEditorOpen(false)
+      setEditingChartId(null)
+      setLatexEditorTarget(null)
+      runtime.store.dispatch(editorActions.drawingModeChanged(false))
+      closeTaskPanel({ restoreFocus: false })
+    })
+  }, [closeTaskPanel, runtime, subscribeToPresentationStart])
 
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const currentSlide = useEditorSelector(runtime.store, selectCurrentSlide)
@@ -127,6 +201,7 @@ export function EditorDeck({
         ? [
           { key: 'multiStyle', label: t('foundation.editor.toolbar.multiStyle') },
           { key: 'multiPosition', label: t('foundation.editor.toolbar.multiPosition') },
+          { key: 'elAnimation', label: t('foundation.editor.text.animation') },
         ]
         : [
           { key: 'elStyle', label: t('foundation.editor.text.style') },
@@ -134,36 +209,40 @@ export function EditorDeck({
           { key: 'elAnimation', label: t('foundation.editor.text.animation') },
         ]
   ), [session.activeElementIds.length, session.activeGroupElementId, t])
-  const openNotes = useCallback(() => {
-    runtime.store.dispatch(editorActions.panelVisibilityChanged({ open: true, panel: 'notes' }))
-  }, [runtime])
+  const openComments = useCallback(() => {
+    openTaskPanel('comments')
+  }, [openTaskPanel])
   const startSlideshow = useCallback((fromCurrent: boolean) => {
-    window.dispatchEvent(new CustomEvent('mona:screening-request', { detail: { fromStart: !fromCurrent } }))
-  }, [])
-
-  useEffect(() => {
-    if (!import.meta.env.DEV) return undefined
-    const bridge = Object.freeze({
-      getHistoryState: runtime.getHistoryState,
-      getRichTextState: runtime.richText.getSnapshot,
-      getShapeFormatPainterState: runtime.shapeFormatPainter.getSnapshot,
-      // Match the Vue development bridge's serializable-state contract exactly.
-      // JSON cloning intentionally drops undefined object properties and turns
-      // undefined array entries into null, which is also what consumers receive
-      // when this state crosses a JSON/process boundary.
-      getState: () => JSON.parse(JSON.stringify(runtime.store.getState())) as EditorRootState,
-      isReady: () => true,
-    } satisfies MonaReactTestBridge)
-    window.__MONA_REACT_TEST__ = bridge
-    return () => {
-      if (window.__MONA_REACT_TEST__ === bridge) delete window.__MONA_REACT_TEST__
-    }
-  }, [runtime])
+    startPresentation({ fromStart: !fromCurrent })
+  }, [startPresentation])
 
   useEffect(() => {
     if (currentTabs.some(tab => tab.key === session.toolbarState)) return
     runtime.store.dispatch(editorActions.toolbarStateChanged(currentTabs[0]!.key))
   }, [currentTabs, runtime, session.toolbarState])
+
+  const railPanel = taskPanelRoute
+  const changeRailPanel = useCallback((panel: EditorTaskPanelRoute | null, trigger?: HTMLElement | null) => {
+    if (panel) {
+      runtime.store.dispatch(editorActions.drawingModeChanged(false))
+      openTaskPanel(panel, trigger)
+    }
+    else closeTaskPanel()
+  }, [closeTaskPanel, openTaskPanel, runtime])
+
+  const openContextualInspector = useCallback((toolbarState: EditorToolbarState) => {
+    runtime.store.dispatch(editorActions.toolbarStateChanged(toolbarState))
+    openTaskPanel('properties')
+  }, [openTaskPanel, runtime])
+  const inspectorScrollRef = useRef<HTMLDivElement>(null)
+  // Fade the top/bottom edge wherever inspector content is cut off.
+  useEdgeFade(inspectorScrollRef, 'y', `${railPanel}:${session.toolbarState}:${session.handleElementId ?? ''}`)
+  const drawerOpen = Boolean(railPanel)
+  // The border pill CLOSES the panel outright — nothing is kept in the
+  // background to restore, so it only renders while a panel is open.
+  const closeDrawer = () => {
+    closeTaskPanel()
+  }
 
   useEffect(() => runtime.store.subscribe(() => {
     setEditingChartId(current => {
@@ -180,10 +259,38 @@ export function EditorDeck({
     })
   }), [runtime])
 
+  const previousSelectionRef = useRef(session.activeElementIds)
+  useEffect(() => {
+    const previous = previousSelectionRef.current
+    previousSelectionRef.current = session.activeElementIds
+    const selectionChanged = previous.length !== session.activeElementIds.length
+      || previous.some((id, index) => id !== session.activeElementIds[index])
+    if (!selectionChanged || !taskPanelRoute) return
+    if (['design', 'elements', 'text', 'uploads'].includes(taskPanelRoute)) {
+      closeTaskPanel({ restoreFocus: false })
+    }
+  }, [closeTaskPanel, session.activeElementIds, taskPanelRoute])
+
   const changeCreateTool = (tool: EditorCreateTool | null) => {
     setCreateTool(tool)
     runtime.store.dispatch(editorActions.activeToolChanged(tool?.key ?? null))
-    if (tool) runtime.store.dispatch(editorActions.creatingCustomShapeChanged(false))
+    if (tool) {
+      runtime.store.dispatch(editorActions.creatingCustomShapeChanged(false))
+      runtime.store.dispatch(editorActions.drawingModeChanged(false))
+    }
+  }
+  const toggleDrawingMode = () => {
+    const next = !runtime.store.getState().session.drawingMode
+    closeTaskPanel({ restoreFocus: false })
+    setCreateTool(null)
+    runtime.store.dispatch(editorActions.activeToolChanged(null))
+    runtime.store.dispatch(editorActions.creatingCustomShapeChanged(false))
+    runtime.store.dispatch(editorActions.drawingModeChanged(next))
+    if (next) runtime.store.dispatch(editorActions.sketchesVisibilityChanged(true))
+  }
+  const buildFromSketch = (handoff: SketchAgentHandoff) => {
+    setAgentSketchHandoff(handoff)
+    openAgent()
   }
 
   const insertSvgPath = (path: string) => {
@@ -353,22 +460,43 @@ export function EditorDeck({
     requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-element-id="' + CSS.escape(element.id) + '"] .ProseMirror')?.focus())
   }
 
+  const taskPanelTitle = taskPanelRoute
+    ? t(`foundation.editor.taskPanels.${taskPanelRoute}`, {
+        number: presentation.slideIndex + 1,
+        selected: session.activeElementIds.length,
+        total: currentSlide?.elements.length ?? 0,
+      })
+    : ''
+  const secondaryTaskPanel = (
+    <EditorErrorBoundary key={taskPanelRoute ?? 'closed'}>
+      <Suspense fallback={<div className="mona-agent-loading" role="status">{t('common.loading')}</div>}>
+      {taskPanelRoute === 'speakerNotes' ? <EditorRemark runtime={runtime} /> : null}
+      {taskPanelRoute === 'comments' ? <EditorCommentsPanel runtime={runtime} /> : null}
+      {taskPanelRoute === 'search' ? <EditorSearchPanel runtime={runtime} /> : null}
+      {taskPanelRoute === 'layers' ? <EditorLayersPanel runtime={runtime} /> : null}
+      {taskPanelRoute === 'semantics' ? <EditorSemanticsPanel runtime={runtime} /> : null}
+      </Suspense>
+    </EditorErrorBoundary>
+  )
+
   return (
     <main
       className="mona-readonly-deck mona-editor-deck"
       data-testid="editor-deck"
-      style={{ gridTemplateRows: `40px minmax(0, 1fr) ${remarkHeight}px` }}
       onFocusCapture={event => {
         const target = event.target as Element
         if (target.closest('.mona-thumbnail-rail')) {
           runtime.store.dispatch(editorActions.thumbnailsFocusChanged(true))
           runtime.store.dispatch(editorActions.canvasFocusChanged(false))
         }
+        else if (target.closest('.mona-page-grid-workspace')) {
+          runtime.store.dispatch(editorActions.canvasFocusChanged(false))
+        }
       }}
       onPointerDownCapture={event => {
         const target = event.target as Element
         // React portals retain their logical ancestry. These editor-owned
-        // overlays live under document.body, but PPTist does not treat their
+        // overlays live under document.body, but the source editor does not treat their
         // pointer activity as leaving the editor-area focus scope.
         if (target.closest([
           '.mona-editor-context-menu',
@@ -380,12 +508,16 @@ export function EditorDeck({
           '.mona-chart-data-modal',
           '.mona-chart-theme-modal',
           '.mona-latex-modal',
-          '.mona-symbol-panel',
-          '.mona-moveable-panel',
           '.mona-remark-menu',
         ].join(','))) return
         if (target.closest('.mona-thumbnail-rail')) {
           runtime.store.dispatch(editorActions.thumbnailsFocusChanged(true))
+          runtime.store.dispatch(editorActions.canvasFocusChanged(false))
+        }
+        else if (target.closest('.mona-page-grid-workspace')) {
+          // Grid selection is document state shared by its cards and header
+          // actions. Moving focus to Duplicate/Hide/Delete must not clear the
+          // selected block before that action reads it.
           runtime.store.dispatch(editorActions.canvasFocusChanged(false))
         }
         else if (target.closest('.mona-editor-stage')) {
@@ -397,58 +529,65 @@ export function EditorDeck({
         }
       }}
     >
-      <EditorErrorBoundary>
-        <EditorThumbnails
-          onOpenNotes={openNotes}
-          onStartSlideshow={startSlideshow}
-          runtime={runtime}
-        />
-      </EditorErrorBoundary>
-      <EditorCanvasTool
+      <div className="mona-editor-shell h-full min-h-0 w-full">
+      <EditorHeader runtime={runtime} />
+      <SidebarProvider className="mona-editor-workspace min-h-0 w-full">
+      <EditorRail
+        activePanel={railPanel}
         activeTool={createTool}
+        agentOpen={agentOpen}
         customShapeActive={session.creatingCustomShape}
+        drawingActive={session.drawingMode}
+        onCreateToolChange={changeCreateTool}
+        onPanelChange={changeRailPanel}
+        onToggleDrawing={toggleDrawingMode}
+        onToggleAgent={agentOpen ? closeAgent : openAgent}
+      />
+      <div className="mona-editor-body">
+      {drawerOpen ? (
+      <Suspense fallback={(
+        <div aria-label={taskPanelTitle || t('foundation.editor.inspector')} className="mona-editor-drawer mona-render-inspector mona-element-inspector mona-agent-loading" role="status">
+          {t('common.loading')}
+        </div>
+      )}>
+      <EditorRailDrawer
+        activePanel={railPanel === 'properties' ? null : railPanel}
+        contextualHeader={(
+          <SidebarHeader className="mona-inspector-tabs-header">
+            <Tabs onValueChange={value => openContextualInspector(value as EditorToolbarState)} value={session.toolbarState}>
+              <TabsList className="w-full">
+                {currentTabs.map(tab => <TabsTrigger className="px-1 text-xs" key={tab.key} onClick={() => openContextualInspector(tab.key)} value={tab.key}>{tab.label}</TabsTrigger>)}
+              </TabsList>
+            </Tabs>
+          </SidebarHeader>
+        )}
+        contextualOpen={railPanel === 'properties'}
+        onClose={closeDrawer}
         onCreateToolChange={changeCreateTool}
         onDrawCustomShape={() => {
           changeCreateTool(null)
           runtime.store.dispatch(editorActions.creatingCustomShapeChanged(true))
         }}
         onInsertAudio={insertAudio}
-        onInsertImage={file => void insertImage(file)}
         onInsertChart={insertChart}
+        onInsertImage={file => void insertImage(file)}
+        onInsertImageSource={src => void insertImageSource(src)}
+        onInsertSymbol={insertSymbol}
         onInsertTable={insertTable}
+        onInsertTemplateAll={(slides, theme) => runtime.insertTemplateSlides(slides, theme)}
+        onInsertTemplateOne={slide => runtime.createSlideFromTemplate(slide)}
         onInsertVideo={insertVideo}
-        onOpenImageLibrary={() => setImageLibraryOpen(true)}
         onOpenLatexEditor={() => setLatexEditorTarget({ kind: 'create' })}
         onOpenPathEditor={() => setPathEditorOpen(true)}
-        onToggleSymbolPanel={() => setSymbolPanelOpen(open => !open)}
-        presentation={presentation}
-        runtime={runtime}
-        symbolPanelOpen={symbolPanelOpen}
-      />
-      <EditorErrorBoundary>
-        <EditorCanvas activeCreateTool={createTool} customShapeActive={session.creatingCustomShape} onCreateToolChange={changeCreateTool} onCustomShapeChange={active => runtime.store.dispatch(editorActions.creatingCustomShapeChanged(active))} onEditChart={id => setEditingChartId(id)} onEditLatex={id => setLatexEditorTarget({ id, kind: 'edit' })} runtime={runtime} />
-      </EditorErrorBoundary>
-      <EditorErrorBoundary>
-        <EditorRemark height={remarkHeight} onHeightChange={setRemarkHeight} runtime={runtime} />
-      </EditorErrorBoundary>
-      <aside aria-label={t('foundation.editor.inspector')} className="mona-render-inspector">
-        <div className="mona-element-inspector">
-          <div className="mona-inspector-tabs" role="tablist">
-            {currentTabs.map(tab => (
-              <button
-                aria-selected={session.toolbarState === tab.key}
-                className={session.toolbarState === tab.key ? 'is-active' : ''}
-                key={tab.key}
-                onClick={() => runtime.store.dispatch(editorActions.toolbarStateChanged(tab.key))}
-                role="tab"
-                type="button"
-              >{tab.label}</button>
-            ))}
-          </div>
-          <div className="mona-inspector-content">
+        panelTitle={taskPanelTitle}
+        secondaryContent={secondaryTaskPanel}
+        templates={presentation.templates}
+        theme={presentation.theme}
+      >
+        <SidebarContent className="mona-inspector-content" ref={inspectorScrollRef}>
             {/* A crash in one panel resets when the user switches tab/element. */}
             <EditorErrorBoundary key={`${session.toolbarState}:${session.handleElementId ?? ''}`}>
-            <Suspense fallback={null}>
+            <Suspense fallback={<div className="mona-agent-loading" role="status">{t('common.loading')}</div>}>
             {session.toolbarState === 'elStyle' && handleText ? <TextStylePanel element={handleText} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'elStyle' && handleShape ? <ShapeStylePanel element={handleShape} presentation={presentation} runtime={runtime} /> : null}
             {session.toolbarState === 'elStyle' && handleLine ? <LineStylePanel element={handleLine} presentation={presentation} runtime={runtime} /> : null}
@@ -468,18 +607,97 @@ export function EditorDeck({
             {session.toolbarState === 'multiPosition' ? <MultiPositionPanel activeElementIds={session.activeElementIds} handleElementId={session.handleElementId} presentation={presentation} runtime={runtime} /> : null}
             </Suspense>
             </EditorErrorBoundary>
-          </div>
-        </div>
-      </aside>
+        </SidebarContent>
+      </EditorRailDrawer>
+      </Suspense>
+      ) : null}
+      {drawerOpen ? (
+        <Button
+          aria-label={t('foundation.editor.rail.collapse')}
+          className="mona-drawer-toggle"
+          onClick={closeDrawer}
+          size="editor-icon"
+          type="button"
+          variant="ghost"
+        >
+          <LeftChevronIcon />
+        </Button>
+      ) : null}
+      <ResizablePanelGroup className="mona-editor-resizable-workspace" orientation="horizontal">
+      <ResizablePanel defaultSize={agentOpen ? '70%' : '100%'} id="mona-editor-surface" minSize="40%">
+      <SidebarInset className="mona-editor-inset min-w-0">
+      {session.workspaceMode === 'page-grid' ? (
+        <EditorErrorBoundary>
+          <EditorPageGrid runtime={runtime} />
+        </EditorErrorBoundary>
+      ) : (
+        <>
+      <EditorContextToolbar
+        activeMode={session.drawingMode ? 'draw' : createTool || session.creatingCustomShape ? 'create' : 'select'}
+        currentSlide={currentSlide}
+        onEditChart={setEditingChartId}
+        onEditLatex={id => setLatexEditorTarget({ id, kind: 'edit' })}
+        onOpenInspector={openContextualInspector}
+        presentation={presentation}
+        runtime={runtime}
+        session={session}
+      />
+      <EditorErrorBoundary>
+        <EditorCanvas
+          activeCreateTool={createTool}
+          customShapeActive={session.creatingCustomShape}
+          drawingStore={drawingStore}
+          onBuildSketch={buildFromSketch}
+          onCreateToolChange={changeCreateTool}
+          onCustomShapeChange={active => runtime.store.dispatch(editorActions.creatingCustomShapeChanged(active))}
+          onDrawingModeChange={active => runtime.store.dispatch(editorActions.drawingModeChanged(active))}
+          onEditChart={id => setEditingChartId(id)}
+          onEditLatex={id => setLatexEditorTarget({ id, kind: 'edit' })}
+          onSketchVisibilityChange={visible => runtime.store.dispatch(editorActions.sketchesVisibilityChanged(visible))}
+          runtime={runtime}
+        />
+      </EditorErrorBoundary>
+        </>
+      )}
+      <div className="mona-editor-bottombar">
+        {session.workspaceMode === 'canvas' && session.filmstripVisible ? (
+        <EditorErrorBoundary>
+          <EditorThumbnails
+            onOpenNotes={openComments}
+            onOpenTransition={slideIndex => {
+              runtime.focusSlide(slideIndex)
+              openContextualInspector('slideAnimation')
+            }}
+            onStartSlideshow={startSlideshow}
+            runtime={runtime}
+          />
+        </EditorErrorBoundary>
+        ) : null}
+        <EditorStatusBar
+          notesVisible={railPanel === 'speakerNotes'}
+          onToggleNotes={() => toggleTaskPanel('speakerNotes')}
+          runtime={runtime}
+        />
+      </div>
+      {banner}
+      </SidebarInset>
+      </ResizablePanel>
+      {agentOpen ? (
+        <>
+          <ResizableHandle aria-label={t('foundation.editor.agent.resize')} className="mona-agent-resize-handle" withHandle />
+          <ResizablePanel className="mona-agent-dock-panel" defaultSize="30%" id="mona-agent-dock" maxSize="520px" minSize="280px">
+            <Suspense fallback={<div className="mona-agent-loading" role="status">{t('foundation.editor.agent.loading')}</div>}>
+              <EditorAgentDock handoff={agentSketchHandoff} key={agentSketchHandoff?.updatedAt ?? 'text-only'} runtime={runtime} />
+            </Suspense>
+          </ResizablePanel>
+        </>
+      ) : null}
+      </ResizablePanelGroup>
+      </div>
+      </SidebarProvider>
+      </div>
       <Suspense fallback={null}>
       {pathEditorOpen ? <EditorSvgPathEditor onClose={() => setPathEditorOpen(false)} onInsert={insertSvgPath} /> : null}
-      {imageLibraryOpen ? (
-        <EditorImageLibraryPanel
-          onClose={() => setImageLibraryOpen(false)}
-          onInsert={src => void insertImageSource(src)}
-        />
-      ) : null}
-      {symbolPanelOpen ? <EditorSymbolPanel onClose={() => setSymbolPanelOpen(false)} onSelect={insertSymbol} /> : null}
       {latexEditorTarget && (latexEditorTarget.kind === 'create' || editingLatex) ? (
         <EditorLatexEditor initialValue={editingLatex?.latex} onClose={() => setLatexEditorTarget(null)} onSave={saveLatex} />
       ) : null}
@@ -492,30 +710,6 @@ export function EditorDeck({
             runtime.commit('Update chart data', [{ type: 'element.update', payload: { id: editingChart.id, props: { data, chartType: type } } }])
             setEditingChartId(null)
           }}
-        />
-      ) : null}
-      {session.openPanels.includes('notes') ? (
-        <EditorNotesPanel
-          onClose={() => runtime.store.dispatch(editorActions.panelVisibilityChanged({ open: false, panel: 'notes' }))}
-          runtime={runtime}
-        />
-      ) : null}
-      {session.openPanels.includes('selection') ? (
-        <EditorSelectionPanel
-          onClose={() => runtime.store.dispatch(editorActions.panelVisibilityChanged({ open: false, panel: 'selection' }))}
-          runtime={runtime}
-        />
-      ) : null}
-      {session.openPanels.includes('markup') ? (
-        <EditorMarkupPanel
-          onClose={() => runtime.store.dispatch(editorActions.panelVisibilityChanged({ open: false, panel: 'markup' }))}
-          runtime={runtime}
-        />
-      ) : null}
-      {session.openPanels.includes('search') ? (
-        <EditorSearchPanel
-          onClose={() => runtime.store.dispatch(editorActions.panelVisibilityChanged({ open: false, panel: 'search' }))}
-          runtime={runtime}
         />
       ) : null}
       </Suspense>

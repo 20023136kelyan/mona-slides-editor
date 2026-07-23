@@ -197,7 +197,7 @@ export const getElementBounds = (element: PPTElement): InteractionBounds => {
       maxY: element.top + element.height,
     }
   }
-  // Preserve PPTist's operation order rather than using an equivalent corner
+  // Preserve the established editor's operation order rather than using an equivalent corner
   // rotation. The distinction is one IEEE-754 bit in some snapped positions,
   // which then becomes persisted document state.
   const radius = Math.sqrt(Math.pow(element.width, 2) + Math.pow(element.height, 2)) / 2
@@ -246,11 +246,11 @@ const jsonCloneElements = (elements: readonly PPTElement[]): PPTElement[] => (
   JSON.parse(JSON.stringify(elements)) as PPTElement[]
 )
 
-// These action helpers intentionally preserve PPTist's implementation details,
+// These action helpers intentionally preserve the established editor's implementation details,
 // including its JSON clone boundary and its line-range assumptions. They are
 // not shared with gesture geometry because changing either contract would turn
 // a framework port into an editor-behavior rewrite.
-export const getPptistActionElementBounds = (element: PPTElement): InteractionBounds => {
+export const getActionElementBounds = (element: PPTElement): InteractionBounds => {
   if (element.type === 'line') {
     return {
       minX: element.left,
@@ -293,7 +293,7 @@ export const getPptistActionElementBounds = (element: PPTElement): InteractionBo
   }
 }
 
-const getPptistRectBoundsAtRotation = (
+const getRectBoundsAtRotation = (
   element: Exclude<PPTElement, PPTLineElement>,
   rotate: number,
 ): InteractionBounds => {
@@ -323,16 +323,16 @@ const getPptistRectBoundsAtRotation = (
   }
 }
 
-const getPptistRectRotatedOffset = (element: Exclude<PPTElement, PPTLineElement>) => {
-  const origin = getPptistRectBoundsAtRotation(element, 0)
-  const rotated = getPptistRectBoundsAtRotation(element, element.rotate)
+const getRectRotatedOffset = (element: Exclude<PPTElement, PPTLineElement>) => {
+  const origin = getRectBoundsAtRotation(element, 0)
+  const rotated = getRectBoundsAtRotation(element, element.rotate)
   return {
     offsetX: rotated.minX - origin.minX,
     offsetY: rotated.minY - origin.minY,
   }
 }
 
-export const alignElementsToCanvasLikePptist = (input: {
+export const alignElementsToCanvas = (input: {
   readonly command: CanvasAlignmentCommand
   readonly elements: readonly PPTElement[]
   readonly selectedIds: ReadonlySet<string>
@@ -341,7 +341,7 @@ export const alignElementsToCanvasLikePptist = (input: {
 }): PPTElement[] => {
   const selected = input.elements.filter(element => input.selectedIds.has(element.id))
   if (!selected.length) return jsonCloneElements(input.elements)
-  const ranges = selected.map(getPptistActionElementBounds)
+  const ranges = selected.map(getActionElementBounds)
   const minX = Math.min(...ranges.map(range => range.minX))
   const maxX = Math.max(...ranges.map(range => range.maxX))
   const minY = Math.min(...ranges.map(range => range.minY))
@@ -367,11 +367,11 @@ export const alignElementsToCanvasLikePptist = (input: {
 }
 
 /**
- * Aligns multiple selected items to one another using PPTist's exact action
+ * Aligns multiple selected items to one another using the established editor's exact action
  * semantics. A selected group is one item: every member is translated by the
  * same delta derived from the group's combined rotated range.
  */
-export const alignActiveElementsLikePptist = (input: {
+export const alignActiveElements = (input: {
   readonly command: MultiAlignmentCommand
   readonly elements: readonly PPTElement[]
   readonly selectedIds: ReadonlySet<string>
@@ -379,7 +379,7 @@ export const alignActiveElementsLikePptist = (input: {
   const activeElements = input.elements.filter(element => input.selectedIds.has(element.id))
   if (!activeElements.length) return jsonCloneElements(input.elements)
   const activeRange = getElementsBounds(activeElements.map(element => (
-    // getElementsBounds deliberately shares the same PPTist range operation as
+    // getElementsBounds deliberately shares the same the source editor range operation as
     // the action helpers, but clone here to preserve the source hook boundary.
     JSON.parse(JSON.stringify(element)) as PPTElement
   )))
@@ -399,7 +399,7 @@ export const alignActiveElementsLikePptist = (input: {
     if (input.command === 'left') {
       if (groupRange) element.left -= groupRange.minX - activeRange.minX
       else if (element.type !== 'line' && element.rotate) {
-        const { offsetX } = getPptistRectRotatedOffset(element)
+        const { offsetX } = getRectRotatedOffset(element)
         element.left = activeRange.minX - offsetX
       }
       else element.left = activeRange.minX
@@ -411,7 +411,7 @@ export const alignActiveElementsLikePptist = (input: {
           ? Math.max(element.start[0], element.end[0])
           : element.width
         if (element.type !== 'line' && element.rotate) {
-          const { offsetX } = getPptistRectRotatedOffset(element)
+          const { offsetX } = getRectRotatedOffset(element)
           element.left = activeRange.maxX - elementWidth + offsetX
         }
         else element.left = activeRange.maxX - elementWidth
@@ -420,7 +420,7 @@ export const alignActiveElementsLikePptist = (input: {
     else if (input.command === 'top') {
       if (groupRange) element.top -= groupRange.minY - activeRange.minY
       else if (element.type !== 'line' && element.rotate) {
-        const { offsetY } = getPptistRectRotatedOffset(element)
+        const { offsetY } = getRectRotatedOffset(element)
         element.top = activeRange.minY - offsetY
       }
       else element.top = activeRange.minY
@@ -432,7 +432,7 @@ export const alignActiveElementsLikePptist = (input: {
           ? Math.max(element.start[1], element.end[1])
           : element.height
         if (element.type !== 'line' && element.rotate) {
-          const { offsetY } = getPptistRectRotatedOffset(element)
+          const { offsetY } = getRectRotatedOffset(element)
           element.top = activeRange.maxY - elementHeight + offsetY
         }
         else element.top = activeRange.maxY - elementHeight
@@ -480,7 +480,7 @@ interface UniformDisplayItem {
  * particular, rotated elements are positioned by their range minimum and a
  * selected group retains every member's offset within the group range.
  */
-export const uniformDisplayElementsLikePptist = (input: {
+export const distributeElements = (input: {
   readonly axis: UniformDisplayAxis
   readonly elements: readonly PPTElement[]
   readonly selectedIds: ReadonlySet<string>
@@ -496,7 +496,7 @@ export const uniformDisplayElementsLikePptist = (input: {
 
   for (const element of activeElements) {
     if (!element.groupId) {
-      const range = getPptistActionElementBounds(element)
+      const range = getActionElementBounds(element)
       singles.push({
         elements: [element],
         grouped: false,
@@ -536,7 +536,7 @@ export const uniformDisplayElementsLikePptist = (input: {
   if (!first.grouped) targetPositions.set(first.elements[0]!.id, first.min)
   else {
     for (const element of first.elements) {
-      const range = getPptistActionElementBounds(element)
+      const range = getActionElementBounds(element)
       targetPositions.set(element.id, input.axis === 'horizontal' ? range.minX : range.minY)
     }
   }
@@ -550,7 +550,7 @@ export const uniformDisplayElementsLikePptist = (input: {
     if (!item.grouped) targetPositions.set(item.elements[0]!.id, currentPosition)
     else {
       for (const element of item.elements) {
-        const range = getPptistActionElementBounds(element)
+        const range = getActionElementBounds(element)
         const elementMinimum = input.axis === 'horizontal' ? range.minX : range.minY
         const offset = elementMinimum - item.min
         targetPositions.set(element.id, currentPosition + offset)
@@ -564,13 +564,13 @@ export const uniformDisplayElementsLikePptist = (input: {
     if (target === undefined) continue
     if (input.axis === 'horizontal') {
       if (element.type !== 'line' && element.rotate) {
-        const { offsetX } = getPptistRectRotatedOffset(element)
+        const { offsetX } = getRectRotatedOffset(element)
         element.left = target - offsetX
       }
       else element.left = target
     }
     else if (element.type !== 'line' && element.rotate) {
-      const { offsetY } = getPptistRectRotatedOffset(element)
+      const { offsetY } = getRectRotatedOffset(element)
       element.top = target - offsetY
     }
     else element.top = target
@@ -578,7 +578,7 @@ export const uniformDisplayElementsLikePptist = (input: {
   return elements
 }
 
-export const getMultiSelectionStateLikePptist = (
+export const getMultiSelectionState = (
   elements: readonly PPTElement[],
   selectedIds: ReadonlySet<string>,
 ) => {
@@ -594,12 +594,12 @@ export const getMultiSelectionStateLikePptist = (
   return { canCombine, displayItemCount: displayItems.size }
 }
 
-const getPptistGroupLevelRange = (elements: readonly PPTElement[], group: readonly PPTElement[]) => ({
+const getGroupLevelRange = (elements: readonly PPTElement[], group: readonly PPTElement[]) => ({
   minLevel: elements.findIndex(element => element.id === group[0]!.id),
   maxLevel: elements.findIndex(element => element.id === group[group.length - 1]!.id),
 })
 
-export const orderElementLikePptist = (
+export const orderElement = (
   sourceElements: readonly PPTElement[],
   elementId: string,
   command: ElementOrderCommand,
@@ -612,7 +612,7 @@ export const orderElementLikePptist = (
   if (command === 'up') {
     if (element.groupId) {
       const group = elements.filter(item => item.groupId === element.groupId)
-      const { minLevel, maxLevel } = getPptistGroupLevelRange(sourceElements, group)
+      const { minLevel, maxLevel } = getGroupLevelRange(sourceElements, group)
       if (maxLevel === sourceElements.length - 1) return undefined
       const nextElement = elements[maxLevel + 1]!
       const moved = elements.splice(minLevel, group.length)
@@ -639,7 +639,7 @@ export const orderElementLikePptist = (
   if (command === 'down') {
     if (element.groupId) {
       const group = elements.filter(item => item.groupId === element.groupId)
-      const { minLevel } = getPptistGroupLevelRange(sourceElements, group)
+      const { minLevel } = getGroupLevelRange(sourceElements, group)
       if (minLevel === 0) return undefined
       const previousElement = elements[minLevel - 1]!
       const moved = elements.splice(minLevel, group.length)
@@ -666,7 +666,7 @@ export const orderElementLikePptist = (
   if (command === 'top') {
     if (element.groupId) {
       const group = elements.filter(item => item.groupId === element.groupId)
-      const { minLevel, maxLevel } = getPptistGroupLevelRange(sourceElements, group)
+      const { minLevel, maxLevel } = getGroupLevelRange(sourceElements, group)
       if (maxLevel === sourceElements.length - 1) return undefined
       elements.push(...elements.splice(minLevel, group.length))
     }
@@ -681,7 +681,7 @@ export const orderElementLikePptist = (
 
   if (element.groupId) {
     const group = elements.filter(item => item.groupId === element.groupId)
-    const { minLevel } = getPptistGroupLevelRange(sourceElements, group)
+    const { minLevel } = getGroupLevelRange(sourceElements, group)
     if (minLevel === 0) return undefined
     elements.unshift(...elements.splice(minLevel, group.length))
   }
@@ -694,7 +694,7 @@ export const orderElementLikePptist = (
   return elements
 }
 
-export const groupElementsLikePptist = (
+export const groupElements = (
   sourceElements: readonly PPTElement[],
   selectedIds: ReadonlySet<string>,
   groupId: string,
@@ -714,7 +714,7 @@ export const groupElementsLikePptist = (
   return elements
 }
 
-export const ungroupElementsLikePptist = (
+export const ungroupElements = (
   sourceElements: readonly PPTElement[],
   selectedIds: ReadonlySet<string>,
 ): PPTElement[] | undefined => {
@@ -726,7 +726,7 @@ export const ungroupElementsLikePptist = (
   return elements
 }
 
-export const setElementLocksLikePptist = (input: {
+export const setElementLocks = (input: {
   readonly elements: readonly PPTElement[]
   readonly lock: boolean
   readonly selectedIds?: ReadonlySet<string>
@@ -968,7 +968,7 @@ export const updateImageCropGeometry = (input: {
   readonly lockAspectRatio: boolean
 }): ImageCropGeometry => {
   const { element, geometry, handle } = input
-  // Keep PPTist's polar-coordinate arithmetic order literally. The matrix
+  // Keep the established editor's polar-coordinate arithmetic order literally. The matrix
   // identity is mathematically equivalent, but produces observably different
   // IEEE-754 tails in committed crop geometry.
   const moveLength = Math.sqrt(input.delta.x * input.delta.x + input.delta.y * input.delta.y)
@@ -1015,7 +1015,7 @@ export const commitImageCropGeometry = (
   const imageTop = -rect.top * (100 / rect.height)
   const imageWidth = geometry.rawWidth / rect.width * 100
   const imageHeight = geometry.rawHeight / rect.height * 100
-  // PPTist derives the range from percentage style strings with parseInt.
+  // the source editor derives the range from percentage style strings with parseInt.
   // Math.trunc reproduces that intentional integer quantization.
   const rendered = {
     left: Math.trunc(imageLeft),

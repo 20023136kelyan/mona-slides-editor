@@ -12,10 +12,7 @@ import {
   type ScreenPresentationController,
   type ScreenSyncMessage,
 } from '@/features/screen/screen-types'
-
-const postNotice = (text: string) => {
-  window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text, type: 'success' } }))
-}
+import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
 
 export interface ScreenPlayback {
   animationIndex: number
@@ -45,9 +42,11 @@ export interface ScreenPlayback {
 export const useScreenPlayback = ({
   audience = false,
   controller,
+  notify,
 }: {
   audience?: boolean
   controller: ScreenPresentationController
+  notify?: EditorNotificationService['notify']
 }): ScreenPlayback => {
   const { t } = useTranslation()
   const { presentation, setSlideIndex } = controller
@@ -98,8 +97,11 @@ export const useScreenPlayback = ({
     const now = Date.now()
     if (now - lastBoundaryNoticeAtRef.current < 1000) return
     lastBoundaryNoticeAtRef.current = now
-    postNotice(text)
-  }, [])
+    notify?.({ text, type: 'success' })
+  }, [notify])
+  const postNotice = useCallback((text: string) => {
+    notify?.({ text, type: 'success' })
+  }, [notify])
 
   const animationElement = useCallback((elementId: string) => (
     document.querySelector<HTMLElement>(`#screen-element-${CSS.escape(elementId)} [data-element-id]`)
@@ -173,7 +175,7 @@ export const useScreenPlayback = ({
     setAnimationPosition(0)
     // A jump mid-animation unmounts the animated elements, so their
     // animationend never fires; without this reset "next" wedges on any
-    // slide that has animations. (Shared PPTist defect, fixed here.)
+    // slide that has animations. (Shared the source editor defect, fixed here.)
     inAnimationRef.current = false
   }, [setAnimationPosition, setSlideIndex])
   const turnSlideToId = useCallback((id: string) => {
@@ -236,19 +238,32 @@ export const useScreenPlayback = ({
     runAnimationRef.current = runAnimation
   }, [execNext, execPrev, runAnimation])
 
+  useEffect(() => {
+    if (audience) return undefined
+    const state = presentationRef.current
+    const durationMs = state.slides[state.slideIndex]?.durationMs
+    if (!durationMs) return undefined
+    const timer = window.setTimeout(() => {
+      const current = presentationRef.current
+      if (current.slideIndex < current.slides.length - 1) turnSlideToIndex(current.slideIndex + 1)
+      else if (loopPlayRef.current) turnSlideToIndex(0)
+    }, durationMs)
+    return () => window.clearTimeout(timer)
+  }, [audience, presentation.slideIndex, presentation.slides, turnSlideToIndex])
+
   const autoPlay = useCallback(() => {
     closeAutoPlay()
     postNotice(t('runtime.autoPlayStarted'))
     autoPlayTimerRef.current = window.setInterval(() => execNextRef.current(), autoPlayInterval)
     setAutoPlayActive(true)
-  }, [autoPlayInterval, closeAutoPlay, t])
+  }, [autoPlayInterval, closeAutoPlay, postNotice, t])
   const setAutoPlayInterval = useCallback((interval: number) => {
     closeAutoPlay()
     setAutoPlayIntervalState(interval)
     postNotice(t('runtime.autoPlayStarted'))
     autoPlayTimerRef.current = window.setInterval(() => execNextRef.current(), interval)
     setAutoPlayActive(true)
-  }, [closeAutoPlay, t])
+  }, [closeAutoPlay, postNotice, t])
 
   const mousewheelListener = useCallback((event: WheelEvent | React.WheelEvent) => {
     const now = Date.now()
@@ -299,6 +314,9 @@ export const useScreenPlayback = ({
   useEffect(() => {
     if (audience) return undefined
     const keydown = throttle((event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('a, button, input, select, textarea, [contenteditable="true"], [role="menuitem"]')) return
       const key = event.key.toUpperCase()
       if (['ARROWUP', 'ARROWLEFT', 'PAGEUP'].includes(key)) execPrevRef.current()
       else if (['ARROWDOWN', 'ARROWRIGHT', ' ', 'ENTER', 'PAGEDOWN'].includes(key)) execNextRef.current()

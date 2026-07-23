@@ -1,11 +1,15 @@
 /* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the source formula/symbol tiles and modal mask are pointer surfaces without keyboard roles. */
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { FORMULA_LIST, SYMBOL_LIST } from '@mona/presentation-core/latex-presets'
 
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { renderLatex, renderLatexSymbol, type LatexRenderResult } from '@/features/editor/editor-latex'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 
 type FormulaToolbarState = 'formula' | 'symbol'
 
@@ -34,9 +38,16 @@ function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }
   value: string
 }) {
   return (
-    <div className={'mona-latex-tabs' + (card ? ' is-card' : '') + (spaceBetween ? ' is-space-between' : '')}>
-      {tabs.map(tab => <button className={tab.key === value ? 'is-active' : ''} key={tab.key} onClick={() => onChange(tab.key)} type="button">{tab.label}</button>)}
-    </div>
+    <ToggleGroup
+      className={'mona-latex-tabs' + (card ? ' is-card' : '') + (spaceBetween ? ' is-space-between' : '')}
+      onValueChange={next => {
+        if (next) onChange(next)
+      }}
+      type="single"
+      value={value}
+    >
+      {tabs.map(tab => <ToggleGroupItem className={tab.key === value ? 'is-active' : ''} key={tab.key} value={tab.key}>{tab.label}</ToggleGroupItem>)}
+    </ToggleGroup>
   )
 }
 
@@ -46,19 +57,11 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
   onSave: (result: LatexRenderResult) => void
 }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const [latex, setLatex] = useState(initialValue)
-  const [closing, setClosing] = useState(false)
   const [toolbarState, setToolbarState] = useState<FormulaToolbarState>('symbol')
   const [selectedSymbolKey, setSelectedSymbolKey] = useState(SYMBOL_LIST[0]!.type)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
-  const closeTimerRef = useRef<number | null>(null)
-  useEffect(() => {
-    const timer = window.setTimeout(() => textAreaRef.current?.focus(), 0)
-    return () => {
-      window.clearTimeout(timer)
-      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current)
-    }
-  }, [])
   const formulaTabs = [
     { key: 'symbol', label: t('foundation.editor.latex.symbols') },
     { key: 'formula', label: t('foundation.editor.latex.presets') },
@@ -79,32 +82,34 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
     })
   }
 
-  const requestClose = () => {
-    if (closing) return
-    setClosing(true)
-    closeTimerRef.current = window.setTimeout(onClose, 250)
-  }
-
   const confirm = () => {
     if (!latex) {
-      window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: t('foundation.editor.latex.required'), type: 'error' } }))
+      notifications.notify({ text: t('foundation.editor.latex.required'), type: 'error' })
       return
     }
     onSave(renderLatex(latex))
-    requestClose()
+    onClose()
   }
 
-  return createPortal((
-    <div className={'mona-latex-modal' + (closing ? ' is-closing' : '')} onKeyUp={event => {
-      if (event.key === 'Escape') requestClose() 
-    }} tabIndex={-1}>
-      <div className="mona-latex-modal-mask" onClick={requestClose} />
-      <div className="mona-latex-modal-content">
+  return (
+    <Dialog onOpenChange={open => {
+      if (!open) onClose()
+    }} open>
+      <DialogContent
+        className="mona-latex-modal-content"
+        onOpenAutoFocus={event => {
+          event.preventDefault()
+          textAreaRef.current?.focus()
+        }}
+        overlayClassName="mona-latex-modal-mask"
+        showCloseButton={false}
+      >
+        <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.latex.edit')}</DialogTitle></DialogHeader>
         <div className="mona-latex-editor">
           <div className="mona-latex-editor-container">
             <div className="mona-latex-editor-left">
               <div className="mona-latex-input-area">
-                <textarea onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
+                <Textarea onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
               </div>
               <div className="mona-latex-preview">
                 {!latex ? <div className="mona-latex-preview-placeholder">{t('foundation.editor.latex.preview')}</div> : (
@@ -136,11 +141,11 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
             </div>
           </div>
           <div className="mona-latex-editor-footer">
-            <button className="mona-latex-editor-button is-default" onClick={requestClose} type="button">{t('foundation.editor.latex.cancel')}</button>
-            <button className="mona-latex-editor-button is-primary" onClick={confirm} type="button">{t('foundation.editor.latex.confirm')}</button>
+            <Button className="mona-latex-editor-button" onClick={onClose} size="editor" variant="outline">{t('foundation.editor.latex.cancel')}</Button>
+            <Button className="mona-latex-editor-button" onClick={confirm} size="editor">{t('foundation.editor.latex.confirm')}</Button>
           </div>
         </div>
-      </div>
-    </div>
-  ), document.body)
+      </DialogContent>
+    </Dialog>
+  )
 }

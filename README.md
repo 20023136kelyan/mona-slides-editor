@@ -1,24 +1,31 @@
-# Mona Slides
+# Mona
 
 [简体中文](./README_zh.md) | English
 
-Mona Slides is an open-source, browser-based presentation editor. It preserves
+Mona is an open-source, browser-based presentation editor. It preserves
 PowerPoint-style editable objects—text, images, shapes, lines, tables, charts,
 media, and equations—rather than flattening a deck into generated images.
 
-The current repository is the completed React re-platform of the PPTist editor.
 The editor, mobile surfaces, slideshow, presenter tools, import/export flows,
-and English/Chinese interface have been ported to React and verified against a
-frozen build of the original implementation. The frozen Vue build under
-`tests/oracle/vue/` is test evidence only; it is not a production application.
+and English/Chinese interface are implemented in React. The repository now
+uses Mona-owned product tests and fixtures rather than retaining a second
+framework implementation as a reference runtime.
 
-## Current product boundary
+## Agentic editing
 
-This milestone establishes the exact editor foundation for Mona's later agentic
-workflow. The planned AI presentation SDK, hosted-model adapters, and
-Excalidraw drawing-first input are not implemented in this milestone. When
-added, they must edit the same native presentation model used by the human
-editor; screenshots remain inspection evidence, not slide data.
+Mona includes a drawing-first and text-first presentation agent workflow.
+Excalidraw sketches are stored per slide and can be handed to Mona as visual
+intent. The agent receives both the native presentation structure and rendered
+slide pixels, generates a bounded JavaScript presentation program, previews
+the result, validates its commands, and applies the accepted edit as one
+undoable transaction. It creates ordinary editable presentation elements;
+screenshots are inspection evidence, never slide data.
+
+Provider paths currently include OpenAI account sign-in, Anthropic account
+sign-in, a Google AI Studio bring-your-own-key adapter, and a local reference
+engine for testing the complete edit pipeline without a model. OAuth
+credentials stay encrypted in the agent server and never enter the editor or
+generated presentation code.
 
 ## Technology
 
@@ -38,37 +45,38 @@ npm install
 npm run dev
 ```
 
-Open <http://127.0.0.1:5173/>. The root `dev`, `build`, and `preview` commands
-all target the React application in `apps/web`.
+Open <http://127.0.0.1:5173/>. The root `dev` command starts both the React
+application and the local agent server. See
+[`apps/agent-server/README.md`](./apps/agent-server/README.md) for hosted
+provider and production-secret requirements.
 
 ## Verification
 
 ```sh
 npm run type-check
+npm run check:architecture
 npm run lint
-npm run test:gate2
+npm run test:core
 npm run test:react
 npm run e2e:react
 npm run build
-npm run parity:gate8
 ```
-
-The complete two-sided parity suites are intentionally more expensive. Their
-commands and final evidence are recorded in
-[`tests/parity/PARITY_MATRIX.md`](./tests/parity/PARITY_MATRIX.md) and the Gate
-4–8 ledgers under [`doc/`](./doc/).
 
 ## Repository layout
 
 ```text
 apps/web/                    React production application
+apps/agent-server/           hosted provider, credential, and managed-asset boundary
+packages/agent-protocol/     shared agent program and review protocol
 packages/presentation-core/ presentation model and domain behavior
 packages/editor-state/      canonical state, transactions, and selectors
 packages/editor-interactions/ geometry and gesture behavior
 packages/rich-text/         framework-neutral rich-text behavior
-packages/parity-fixtures/   shared deterministic fixtures
-tests/oracle/vue/           immutable compiled test oracle only
-tests/gate*/                two-sided parity and stabilization suites
+packages/test-fixtures/     shared deterministic fixtures
+tests/core/                 framework-neutral integration contracts
+tests/performance/          state and interaction performance budgets
+tests/stability/            production runtime stability checks
+tests/corpus/               real-world PowerPoint fixture metadata
 ```
 
 UI localization uses English as the canonical source and fallback. Simplified
@@ -78,6 +86,6 @@ and are never translated automatically. See [`doc/I18N.md`](./doc/I18N.md).
 
 ## Attribution and license
 
-Mona Slides is derived from [PPTist](https://github.com/pipipi-pikachu/PPTist)
-and retains its copyright and license notices. See [`LICENSE`](./LICENSE) for
-the repository's licensing terms.
+Mona preserves the copyright and license notices of the open-source software it
+builds on. See [`NOTICE.md`](./NOTICE.md) for attribution and [`LICENSE`](./LICENSE)
+for the repository's licensing terms.

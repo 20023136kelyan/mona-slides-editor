@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { editorActions } from '@mona/editor-state'
 import type { PPTElement } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
 import { getElementBounds } from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
-import { replaceLegacyPlaceholders } from '@/lib/utils'
 
 const FLOAT_LAYER_GAP = 10
 const FLOATING_TOOLBAR_HEIGHT = 40
@@ -82,11 +82,11 @@ export function EditorFloatingLinkHandler({
     <div className="mona-link-handler" onPointerDown={event => event.stopPropagation()} ref={handlerRef} style={position || { visibility: 'hidden' }}>
       {link.type === 'web'
         ? <a className="mona-link-handler-link" href={link.target} rel="noreferrer" target="_blank">{link.target}</a>
-        : <button className="mona-link-handler-link" onClick={goToSlide} type="button">{replaceLegacyPlaceholders(t('canvas.slideLink'), { number: link.target })}</button>}
+        : <Button className="mona-link-handler-link" onClick={goToSlide} size="xs" type="button" variant="ghost">{t('canvas.slideLink', { number: link.target })}</Button>}
       <div className="mona-link-handler-buttons">
-        <button className="mona-link-handler-button" onClick={onChangeLink} type="button">{t('canvas.change')}</button>
+        <Button className="mona-link-handler-button" onClick={onChangeLink} size="xs" type="button" variant="ghost">{t('canvas.change')}</Button>
         <div className="mona-link-handler-divider" />
-        <button className="mona-link-handler-button" onClick={removeLink} type="button">{t('canvas.remove')}</button>
+        <Button className="mona-link-handler-button" onClick={removeLink} size="xs" type="button" variant="ghost">{t('canvas.remove')}</Button>
       </div>
     </div>
   )

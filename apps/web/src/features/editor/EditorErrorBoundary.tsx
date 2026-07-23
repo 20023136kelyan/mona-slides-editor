@@ -1,6 +1,8 @@
 import { Component, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
+
 interface BoundaryProps {
   children: ReactNode
   fallback: (reset: () => void) => ReactNode
@@ -35,7 +37,7 @@ export function EditorErrorBoundary({ children }: { children: ReactNode }) {
       fallback={reset => (
         <div className="mona-surface-error" role="alert">
           <div className="mona-surface-error-text">{t('foundation.editor.surfaceError')}</div>
-          <button className="mona-surface-error-retry" onClick={reset} type="button">{t('foundation.editor.surfaceRetry')}</button>
+          <Button className="mona-surface-error-retry" onClick={reset} size="sm" type="button" variant="outline">{t('foundation.editor.surfaceRetry')}</Button>
         </div>
       )}
     >{children}</Boundary>

@@ -1,4 +1,3 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- PPTist's drawing surface and compact tool palette are pointer-first controls. */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from 'react'
 import tippy, { type Instance } from 'tippy.js'
 import { useTranslation } from 'react-i18next'
@@ -15,9 +14,9 @@ import PlusIcon from '~icons/icon-park-outline/plus'
 import ShapeIcon from '~icons/icon-park-outline/graphic-design'
 import SquareIcon from '~icons/icon-park-outline/square'
 
-import { EditorMoveablePanel } from '@/features/editor/EditorMoveablePanel'
 import { InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
 import { AUDIENCE_SYNC_CHANNEL, type ScreenSyncMessage } from '@/features/screen/screen-types'
+import { ScreenMoveablePanel } from '@/features/screen/ScreenMoveablePanel'
 import { ScreenTooltip } from '@/features/screen/ScreenTooltip'
 import { readWritingBoardImage, writeWritingBoardImage } from '@/features/screen/screen-writing-storage'
 
@@ -308,7 +307,7 @@ function WritingToolPopover({
   open: boolean
   trigger: React.ReactNode
 }) {
-  const anchorRef = useRef<HTMLDivElement>(null)
+  const anchorRef = useRef<HTMLButtonElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const instanceRef = useRef<Instance | null>(null)
   const handleHidden = useCallback(() => onHide(name), [name, onHide])
@@ -344,10 +343,17 @@ function WritingToolPopover({
   }, [open])
 
   return (
-    <div className="mona-screen-writing-tool-wrap" ref={anchorRef}>
+    <div className="mona-screen-writing-tool-wrap">
       <div className="mona-screen-writing-setting-popover" ref={contentRef}>{children}</div>
       <ScreenTooltip content={label}>
-        <div className={`mona-screen-writing-btn${active ? ' is-active' : ''}`} onClick={onClick}>{trigger}</div>
+        <button
+          aria-label={label}
+          aria-pressed={active}
+          className={`mona-screen-writing-btn${active ? ' is-active' : ''}`}
+          onClick={onClick}
+          ref={anchorRef}
+          type="button"
+        >{trigger}</button>
       </ScreenTooltip>
     </div>
   )
@@ -370,6 +376,7 @@ export function ScreenWritingBoard({
 }) {
   const { t } = useTranslation()
   const canvasRef = useRef<DrawingCanvasHandle | null>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
   const channelRef = useRef<BroadcastChannel | null>(null)
   const blackboardRef = useRef(false)
   const [color, setColor] = useState('#e2534d')
@@ -391,6 +398,10 @@ export function ScreenWritingBoard({
     broadcast(dataURL)
     void writeWritingBoardImage(slideId, dataURL)
   }, [broadcast, slideId])
+  const close = useCallback(() => {
+    channelRef.current?.postMessage({ type: 'WRITING_BOARD_CLOSE' } satisfies ScreenSyncMessage)
+    onClose()
+  }, [onClose])
 
   useEffect(() => {
     const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
@@ -414,14 +425,20 @@ export function ScreenWritingBoard({
     blackboardRef.current = blackboard
     broadcast(canvasRef.current?.getDataURL() || '', blackboard)
   }, [blackboard, broadcast])
+  useEffect(() => {
+    boardRef.current?.querySelector<HTMLButtonElement>('.mona-screen-writing-btn')?.focus()
+    const keydown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      close()
+    }
+    document.addEventListener('keydown', keydown)
+    return () => document.removeEventListener('keydown', keydown)
+  }, [close])
 
   const changeModel = (next: DrawingModel) => {
     setModel(next)
     setSizePopover(current => current === next ? null : next)
-  }
-  const close = () => {
-    channelRef.current?.postMessage({ type: 'WRITING_BOARD_CLOSE' } satisfies ScreenSyncMessage)
-    onClose()
   }
   const clear = () => {
     canvasRef.current?.clear()
@@ -449,28 +466,28 @@ export function ScreenWritingBoard({
   )
 
   return (
-    <div className="mona-screen-writing-board">
+    <div aria-label={t('screen.penTools')} className="mona-screen-writing-board" ref={boardRef} role="dialog">
       <div className="mona-screen-writing-wrap" style={{ height: slideHeight, width: slideWidth }}>
         <DrawingCanvas blackboard={blackboard} color={color} markSize={markSize} model={model} onEnd={persist} penSize={penSize} register={handle => {
           canvasRef.current = handle 
         }} rubberSize={rubberSize} shapeSize={shapeSize} shapeType={shapeType} />
       </div>
-      <EditorMoveablePanel className="mona-screen-writing-tools-panel" height={50} left={left} top={top} width={510}>
-        <div className="mona-screen-writing-tools" onMouseDown={event => event.stopPropagation()}>
+      <ScreenMoveablePanel className="mona-screen-writing-tools-panel" height={50} left={left} top={top} width={510}>
+        <div className="mona-screen-writing-tools">
           <div className="mona-screen-writing-tool-content">
             {tool('pen', t('screen.pen'), <PenIcon />, <div className="mona-screen-writing-setting"><span>{t('drawingTools.strokeWidth')}</span><InspectorSlider ariaLabel={t('drawingTools.strokeWidth')} max={10} min={4} onChange={setPenSize} step={2} value={penSize} /></div>)}
-            {tool('shape', t('drawingTools.shape'), <ShapeIcon />, <div className="mona-screen-writing-setting is-shape"><div className="mona-screen-writing-shapes"><SquareIcon className={shapeType === 'rect' ? 'is-active' : ''} onClick={() => setShapeType('rect')} /><CircleIcon className={shapeType === 'circle' ? 'is-active' : ''} onClick={() => setShapeType('circle')} /><ArrowIcon className={shapeType === 'arrow' ? 'is-active' : ''} onClick={() => setShapeType('arrow')} /></div><div className="mona-screen-writing-divider" /><span>{t('drawingTools.strokeWidth')}</span><InspectorSlider ariaLabel={t('drawingTools.strokeWidth')} max={8} min={2} onChange={setShapeSize} step={2} value={shapeSize} /></div>)}
+            {tool('shape', t('drawingTools.shape'), <ShapeIcon />, <div className="mona-screen-writing-setting is-shape"><div className="mona-screen-writing-shapes"><button aria-label={t('drawingTools.rectangle')} aria-pressed={shapeType === 'rect'} className={shapeType === 'rect' ? 'is-active' : ''} onClick={() => setShapeType('rect')} type="button"><SquareIcon /></button><button aria-label={t('drawingTools.circle')} aria-pressed={shapeType === 'circle'} className={shapeType === 'circle' ? 'is-active' : ''} onClick={() => setShapeType('circle')} type="button"><CircleIcon /></button><button aria-label={t('drawingTools.arrow')} aria-pressed={shapeType === 'arrow'} className={shapeType === 'arrow' ? 'is-active' : ''} onClick={() => setShapeType('arrow')} type="button"><ArrowIcon /></button></div><div className="mona-screen-writing-divider" /><span>{t('drawingTools.strokeWidth')}</span><InspectorSlider ariaLabel={t('drawingTools.strokeWidth')} max={8} min={2} onChange={setShapeSize} step={2} value={shapeSize} /></div>)}
             {tool('mark', t('drawingTools.highlighter'), <HighlighterIcon />, <div className="mona-screen-writing-setting"><span>{t('drawingTools.strokeWidth')}</span><InspectorSlider ariaLabel={t('drawingTools.strokeWidth')} max={40} min={16} onChange={setMarkSize} step={4} value={markSize} /></div>)}
             {tool('eraser', t('drawingTools.eraser'), <EraserIcon />, <div className="mona-screen-writing-setting"><span>{t('drawingTools.eraserSize')}</span><InspectorSlider ariaLabel={t('drawingTools.eraserSize')} max={200} min={20} onChange={setRubberSize} step={20} value={rubberSize} /></div>)}
-            <ScreenTooltip content={t('drawingTools.clear')}><div className="mona-screen-writing-btn" onClick={clear}><ClearIcon /></div></ScreenTooltip>
-            <ScreenTooltip content={t('drawingTools.blackboard')}><div className={`mona-screen-writing-btn${blackboard ? ' is-active' : ''}`} onClick={() => setBlackboard(current => !current)}><FillIcon /></div></ScreenTooltip>
+            <ScreenTooltip content={t('drawingTools.clear')}><button aria-label={t('drawingTools.clear')} className="mona-screen-writing-btn" onClick={clear} type="button"><ClearIcon /></button></ScreenTooltip>
+            <ScreenTooltip content={t('drawingTools.blackboard')}><button aria-label={t('drawingTools.blackboard')} aria-pressed={blackboard} className={`mona-screen-writing-btn${blackboard ? ' is-active' : ''}`} onClick={() => setBlackboard(current => !current)} type="button"><FillIcon /></button></ScreenTooltip>
             <div className="mona-screen-writing-colors">
-              {COLORS.map(item => <div className={`mona-screen-writing-color${item === color ? ' is-active' : ''}${item === '#ffffff' ? ' is-white' : ''}`} key={item} onClick={() => chooseColor(item)} style={{ backgroundColor: item }} />)}
+              {COLORS.map(item => <button aria-label={`${t('common.color')} ${item}`} aria-pressed={item === color} className={`mona-screen-writing-color${item === color ? ' is-active' : ''}${item === '#ffffff' ? ' is-white' : ''}`} key={item} onClick={() => chooseColor(item)} style={{ backgroundColor: item }} type="button" />)}
             </div>
           </div>
-          <ScreenTooltip content={t('drawingTools.close')}><div className="mona-screen-writing-btn is-close" onClick={close}><CloseIcon /></div></ScreenTooltip>
+          <ScreenTooltip content={t('drawingTools.close')}><button aria-label={t('drawingTools.close')} className="mona-screen-writing-btn is-close" onClick={close} type="button"><CloseIcon /></button></ScreenTooltip>
         </div>
-      </EditorMoveablePanel>
+      </ScreenMoveablePanel>
     </div>
   )
 }

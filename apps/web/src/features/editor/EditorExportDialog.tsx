@@ -1,5 +1,4 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- PPTist's two-thumb slider is a direct-manipulation div; an input cannot preserve its source geometry or range semantics. */
-import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { selectPresentation } from '@mona/editor-state'
@@ -7,6 +6,11 @@ import type { Slide } from '@mona/presentation-core/model'
 
 import DownloadIcon from '~icons/icon-park-outline/download'
 
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { EditorFullscreenSpin } from '@/features/editor/EditorFullscreenSpin'
 import { InspectorSelect } from '@/features/editor/EditorInspectorPrimitives'
 import { EditorModal } from '@/features/editor/EditorModal'
@@ -14,7 +18,7 @@ import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 
-export type ExportDialogType = 'image' | 'json' | 'pdf' | 'pptist' | 'pptx'
+export type ExportDialogType = 'image' | 'json' | 'native' | 'pdf' | 'pptx'
 type RangeType = 'all' | 'current' | 'custom'
 
 export interface EditorExportActions {
@@ -27,73 +31,25 @@ export interface EditorExportActions {
 }
 
 function ExportButton({ children, className = '', onClick, primary = false }: { children: ReactNode; className?: string; onClick: () => void; primary?: boolean }) {
-  return <button className={`mona-export-button ${primary ? 'is-primary' : 'is-default'} ${className}`} onClick={onClick} type="button">{children}</button>
+  return <Button className={`mona-export-button ${primary ? 'is-primary' : 'is-default'} ${className}`} onClick={onClick} size="editor" variant={primary ? 'default' : 'outline'}>{children}</Button>
 }
 
 function ExportRadioGroup({ items, onChange, value }: { items: Array<{ label: string; value: string }>; onChange: (value: string) => void; value: string }) {
-  return <div className="mona-export-radio-group">{items.map(item => <button className={`mona-export-radio${value === item.value ? ' is-checked' : ''}`} key={item.value} onClick={() => onChange(item.value)} type="button">{item.label}</button>)}</div>
+  return <ToggleGroup className="mona-export-radio-group" onValueChange={next => {
+    if (next) onChange(next)
+  }} spacing={0} type="single" value={value} variant="outline">{items.map(item => <ToggleGroupItem className="mona-export-radio" key={item.value} value={item.value}>{item.label}</ToggleGroupItem>)}</ToggleGroup>
 }
 
 function ExportSwitch({ ariaLabel, checked, onChange }: { ariaLabel: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <span aria-checked={checked} aria-label={ariaLabel} className={`mona-export-switch${checked ? ' is-active' : ''}`} onClick={() => onChange(!checked)} onKeyDown={event => {
-    if (event.key === 'Enter' || event.key === ' ') onChange(!checked) 
-  }} role="switch" tabIndex={0}><span /></span>
-}
-
-const valueAt = (clientX: number, element: HTMLElement, min: number, max: number, step: number) => {
-  const rect = element.getBoundingClientRect()
-  const percentage = Math.min(1, Math.max(0, (clientX - rect.left) / element.clientWidth))
-  const stepped = Math.round((percentage * (max - min)) / step) * step + min
-  const decimals = `${step}`.split('.')[1]?.length ?? 0
-  return +Math.min(max, Math.max(min, stepped)).toFixed(decimals)
+  return <Switch aria-label={ariaLabel} checked={checked} className="mona-export-switch" onCheckedChange={onChange} />
 }
 
 function ExportSlider({ max, min, onChange, step, value }: { max: number; min: number; onChange: (value: number) => void; step: number; value: number }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const percentage = max === min ? 0 : (value - min) / (max - min) * 100
-  const start = (event: ReactMouseEvent) => {
-    const element = ref.current
-    if (!element) return
-    const move = (moveEvent: MouseEvent) => onChange(valueAt(moveEvent.clientX, element, min, max, step))
-    const end = (endEvent: MouseEvent) => {
-      onChange(valueAt(endEvent.clientX, element, min, max, step))
-      document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', end)
-    }
-    document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', end)
-    event.preventDefault()
-  }
-  return <div aria-label="slider" aria-valuemax={max} aria-valuemin={min} aria-valuenow={value} className="mona-export-slider" onMouseDown={start} ref={ref} role="slider" tabIndex={0}><div className="mona-export-slider-bar"><div className="mona-export-slider-track" style={{ width: `${percentage}%` }} /><div className="mona-export-slider-thumb" data-tooltip={value} style={{ left: `${percentage}%` }} /></div></div>
+  return <Slider aria-label="slider" className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange(next[0] ?? value)} step={step} value={[value]} />
 }
 
 function ExportRangeSlider({ max, min, onChange, step, value }: { max: number; min: number; onChange: (value: [number, number]) => void; step: number; value: [number, number] }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const toPercent = (entry: number) => max === min ? 0 : (entry - min) / (max - min) * 100
-  const start = (event: ReactMouseEvent) => {
-    const element = ref.current
-    if (!element) return
-    const selected = valueAt(event.clientX, element, min, max, step)
-    const side = Math.abs(selected - value[0]) < Math.abs(selected - value[1]) ? 0 : 1
-    const update = (clientX: number) => {
-      const next: [number, number] = [...value]
-      next[side] = valueAt(clientX, element, min, max, step)
-      if (next[0] > next[1]) next.reverse()
-      onChange(next)
-    }
-    const move = (moveEvent: MouseEvent) => update(moveEvent.clientX)
-    const end = (endEvent: MouseEvent) => {
-      update(endEvent.clientX)
-      document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', end)
-    }
-    document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', end)
-    event.preventDefault()
-  }
-  const startPercent = toPercent(value[0])
-  const endPercent = toPercent(value[1])
-  return <div aria-label="range slider" aria-valuemax={max} aria-valuemin={min} aria-valuenow={value[1]} aria-valuetext={`${value[0]}–${value[1]}`} className="mona-export-slider" onMouseDown={start} ref={ref} role="slider" tabIndex={0}><div className="mona-export-slider-bar"><div className="mona-export-slider-track" style={{ left: `${startPercent}%`, width: `${endPercent - startPercent}%` }} /><div className="mona-export-slider-thumb" data-tooltip={value[0]} style={{ left: `${startPercent}%` }} /><div className="mona-export-slider-thumb" data-tooltip={value[1]} style={{ left: `${endPercent}%` }} /></div></div>
+  return <Slider aria-label="range slider" className="mona-export-slider" getValueLabel={entry => String(entry)} max={max} min={min} onValueChange={next => onChange([next[0] ?? value[0], next[1] ?? value[1]])} step={step} value={value} />
 }
 
 function HiddenSlideSurfaces({ breakEvery, className, slides, presentation }: { breakEvery?: number; className: string; slides: Slide[]; presentation: ReturnType<typeof selectPresentation> }) {
@@ -152,7 +108,7 @@ function NativeExport({ actions, close, runtime }: ExportPanelProps) {
     <ExportRow label={t('export.range')}><ExportRadioGroup items={[{ label: t('common.all'), value: 'all' }, { label: t('common.currentSlide'), value: 'current' }, { label: t('common.custom'), value: 'custom' }]} onChange={value => setRangeType(value as RangeType)} value={rangeType} /></ExportRow>
     {rangeType === 'custom' ? <ExportRow extra={`(${range[0]}–${range[1]})`} label={`${t('common.customRange')}:`}><ExportRangeSlider max={presentation.slides.length} min={1} onChange={setRange} step={1} value={range} /></ExportRow> : null}
     <div className="mona-export-tip">{t('export.nativeFileTip')}</div>
-  </div><ExportButtons close={close} label={t('export.exportPptist')} onExport={() => actions.exportNative(slides)} /></div>
+  </div><ExportButtons close={close} label={t('export.exportNative')} onExport={() => actions.exportNative(slides)} /></div>
 }
 
 function JsonExport({ actions, close, runtime }: ExportPanelProps) {
@@ -229,9 +185,22 @@ function EditorExportDialogContent({ actions, initialType, onClose, runtime }: {
   const { t } = useTranslation()
   const [exporting, setExporting] = useState(false)
   const tabs = useMemo<Array<{ label: string; type: ExportDialogType }>>(() => [
-    { label: t('export.exportPptist'), type: 'pptist' }, { label: t('export.exportPptx'), type: 'pptx' }, { label: t('export.exportImage'), type: 'image' }, { label: t('export.exportJson'), type: 'json' }, { label: t('export.exportPdf'), type: 'pdf' },
+    { label: t('export.exportNative'), type: 'native' }, { label: t('export.exportPptx'), type: 'pptx' }, { label: t('export.exportImage'), type: 'image' }, { label: t('export.exportJson'), type: 'json' }, { label: t('export.exportPdf'), type: 'pdf' },
   ], [t])
   const [type, setType] = useState<ExportDialogType>(initialType)
   const props = { actions, close: onClose, onExporting: setExporting, runtime }
-  return <><EditorModal onClose={onClose} open width={680}><div className="mona-export-dialog"><div className="mona-export-tabs">{tabs.map(tab => <button className={type === tab.type ? 'is-active' : ''} key={tab.type} onClick={() => setType(tab.type)} type="button">{tab.label}</button>)}</div><div className="mona-export-content" key={type}>{type === 'pptist' ? <NativeExport {...props} /> : type === 'pptx' ? <PptxExport {...props} /> : type === 'image' ? <ImageExport {...props} /> : type === 'json' ? <JsonExport {...props} /> : <PdfExport {...props} />}</div></div></EditorModal><EditorFullscreenSpin loading={exporting} tip={t('common.exporting')} /></>
+  return <><EditorModal onClose={onClose} open title={t('header.export')} width={680}>
+    <Tabs className="mona-export-dialog" onValueChange={value => setType(value as ExportDialogType)} value={type}>
+      {/* Full-bleed strip: neutralize the pill-list defaults (w-fit, muted
+          background, inner padding) so the five triggers span the dialog. */}
+      <TabsList className="h-10 w-full rounded-none bg-transparent p-0 mona-export-tabs">
+        {tabs.map(tab => <TabsTrigger key={tab.type} value={tab.type}>{tab.label}</TabsTrigger>)}
+      </TabsList>
+      <TabsContent className="mona-export-content" value="native"><NativeExport {...props} /></TabsContent>
+      <TabsContent className="mona-export-content" value="pptx"><PptxExport {...props} /></TabsContent>
+      <TabsContent className="mona-export-content" value="image"><ImageExport {...props} /></TabsContent>
+      <TabsContent className="mona-export-content" value="json"><JsonExport {...props} /></TabsContent>
+      <TabsContent className="mona-export-content" value="pdf"><PdfExport {...props} /></TabsContent>
+    </Tabs>
+  </EditorModal><EditorFullscreenSpin loading={exporting} tip={t('common.exporting')} /></>
 }

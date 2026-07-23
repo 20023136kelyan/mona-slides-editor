@@ -1,59 +1,51 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EditorModalCloseContext } from '@/features/editor/editor-modal-context'
 
 export function EditorModal({
   children,
+  closeOnClickMask = true,
+  closeOnEsc = true,
   onClose,
   open,
+  title,
   width = 480,
 }: {
   children: ReactNode
+  closeOnClickMask?: boolean
+  closeOnEsc?: boolean
   onClose: () => void
   open: boolean
+  title: string
   width?: number
 }) {
-  const modalRef = useRef<HTMLDialogElement>(null)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [closing, setClosing] = useState(false)
-
-  useEffect(() => {
-    if (!open) return undefined
-    modalRef.current?.focus()
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-  }, [open])
-
-  const close = useCallback(() => {
-    if (closing) return
-    setClosing(true)
-    closeTimerRef.current = setTimeout(() => {
-      closeTimerRef.current = null
-      onClose()
-    }, 250)
-  }, [closing, onClose])
-
-  if (!open) return null
-  return createPortal((
-    <dialog
-      aria-modal="true"
-      className={`mona-source-modal${closing ? ' is-closing' : ''}`}
-      onKeyDown={event => {
-        if (event.key === 'Escape') close()
-      }}
-      ref={modalRef}
-      open
-      tabIndex={-1}
-    >
-      <button aria-label="Close" className="mona-source-modal-mask" onClick={close} type="button" />
-      <EditorModalCloseContext.Provider value={close}>
-        <div className="mona-source-modal-content" style={{ width }}>
+  return (
+    <Dialog onOpenChange={next => {
+      if (!next) onClose()
+    }} open={open}>
+      <DialogContent
+        aria-describedby={undefined}
+        className="mona-source-modal-content"
+        onEscapeKeyDown={event => {
+          if (!closeOnEsc) event.preventDefault()
+        }}
+        onPointerDownOutside={event => {
+          if (!closeOnClickMask) event.preventDefault()
+        }}
+        overlayClassName="mona-source-modal-mask"
+        showCloseButton={false}
+        style={{ width }}
+      >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <EditorModalCloseContext.Provider value={onClose}>
           {children}
-        </div>
-      </EditorModalCloseContext.Provider>
-    </dialog>
-  ), document.body)
+        </EditorModalCloseContext.Provider>
+      </DialogContent>
+    </Dialog>
+  )
 }

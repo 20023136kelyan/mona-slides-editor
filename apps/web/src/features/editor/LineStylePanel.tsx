@@ -5,6 +5,7 @@ import SwitchIcon from '~icons/icon-park-outline/switch'
 import type { PresentationState } from '@mona/presentation-core'
 import type { Broken2LineDirection, LinePoint, LineStyleType, PPTLineElement } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
 import {
   InspectorButton,
   InspectorColorButton,
@@ -46,7 +47,7 @@ const lineTypeOptions: LineTypeOption[] = [
 function LineTypeThumbnail({ element, item, onSelect }: { element: PPTLineElement; item: LineTypeOption; onSelect: () => void }) {
   const id = `mona-replace-line-${item.key}`
   return (
-    <button aria-label={`Replace with ${item.key} line`} className="mona-line-type-item" onClick={onSelect} type="button">
+    <Button aria-label={`Replace with ${item.key} line`} className="mona-line-type-item" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
       <svg height="24" overflow="visible" width="24">
         <defs>
           {element.points[0] ? <LinePointMarker baseSize={2} color="currentColor" id={id} position="start" preview type={element.points[0]} /> : null}
@@ -62,7 +63,7 @@ function LineTypeThumbnail({ element, item, onSelect }: { element: PPTLineElemen
           strokeWidth="2"
         />
       </svg>
-    </button>
+    </Button>
   )
 }
 

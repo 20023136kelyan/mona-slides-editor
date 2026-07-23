@@ -191,7 +191,7 @@ export function getImageFilter(filters?: ImageElementFilters): string {
 
 function getBroken2Direction(element: PPTLineElement): 'horizontal' | 'vertical' {
   if (element.broken2Direction) return element.broken2Direction
-  // PPTist derives the fallback from getElementRange, which for lines spans
+  // the source editor derives the fallback from getElementRange, which for lines spans
   // from the local origin to max(start, end) per axis — not the |start-end| extent.
   return Math.max(element.start[0], element.end[0]) >= Math.max(element.start[1], element.end[1])
     ? 'horizontal'

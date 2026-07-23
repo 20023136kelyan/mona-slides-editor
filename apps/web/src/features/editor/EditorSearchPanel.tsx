@@ -1,16 +1,19 @@
-/* oxlint-disable jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- Tabs and compact search suffix controls preserve PPTist's exact pointer DOM and geometry. */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import CloseIcon from '~icons/icon-park-outline/close'
 import LeftIcon from '~icons/icon-park-outline/left'
 import RightIcon from '~icons/icon-park-outline/right'
 import { editorActions, selectPresentation, selectSession } from '@mona/editor-state'
 import type { PPTElement, PPTTableElement } from '@mona/presentation-core'
 import { normalizeRichTextHtml } from '@mona/rich-text'
 
-import { EditorMoveablePanel } from '@/features/editor/EditorMoveablePanel'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 
 type SearchResult =
@@ -138,8 +141,9 @@ const replaceActiveMark = (html: string, replacement: string) => {
   return root.innerHTML
 }
 
-export function EditorSearchPanel({ onClose, runtime }: { onClose: () => void; runtime: EditorRuntime }) {
+export function EditorSearchPanel({ runtime }: { runtime: EditorRuntime }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const session = useEditorSelector(runtime.store, selectSession)
   const [mode, setMode] = useState<'replace' | 'search'>('search')
@@ -156,7 +160,7 @@ export function EditorSearchPanel({ onClose, runtime }: { onClose: () => void; r
     latestRef.current = { presentation, results, searchIndex, searchWord, modifiers }
   }, [modifiers, presentation, results, searchIndex, searchWord])
 
-  const notice = (text: string) => window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text, type: 'warning' } }))
+  const notice = (text: string) => notifications.notify({ text, type: 'warning' })
   const clearMarks = () => {
     for (const mark of document.querySelectorAll('.mona-editor-slide-canvas mark[data-index]')) {
       const parent = mark.parentNode
@@ -312,17 +316,20 @@ export function EditorSearchPanel({ onClose, runtime }: { onClose: () => void; r
       runtime.commit('Replace text', [{
         type: 'element.update',
         payload: { id: element.id, slideId: slide!.id, props: { content } },
-      }], { recordHistory: false })
+      }], { historyKey: 'find-replace' })
     }
     else if (element.type === 'shape' && element.text) {
       runtime.commit('Replace shape text', [{
         type: 'element.update',
         payload: { id: element.id, slideId: slide!.id, props: { text: { ...element.text, content } } },
-      }], { recordHistory: false })
+      }], { historyKey: 'find-replace' })
     }
     else if (element.type === 'table' && target.elType === 'table') {
       const data = element.data.map((row, rowIndex) => row.map((cell, columnIndex) => rowIndex === target.cellIndex[0] && columnIndex === target.cellIndex[1] ? { ...cell, text: content } : cell))
-      runtime.commit('Replace table text', [{ type: 'element.update', payload: { id: element.id, slideId: slide!.id, props: { data } } }], { recordHistory: false })
+      runtime.commit('Replace table text', [{
+        type: 'element.update',
+        payload: { id: element.id, slideId: slide!.id, props: { data } },
+      }], { historyKey: 'find-replace' })
     }
   }
   const replace = () => {
@@ -402,7 +409,7 @@ export function EditorSearchPanel({ onClose, runtime }: { onClose: () => void; r
         if (currentShape?.type === 'shape' && currentShape.text) commands.push({ type: 'element.update', payload: { id: currentShape.id, slideId: currentSlide.id, props: { text: { ...currentShape.text, content: replaceAllText(element.text.content, new RegExp(searchWord, modifiers), replaceWord, index) } } } })
       }
     }
-    if (commands.length) runtime.commit('Replace all text', commands, { recordHistory: false })
+    if (commands.length) runtime.commit('Replace all text', commands, { historyKey: 'find-replace-all' })
     if (preservedTableMarkup.length) {
       setTimeout(() => {
         for (const item of preservedTableMarkup) {
@@ -444,30 +451,40 @@ export function EditorSearchPanel({ onClose, runtime }: { onClose: () => void; r
   const setSearchWord = (value: string) => {
     setSearchWordValue(value); reset(value) 
   }
+  const renderSearchField = () => (
+    <InputGroup className="mona-search-input">
+      <InputGroupInput onChange={event => setSearchWord(event.target.value)} onKeyDown={event => {
+        if (event.key === 'Enter') searchNext()
+      }} placeholder={t('foundation.editor.search.findPlaceholder')} ref={searchInputRef} value={searchWord} />
+      <InputGroupAddon align="inline-end" className="mona-search-suffix">
+        <InputGroupText className="mona-search-count">{searchIndex + 1}/{results.length}</InputGroupText>
+        <Separator orientation="vertical" />
+        <InputGroupButton aria-pressed={modifiers === 'g'} className="mona-search-case" onClick={() => {
+          setModifiers(value => value === 'g' ? 'gi' : 'g'); reset()
+        }}>Aa</InputGroupButton>
+        <Separator orientation="vertical" />
+        <InputGroupButton aria-label={t('foundation.editor.search.previous')} className="mona-search-next" onClick={searchPrev} size="icon-xs"><LeftIcon /></InputGroupButton>
+        <InputGroupButton aria-label={t('foundation.editor.search.next')} className="mona-search-next" onClick={searchNext} size="icon-xs"><RightIcon /></InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+  )
 
   return (
-    <EditorMoveablePanel className="mona-search-panel" height={0} left={-270} top={90} width={330}>
-      <div className="mona-search-close" onClick={onClose} onMouseDown={event => event.stopPropagation()}><CloseIcon /></div>
-      <div className="mona-search-tabs">
-        <div className={mode === 'search' ? 'is-active' : ''} onClick={() => setMode('search')}>{t('foundation.editor.search.find')}</div>
-        <div className={mode === 'replace' ? 'is-active' : ''} onClick={() => setMode('replace')}>{t('foundation.editor.search.replace')}</div>
-      </div>
-      <div className={`mona-search-content is-${mode}`} onMouseDown={event => event.stopPropagation()}>
-        <div className="mona-search-input">
-          <input onChange={event => setSearchWord(event.target.value)} onKeyDown={event => {
-            if (event.key === 'Enter') searchNext() 
-          }} placeholder={t('foundation.editor.search.findPlaceholder')} ref={searchInputRef} value={searchWord} />
-          <span className="mona-search-count">{searchIndex + 1}/{results.length}</span><i />
-          <span className={`mona-search-case${modifiers === 'g' ? ' is-active' : ''}`} onClick={() => {
-            setModifiers(value => value === 'g' ? 'gi' : 'g'); reset() 
-          }}>Aa</span><i />
-          <span className="mona-search-next" onClick={searchPrev}><LeftIcon /></span><span className="mona-search-next" onClick={searchNext}><RightIcon /></span>
-        </div>
-        {mode === 'replace' ? <div className="mona-search-input"><input onChange={event => setReplaceWord(event.target.value)} onKeyDown={event => {
-          if (event.key === 'Enter') replace() 
-        }} placeholder={t('foundation.editor.search.replacePlaceholder')} value={replaceWord} /></div> : null}
-        {mode === 'replace' ? <div className="mona-search-footer"><button disabled={!searchWord} onClick={replace}>{t('foundation.editor.action.replace')}</button><button className="is-primary" disabled={!searchWord} onClick={replaceAll}>{t('foundation.editor.action.replaceAll')}</button></div> : null}
-      </div>
-    </EditorMoveablePanel>
+    <div className="mona-search-panel is-embedded">
+      <Tabs onValueChange={value => setMode(value as 'replace' | 'search')} value={mode}>
+        <TabsList className="mona-search-tabs">
+          <TabsTrigger value="search">{t('foundation.editor.search.find')}</TabsTrigger>
+          <TabsTrigger value="replace">{t('foundation.editor.search.replace')}</TabsTrigger>
+        </TabsList>
+        <TabsContent className="mona-search-content is-search" onMouseDown={event => event.stopPropagation()} value="search">{renderSearchField()}</TabsContent>
+        <TabsContent className="mona-search-content is-replace" onMouseDown={event => event.stopPropagation()} value="replace">
+          {renderSearchField()}
+          <Input className="mona-search-replace-input" onChange={event => setReplaceWord(event.target.value)} onKeyDown={event => {
+            if (event.key === 'Enter') replace()
+          }} placeholder={t('foundation.editor.search.replacePlaceholder')} value={replaceWord} />
+          <div className="mona-search-footer"><Button disabled={!searchWord} onClick={replace} size="editor" variant="outline">{t('foundation.editor.action.replace')}</Button><Button disabled={!searchWord} onClick={replaceAll} size="editor">{t('foundation.editor.action.replaceAll')}</Button></div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }

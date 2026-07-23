@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { editorActions } from '@mona/editor-state'
-import type { PresentationState } from '@mona/presentation-core'
+import { createPresentationTransaction, type PresentationState } from '@mona/presentation-core'
 
 import { parseEditorClipboard } from '@/features/editor/editor-clipboard'
 import { createEditorRuntime } from '@/features/editor/editor-runtime'
@@ -69,14 +69,173 @@ describe('editor runtime', () => {
       payload: { id: 'shape-1', props: { left: 90 } },
     }])).toBe(true)
     expect(runtime.store.getState().presentation.slides[0]?.elements[0]?.left).toBe(90)
-    expect(runtime.canUndo()).toBe(false)
-    vi.advanceTimersByTime(300)
     expect(runtime.canUndo()).toBe(true)
 
     expect(runtime.undo()).toBe(true)
     expect(runtime.store.getState().presentation.slides[0]?.elements[0]?.left).toBe(20)
     expect(runtime.redo()).toBe(true)
     expect(runtime.store.getState().presentation.slides[0]?.elements[0]?.left).toBe(90)
+  })
+
+  it('duplicates every selected slide together and selects the duplicated block', () => {
+    const multiSlidePresentation: PresentationState = {
+      ...presentation,
+      slides: [
+        { ...presentation.slides[0]!, id: 'slide-1', title: 'Opening' },
+        { id: 'slide-2', elements: [], title: 'Plan' },
+        { id: 'slide-3', elements: [], title: 'Closing' },
+      ],
+    }
+    const runtime = createEditorRuntime(multiSlidePresentation)
+    runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([0, 1]))
+
+    expect(runtime.duplicateSlides()).toHaveLength(2)
+    expect(runtime.store.getState().presentation.slides.map(slide => slide.title)).toEqual([
+      'Opening',
+      'Plan',
+      'Opening',
+      'Plan',
+      'Closing',
+    ])
+    expect(runtime.store.getState().session.selectedSlideIndexes).toEqual([2, 3])
+  })
+
+  it('keeps page metadata and speaker notes attached through duplicate, reorder, undo, and redo', () => {
+    const runtime = createEditorRuntime({
+      ...presentation,
+      slides: [
+        {
+          id: 'slide-a',
+          durationMs: 8000,
+          elements: [],
+          hidden: true,
+          remark: '<p>Notes for A</p>',
+          title: 'A',
+          turningMode: 'fade',
+        },
+        {
+          id: 'slide-b',
+          elements: [],
+          remark: '<p>Notes for B</p>',
+          title: 'B',
+        },
+      ],
+    })
+    runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([0]))
+    const [duplicateId] = runtime.duplicateSlides()
+    vi.advanceTimersByTime(300)
+
+    expect(runtime.store.getState().presentation.slides[1]).toMatchObject({
+      id: duplicateId,
+      durationMs: 8000,
+      hidden: true,
+      remark: '<p>Notes for A</p>',
+      title: 'A',
+      turningMode: 'fade',
+    })
+
+    expect(runtime.reorderSlide(1, 2)).toBe(true)
+    vi.advanceTimersByTime(300)
+    expect(runtime.store.getState().presentation.slides.map(slide => [slide.title, slide.remark])).toEqual([
+      ['A', '<p>Notes for A</p>'],
+      ['B', '<p>Notes for B</p>'],
+      ['A', '<p>Notes for A</p>'],
+    ])
+
+    expect(runtime.undo()).toBe(true)
+    expect(runtime.store.getState().presentation.slides.map(slide => slide.title)).toEqual(['A', 'A', 'B'])
+    expect(runtime.redo()).toBe(true)
+    expect(runtime.store.getState().presentation.slides.map(slide => slide.title)).toEqual(['A', 'B', 'A'])
+  })
+
+  it('restores complete presentation state through undo and redo', () => {
+    const runtime = createEditorRuntime(presentation)
+    expect(runtime.commit('Update document settings', [
+      { type: 'presentation.title.set', title: 'Renamed deck', fallbackTitle: 'Untitled presentation' },
+      { type: 'presentation.theme.update', props: { backgroundColor: '#123456', fontName: 'Inter' } },
+      { type: 'presentation.viewport-size.set', size: 1440 },
+      { type: 'presentation.viewport-ratio.set', ratio: 0.75 },
+    ])).toBe(true)
+    vi.advanceTimersByTime(300)
+
+    expect(runtime.store.getState().presentation).toMatchObject({
+      title: 'Renamed deck',
+      viewportSize: 1440,
+      viewportRatio: 0.75,
+      theme: { backgroundColor: '#123456', fontName: 'Inter' },
+    })
+
+    expect(runtime.undo()).toBe(true)
+    expect(runtime.store.getState().presentation).toMatchObject({
+      title: 'Editor runtime fixture',
+      viewportSize: 1000,
+      viewportRatio: 0.5625,
+      theme: { backgroundColor: '#fff', fontName: 'Arial' },
+    })
+
+    expect(runtime.redo()).toBe(true)
+    expect(runtime.store.getState().presentation).toMatchObject({
+      title: 'Renamed deck',
+      viewportSize: 1440,
+      viewportRatio: 0.75,
+      theme: { backgroundColor: '#123456', fontName: 'Inter' },
+    })
+  })
+
+  it('previews and commits agent transactions without mutating the previewed deck', () => {
+    const runtime = createEditorRuntime(presentation)
+    const transaction = createPresentationTransaction({
+      id: 'agent-transaction',
+      label: 'Agent moves shape',
+      origin: 'agent',
+      commands: [{
+        type: 'element.update',
+        payload: { id: 'shape-1', props: { left: 240 } },
+      }],
+    })
+
+    const preview = runtime.previewTransaction(transaction)
+    expect(preview.ok).toBe(true)
+    expect(preview.transaction.origin).toBe('agent')
+    expect(preview.state.slides[0]!.elements[0]!.left).toBe(240)
+    expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.left).toBe(20)
+
+    const committed = runtime.commitTransaction(transaction)
+    expect(committed.ok).toBe(true)
+    expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.left).toBe(240)
+    vi.advanceTimersByTime(300)
+    expect(runtime.undo()).toBe(true)
+    expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.left).toBe(20)
+  })
+
+  it('rejects an invalid transaction atomically during preview and commit', () => {
+    const runtime = createEditorRuntime(presentation)
+    const transaction = createPresentationTransaction({
+      id: 'invalid-agent-transaction',
+      label: 'Invalid agent edit',
+      origin: 'agent',
+      commands: [
+        {
+          type: 'element.update',
+          payload: { id: 'shape-1', props: { left: 240 } },
+        },
+        {
+          type: 'slide.delete',
+          slideIds: 'missing-slide',
+        },
+      ],
+    })
+    const before = runtime.store.getState().presentation
+
+    const preview = runtime.previewTransaction(transaction)
+    expect(preview.ok).toBe(false)
+    expect(preview.state).toBe(before)
+    expect(runtime.store.getState().presentation).toBe(before)
+
+    const committed = runtime.commitTransaction(transaction)
+    expect(committed.ok).toBe(false)
+    expect(runtime.store.getState().presentation).toBe(before)
+    expect(runtime.getHistoryState()).toEqual({ cursor: 0, length: 1 })
   })
 
   it('copies and pastes selected groups with fresh element and group IDs', () => {
@@ -100,7 +259,7 @@ describe('editor runtime', () => {
     expect(second.map(element => [element.left, element.top])).toEqual([[40, 50], [180, 50]])
   })
 
-  it('uses PPTist-compatible encrypted payloads and remaps complete slide relationships', () => {
+  it('uses the source editor-compatible encrypted payloads and remaps complete slide relationships', () => {
     const linkedPresentation: PresentationState = {
       ...presentation,
       slides: [
@@ -135,18 +294,18 @@ describe('editor runtime', () => {
     expect(copied[0]!.animations![0]!.elId).toBe(copied[0]!.elements[0]!.id)
   })
 
-  it('duplicates only the current slide and resets an all-slide deletion to one themed blank slide', () => {
+  it('duplicates the selected slide block and resets an all-slide deletion to one themed blank slide', () => {
     const runtime = createEditorRuntime({
       ...presentation,
       slides: [structuredClone(presentation.slides[0]!), { id: 'slide-2', elements: [] }],
     })
     runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([0, 1]))
     const duplicated = runtime.duplicateSlides()
-    expect(duplicated).toHaveLength(1)
-    expect(runtime.store.getState().presentation.slides).toHaveLength(3)
-    expect(runtime.store.getState().presentation.slideIndex).toBe(1)
+    expect(duplicated).toHaveLength(2)
+    expect(runtime.store.getState().presentation.slides).toHaveLength(4)
+    expect(runtime.store.getState().presentation.slideIndex).toBe(2)
 
-    runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([0, 1, 2]))
+    runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([0, 1, 2, 3]))
     expect(runtime.deleteSlides()).toBe(true)
     const state = runtime.store.getState()
     expect(state.presentation.slides).toHaveLength(1)
@@ -154,7 +313,7 @@ describe('editor runtime', () => {
     expect(state.presentation.slides[0]!.background).toEqual({ type: 'solid', color: '#fff' })
   })
 
-  it('reproduces PPTist section-aware slide reordering without creating history', () => {
+  it('preserves section-aware slide reordering as an immediately undoable action', () => {
     const runtime = createEditorRuntime({
       ...presentation,
       slides: [
@@ -172,7 +331,7 @@ describe('editor runtime', () => {
       ['slide-a', undefined],
     ])
     expect(runtime.store.getState().presentation.slideIndex).toBe(3)
-    expect(runtime.getHistoryState()).toEqual({ cursor: 0, length: 1 })
+    expect(runtime.getHistoryState()).toEqual({ cursor: 1, length: 2 })
 
     expect(runtime.reorderSlide(3, 0)).toBe(true)
     expect(runtime.store.getState().presentation.slides.map(slide => [slide.id, slide.sectionTag?.id])).toEqual([
@@ -180,6 +339,10 @@ describe('editor runtime', () => {
       ['slide-b', undefined],
       ['slide-c', 'section-c'],
       ['slide-d', undefined],
+    ])
+    expect(runtime.undo()).toBe(true)
+    expect(runtime.store.getState().presentation.slides.map(slide => slide.id)).toEqual([
+      'slide-b', 'slide-c', 'slide-d', 'slide-a',
     ])
   })
 
@@ -246,7 +409,9 @@ describe('editor runtime', () => {
     const replacementIds = emptyRuntime.insertTemplateSlides([template], { backgroundColor: '#abc' })
     expect(replacementIds).toEqual(['template-slide'])
     expect(emptyRuntime.store.getState().presentation.theme.backgroundColor).toBe('#abc')
-    expect(emptyRuntime.getHistoryState()).toEqual({ cursor: 0, length: 1 })
+    expect(emptyRuntime.getHistoryState()).toEqual({ cursor: 1, length: 2 })
+    expect(emptyRuntime.undo()).toBe(true)
+    expect(emptyRuntime.store.getState().presentation.slides).toEqual([{ id: 'empty', elements: [] }])
 
     const appendedIds = runtime.insertTemplateSlides([template], {})
     expect(appendedIds).toHaveLength(1)
@@ -294,7 +459,7 @@ describe('editor runtime', () => {
     vi.advanceTimersByTime(200)
     runtime.commit('Move', [{ type: 'element.update', payload: { id: 'shape-1', props: { left: 80 } } }])
     vi.advanceTimersByTime(299)
-    expect(runtime.getHistoryState()).toEqual({ cursor: 0, length: 1 })
+    expect(runtime.getHistoryState()).toEqual({ cursor: 1, length: 2 })
     vi.advanceTimersByTime(1)
     expect(runtime.getHistoryState()).toEqual({ cursor: 1, length: 2 })
     expect(runtime.undo()).toBe(true)
@@ -331,7 +496,8 @@ describe('editor runtime', () => {
     vi.advanceTimersByTime(300)
     expect(runtime.getHistoryState()).toEqual({ cursor: 2, length: 3 })
     expect(runtime.undo()).toBe(true)
-    expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
+    expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(2)
+    expect(runtime.store.getState().presentation.slides[0]!.elements[0]!.left).toBe(21)
     expect(runtime.undo()).toBe(true)
     expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(2)
   })

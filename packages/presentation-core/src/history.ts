@@ -9,7 +9,7 @@ export interface PresentationHistoryEntry {
 
 /**
  * Contract around the existing Dexie snapshot implementation.
- * Gate 2 does not replace history storage while changing framework boundaries.
+ * History storage remains framework-neutral and serializable.
  */
 export interface PresentationHistoryAdapter {
   initialize(state: PresentationState): Promise<void>

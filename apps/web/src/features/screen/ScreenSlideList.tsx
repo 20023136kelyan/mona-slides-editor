@@ -1,20 +1,10 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- slideshow links and the full-screen navigation surface intentionally mirror PPTist's pointer behavior. */
 import { useMemo, type MouseEvent } from 'react'
 
-import { selectFormattedCurrentSlideAnimations, type PresentationState, type Slide, type TurningMode } from '@mona/presentation-core'
+import { selectFormattedCurrentSlideAnimations, type PresentationState, type Slide } from '@mona/presentation-core'
 
 import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
 import { getSlideBackgroundStyle } from '@/features/presentation-renderer/render-utils'
-
-const RANDOM_TURNING_MODES: TurningMode[] = ['slideX', 'slideY', 'slideX3D', 'slideY3D', 'fade', 'rotate', 'scaleY', 'scaleX', 'scale', 'scaleReverse']
-
-const resolveTurningModes = (slides: readonly Slide[]) => slides.map(slide => {
-  let turningMode = slide.turningMode || 'slideY'
-  // PPTist intentionally draws a fresh mode whenever the slides collection invalidates.
-  // eslint-disable-next-line react-hooks/purity
-  if (turningMode === 'random') turningMode = RANDOM_TURNING_MODES[Math.floor(Math.random() * RANDOM_TURNING_MODES.length)]!
-  return { ...slide, turningMode }
-})
+import { resolveTurningModes } from '@/features/screen/screen-presentation'
 
 interface ScreenSlideListProps {
   animationIndex: number
@@ -48,18 +38,14 @@ export function ScreenSlideList({
   const currentMode = slides[presentation.slideIndex]?.turningMode
   const scale = presentation.viewportSize ? slideWidth / presentation.viewportSize : 1
 
-  const openLink = (event: MouseEvent, slide: Slide, elementId: string) => {
-    const target = event.target as HTMLElement
-    if (target.tagName === 'A') {
-      manualExitFullscreen()
-      return
-    }
+  const openLink = (event: MouseEvent<HTMLAnchorElement>, slide: Slide, elementId: string) => {
     const element = slide.elements.find(candidate => candidate.id === elementId)
     const link = element?.link
     if (!link) return
+    event.preventDefault()
     if (link.type === 'web') {
       manualExitFullscreen()
-      window.open(link.target)
+      window.open(link.target, '_blank', 'noopener,noreferrer')
     }
     else turnSlideToId(link.target)
   }
@@ -92,20 +78,8 @@ export function ScreenSlideList({
                   }}
                 >
                   <div className="mona-screen-slide-background" style={getSlideBackgroundStyle(slide.background)} />
-                  {slide.elements.map((element, elementIndex) => (
-                    <div
-                      className={`mona-screen-element${element.link ? ' is-link' : ''}`}
-                      id={`screen-element-${element.id}`}
-                      key={element.id}
-                      onClick={event => openLink(event, slide, element.id)}
-                      style={{
-                        color: presentation.theme.fontColor,
-                        fontFamily: presentation.theme.fontName,
-                        visibility: needsEntryWait(presentation, element.id, animationIndex) ? 'hidden' : 'visible',
-                        zIndex: elementIndex + 1,
-                      }}
-                      title={element.link?.target || ''}
-                    >
+                  {slide.elements.map((element, elementIndex) => {
+                    const renderer = (
                       <ElementRenderer
                         element={element}
                         mediaScreen={{
@@ -116,8 +90,53 @@ export function ScreenSlideList({
                         }}
                         theme={presentation.theme}
                       />
-                    </div>
-                  ))}
+                    )
+                    const style = {
+                      color: presentation.theme.fontColor,
+                      fontFamily: presentation.theme.fontName,
+                      visibility: needsEntryWait(presentation, element.id, animationIndex) ? 'hidden' as const : 'visible' as const,
+                      zIndex: elementIndex + 1,
+                    }
+                    if (element.link) {
+                      const linkBounds = element.type === 'line'
+                        ? {
+                            height: Math.max(Math.abs(element.start[1] - element.end[1]), 24),
+                            width: Math.max(Math.abs(element.start[0] - element.end[0]), 24),
+                          }
+                        : { height: element.height, width: element.width }
+                      return (
+                        <div
+                          className="mona-screen-element is-link"
+                          id={`screen-element-${element.id}`}
+                          key={element.id}
+                          style={style}
+                          title={element.link.target}
+                        >
+                          {renderer}
+                          <a
+                            aria-label={element.name || element.link.target}
+                            className="mona-screen-element-link"
+                            href={element.link.type === 'web' ? element.link.target : `#${element.link.target}`}
+                            onClick={event => openLink(event, slide, element.id)}
+                            rel={element.link.type === 'web' ? 'noopener noreferrer' : undefined}
+                            style={{
+                              height: linkBounds.height,
+                              left: element.left,
+                              top: element.top,
+                              transform: element.type === 'line' ? undefined : `rotate(${element.rotate}deg)`,
+                              width: linkBounds.width,
+                            }}
+                            target={element.link.type === 'web' ? '_blank' : undefined}
+                          />
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className="mona-screen-element" id={`screen-element-${element.id}`} key={element.id} style={style}>
+                        {renderer}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ) : null}

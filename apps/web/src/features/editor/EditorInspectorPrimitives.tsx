@@ -1,22 +1,58 @@
-/* oxlint-disable jsx-a11y/prefer-tag-over-role -- PPTist's custom slider DOM and commit-on-release interaction are required for parity. */
-import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 
 import DownIcon from '~icons/icon-park-outline/down'
 import PaletteIcon from '~icons/icon-park-outline/platte'
-import NP from 'number-precision'
-import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
-
-// Values are clamped before slider arithmetic. number-precision's optional
-// diagnostic can nevertheless fire while it scales valid decimals to an
-// internal integer, so silence that diagnostic without changing the result.
-NP.enableBoundaryChecking(false)
+import { cn } from '@/lib/utils'
 
 export interface InspectorOption<T extends number | string> {
   disabled?: boolean
   label: string
   value: T
+}
+
+export function InspectorCheckbox({
+  checked,
+  children,
+  className,
+  onChange,
+  style,
+}: {
+  checked: boolean
+  children: ReactNode
+  className?: string
+  onChange: (value: boolean) => void
+  style?: CSSProperties
+}) {
+  return (
+    <label className={cn('mona-inspector-checkbox', className)} style={style}>
+      <Checkbox checked={checked} onCheckedChange={value => onChange(value === true)} />
+      <span>{children}</span>
+    </label>
+  )
 }
 
 export function InspectorButton({
@@ -39,19 +75,20 @@ export function InspectorButton({
   style?: CSSProperties
 }) {
   return (
-    <button
+    <Button
       aria-label={ariaLabel}
       aria-pressed={active}
-      className={`mona-panel-button${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
+      className={cn('mona-panel-button', active && 'is-active', className)}
       disabled={disabled}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       style={style}
       title={ariaLabel}
-      type="button"
+      size="editor"
+      variant="editor"
     >
       {children}
-    </button>
+    </Button>
   )
 }
 
@@ -62,13 +99,12 @@ export function InspectorButtonGroup({
   children: ReactNode
   className?: string
 }) {
-  return <div className={`mona-panel-button-group${className ? ` ${className}` : ''}`}>{children}</div>
+  return <ButtonGroup className={cn('mona-panel-button-group', className)}>{children}</ButtonGroup>
 }
 
 export function InspectorPopoverButton({
   active = false,
   ariaLabel,
-  asDiv = false,
   children,
   className = '',
   content,
@@ -78,7 +114,6 @@ export function InspectorPopoverButton({
 }: {
   ariaLabel: string
   active?: boolean
-  asDiv?: boolean
   children: ReactNode
   className?: string
   content: ReactNode
@@ -86,54 +121,31 @@ export function InspectorPopoverButton({
   open?: boolean
   style?: CSSProperties
 }) {
-  const triggerClassName = `mona-panel-button mona-panel-popover-trigger${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`
+  const triggerClassName = cn('mona-panel-button mona-panel-popover-trigger', active && 'is-active', className)
   return (
-    <PopoverPrimitive.Root onOpenChange={onOpenChange} open={open}>
-      {asDiv ? (
-        <PopoverPrimitive.Trigger asChild>
-          <div
-            aria-label={ariaLabel}
-            aria-pressed={active}
-            className={triggerClassName}
-            role="button"
-            style={style}
-            tabIndex={0}
-            title={ariaLabel}
-          >
-            {children}
-          </div>
-        </PopoverPrimitive.Trigger>
-      ) : (
-        <PopoverPrimitive.Trigger
-          aria-label={ariaLabel}
-          aria-pressed={active}
-          className={triggerClassName}
-          style={style}
-          title={ariaLabel}
-          type="button"
-        >
+    <Popover onOpenChange={onOpenChange} open={open}>
+      <PopoverTrigger asChild>
+        <Button aria-label={ariaLabel} aria-pressed={active} className={triggerClassName} size="editor" style={style} title={ariaLabel} variant="editor">
           {children}
-        </PopoverPrimitive.Trigger>
-      )}
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
-          align="center"
-          className="mona-panel-popover-content"
-          collisionPadding={5}
-          onCloseAutoFocus={event => event.preventDefault()}
-          onFocusOutside={event => event.preventDefault()}
-          side="bottom"
-          sideOffset={8}
-        >
-          {content}
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="center"
+        className="mona-panel-popover-content"
+        collisionPadding={5}
+        onCloseAutoFocus={event => event.preventDefault()}
+        onFocusOutside={event => event.preventDefault()}
+        side="bottom"
+        sideOffset={8}
+      >
+        {content}
+      </PopoverContent>
+    </Popover>
   )
 }
 
 export function InspectorPopoverClose({ children }: { children: ReactNode }) {
-  return <PopoverPrimitive.Close asChild>{children}</PopoverPrimitive.Close>
+  return <PopoverClose asChild>{children}</PopoverClose>
 }
 
 export function InspectorSelect<T extends number | string>({
@@ -163,73 +175,83 @@ export function InspectorSelect<T extends number | string>({
 }) {
   const selectedOption = options.find(option => option.value === value)
   const label = selectedOption?.label ?? String(value)
-  const [query, setQuery] = useState('')
-  const visibleOptions = search && query.trim()
-    ? options.filter(option => option.label.toLowerCase().includes(query.toLowerCase()))
-    : options
-  return (
-    <PopoverPrimitive.Root onOpenChange={open => {
-      if (!open) setQuery('') 
-    }}>
-      <PopoverPrimitive.Trigger asChild>
-        <div
+  const [open, setOpen] = useState(false)
+  const triggerLabel = renderLabel ? renderLabel(selectedOption) : label
+
+  if (!search) {
+    return (
+      <Select
+        onValueChange={next => {
+          const option = options.find(candidate => String(candidate.value) === next)
+          if (option) onChange(option.value)
+        }}
+        value={String(value)}
+      >
+        <SelectTrigger
           aria-label={ariaLabel}
-          className={`mona-panel-select${className ? ` ${className}` : ''}`}
-          onKeyDown={event => {
-            if (event.key !== 'Enter' && event.key !== ' ') return
-            event.preventDefault()
-            event.currentTarget.click()
-          }}
-          role="button"
+          className={cn('mona-panel-select', className)}
+          icon={icon}
           style={style}
-          tabIndex={0}
         >
-          <div className="mona-panel-select-label">{renderLabel ? renderLabel(selectedOption) : label}</div>
-          <div aria-hidden="true" className="mona-panel-select-icon">
-            {icon ?? <DownIcon />}
-          </div>
-        </div>
-      </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
-          align="start"
-          className="mona-panel-select-popover"
-          collisionPadding={8}
-          side="bottom"
-          sideOffset={8}
+          <SelectValue className="mona-panel-select-label">{triggerLabel}</SelectValue>
+        </SelectTrigger>
+        <SelectContent align="start" className="mona-panel-select-popover" collisionPadding={8} position="popper" sideOffset={8}>
+          {options.map(option => (
+            <SelectItem
+              className="mona-panel-select-option"
+              disabled={option.disabled}
+              key={String(option.value)}
+              value={String(option.value)}
+            >
+              {renderOption ? renderOption(option) : option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <Button
+          aria-label={ariaLabel}
+          className={cn('mona-panel-select', className)}
+          size="editor"
+          style={style}
+          variant="outline"
         >
-          {search ? (
-            <>
-              <div className="mona-panel-select-search">
-                <input
-                  aria-label={searchLabel}
-                  onChange={event => setQuery(event.target.value)}
-                  placeholder={searchLabel}
-                  value={query}
-                />
-              </div>
-              <div className="mona-panel-select-divider" />
-            </>
-          ) : null}
-          <div className="mona-panel-select-options">
-            {(visibleOptions.length ? visibleOptions : options).map(option => (
-              <PopoverPrimitive.Close asChild key={String(option.value)}>
-                <button
-                  aria-label={option.label}
-                  aria-pressed={option.value === value}
-                  className={`mona-panel-select-option${option.value === value ? ' is-selected' : ''}`}
+          <span className="mona-panel-select-label">{triggerLabel}</span>
+          <span aria-hidden="true" className="mona-panel-select-icon">{icon ?? <DownIcon />}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="mona-panel-select-popover p-0" collisionPadding={8} side="bottom" sideOffset={8}>
+        <Command>
+          <CommandInput aria-label={searchLabel} placeholder={searchLabel} />
+          <CommandList className="mona-panel-select-options">
+            <CommandEmpty>{searchLabel}</CommandEmpty>
+            <CommandGroup>
+              {options.map(option => (
+                <CommandItem
+                  aria-selected={option.value === value}
+                  className={cn('mona-panel-select-option', option.value === value && 'is-selected')}
+                  data-checked={option.value === value}
                   disabled={option.disabled}
-                  onClick={() => onChange(option.value)}
-                  type="button"
+                  key={String(option.value)}
+                  onSelect={() => {
+                    onChange(option.value)
+                    setOpen(false)
+                  }}
+                  value={`${option.label} ${String(option.value)}`}
                 >
                   {renderOption ? renderOption(option) : option.label}
-                </button>
-              </PopoverPrimitive.Close>
-            ))}
-          </div>
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -256,16 +278,10 @@ export function InspectorNumberInput({
   style?: CSSProperties
   value: number
 }) {
-  const [draft, setDraft] = useState(String(value))
-  const [previousValue, setPreviousValue] = useState(value)
+  const [editState, setEditState] = useState({ baseValue: value, draft: String(value) })
   const [focused, setFocused] = useState(false)
-  if (value !== previousValue) {
-    // Vue's NumberInput watches external value changes even while focused.
-    // Keep an in-progress equivalent draft, but accept gesture-driven parent
-    // updates so a later blur cannot restore a stale pre-drag value.
-    setPreviousValue(value)
-    if (value !== Number(draft)) setDraft(String(value))
-  }
+  const draft = editState.baseValue === value ? editState.draft : String(value)
+  const setDraft = (next: string) => setEditState({ baseValue: value, draft: next })
   const normalize = (candidate: string | number) => {
     let next = Number(candidate)
     if (Number.isNaN(next)) next = min
@@ -291,8 +307,9 @@ export function InspectorNumberInput({
     <div className={`mona-panel-number${focused ? ' is-focused' : ''}${disabled ? ' is-disabled' : ''}`} style={style}>
       {label ? <span className="mona-panel-number-prefix">{label}</span> : null}
       <span className="mona-panel-number-input-wrap">
-        <input
+        <Input
           aria-label={ariaLabel}
+          className="mona-panel-number-input"
           disabled={disabled}
           onBlur={() => {
             normalize(draft)
@@ -310,12 +327,12 @@ export function InspectorNumberInput({
           value={draft}
         />
         <span className="mona-panel-number-handlers">
-          <button aria-label={`${ariaLabel} increase`} disabled={disabled} onClick={() => increment(1)} type="button">
+          <Button aria-label={`${ariaLabel} increase`} disabled={disabled} onClick={() => increment(1)} size="icon-xs" variant="ghost">
             <svg fill="currentColor" height="1em" viewBox="64 64 896 896" width="1em"><path d="M890.5 755.3L537.9 269.2c-12.8-17.6-39-17.6-51.7 0L133.5 755.3A8 8 0 00140 768h75c5.1 0 9.9-2.5 12.9-6.6L512 369.8l284.1 391.6c3 4.1 7.8 6.6 12.9 6.6h75c6.5 0 10.3-7.4 6.5-12.7z" /></svg>
-          </button>
-          <button aria-label={`${ariaLabel} decrease`} disabled={disabled} onClick={() => increment(-1)} type="button">
+          </Button>
+          <Button aria-label={`${ariaLabel} decrease`} disabled={disabled} onClick={() => increment(-1)} size="icon-xs" variant="ghost">
             <svg fill="currentColor" height="1em" viewBox="64 64 896 896" width="1em"><path d="M884 256h-75c-5.1 0-9.9 2.5-12.9 6.6L512 654.2 227.9 262.6c-3-4.1-7.8-6.6-12.9-6.6h-75c-6.5 0-10.3 7.4-6.5 12.7l352.6 486.1c12.8 17.6 39 17.6 51.7 0l352.6-486.1c3.9-5.3.1-12.7-6.4-12.7z" /></svg>
-          </button>
+          </Button>
         </span>
       </span>
     </div>
@@ -337,67 +354,23 @@ export function InspectorSlider({
   step?: number
   value: number
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [dragPercentage, setDragPercentage] = useState<number | null>(null)
-  const clampPercentage = (candidate: number) => Math.min(Math.max(candidate, 0), 100)
-  const valuePercentage = max === min ? 0 : clampPercentage(((value - min) / (max - min)) * 100)
-  const percentage = dragPercentage ?? valuePercentage
-  const getPercentage = (clientX: number) => {
-    const element = ref.current
-    if (!element) return 0
-    let progress = (clientX - element.getBoundingClientRect().left) / element.clientWidth
-    progress = Math.max(0, Math.min(1, progress))
-    let next = progress * 100
-    const percentageStep = (step / (max - min)) * 100
-    const remainder = next % percentageStep
-    if (remainder > 0) next = remainder <= percentageStep / 2 ? next - remainder : next - remainder + percentageStep
-    return next
-  }
-  const getNewValue = (candidate: number) => {
-    let difference = (candidate / 100) * (max - min)
-    if (step >= 1) difference = Math.fround(difference)
-    else {
-      const match = step.toString().match(/^[0.]*([1-9])/)
-      if (match) {
-        const position = step.toString().indexOf(match[1]!) - 1
-        if (position > 0) {
-          const accuracy = 10 ** position
-          difference = Math.fround(difference * accuracy) / accuracy
-        }
-      }
-    }
-    return NP.plus(difference, min)
-  }
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    const update = (pointer: PointerEvent) => setDragPercentage(getPercentage(pointer.clientX))
-    const stop = (pointer: PointerEvent) => {
-      const next = getPercentage(pointer.clientX)
-      setDragPercentage(null)
-      onChange(getNewValue(next))
-      document.removeEventListener('pointermove', update)
-      document.removeEventListener('pointerup', stop)
-    }
-    document.addEventListener('pointermove', update)
-    document.addEventListener('pointerup', stop)
-  }
+  const [dragState, setDragState] = useState<{ baseValue: number; draftValue: number } | null>(null)
+  const draftValue = dragState?.baseValue === value ? dragState.draftValue : value
   return (
-    <div
+    <Slider
       aria-label={ariaLabel}
-      aria-valuemax={max}
-      aria-valuemin={min}
-      aria-valuenow={getNewValue(percentage)}
       className="mona-panel-slider"
-      onPointerDown={handlePointerDown}
-      ref={ref}
-      role="slider"
-      tabIndex={0}
-    >
-      <div className="mona-panel-slider-bar">
-        <div className="mona-panel-slider-track" style={{ width: `${percentage}%` }} />
-        <div className="mona-panel-slider-thumb" data-tooltip={getNewValue(percentage)} style={{ left: `${percentage}%` }} />
-      </div>
-    </div>
+      getValueLabel={current => String(current)}
+      max={max}
+      min={min}
+      onValueChange={next => setDragState({ baseValue: value, draftValue: next[0] ?? value })}
+      onValueCommit={next => {
+        setDragState(null)
+        onChange(next[0] ?? value)
+      }}
+      step={step}
+      value={[draftValue]}
+    />
   )
 }
 
@@ -411,16 +384,12 @@ export function InspectorSwitch({
   onChange: (value: boolean) => void
 }) {
   return (
-    <button
+    <Switch
       aria-label={ariaLabel}
-      aria-checked={checked}
       className={`mona-panel-switch${checked ? ' is-active' : ''}`}
-      onClick={() => onChange(!checked)}
-      role="switch"
-      type="button"
-    >
-      <span />
-    </button>
+      checked={checked}
+      onCheckedChange={onChange}
+    />
   )
 }
 

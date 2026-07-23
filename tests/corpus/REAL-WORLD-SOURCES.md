@@ -57,7 +57,7 @@ shasum -a 256 tests/corpus/private/*.pptx
 for deck in tests/corpus/private/*.pptx; do unzip -t "$deck"; done
 ```
 
-Generate the machine-readable package inventory used by Gate 7:
+Generate the machine-readable package inventory used by the corpus tests:
 
 ```sh
 npm run corpus:inspect

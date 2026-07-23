@@ -1,11 +1,22 @@
 import AES from 'crypto-js/aes'
 import Utf8 from 'crypto-js/enc-utf8'
 
-const NATIVE_FILE_KEY = 'pptist'
+import { LEGACY_PRESENTATION_ENCRYPTION_KEY } from '@/lib/legacy-compatibility'
 
-export const encryptNativePresentation = (value: string) => AES.encrypt(value, NATIVE_FILE_KEY).toString()
+const MONA_NATIVE_FILE_KEY = 'mona'
+
+const decryptWithKey = (value: string, key: string) => {
+  try {
+    return AES.decrypt(value, key).toString(Utf8)
+  }
+  catch {
+    return ''
+  }
+}
+
+export const encryptNativePresentation = (value: string) => AES.encrypt(value, MONA_NATIVE_FILE_KEY).toString()
 
 export const decryptNativePresentation = (value: string) => {
-  const bytes = AES.decrypt(value, NATIVE_FILE_KEY)
-  return bytes.toString(Utf8)
+  const current = decryptWithKey(value, MONA_NATIVE_FILE_KEY)
+  return current || decryptWithKey(value, LEGACY_PRESENTATION_ENCRYPTION_KEY)
 }

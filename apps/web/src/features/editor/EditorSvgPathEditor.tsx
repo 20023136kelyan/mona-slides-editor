@@ -1,10 +1,13 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- PPTist's modal, SVG drawing surface, mask, menu, and custom checkbox DOM are preserved for interaction and pixel parity. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- the SVG path canvas and point handles are direct-manipulation drawing controls. */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
-import { InspectorNumberInput } from '@/features/editor/EditorInspectorPrimitives'
+import { Button } from '@/components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@/components/ui/context-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { InspectorCheckbox, InspectorNumberInput } from '@/features/editor/EditorInspectorPrimitives'
 
 type SegmentType = 'L' | 'Q' | 'C' | 'A'
 type PointAxis = 'x' | 'y'
@@ -34,11 +37,6 @@ type DraggingState =
   | { type: 'point'; index: number }
   | { type: 'quadratic'; index: number }
   | { type: 'cubic'; index: number; anchor: 0 | 1 }
-
-interface ContextMenuState {
-  left: number
-  top: number
-}
 
 const GRID_SIZE = 400
 const GRID_GAP = 20
@@ -92,13 +90,7 @@ function PathCheckbox({ checked, children, onChange }: {
   children: React.ReactNode
   onChange: (checked: boolean) => void
 }) {
-  return (
-    <label className={`mona-path-checkbox${checked ? ' is-checked' : ''}`}>
-      <span className="mona-path-checkbox-input" />
-      <input checked={checked} onChange={event => onChange(event.target.checked)} type="checkbox" />
-      <span className="mona-path-checkbox-label">{children}</span>
-    </label>
-  )
+  return <InspectorCheckbox checked={checked} className="mona-path-checkbox" onChange={onChange}>{children}</InspectorCheckbox>
 }
 
 function PathButton({ children, disabled = false, onClick, primary = false }: {
@@ -108,12 +100,13 @@ function PathButton({ children, disabled = false, onClick, primary = false }: {
   primary?: boolean
 }) {
   return (
-    <button
-      className={`mona-path-button${primary ? ' is-primary' : ' is-default'}`}
+    <Button
+      className="mona-path-button"
       disabled={disabled}
       onClick={onClick}
-      type="button"
-    >{children}</button>
+      size="editor"
+      variant={primary ? 'default' : 'outline'}
+    >{children}</Button>
   )
 }
 
@@ -122,14 +115,12 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
   onInsert: (path: string) => void
 }) {
   const { t } = useTranslation()
-  const modalRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const draggingRef = useRef<DraggingState | null>(null)
   const [points, setPoints] = useState<PathPoint[]>([{ x: 0, y: 0 }])
   const [activePointIndex, setActivePointIndex] = useState(0)
   const [closePath, setClosePath] = useState(false)
   const [contextPoint, setContextPoint] = useState<PointPosition>({ x: 280, y: 200 })
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const activePoint = points[activePointIndex] ?? points[0]!
   const activeSegmentType: SegmentType = activePointIndex === 0
     ? 'L'
@@ -214,10 +205,6 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
     setActivePointIndex(Math.max(activePointIndex - 1, 0))
   }
 
-  useEffect(() => {
-    modalRef.current?.focus()
-  }, [])
-
   const stopDraggingRef = useRef<(() => void) | null>(null)
 
   const startDragging = (event: ReactMouseEvent<SVGCircleElement>, state: DraggingState) => {
@@ -259,45 +246,30 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
   }, [])
 
   const openContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
     const position = getSvgPoint(event)
     setContextPoint(position)
     const target = event.target as Element
     const pointElement = target.closest<SVGCircleElement>('[data-point-index]')
     if (pointElement?.dataset.pointIndex) setActivePointIndex(Number(pointElement.dataset.pointIndex))
-    const menuHeight = (5 * 30) + 11 + 10
-    setContextMenu({
-      left: document.body.clientWidth <= event.clientX + 180 ? event.clientX - 180 : event.clientX,
-      top: document.body.clientHeight <= event.clientY + menuHeight ? event.clientY - menuHeight : event.clientY,
-    })
   }
 
   const selectContextAction = (action: SegmentType | 'delete') => {
     if (action === 'delete') removeActivePoint()
     else addPoint(action, contextPoint)
-    setContextMenu(null)
   }
 
-  const modal = (
-    <div
-      aria-label={t('foundation.editor.pathEditor.label')}
-      className="mona-svg-path-modal"
-      onKeyUp={event => {
-        if (event.key === 'Escape') onClose()
-      }}
-      ref={modalRef}
-      role="dialog"
-      tabIndex={-1}
-    >
-      <div className="mona-svg-path-mask" onMouseDown={event => {
-        if (event.button === 0) onClose()
-      }} />
-      <div className="mona-svg-path-modal-content">
+  return (
+    <Dialog onOpenChange={open => {
+      if (!open) onClose()
+    }} open>
+      <DialogContent className="mona-svg-path-modal-content" overlayClassName="mona-svg-path-mask" showCloseButton={false}>
+        <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.pathEditor.label')}</DialogTitle></DialogHeader>
         <div className="mona-svg-path-editor">
           <div className="mona-svg-path-container">
-            <div className="mona-svg-path-canvas" onContextMenu={openContextMenu}>
-              <svg
+            <ContextMenu>
+              <ContextMenuTrigger asChild>
+                <div className="mona-svg-path-canvas" onContextMenu={openContextMenu}>
+                  <svg
                 className="mona-svg-path-grid"
                 onDoubleClick={event => {
                   const position = getSvgPoint(event)
@@ -312,7 +284,7 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
                 <g className="mona-svg-grid-lines">
                   {gridLines.map(({ key, ...line }) => <line key={key} {...line} />)}
                 </g>
-                <path className="mona-svg-path-preview" d={path} fill={closePath ? 'rgba(209, 68, 36, 0.05)' : 'none'} />
+                <path className="mona-svg-path-preview" d={path} fill={closePath ? 'rgb(0 0 0 / 5%)' : 'none'} />
                 {points.map((point, index) => (
                   <g key={index}>
                     {index > 0 && point.q ? (
@@ -363,21 +335,34 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
                     />
                   </g>
                 ))}
-              </svg>
-            </div>
+                  </svg>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="mona-svg-path-context-menu">
+                {([
+                  ['L', 'appendLine'],
+                  ['Q', 'appendQuadratic'],
+                  ['C', 'appendCubic'],
+                  ['A', 'appendArc'],
+                ] as const).map(([action, key]) => (
+                  <ContextMenuItem key={action} onSelect={() => selectContextAction(action)}>{t(`foundation.editor.pathEditor.${key}`)}</ContextMenuItem>
+                ))}
+                <ContextMenuSeparator />
+                <ContextMenuItem disabled={activePointIndex === 0} onSelect={() => selectContextAction('delete')} variant="destructive">{t('foundation.editor.pathEditor.deletePoint')}</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
 
             <div className="mona-svg-path-panel">
-              <div className={`mona-svg-segment-type${activePointIndex === 0 ? ' is-disabled' : ''}`}>
+              <ToggleGroup className="mona-svg-segment-type" disabled={activePointIndex === 0} onValueChange={value => {
+                if (value) updateSegmentType(value as SegmentType)
+              }} type="single" value={activeSegmentType}>
                 {(['L', 'Q', 'C', 'A'] as const).map(type => (
-                  <button
-                    className={activePointIndex !== 0 && activeSegmentType === type ? 'is-checked' : ''}
-                    disabled={activePointIndex === 0}
+                  <ToggleGroupItem
                     key={type}
-                    onClick={() => updateSegmentType(type)}
-                    type="button"
-                  >{t(`foundation.editor.pathEditor.${type === 'L' ? 'straight' : type === 'Q' ? 'quadratic' : type === 'C' ? 'cubic' : 'arc'}`)}</button>
+                    value={type}
+                  >{t(`foundation.editor.pathEditor.${type === 'L' ? 'straight' : type === 'Q' ? 'quadratic' : type === 'C' ? 'cubic' : 'arc'}`)}</ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
 
               <div className="mona-svg-path-divider" />
               <section className="mona-svg-path-section">
@@ -453,42 +438,7 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
             </div>
           </div>
         </div>
-      </div>
-      {contextMenu ? (
-        <>
-          <div
-            className="mona-editor-context-menu-mask"
-            onContextMenu={event => {
-              event.preventDefault(); setContextMenu(null) 
-            }}
-            onMouseDown={event => {
-              if (event.button === 0) setContextMenu(null) 
-            }}
-          />
-          <div className="mona-editor-context-menu" onContextMenu={event => event.preventDefault()} style={contextMenu}>
-            <ul className="mona-context-menu-content">
-              {([
-                ['L', 'appendLine'],
-                ['Q', 'appendQuadratic'],
-                ['C', 'appendCubic'],
-                ['A', 'appendArc'],
-              ] as const).map(([action, key]) => (
-                <li className="mona-context-menu-entry" data-action={action} key={action} onClick={() => selectContextAction(action)}>
-                  <div className="mona-context-menu-item-content"><span className="mona-context-menu-label">{t(`foundation.editor.pathEditor.${key}`)}</span></div>
-                </li>
-              ))}
-              <li className="mona-context-menu-entry is-divider" />
-              <li className={`mona-context-menu-entry${activePointIndex === 0 ? ' is-disabled' : ''}`} data-action="delete" onClick={() => {
-                if (activePointIndex !== 0) selectContextAction('delete')
-              }}>
-                <div className="mona-context-menu-item-content"><span className="mona-context-menu-label">{t('foundation.editor.pathEditor.deletePoint')}</span></div>
-              </li>
-            </ul>
-          </div>
-        </>
-      ) : null}
-    </div>
+      </DialogContent>
+    </Dialog>
   )
-
-  return createPortal(modal, document.body)
 }

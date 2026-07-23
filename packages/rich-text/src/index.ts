@@ -16,7 +16,7 @@ export const createDocument = (content: string) => {
   return DOMParser.fromSchema(richTextSchema).parse(element as Element)
 }
 
-/** Round-trip HTML through PPTist's ProseMirror schema and DOM serializer. */
+/** Round-trip HTML through the established editor's ProseMirror schema and DOM serializer. */
 export const normalizeRichTextHtml = (content: string) => {
   const container = document.createElement('div')
   const fragment = DOMSerializer.fromSchema(richTextSchema).serializeFragment(createDocument(content).content)

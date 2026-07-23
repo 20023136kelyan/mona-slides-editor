@@ -11,7 +11,7 @@ const excludeDevelopmentFixtures = () => ({
   name: 'exclude-development-fixtures',
   apply: 'build' as const,
   async closeBundle() {
-    await rm(fileURLToPath(new URL('./dist/mocks/gate3-renderer.json', import.meta.url)), { force: true })
+    await rm(fileURLToPath(new URL('./dist/mocks/editor-fixture.json', import.meta.url)), { force: true })
   },
 })
 
@@ -36,10 +36,19 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@excalidraw/mermaid-to-excalidraw': fileURLToPath(new URL(
+        './src/features/editor/drawing/excalidraw-mermaid-disabled.ts',
+        import.meta.url,
+      )),
     },
   },
   server: {
     forwardConsole: true,
+    proxy: {
+      '/api/agent': {
+        target: process.env.MONA_AGENT_SERVER_URL ?? 'http://127.0.0.1:8788',
+      },
+    },
   },
   build: {
     sourcemap: false,

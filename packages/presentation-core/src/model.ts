@@ -768,6 +768,9 @@ export type SlideType = 'cover' | 'contents' | 'transition' | 'content' | 'end'
 export interface Slide {
   id: string
   elements: PPTElement[]
+  title?: string
+  hidden?: boolean
+  durationMs?: number
   notes?: Note[]
   remark?: string
   background?: SlideBackground

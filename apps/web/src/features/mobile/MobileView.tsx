@@ -21,9 +21,9 @@ export function MobileView({ runtime }: { runtime: EditorRuntime }) {
       getState: () => structuredClone(runtime.store.getState()),
       isReady: () => true,
     })
-    window.__MONA_REACT_TEST__ = bridge
+    window.__MONA_TEST__ = bridge
     return () => {
-      if (window.__MONA_REACT_TEST__ === bridge) delete window.__MONA_REACT_TEST__
+      if (window.__MONA_TEST__ === bridge) delete window.__MONA_TEST__
     }
   }, [runtime])
 

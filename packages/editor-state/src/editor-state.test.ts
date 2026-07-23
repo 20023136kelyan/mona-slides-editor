@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createGate2Presentation } from '@mona/parity-fixtures'
+import { createTestPresentation } from '@mona/test-fixtures'
 import { createPresentationTransaction } from '@mona/presentation-core'
 import {
   createEditorStore,
@@ -10,7 +10,7 @@ import {
 
 describe('canonical editor state adapter', () => {
   it('applies one semantic transaction and preserves unrelated references', () => {
-    const store = createEditorStore({ presentation: createGate2Presentation() })
+    const store = createEditorStore({ presentation: createTestPresentation() })
     const previous = store.getState()
     const selectUnchangedElement = makeSelectElementById('fixture-shape-2')
     const unchangedElement = selectUnchangedElement(previous)
@@ -35,7 +35,7 @@ describe('canonical editor state adapter', () => {
   })
 
   it('does not rebuild the element index for title-only changes', () => {
-    const store = createEditorStore({ presentation: createGate2Presentation() })
+    const store = createEditorStore({ presentation: createTestPresentation() })
     const index = selectElementIndex(store.getState())
     store.dispatch(editorActions.transactionCommitted(createPresentationTransaction({
       id: 'tx-title',
@@ -51,7 +51,7 @@ describe('canonical editor state adapter', () => {
   })
 
   it('rejects invalid transactions without changing the live presentation', () => {
-    const store = createEditorStore({ presentation: createGate2Presentation() })
+    const store = createEditorStore({ presentation: createTestPresentation() })
     const presentation = store.getState().presentation
     store.dispatch(editorActions.transactionCommitted(createPresentationTransaction({
       id: 'tx-invalid',
@@ -64,7 +64,7 @@ describe('canonical editor state adapter', () => {
   })
 
   it('keeps viewport and editing focus in session state', () => {
-    const store = createEditorStore({ presentation: createGate2Presentation() })
+    const store = createEditorStore({ presentation: createTestPresentation() })
     const presentation = store.getState().presentation
     expect(store.getState().session.canvasZoom).toBe(90)
     store.dispatch(editorActions.canvasZoomChanged(135))
@@ -75,7 +75,8 @@ describe('canonical editor state adapter', () => {
     store.dispatch(editorActions.hotkeysDisabledChanged(true))
     store.dispatch(editorActions.gridLineSizeChanged(50))
     store.dispatch(editorActions.rulerVisibilityChanged(true))
-    store.dispatch(editorActions.bubbleMenuVisibilityChanged(true))
+    store.dispatch(editorActions.drawingModeChanged(true))
+    store.dispatch(editorActions.sketchesVisibilityChanged(false))
 
     expect(store.getState().session).toMatchObject({
       canvasZoom: 135,
@@ -86,13 +87,14 @@ describe('canonical editor state adapter', () => {
       disableHotkeys: true,
       gridLineSize: 50,
       showRuler: true,
-      showBubbleMenu: true,
+      drawingMode: true,
+      sketchesVisible: false,
     })
     expect(store.getState().presentation).toBe(presentation)
   })
 
-  it('matches the source canvas command extrema', () => {
-    const store = createEditorStore({ presentation: createGate2Presentation() })
+  it('clamps canvas zoom to the supported command extrema', () => {
+    const store = createEditorStore({ presentation: createTestPresentation() })
     store.dispatch(editorActions.canvasZoomChanged(500))
     expect(store.getState().session.canvasZoom).toBe(205)
     store.dispatch(editorActions.canvasZoomChanged(-500))
@@ -100,7 +102,7 @@ describe('canonical editor state adapter', () => {
   })
 
   it('restores history atomically and preserves still-valid document selection', () => {
-    const initial = createGate2Presentation()
+    const initial = createTestPresentation()
     const store = createEditorStore({ presentation: initial })
     store.dispatch(editorActions.selectionChanged(['fixture-shape-1']))
     store.dispatch(editorActions.transactionCommitted(createPresentationTransaction({

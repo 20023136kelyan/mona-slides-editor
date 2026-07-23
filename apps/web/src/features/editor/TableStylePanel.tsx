@@ -19,9 +19,11 @@ import TextUnderlineIcon from '~icons/icon-park-outline/text-underline'
 import type { PresentationState } from '@mona/presentation-core'
 import type { PPTTableElement, TableCellStyle, TableTheme, TextAlign, TextAlignVertical } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
 import {
   InspectorButton,
   InspectorButtonGroup,
+  InspectorCheckbox,
   InspectorColorButton,
   InspectorPopoverButton,
   InspectorSelect,
@@ -30,6 +32,7 @@ import {
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import { executeTableCommand, parseTableCellKey, updateTableCellStyles, type TableCommand, type TableCommandPosition } from '@/features/editor/editor-table'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 
 const fontOptions = [
   { label: '思源黑体', value: 'SourceHanSans' },
@@ -57,16 +60,6 @@ const fontOptions = [
 
 const fontSizeOptions = ['12px', '14px', '16px', '18px', '20px', '22px', '24px', '28px', '32px'].map(value => ({ label: value, value }))
 
-function InspectorCheckbox({ checked, children, onChange }: { checked: boolean; children: string; onChange: (value: boolean) => void }) {
-  return (
-    <label className="mona-panel-checkbox">
-      <input checked={checked} onChange={event => onChange(event.target.checked)} type="checkbox" />
-      <span className="mona-panel-checkbox-control" />
-      <span>{children}</span>
-    </label>
-  )
-}
-
 export function TableStylePanel({
   element,
   presentation,
@@ -79,6 +72,7 @@ export function TableStylePanel({
   selectedCells: readonly string[]
 }) {
   const { t } = useTranslation()
+  const { notifications } = useEditorApplication()
   const [row, column] = selectedCells.length ? parseTableCellKey(selectedCells[0]!) : [0, 0]
   const style = element.data[row]?.[column]?.style ?? {}
   const attrs = {
@@ -99,12 +93,10 @@ export function TableStylePanel({
     const next = executeTableCommand(element, selectedCells, name, position)
     if (next === element) {
       if (name === 'delete-row' || name === 'delete-col') {
-        window.dispatchEvent(new CustomEvent('mona:notice', {
-          detail: {
-            text: t(`foundation.editor.tableEditing.${name === 'delete-row' ? 'keepOneRow' : 'keepOneColumn'}`),
-            type: 'warning',
-          },
-        }))
+        notifications.notify({
+          text: t(`foundation.editor.tableEditing.${name === 'delete-row' ? 'keepOneRow' : 'keepOneColumn'}`),
+          type: 'warning',
+        })
       }
       return
     }
@@ -151,9 +143,9 @@ export function TableStylePanel({
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addRow')} onClick={() => command('insert-row', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addRow')}</InspectorButton>
           <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.rowActions')} className="mona-table-action-menu-trigger" content={<div className="mona-table-command-menu">
-            <button onClick={() => command('insert-row', 'before')} type="button">{t('foundation.editor.tableStyle.addAbove')}</button>
-            <button onClick={() => command('insert-row', 'after')} type="button">{t('foundation.editor.tableStyle.addBelow')}</button>
-            <button onClick={() => command('delete-row')} type="button">{t('foundation.editor.table.deleteRow')}</button>
+            <Button onClick={() => command('insert-row', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addAbove')}</Button>
+            <Button onClick={() => command('insert-row', 'after')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addBelow')}</Button>
+            <Button onClick={() => command('delete-row')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteRow')}</Button>
           </div>}><DownIcon /></InspectorPopoverButton>
         </InspectorButtonGroup>
       </PropertyRow>
@@ -161,9 +153,9 @@ export function TableStylePanel({
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addColumn')} onClick={() => command('insert-col', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addColumn')}</InspectorButton>
           <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.columnActions')} className="mona-table-action-menu-trigger" content={<div className="mona-table-command-menu">
-            <button onClick={() => command('insert-col', 'before')} type="button">{t('foundation.editor.tableStyle.addLeft')}</button>
-            <button onClick={() => command('insert-col', 'after')} type="button">{t('foundation.editor.tableStyle.addRight')}</button>
-            <button onClick={() => command('delete-col')} type="button">{t('foundation.editor.table.deleteColumn')}</button>
+            <Button onClick={() => command('insert-col', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addLeft')}</Button>
+            <Button onClick={() => command('insert-col', 'after')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addRight')}</Button>
+            <Button onClick={() => command('delete-col')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteColumn')}</Button>
           </div>}><DownIcon /></InspectorPopoverButton>
         </InspectorButtonGroup>
       </PropertyRow>
@@ -176,12 +168,12 @@ export function TableStylePanel({
       </div>
       {element.theme ? <>
         <div className="mona-table-theme-options">
-          <InspectorCheckbox checked={element.theme.rowHeader} onChange={rowHeader => updateTheme({ rowHeader })}>{t('foundation.editor.tableStyle.headerRow')}</InspectorCheckbox>
-          <InspectorCheckbox checked={element.theme.rowFooter} onChange={rowFooter => updateTheme({ rowFooter })}>{t('foundation.editor.tableStyle.totalRow')}</InspectorCheckbox>
+          <InspectorCheckbox className="mona-panel-checkbox" checked={element.theme.rowHeader} onChange={rowHeader => updateTheme({ rowHeader })}>{t('foundation.editor.tableStyle.headerRow')}</InspectorCheckbox>
+          <InspectorCheckbox className="mona-panel-checkbox" checked={element.theme.rowFooter} onChange={rowFooter => updateTheme({ rowFooter })}>{t('foundation.editor.tableStyle.totalRow')}</InspectorCheckbox>
         </div>
         <div className="mona-table-theme-options">
-          <InspectorCheckbox checked={element.theme.colHeader} onChange={colHeader => updateTheme({ colHeader })}>{t('foundation.editor.tableStyle.firstColumn')}</InspectorCheckbox>
-          <InspectorCheckbox checked={element.theme.colFooter} onChange={colFooter => updateTheme({ colFooter })}>{t('foundation.editor.tableStyle.lastColumn')}</InspectorCheckbox>
+          <InspectorCheckbox className="mona-panel-checkbox" checked={element.theme.colHeader} onChange={colHeader => updateTheme({ colHeader })}>{t('foundation.editor.tableStyle.firstColumn')}</InspectorCheckbox>
+          <InspectorCheckbox className="mona-panel-checkbox" checked={element.theme.colFooter} onChange={colFooter => updateTheme({ colFooter })}>{t('foundation.editor.tableStyle.lastColumn')}</InspectorCheckbox>
         </div>
         <PropertyRow label={t('foundation.editor.tableStyle.themeColor')}><InspectorColorButton ariaLabel={t('foundation.editor.tableStyle.themeColor')} color={element.theme.color} onChange={color => updateTheme({ color })} /></PropertyRow>
       </> : null}

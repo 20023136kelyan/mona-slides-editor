@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/no-static-element-interactions -- Gradient stops preserve PPTist's pointer and context-menu interaction contract. */
+/* oxlint-disable jsx-a11y/no-static-element-interactions -- Gradient stops preserve the established editor's pointer and context-menu interaction contract. */
 import { useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -15,6 +15,7 @@ import type { PresentationState, ShapePoolItem } from '@mona/presentation-core'
 import { SHAPE_LIST, SHAPE_PATH_FORMULAS } from '@mona/presentation-core/shape-presets'
 import type { Gradient, GradientColor, GradientType, PPTShapeElement, ShapeText, TextInset } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
 import {
   InspectorButton,
   InspectorButtonGroup,
@@ -41,7 +42,7 @@ const wordSpaceOptions = [0, 1, 2, 3, 4, 5, 6, 8, 10].map(value => ({ label: `${
 
 function ShapeThumbnail({ onSelect, shape }: { onSelect: () => void; shape: ShapePoolItem }) {
   return (
-    <button aria-label={shape.title || 'Shape preset'} className="mona-shape-thumbnail" onClick={onSelect} type="button">
+    <Button aria-label={shape.title || 'Shape preset'} className="mona-shape-thumbnail" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
       <svg height="18" overflow="visible" width="18">
         <g transform={`scale(${18 / shape.viewBox[0]}, ${18 / shape.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`}>
           <path
@@ -56,7 +57,7 @@ function ShapeThumbnail({ onSelect, shape }: { onSelect: () => void; shape: Shap
           />
         </g>
       </svg>
-    </button>
+    </Button>
   )
 }
 
@@ -270,7 +271,7 @@ export function ShapeStylePanel({
             }, { once: true })
             reader.readAsDataURL(file)
           }} ref={fileRef} type="file" />
-          <button className="mona-pattern-image" onClick={() => fileRef.current?.click()} style={{ backgroundImage: `url(${element.pattern || ''})` }} type="button"><PlusIcon /></button>
+          <Button className="mona-pattern-image" onClick={() => fileRef.current?.click()} size="editor" style={{ backgroundImage: `url(${element.pattern || ''})` }} type="button" variant="outline"><PlusIcon /></Button>
         </div>
       ) : null}
 

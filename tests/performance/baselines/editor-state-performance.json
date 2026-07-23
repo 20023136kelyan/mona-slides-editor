@@ -1,0 +1,29 @@
+{
+  "measuredAt": "2026-07-23T11:03:09.089Z",
+  "runtime": "v24.13.1",
+  "budgets": {
+    "semanticTransactionP95Ms": 8,
+    "pointerUpdateP95Ms": 0.5,
+    "reduxDispatchesDuringGesture": 0
+  },
+  "result": {
+    "deck": {
+      "slides": 120,
+      "elements": 4800
+    },
+    "semanticTransactions": {
+      "samples": 300,
+      "medianMs": 0.71,
+      "p95Ms": 0.848,
+      "maxMs": 2.028,
+      "unrelatedSlideReferenceStable": true
+    },
+    "pointerUpdates": {
+      "samples": 20000,
+      "medianMs": 0,
+      "p95Ms": 0,
+      "maxMs": 0.024,
+      "reduxDispatchesDuringGesture": 0
+    }
+  }
+}

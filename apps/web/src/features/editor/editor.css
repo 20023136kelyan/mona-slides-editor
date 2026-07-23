@@ -1,168 +1,235 @@
+/* Chrome, not surface: the header reads as part of the workspace (a shade
+   off the canvas gray), so the white rail/drawer/pill stand out as the
+   actual surfaces. */
 .mona-editor-header {
-  display: flex;
-  height: 40px;
+  position: relative;
+  display: grid;
+  height: 56px;
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 32rem) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #fff;
-  padding: 0 5px;
-  color: #41464b;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--background);
+  padding: 0 12px;
+  color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: normal;
   user-select: none;
 }
+.mona-skip-link {
+  position: fixed;
+  z-index: 6000;
+  top: 8px;
+  left: 8px;
+  border-radius: var(--radius-control);
+  background: var(--foreground);
+  padding: 10px 14px;
+  color: var(--background);
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-150%);
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+.mona-skip-link:focus {
+  opacity: 1;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  pointer-events: auto;
+  transform: translateY(0);
+}
 .mona-editor-header-left,
-.mona-editor-header-right { display: flex; align-items: center; justify-content: center; }
+.mona-editor-header-right {
+  border: 0;
+  display: flex;
+  margin: 0;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+}
+.mona-editor-header-left { justify-self: start; }
+.mona-editor-header-right { justify-self: end; }
+.mona-editor-header-center {
+  width: 100%;
+  min-width: 0;
+  padding: 0 16px;
+}
+.mona-header-wordmark {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.03em;
+}
+.mona-header-logo { width: 20px; height: 20px; flex: none; }
+/* Unified header button system: every action control is one outlined pill —
+   same 40px height, same action radius, 1px border, white surface, a light
+   wash on hover. Icon-only variants are square; Export alone is filled. */
 .mona-editor-header-item {
   display: flex;
-  height: 30px;
+  min-width: 40px;
+  height: 40px;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-action);
+  background: var(--background);
   padding: 0 10px;
-  color: inherit;
+  color: var(--foreground);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
-.mona-editor-header-item:hover { background-color: #f1f1f1; }
-.mona-editor-header-icon { color: #666; font-size: 18px; }
-.mona-editor-header-title { height: 30px; margin-left: 2px; font-size: 13px; }
-.mona-editor-header-title-text {
-  overflow: hidden;
-  min-width: 20px;
-  max-width: 400px;
-  height: 30px;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  padding: 0 6px;
-  color: inherit;
-  font: inherit;
-  line-height: 30px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-editor-header-title-text:hover { background-color: #f1f1f1; }
+.mona-editor-header-item[data-size="editor-icon"] { width: 40px; padding: 0; }
+.mona-editor-header-item:hover { background-color: rgb(15 16 21 / 5%); }
+.mona-editor-header-item.is-active { background-color: rgb(15 16 21 / 8%); border-color: rgb(15 16 21 / 14%); }
+.mona-editor-header-item.is-active .mona-editor-header-icon { color: var(--editor-selection); }
+.mona-editor-header-item[disabled] { opacity: .45; }
+.mona-header-divider-bar { width: 1px; height: 20px; flex: none; background: var(--border); margin: 0 6px; }
+.mona-editor-header-icon { width: 17px; height: 17px; color: rgb(16 18 25 / 78%); }
 .mona-editor-header-title-input {
-  width: 200px;
-  height: 30px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  width: 100%;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
   outline: 0;
-  background: #fff;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  line-height: 28px;
+  background: transparent;
+  padding: 0 12px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 38px;
+  text-align: center;
+  text-overflow: ellipsis;
 }
 .mona-editor-header-title-input:hover,
-.mona-editor-header-title-input:focus { border-color: #d14424; }
+.mona-editor-header-title-input:focus {
+  border-color: var(--input);
+  background: var(--background);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 18%, transparent);
+}
+.mona-editor-header-title-input[readonly] { cursor: text; }
+.mona-editor-header-title-input::placeholder { color: var(--muted-foreground); font-weight: 500; opacity: 1; }
 .mona-header-popover {
-  position: fixed;
-  z-index: 9999;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  background: #fff;
-  padding: 10px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
-  color: #41464b;
+  border: 0;
+  border-radius: var(--radius-overlay);
+  background: var(--popover);
+  padding: 6px;
+  box-shadow: 0 10px 30px rgb(15 23 42 / 13%), 0 2px 8px rgb(15 23 42 / 8%);
+  color: var(--popover-foreground);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   font-size: 13px;
   line-height: normal;
-  transform-origin: top center;
-  animation: mona-popover-scale-in 200ms ease;
 }
+.mona-header-menu-content { min-width: 240px; }
 .mona-header-popover-menu-item {
   display: flex;
   width: 100%;
-  min-width: 80px;
+  min-width: 120px;
   align-items: center;
+  gap: 10px;
+  white-space: nowrap;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px;
   color: inherit;
   font: inherit;
   text-align: start;
   cursor: pointer;
 }
-.mona-header-popover-menu-item:hover { background-color: #f1f1f1; }
+.mona-header-popover-menu-item:hover { background-color: var(--accent); }
 .mona-header-popover-menu-item + .mona-header-popover-menu-item { margin-top: 2px; }
-.mona-header-popover-icon { margin-right: 10px; font-size: 18px; }
-.mona-header-menu-label { position: relative; top: -1px; }
+.mona-header-popover-menu-item > svg { width: 17px; height: 17px; color: var(--muted-foreground); }
+.mona-header-menu-label { position: relative; top: -1px; flex: 1; }
 .mona-header-divider {
   width: 100%;
-  margin: 10px 0;
-  border-block-start: 1px solid rgb(5 5 5 / 6%);
-}
-.mona-header-ai-menu {
-  display: flex;
-  align-items: center;
-  border-radius: 2px;
-  background: linear-gradient(270deg, #f8edff, #d4f1ff);
-  padding: 12px 16px;
-  color: #d14424;
-  cursor: pointer;
-  width: 300px;
-}
-.mona-header-ai-icon { margin-right: 16px; font-size: 22px; }
-.mona-header-ai-content { display: flex; flex-direction: column; }
-.mona-header-ai-title { font-size: 16px; font-weight: 700; }
-.mona-header-ai-title span,
-.mona-header-ai-text {
-  background: linear-gradient(270deg, #d897fd, #33bcfc);
-  background-clip: text;
-  color: transparent;
-}
-.mona-header-ai-subtitle { margin-top: 5px; color: #777; font-size: 12px; }
-.mona-header-import-section { padding: 5px 0; }
-.mona-header-import-label { margin-bottom: 6px; color: #999; font-size: 12px; }
-.mona-header-import-grid { display: flex; justify-content: space-between; gap: 8px; }
-.mona-header-import-block {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  padding: 12px 8px;
-  transition: background-color 200ms;
-  cursor: pointer;
-}
-.mona-header-import-block:hover { background-color: #f1f1f1; }
-.mona-header-import-block input { display: none; }
-.mona-header-import-icon { margin-bottom: 2px; font-size: 24px; }
-.mona-header-import-name { font-size: 12px; text-align: center; }
-.mona-header-import-sub { color: #999; font-size: 10px; }
-.mona-header-statement { padding: 8px 10px; color: #999; font-size: 12px; font-style: italic; }
-.mona-header-screen-group {
-  display: flex;
-  height: 30px;
-  margin: 0 8px;
-  border-radius: 2px;
-  padding: 0 2px;
-}
-.mona-header-screen-group:hover { background-color: #f1f1f1; }
-.mona-header-screen-main { padding: 0 3px; }
-.mona-header-screen-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 1px;
+  margin: 5px 0;
   border: 0;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+  background: var(--border);
 }
-.mona-header-screen-arrow svg { font-size: 1em; }
-.mona-header-ai-text { width: 18px; font-size: 17px; font-weight: 700; text-align: center; }
+/* Docs-style menu bar next to the title: File / Edit / View / Tools. */
+.mona-header-menubar { display: flex; min-width: 0; align-items: center; gap: 1px; }
+/* Menu bar stays quiet text (File/View/Tools is a menu strip, not an action
+   button), but shares the row height so it aligns with the pills. */
+.mona-header-menu-trigger {
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  border-radius: var(--radius-action);
+  padding: 0 9px;
+  color: var(--foreground);
+  font-size: 13px;
+}
+.mona-header-menu-trigger:hover { background: rgb(15 16 21 / 6%); }
+.mona-header-menu-trigger[data-state="open"] { background: rgb(15 16 21 / 8%); }
+/* Present is a segmented outlined group: the border lives on the group, the
+   two inner buttons are seamless with a hairline divider between them. */
+.mona-header-screen-group {
+  height: 40px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-action);
+  background: var(--background);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.mona-present-main {
+  height: 100%;
+  gap: 6px;
+  border-radius: 0;
+  padding: 0 12px;
+  color: rgb(16 18 25 / 82%);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mona-present-main svg { font-size: 15px; }
+.mona-present-arrow {
+  width: 40px;
+  height: 100%;
+  border-radius: 0;
+  border-left: 1px solid var(--border);
+  padding: 0;
+  color: rgb(16 18 25 / 70%);
+}
+.mona-present-arrow svg { width: 15px; height: 15px; }
+.mona-present-main:hover,
+.mona-present-arrow:hover { background: rgb(15 16 21 / 5%); color: rgb(15 16 21); }
+.mona-present-arrow[data-state="open"] { background: rgb(15 16 21 / 8%); color: rgb(15 16 21); }
+.mona-header-ai-button > svg { width: 17px; height: 17px; }
+.mona-header-ai-button > span { font-size: 13px; font-weight: 500; }
+/* Export is the single filled primary in the row. */
+.mona-header-export-button { min-width: 40px; height: 40px; gap: 7px; border-radius: var(--radius-action); padding-inline: 13px; }
+.mona-header-export-button > svg { width: 16px; height: 16px; }
 .mona-header-screen-menu { width: max-content; }
 .mona-header-screen-menu .mona-header-popover-menu-item { width: auto; }
+.mona-header-export-submenu { min-width: 210px; }
+/* Save state is an informational status, not an action — it stays borderless
+   at the shared height. */
+.mona-header-save-status {
+  min-width: 40px;
+  height: 40px;
+  gap: 6px;
+  padding-inline: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+.mona-header-save-status > svg { width: 14px; height: 14px; }
+.mona-header-save-status.is-error { color: var(--destructive); }
+.mona-save-status-popover { width: 280px; padding: 14px; }
+.mona-save-status-title { color: var(--foreground); font-size: 14px; font-weight: 700; }
+.mona-save-status-popover p { margin: 6px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; }
+.mona-save-status-popover button { margin-top: 12px; }
 .mona-header-settings-menu { width: 272px; }
 .mona-header-settings-title {
   display: flex;
@@ -180,6 +247,41 @@
 .mona-header-locale-select .mona-panel-select-label,
 .mona-header-locale-select .mona-panel-select-icon { height: 28px; line-height: 28px; }
 
+@media (max-width: 1160px) {
+  .mona-editor-header { grid-template-columns: minmax(0, 1fr) minmax(10rem, 24rem) minmax(0, 1fr); padding-inline: 8px; }
+  .mona-header-wordmark { margin-right: 6px; }
+  .mona-header-save-status > span,
+  .mona-header-ai-button > span,
+  .mona-header-export-button > span { display: none; }
+  .mona-header-save-status,
+  .mona-header-ai-button,
+  .mona-header-export-button { width: 40px; padding: 0; }
+  .mona-header-menu-trigger { padding-inline: 6px; }
+}
+
+@media (max-width: 900px) {
+  .mona-editor-header {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+  }
+  .mona-editor-header-left,
+  .mona-editor-header-right { gap: 0; }
+  .mona-editor-header-center { padding-inline: 4px; }
+  .mona-header-divider-bar { margin-inline: 3px; }
+  .mona-header-screen-group { margin-inline: 2px; }
+  .mona-present-main { padding-inline: 8px; }
+}
+
+@media (max-width: 680px) {
+  .mona-editor-header { padding-inline: 4px; }
+  .mona-header-wordmark { display: none; }
+  .mona-header-menu-trigger { padding-inline: 4px; }
+  .mona-present-main {
+    width: 40px;
+    padding: 0;
+  }
+  .mona-present-main > span { display: none; }
+}
+
 .mona-hotkey-drawer,
 .mona-hotkey-drawer * { box-sizing: border-box; }
 .mona-hotkey-drawer {
@@ -191,14 +293,13 @@
   display: flex;
   width: 320px;
   flex-direction: column;
+  gap: 0;
   background: #fff;
   box-shadow: -3px 0 6px -4px rgb(0 0 0 / 12%), -9px 0 28px 8px rgb(0 0 0 / 5%);
   color: #41464b;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: normal;
-  animation: mona-drawer-right-in 250ms both ease;
 }
-.mona-hotkey-drawer.is-closing { animation: mona-drawer-right-out 250ms both ease; }
 .mona-hotkey-drawer-header { position: relative; display: flex; height: 50px; flex: none; align-items: center; padding: 0 15px; }
 .mona-hotkey-drawer-header button {
   position: absolute;
@@ -222,8 +323,6 @@
 .mona-hotkey-item { display: flex; align-items: center; border-bottom: 1px solid #e5e5e5; padding: 15px 0 5px; }
 .mona-hotkey-label { overflow: hidden; width: 140px; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes mona-popover-scale-in { from { opacity: 0; transform: scale(.5); } }
-@keyframes mona-drawer-right-in { from { transform: translateX(100%); } }
-@keyframes mona-drawer-right-out { to { transform: translateX(100%); } }
 
 .mona-fullscreen-spin {
   position: fixed;
@@ -232,7 +331,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #d14424;
+  color: var(--editor-selection);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 .mona-fullscreen-spin.is-masked { background-color: rgb(241 241 241 / 70%); }
@@ -252,9 +351,9 @@
 .mona-fullscreen-spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid #d14424;
+  border: 3px solid var(--editor-selection);
   border-top-color: transparent;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   animation: mona-fullscreen-spinner 800ms linear infinite;
 }
 .mona-fullscreen-spin-text { margin-top: 20px; }
@@ -263,6 +362,7 @@
 .mona-export-dialog,
 .mona-export-dialog * { box-sizing: border-box; }
 .mona-export-dialog {
+  gap: 0;
   height: 500px;
   margin: -20px;
   color: #41464b;
@@ -284,7 +384,7 @@
   cursor: pointer;
 }
 .mona-export-tabs button + button { border-left: 1px solid #e5e7eb; }
-.mona-export-tabs button.is-active { border-bottom-color: transparent; background: transparent; }
+.mona-export-tabs button[data-state="active"] { border-bottom-color: transparent; background: transparent; }
 .mona-export-content { overflow: overlay; height: 460px; padding: 12px; font-size: 13px; }
 .mona-export-panel { position: relative; display: flex; overflow: hidden; height: 100%; align-items: center; justify-content: center; flex-direction: column; }
 .mona-export-thumbnails-view { position: absolute; inset: 0; }
@@ -295,222 +395,1337 @@
 .mona-export-configs.is-wide { width: 350px; }
 .mona-export-configs.is-pdf { width: 300px; }
 .mona-export-row { display: flex; align-items: center; justify-content: center; margin-bottom: 25px; }
-.mona-export-row-title { position: relative; width: 100px; }
+.mona-export-row-title { position: relative; width: 170px; }
 .mona-export-row-title::after { position: absolute; top: 20px; left: 0; content: attr(data-range); }
 .mona-export-row-control { min-width: 0; flex: 1; }
 .mona-export-row-control > .mona-panel-select { width: 100%; }
 .mona-export-row-control > .mona-export-switch { float: none; }
+.mona-export-radio { white-space: nowrap; }
 .mona-export-tip { margin-top: 25px; color: #aaa; font-size: 12px; line-height: 1.8; }
 .mona-export-tip.is-compact { margin-top: 10px; }
 .mona-export-buttons { z-index: 1; display: flex; width: 300px; height: 80px; align-items: center; justify-content: center; }
 .mona-export-button {
-  height: 32px;
-  border-radius: 2px;
-  outline: 0;
-  padding: 0 15px;
-  font-size: 13px;
   font-family: Arial, sans-serif;
   letter-spacing: 1px;
-  line-height: 32px;
-  text-align: center;
-  user-select: none;
-  cursor: pointer;
 }
-.mona-export-button.is-default { border: 1px solid #d9d9d9; background: #fff; color: #41464b; }
-.mona-export-button.is-default:hover { border-color: #d14424; color: #d14424; }
-.mona-export-button.is-primary { border: 1px solid #d14424; background: #d14424; color: #fff; }
-.mona-export-button.is-primary:hover { border-color: #bb3d22; background: #bb3d22; }
 .mona-export-submit { flex: 1; }
 .mona-export-close { width: 100px; margin-left: 10px; }
 .mona-export-button svg { vertical-align: -0.15em; }
-.mona-export-radio-group { display: flex; align-items: center; }
+.mona-export-radio-group { display: flex; width: 100%; align-items: center; gap: 0; }
 .mona-export-radio {
-  display: inline-block;
   width: 100%;
   height: 32px;
   flex: none;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--border);
   border-right-width: 0;
   border-radius: 0;
-  outline: 0;
-  background: #fff;
+  background: var(--background);
   padding: 0 15px;
-  color: #41464b;
+  color: var(--foreground);
   font-size: 13px;
   font-family: Arial, sans-serif;
   letter-spacing: 1px;
-  line-height: 32px;
-  text-align: center;
-  user-select: none;
   white-space: normal;
-  cursor: pointer;
 }
 .mona-export-radio:first-child:nth-last-child(2),
 .mona-export-radio:first-child:nth-last-child(2) ~ .mona-export-radio { width: 50%; }
 .mona-export-radio:first-child:nth-last-child(3),
 .mona-export-radio:first-child:nth-last-child(3) ~ .mona-export-radio { width: 33.33%; }
-.mona-export-radio:first-child { border-radius: 2px 0 0 2px; }
-.mona-export-radio:last-child { border-right-width: 1px; border-radius: 0 2px 2px 0; }
-.mona-export-radio:not(.is-checked):hover { color: #d14424; }
-.mona-export-radio.is-checked { border-color: #d14424; background: #d14424; color: #fff; }
-.mona-export-radio.is-checked:hover { border-color: #bb3d22; background: #bb3d22; }
-.mona-export-switch { display: inline-block; height: 20px; cursor: pointer; }
-.mona-export-switch > span { position: relative; display: inline-block; width: 40px; height: 20px; margin: 0; border: 1px solid #d9d9d9; border-radius: 10px; outline: 0; background: #d9d9d9; box-sizing: border-box; transition: border-color .3s, background-color .3s; vertical-align: middle; }
-.mona-export-switch > span::after { position: absolute; top: 1px; left: 1px; width: 16px; height: 16px; border-radius: 100%; background: #fff; content: ''; transition: all .3s; }
-.mona-export-switch.is-active > span { border-color: #d14424; background: #d14424; }
-.mona-export-switch.is-active > span::after { left: 100%; margin-left: -17px; }
+.mona-export-radio:first-child { border-radius: var(--radius-control) 0 0 var(--radius-control); }
+.mona-export-radio:last-child { border-right-width: 1px; border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+.mona-export-radio:not([data-state="on"]):hover { background: var(--muted); }
+.mona-export-radio[data-state="on"] { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.mona-export-switch { width: 40px; height: 20px; }
+.mona-export-switch > [data-slot="switch-thumb"] {
+  width: 16px;
+  height: 16px;
+  /* The skin owns thumb motion via transform; drop the primitive's separate
+     tailwind `translate` or the two add up and push the thumb off the track. */
+  translate: none;
+}
+.mona-export-switch[data-state="checked"] > [data-slot="switch-thumb"] { transform: translateX(20px); }
 .mona-export-slider { width: 100%; height: 12px; padding: 4px 0; user-select: none; cursor: pointer; }
-.mona-export-slider-bar { position: relative; width: calc(100% - 10px); height: 4px; margin-left: 5px; border-radius: 2px; background: #f5f5f5; transition: background-color .2s; user-select: none; }
-.mona-export-slider:hover .mona-export-slider-bar { background: #f0f0f0; }
-.mona-export-slider-track { position: absolute; top: 0; left: 0; height: 100%; background: #d14424; transition: background-color .2s; }
-.mona-export-slider-track:hover { background: #bb3d22; }
-.mona-export-slider-thumb { position: absolute; z-index: 100; top: 50%; left: 0; width: 10px; height: 10px; border-radius: 50%; outline: 2px solid #d14424; background: #fff; transform: translate(-50%, -50%); }
-.mona-export-slider-thumb:hover,
-.mona-export-slider-thumb:active { outline: 4px solid #d14424; }
-.mona-export-slider-thumb::before { position: absolute; bottom: 24px; left: 50%; display: none; min-width: 28px; border-radius: 2px; background: #262626; padding: 6px 5px; color: #fff; content: attr(data-tooltip); font-size: 12px; text-align: center; transform: translateX(-50%); }
-.mona-export-slider-thumb::after { position: absolute; bottom: 15px; left: 50%; display: none; border: 5px solid transparent; border-top-color: #262626; content: ''; transform: translateX(-50%); }
-.mona-export-slider-thumb:hover::before,
-.mona-export-slider-thumb:hover::after,
-.mona-export-slider-thumb:active::before,
-.mona-export-slider-thumb:active::after { display: block; }
+.mona-export-slider [data-slot="slider-track"] { position: relative; width: calc(100% - 10px); height: 4px; margin-left: 5px; border-radius: var(--radius-pill); background: var(--muted); transition: background-color .2s; user-select: none; }
+.mona-export-slider:hover [data-slot="slider-track"] { background: var(--accent); }
+.mona-export-slider [data-slot="slider-range"] { position: absolute; top: 0; left: 0; height: 100%; background: var(--primary); transition: background-color .2s; }
+.mona-export-slider [data-slot="slider-thumb"] { position: absolute; z-index: 100; top: 50%; width: 10px; height: 10px; border: 0; border-radius: var(--radius-pill); outline: 2px solid var(--primary); background: var(--background); }
+.mona-export-slider [data-slot="slider-thumb"]:hover,
+.mona-export-slider [data-slot="slider-thumb"]:active { outline: 4px solid var(--primary); }
+.mona-export-slider [data-slot="slider-thumb"]::before { position: absolute; bottom: 24px; left: 50%; display: none; min-width: 28px; border-radius: var(--radius-surface); background: #262626; padding: 6px 5px; color: #fff; content: attr(data-tooltip); font-size: 12px; text-align: center; transform: translateX(-50%); }
+.mona-export-slider [data-slot="slider-thumb"]::after { position: absolute; bottom: 15px; left: 50%; display: none; border: 5px solid transparent; border-top-color: #262626; content: ''; transform: translateX(-50%); }
+.mona-export-slider [data-slot="slider-thumb"]:hover::before,
+.mona-export-slider [data-slot="slider-thumb"]:hover::after,
+.mona-export-slider [data-slot="slider-thumb"]:active::before,
+.mona-export-slider [data-slot="slider-thumb"]:active::after { display: block; }
 .mona-export-json-preview { overflow: auto; width: 100%; height: calc(100% - 90px); margin-bottom: 10px; background: #f9f9f9; color: #0451a5; }
 .mona-export-json-preview pre { margin: 0; font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace; }
 .mona-export-json-preview::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
-.mona-export-json-preview::-webkit-scrollbar-thumb { border-radius: 5px; background: #e1e1e1; }
+.mona-export-json-preview::-webkit-scrollbar-thumb { border-radius: var(--radius-overlay); background: #e1e1e1; }
 
-.mona-editor-deck {
-  grid-template-columns: 160px minmax(0, 1fr) 260px;
-  grid-template-rows: 40px minmax(0, 1fr) 40px;
+/* The deck shell is a shadcn SidebarProvider row: a persistent icon rail,
+   an optional task panel (creation pools or contextual properties), then a
+   SidebarInset stacking the contextual bar, stage, notes, and bottom bar. */
+.mona-editor-deck { display: block; height: 100%; min-height: 0; overflow: hidden; }
+.mona-editor-shell { display: flex; min-width: 0; flex-direction: column; }
+.mona-editor-workspace { display: flex; min-width: 0; min-height: 0; flex: 1; }
+.mona-editor-body { position: relative; display: flex; min-width: 0; min-height: 0; flex: 1; align-items: stretch; background: #f3f4f7; }
+/* Canva's collapse pill: straddles the open drawer's right border,
+   vertically centered. It closes the panel outright and does not render
+   while nothing is open. */
+.mona-drawer-toggle {
+  position: absolute;
+  z-index: 40;
+  top: 50%;
+  /* Rides the floating panel's right edge (10px margin + 292px card). */
+  left: calc(292px + 10px - 12px);
+  width: 24px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  box-shadow:
+    0 0 0 .5px rgb(64 79 109 / 12%),
+    0 2px 8px 0 rgb(21 30 130 / 10%);
+  color: rgb(16 18 25 / 70%);
+  font-size: 12px;
+  transform: translateY(-50%);
 }
-.mona-editor-deck > .mona-thumbnail-rail { grid-column: 1; grid-row: 1 / 4; }
-.mona-editor-deck > .mona-canvas-tool { grid-column: 2; grid-row: 1; }
-.mona-editor-deck > .mona-editor-stage { grid-column: 2; grid-row: 2; }
-.mona-editor-deck > .mona-editor-remark { grid-column: 2; grid-row: 3; }
-.mona-editor-deck > .mona-render-inspector { grid-column: 3; grid-row: 1 / 4; }
+.mona-drawer-toggle:hover { background: #fff; color: rgb(16 18 25); box-shadow: 0 0 0 .5px rgb(64 79 109 / 20%), 0 3px 10px 0 rgb(21 30 130 / 14%); }
+.mona-drawer-toggle svg { width: 1em; height: 1em; }
+.mona-editor-inset { min-height: 0; overflow: hidden; }
+.mona-editor-inset > .mona-editor-contextbar { flex: none; }
+.mona-editor-inset > .mona-editor-stage { flex: 1; min-height: 0; }
+.mona-editor-inset > .mona-editor-bottombar { flex: none; }
 
-.mona-editor-thumbnails {
+.mona-editor-rail { --sidebar-width: 72px; background: var(--background); }
+.mona-editor-rail-items {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px 4px 8px;
+}
+.mona-rail-item {
+  display: flex;
+  height: 62px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: var(--radius-action);
+  padding: 0 2px;
+  color: rgb(16 18 25 / 70%);
+}
+.mona-rail-item:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
+.mona-rail-item.is-active { background: rgb(15 16 21 / 8%); color: rgb(15 16 21); }
+.mona-rail-item.is-active .mona-rail-item-label { font-weight: 600; }
+.mona-rail-item-icon { display: flex; font-size: 21px; line-height: 1; }
+.mona-rail-item-icon svg { width: 1em; height: 1em; }
+.mona-rail-item-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The panel floats: clear of the rail, header, and bottom edge, rounded on
+   every corner, sitting on the workspace color with a soft shadow. It stays
+   in flow, so the canvas still makes room for it. */
+.mona-editor-drawer {
+  --sidebar-width: 292px;
+  /* Above the (positioned) inset, so the right-side shadow paints over the
+     canvas instead of being sliced off at the card's edge. */
+  position: relative;
+  z-index: 10;
+  height: auto;
+  /* Hard ceiling: whatever else tries to size this card, it can never
+     extend past the visible body (margins included). */
+  max-height: calc(100% - 20px);
+  overflow: hidden;
+  margin: 10px 0 10px 10px;
+  border: 0;
+  border-radius: var(--radius-overlay);
+  background: var(--background);
+  box-shadow:
+    0 0 0 .5px rgb(64 79 109 / 8%),
+    0 2px 5px 0 rgb(21 30 130 / 8%),
+    0 8px 20px 0 rgb(21 30 130 / 6%);
+}
+.mona-contextual-drawer-header {
+  display: flex;
+  min-height: 40px;
+  flex: none;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.mona-contextual-drawer-header > .mona-inspector-tabs-header { min-width: 0; flex: 1; border-bottom: 0; }
+.mona-drawer-content { display: block; min-height: 0; }
+.mona-drawer-content:has(.mona-image-library-panel) {
   display: flex;
   overflow: hidden;
-  flex-direction: column;
-  border-right: 1px solid #e5e7eb;
-  background: #fff;
   padding: 0;
+}
+.mona-drawer-stack { display: flex; flex-direction: column; gap: 8px; }
+.mona-drawer-action {
+  display: flex;
+  width: 100%;
+  height: 34px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.mona-drawer-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.mona-drawer-action-grid .mona-drawer-action {
+  min-width: 0;
+  justify-content: flex-start;
+}
+.mona-drawer-action-icon { display: flex; font-size: 16px; }
+.mona-drawer-action-icon svg { width: 1em; height: 1em; }
+.mona-drawer-hint {
+  margin: 2px 2px 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.mona-drawer-stack + .mona-canvas-shape-pool { margin-top: 12px; }
+.mona-element-category-tabs {
+  display: grid;
+  width: 100%;
+  height: auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 10px;
+}
+/* Category tiles follow the chrome language: borderless washes, never
+   outlined cards. */
+.mona-element-category-tabs > button {
+  display: flex;
+  min-width: 0;
+  height: 50px;
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+  border-radius: var(--radius-action);
+  color: rgb(16 18 25 / 70%);
+  font-size: 10px;
+}
+.mona-element-category-tabs > button:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
+.mona-element-category-tabs > button[data-state="on"] {
+  background: rgb(15 16 21 / 8%);
+  color: rgb(15 16 21);
+  font-weight: 600;
+}
+.mona-element-category-tabs > button svg { width: 17px; height: 17px; }
+.mona-template-empty { grid-column: 1 / -1; margin: 24px 0; color: var(--muted-foreground); font-size: 12px; text-align: center; }
+.mona-editor-resizable-workspace { min-width: 0; flex: 1; }
+.mona-editor-resizable-workspace > [data-slot="resizable-panel"] { display: flex; min-width: 0; min-height: 0; }
+.mona-editor-resizable-workspace .mona-editor-inset { width: 100%; height: 100%; }
+/* The divider itself is invisible — the dock is a floating card, so the
+   workspace color already separates the two. The grip stays for
+   discoverability, and focus keeps a visible affordance. */
+.mona-agent-resize-handle { background: transparent; }
+.mona-agent-resize-handle:hover { background: rgb(15 16 21 / 10%); }
+.mona-agent-resize-handle:focus-visible { background: var(--ring); }
+.mona-agent-dock-panel { min-width: 0; background: transparent; }
+.mona-agent-loading { display: grid; height: 100%; place-items: center; color: var(--muted-foreground); font-size: 12px; }
+/* Like the left drawer, the dock floats on the workspace: clear of the
+   header, right edge, and bottom, rounded all around, on the same shadow. */
+.mona-agent-dock {
+  display: grid;
+  height: calc(100% - 20px);
+  min-width: 0;
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Fill the panel width and clamp the column to 0 min, so a wide child
+     (the horizontal suggestion strip) scrolls internally instead of
+     stretching the dock past the panel. */
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  /* Float with an even gap on every side — the left needs its own 10px so
+     the card's ring/shadow isn't clipped by the panel's overflow. */
+  margin: 10px;
+  border-left: 0;
+  border-radius: var(--radius-overlay);
+  background: var(--background);
+  box-shadow:
+    0 0 0 .5px rgb(64 79 109 / 8%),
+    0 2px 5px 0 rgb(21 30 130 / 8%),
+    0 8px 20px 0 rgb(21 30 130 / 6%);
+  color: var(--foreground);
+}
+/* Slim chat header: name + quiet scope on one line, no divider — the
+   provider picker lives in the composer instead of a toolbar row. */
+.mona-agent-dock-header {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px 0 16px;
+}
+.mona-agent-dock-title { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+.mona-agent-dock-title h2 { margin: 0; font-size: 13px; font-weight: 700; }
+.mona-agent-dock-title p { overflow: hidden; margin: 0; color: var(--muted-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mona-agent-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-action);
+  background: rgb(15 16 21 / 6%);
+  color: rgb(16 18 25 / 70%);
+}
+.mona-agent-dock-header > button svg { width: 16px; height: 16px; }
+.mona-agent-provider-status { width: 7px; height: 7px; flex: none; border-radius: var(--radius-pill); background: var(--muted-foreground); opacity: .65; }
+.mona-agent-provider-status.is-ready { background: var(--success, #16a34a); opacity: 1; }
+/* Model picker: brand model names grouped under their provider, the way
+   current assistant UIs list them. A provider that isn't signed in shows its
+   models grayed with a lock; the group header offers a Sign in shortcut. */
+.mona-agent-model-popover { width: min(248px, calc(100vw - 24px)); max-height: min(70vh, 460px); overflow-y: auto; gap: 0; padding: 5px; }
+/* Filter box at the top, Cursor-style: a magnifier + borderless input over a
+   hairline that bleeds to the popover edges. */
+.mona-agent-model-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -5px -5px 4px;
+  border-bottom: 1px solid var(--border);
+  padding: 3px 11px;
+}
+.mona-agent-model-search > svg { width: 13px; height: 13px; flex: none; color: var(--muted-foreground); }
+.mona-agent-model-search input {
+  width: 100%;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--foreground);
+  font-size: 12.5px;
+  box-shadow: none;
+}
+.mona-agent-model-search input:focus,
+.mona-agent-model-search input:focus-visible { outline: none; box-shadow: none; }
+.mona-agent-model-search input::placeholder { color: var(--muted-foreground); }
+.mona-agent-model-search input::-webkit-search-cancel-button { appearance: none; }
+.mona-agent-model-empty { margin: 10px 0; color: var(--muted-foreground); font-size: 12px; text-align: center; }
+.mona-agent-model-list { display: grid; gap: 1px; }
+.mona-agent-model-group { display: grid; gap: 1px; }
+.mona-agent-model-group + .mona-agent-model-group { margin-top: 3px; }
+.mona-agent-model-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 1px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.mona-agent-model-signin {
+  height: auto;
+  min-height: 0;
+  border-radius: var(--radius-control);
+  padding: 1px 6px;
+  color: var(--foreground);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mona-agent-model-signin:hover { background: rgb(15 16 21 / 6%); }
+.mona-agent-model-option {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  border-radius: var(--radius-control);
+  padding: 0 8px;
+  color: var(--foreground);
+  font-size: 12.5px;
+  text-align: left;
+}
+.mona-agent-model-option:hover { background: rgb(15 16 21 / 6%); }
+.mona-agent-model-option.is-active { background: rgb(15 16 21 / 8%); font-weight: 600; }
+.mona-agent-model-option.is-locked { color: var(--muted-foreground); }
+.mona-agent-model-option-name { display: inline-flex; min-width: 0; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mona-agent-model-option > svg { width: 14px; height: 14px; flex: none; color: var(--muted-foreground); }
+.mona-agent-model-option.is-active > svg { color: var(--foreground); }
+.mona-agent-model-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-detail);
+  padding: 0 4px;
+  background: linear-gradient(90deg, rgb(129 161 193), rgb(125 124 155));
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+/* Sign-in sub-view inside the picker. */
+.mona-agent-auth-view { display: grid; gap: 10px; padding: 4px; }
+.mona-agent-auth-head { display: flex; align-items: center; gap: 6px; }
+.mona-agent-auth-head strong { font-size: 13px; font-weight: 700; }
+.mona-agent-auth-head > button { width: 26px; height: 26px; }
+.mona-agent-auth-head > button svg { width: 15px; height: 15px; }
+.mona-agent-auth-note { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
+.mona-agent-key-form { display: grid; gap: 10px; }
+.mona-agent-key-form > div { display: grid; gap: 5px; }
+.mona-agent-key-form label { font-size: 11px; }
+.mona-agent-key-form > p { margin: -2px 1px 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.4; }
+.mona-agent-key-input { position: relative; }
+.mona-agent-key-input > svg { position: absolute; z-index: 1; top: 50%; left: 8px; width: 13px; height: 13px; color: var(--muted-foreground); transform: translateY(-50%); }
+.mona-agent-key-input input { padding-left: 27px; }
+.mona-agent-oauth-panel { display: grid; gap: 9px; }
+.mona-agent-oauth-panel > div { display: flex; align-items: center; gap: 8px; }
+.mona-agent-oauth-panel > div > span:last-child { display: grid; gap: 1px; }
+.mona-agent-oauth-panel strong { font-size: 11px; }
+.mona-agent-oauth-panel small,
+.mona-agent-oauth-panel > p { margin: 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.4; }
+.mona-agent-oauth-panel button { width: 100%; }
+.mona-agent-oauth-panel button svg { width: 13px; height: 13px; }
+.mona-agent-oauth-panel .mona-agent-auth-error { color: var(--destructive); }
+.mona-agent-device-code,
+.mona-agent-auth-prompt { display: grid; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); padding: 9px; }
+.mona-agent-device-code > span,
+.mona-agent-auth-prompt label { color: var(--muted-foreground); font-size: 10px; line-height: 1.35; }
+.mona-agent-device-code > div { display: flex; align-items: center; gap: 6px; }
+.mona-agent-device-code code { flex: 1; border-radius: var(--radius-sm); background: var(--background); padding: 7px 8px; font-weight: 700; font-size: 13px; letter-spacing: .12em; text-align: center; }
+.mona-agent-device-code > div button { width: 28px; min-width: 28px; }
+.mona-agent-device-code > a { display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: var(--foreground); font-weight: 600; font-size: 10px; text-decoration: none; }
+.mona-agent-device-code > a:hover { text-decoration: underline; }
+.mona-agent-device-code > a svg { width: 12px; height: 12px; }
+.mona-agent-auth-prompt [data-slot="select-trigger"] { width: 100%; background: var(--background); font-size: 11px; }
+.mona-agent-conversation { min-height: 0; }
+/* Radix wraps viewport content in a display:table div; a table context won't
+   let the thread's min-height:100% stretch, so the empty state can't center.
+   Make the wrapper a flex column so the thread fills the full height. */
+.mona-agent-conversation [data-slot="scroll-area-viewport"] > div { display: flex !important; min-height: 100%; flex-direction: column; }
+.mona-agent-thread { display: flex; flex: 1; min-height: 100%; flex-direction: column; gap: 10px; padding: 12px; }
+.mona-agent-empty-state {
+  display: flex;
+  flex: 1;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 28px 10px;
+  text-align: center;
+}
+.mona-agent-empty-icon { width: 44px; height: 44px; margin-bottom: 14px; }
+.mona-agent-empty-icon svg { width: 22px; height: 22px; }
+.mona-agent-empty-state h3 { margin: 0; font-size: 15px; font-weight: 750; }
+.mona-agent-empty-state p { max-width: 290px; margin: 7px 0 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; }
+/* Prompt suggestions: a single horizontal strip that scrolls when it
+   overflows the narrow dock — no wrapping into a vertical stack, no chip
+   containers. Each is just an icon + label; the cut-off edge fades. */
+.mona-agent-suggestions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mona-agent-suggestions::-webkit-scrollbar { display: none; }
+.mona-agent-suggestions[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to right, transparent, #000 28px); }
+.mona-agent-suggestions[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.mona-agent-suggestions[data-fade-start][data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.mona-agent-composer-notice { margin: 10px 2px 0; }
+.mona-agent-chip {
+  height: 28px;
+  flex: none;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mona-agent-chip:hover { background: rgb(15 16 21 / 5%); color: var(--foreground); }
+.mona-agent-chip svg { width: 14px; height: 14px; flex: none; color: var(--muted-foreground); }
+.mona-agent-chip:hover svg { color: var(--foreground); }
+.mona-agent-sketch-handoff {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
+  background: var(--muted);
+  padding: 10px;
+}
+.mona-agent-sketch-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mona-agent-sketch-heading > div { display: grid; gap: 2px; }
+.mona-agent-sketch-heading strong { font-size: 12px; }
+.mona-agent-sketch-heading span { color: var(--muted-foreground); font-size: 10px; }
+.mona-agent-sketch-handoff img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: #fff;
+  object-fit: contain;
+}
+/* Chat turns, current-generation style: the user's message is a soft wash
+   bubble on the right; the assistant replies as plain text — no avatars,
+   no outlined boxes. */
+.mona-agent-message { display: flex; max-width: 100%; }
+.mona-agent-message p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.mona-agent-message.is-user { max-width: 88%; align-self: flex-end; }
+.mona-agent-message.is-user p {
+  border-radius: var(--radius-overlay);
+  background: rgb(15 16 21 / 6%);
+  padding: 8px 12px;
+}
+.mona-agent-message.is-agent p { color: rgb(16 18 25 / 88%); }
+.mona-agent-message.is-error p {
+  border-radius: var(--radius-overlay);
+  background: color-mix(in oklab, var(--destructive) 7%, var(--background));
+  padding: 8px 12px;
+  color: var(--destructive);
+}
+.mona-agent-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-overlay);
+  background: rgb(15 16 21 / 4%);
+  padding: 10px 12px;
+}
+.mona-agent-progress > div { display: grid; gap: 2px; }
+.mona-agent-progress strong { font-size: 11.5px; }
+.mona-agent-progress small { color: var(--muted-foreground); font-size: 9.5px; line-height: 1.35; }
+.mona-agent-progress-spinner {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--foreground);
+  border-radius: var(--radius-pill);
+  animation: mona-agent-spin .75s linear infinite;
+}
+@keyframes mona-agent-spin { to { transform: rotate(360deg); } }
+.mona-agent-candidate {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
+  background: var(--background);
+  box-shadow: 0 8px 26px rgb(15 23 42 / 7%);
+}
+.mona-agent-candidate > header { display: flex; align-items: flex-start; gap: 9px; border-bottom: 1px solid var(--border); padding: 11px; }
+.mona-agent-candidate > header > span { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border-radius: var(--radius-action); background: var(--muted); color: var(--foreground); }
+.mona-agent-candidate > header svg { width: 14px; height: 14px; }
+.mona-agent-candidate > header > div { display: grid; min-width: 0; gap: 2px; }
+.mona-agent-candidate > header strong { font-size: 12px; line-height: 1.4; }
+.mona-agent-candidate > header small { color: var(--muted-foreground); font-size: 10px; }
+.mona-agent-preview-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+.mona-agent-preview-comparison figure { position: relative; min-width: 0; margin: 0; background: var(--muted); }
+.mona-agent-preview-comparison img { display: block; width: 100%; aspect-ratio: 16 / 9; background: white; object-fit: contain; }
+.mona-agent-preview-comparison figcaption {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  border-radius: var(--radius-pill);
+  background: rgb(24 24 27 / 78%);
+  padding: 2px 6px;
+  color: white;
+  font-size: 8.5px;
+  backdrop-filter: blur(5px);
+}
+.mona-agent-operation-summary { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 10px 4px; }
+.mona-agent-operation-summary span { border-radius: var(--radius-pill); background: var(--muted); padding: 3px 7px; color: var(--muted-foreground); font-size: 9px; }
+.mona-agent-candidate details { margin: 5px 10px 10px; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.mona-agent-candidate summary { display: flex; cursor: pointer; list-style: none; align-items: center; gap: 6px; padding: 7px 8px; color: var(--muted-foreground); font-size: 10px; }
+.mona-agent-candidate summary::-webkit-details-marker { display: none; }
+.mona-agent-candidate summary svg { width: 12px; height: 12px; }
+.mona-agent-candidate pre { overflow: auto; max-height: 200px; margin: 0; border-top: 1px solid var(--border); background: var(--muted); padding: 9px; font-size: 9px; line-height: 1.45; white-space: pre-wrap; }
+.mona-agent-candidate > footer { display: flex; justify-content: flex-end; gap: 7px; border-top: 1px solid var(--border); padding: 9px 10px; }
+.mona-agent-candidate > footer svg { width: 13px; height: 13px; }
+.mona-agent-applied { display: flex; align-items: center; gap: 7px; border: 1px solid var(--border); border-radius: var(--radius-overlay); padding: 8px 9px; font-size: 10.5px; }
+.mona-agent-applied > svg { width: 14px; height: 14px; color: var(--success, #16a34a); }
+.mona-agent-applied > span { min-width: 0; flex: 1; }
+.mona-agent-applied button svg { width: 12px; height: 12px; }
+.mona-agent-composer { padding: 4px 12px 10px; }
+/* Chat-input card ported from the blocks.so ai-02 block: an extra-rounded
+   bordered surface with a soft lift, the growing textarea on top, and a
+   control row below holding a leading mark, a bare model select, then the
+   attach + round send controls pushed to the right. Compacted for the dock. */
+.mona-agent-composer-field {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-overlay) + 4px);
+  background: var(--card, var(--background));
+  box-shadow: 0 6px 18px -6px rgb(21 30 130 / 14%), 0 2px 5px -2px rgb(21 30 130 / 8%);
+}
+.mona-agent-composer-field:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 18%, transparent);
+}
+.mona-agent-composer textarea {
+  min-height: 50px;
+  max-height: 220px;
+  overflow-y: auto;
+  field-sizing: content;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 12px 2px;
+  box-shadow: none;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+.mona-agent-composer textarea:focus-visible { border: 0; box-shadow: none; }
+.mona-agent-composer-actions { display: flex; min-height: 40px; align-items: center; gap: 6px; padding: 4px 6px 6px; }
+.mona-agent-composer-actions button svg { width: 15px; height: 15px; }
+.mona-agent-composer-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+/* Model select: a bare trigger — muted text that sharpens on hover, no field
+   chrome, exactly like the block's borderless Select. */
+.mona-agent-model-trigger {
+  height: 26px;
+  min-width: 0;
+  gap: 5px;
+  border-radius: var(--radius-control);
+  padding: 0 4px;
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.mona-agent-model-trigger:hover,
+.mona-agent-model-trigger[data-state="open"] { background: transparent; color: var(--foreground); }
+.mona-agent-model-trigger > svg { width: 12px; height: 12px; flex: none; }
+.mona-agent-model-label { overflow: hidden; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+/* Round arrow-up send: solid primary when armed (grays to disabled when the
+   field is empty), a stop circle while generating — the block's send button. */
+.mona-agent-send {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  padding: 0;
+}
+.mona-agent-send svg { stroke-width: 2.4; }
+/* Empty field → a muted gray circle (the block's disabled send); armed →
+   solid primary. */
+.mona-agent-send:disabled { background: var(--muted); opacity: 1; }
+.mona-agent-send:disabled svg { color: var(--muted-foreground); }
+.mona-agent-send.is-stop { border-color: rgb(16 18 25 / 20%); }
+.mona-agent-composer > p { margin: 7px 2px 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.4; text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .mona-agent-progress-spinner { animation: none; border-color: var(--muted-foreground); }
+}
+
+/* Measured from Canva: the bar has no surface of its own — the pill floats
+   OVER the stage (out of flow, so the slide reclaims the strip's height and
+   centers in the full area), with breathing room below the header instead of
+   hugging it. Only the pill itself takes pointer events; clicks elsewhere on
+   the strip fall through to the canvas. */
+.mona-editor-contextbar {
+  position: absolute;
+  z-index: 30;
+  top: 20px;
+  right: 0;
+  left: 0;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 0;
+  background: transparent;
+  padding: 0 12px;
+  pointer-events: none;
+}
+.mona-contextual-toolbar-group { pointer-events: auto; }
+/* The lane must NOT clip: the pill's drop shadow extends past the bar's
+   box. When space runs out, the pill scrolls its own contents instead —
+   clipping then happens inside the pill, where no shadow lives. */
+.mona-contextual-command-lane {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+.mona-contextual-toolbar-group {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border: 0;
+  border-radius: var(--radius-overlay);
+  background: #fff;
+  padding: 0 6px;
+  /* Canva's measured pill shadow: hairline ring + two soft layers. */
+  box-shadow:
+    0 0 0 .5px rgb(64 79 109 / 7%),
+    0 2px 5px 0 rgb(21 30 130 / 12%),
+    0 6px 12px 0 rgb(21 30 130 / 6%);
+  margin-inline: auto;
+}
+.mona-contextual-toolbar-group::-webkit-scrollbar { display: none; }
+.mona-contextual-controls {
+  position: static;
+  display: flex;
+  box-sizing: border-box;
+  width: max-content;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: #41464b;
+  box-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  line-height: normal;
+  text-size-adjust: auto;
+  visibility: visible;
+}
+.mona-contextual-deep-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: 5px;
+  border-left: 1px solid var(--border);
+  padding-left: 5px;
+}
+.mona-contextual-toolbar-group > .mona-contextual-deep-actions:first-child {
+  margin-left: 0;
+  border-left: 0;
+  padding-left: 0;
+}
+.mona-contextual-action {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-action);
+  padding-inline: 9px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mona-contextual-action:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
+.mona-contextual-action svg { width: 16px; height: 16px; }
+.mona-contextual-kind-icon,
+.mona-contextual-selection-label {
+  display: inline-flex;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: rgb(16 18 25 / 70%);
+}
+.mona-contextual-kind-icon { width: 28px; justify-content: center; }
+.mona-contextual-kind-icon svg,
+.mona-contextual-selection-label svg { width: 16px; height: 16px; }
+.mona-contextual-selection-label {
+  border-right: 1px solid var(--border);
+  padding: 0 10px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.mona-contextual-child-badge {
+  display: inline-flex;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  margin-right: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mona-contextual-color-dot,
+.mona-contextual-stroke-dot {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--radius-control);
+}
+/* A stronger outline so a white/pale swatch stays visible against the pill. */
+.mona-contextual-color-dot { border: 1px solid rgb(16 18 25 / 35%); }
+.mona-contextual-stroke-dot { border: 3px solid; background: var(--background); }
+.mona-contextual-color-dot[data-mixed],
+.mona-contextual-stroke-dot[data-mixed] {
+  background: linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%);
+  border-color: #737780;
+}
+.mona-contextual-transparency-popover {
+  display: flex;
+  width: 220px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px;
+  color: var(--foreground);
+  font-size: 12px;
+}
+.mona-contextual-transparency-popover .mona-panel-slider { width: 100%; }
+
+@media (max-width: 980px) {
+  .mona-contextual-deep-actions .mona-contextual-action span { display: none; }
+  .mona-contextual-deep-actions .mona-contextual-action { width: 30px; padding: 0; }
+}
+
+
+/* Bottom bar, Canva-style: no surface of its own — the workspace color
+   runs through it; the filmstrip row on top, then a slim status bar. */
+.mona-editor-bottombar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border-top: 0;
+  background: #f3f4f7;
+}
+/* The doubled selector out-specifies the read-only renderer's vertical
+   .mona-thumbnail-rail styles (white background, border-right, overflow:
+   auto, padding), which this section would otherwise inherit — the editor
+   filmstrip keeps that class only for focus routing and tests. */
+.mona-editor-filmstrip.mona-thumbnail-rail {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 8px;
+  overflow: visible;
+  border-right: 0;
+  background: transparent;
+  padding: 4px 12px 0;
   color: #41464b;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: normal;
   user-select: none;
 }
-.mona-add-slide {
-  display: flex;
-  height: 40px;
-  flex: none;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 12px;
-  cursor: pointer;
-}
-.mona-add-slide-button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-}
-.mona-add-slide-button:hover,
-.mona-add-slide-select:hover { background: #f1f1f1; }
-.mona-add-slide-select {
-  display: flex;
-  width: 30px;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  border-left: 1px solid #e5e7eb;
-}
-.mona-add-slide-select svg { width: 1em; height: 1em; }
-.mona-add-slide-icon { margin-right: 3px; font-size: 12px; }
 .mona-thumbnail-list {
-  overflow: auto;
-  min-height: 0;
-  flex: 1;
-  padding: 5px 0;
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: flex-end;
+  /* Containers carry 5px of ring room each side, so a hairline gap here
+     yields Canva's ~12px visual spacing between tiles. */
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px;
+  /* Centers the strip under the canvas while it fits; the auto margins
+     collapse to 0 once the list overflows, restoring left-anchored
+     scrolling. The add tile now scrolls inside the list. */
+  margin-inline: auto;
 }
-.mona-thumbnail-container { transition: transform 200ms ease; }
+.mona-thumbnail-list::-webkit-scrollbar { height: 6px; background: transparent; }
+.mona-thumbnail-list::-webkit-scrollbar-thumb { border-radius: var(--radius-overlay); background: #d9d9d9; }
+/* Fade whichever edge hides more slides (data attrs from useEdgeFade), so
+   the cut-off never reads as a hard clip. */
+.mona-thumbnail-list[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to right, transparent, #000 40px); }
+.mona-thumbnail-list[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
+.mona-thumbnail-list[data-fade-start][data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
+.mona-thumbnail-container { transition: opacity 120ms ease, transform 200ms ease; }
 /* Skip layout/paint for offscreen thumbnails on large decks. The remembered
    ("auto") intrinsic size keeps scroll geometry stable after first render;
    browsers without content-visibility simply render everything as before. */
 .mona-thumbnail-container {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 150px auto 90px;
-}
-
-.mona-thumbnail-item {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 0;
+  flex: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* content-visibility's paint containment clips ink overflow at this
+     box's padding edge — without this padding, the tile's 4px selection
+     ring survives only as four corner arcs. */
+  padding: 5px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 138px auto 82px;
 }
-.mona-thumbnail-item .mona-scaled-slide {
-  border-radius: 2px;
-  outline: 2px solid rgba(209, 68, 36, .15);
-  outline-offset: 0;
+
+.mona-thumbnail-visual,
+.mona-thumbnail-item {
+  position: relative;
 }
-.mona-thumbnail-item.is-active .mona-thumbnail-label { color: #d14424; }
-.mona-thumbnail-item.is-active .mona-scaled-slide,
-.mona-thumbnail-item.is-selected .mona-scaled-slide { outline-color: #d14424; }
-.mona-thumbnail-label {
-  width: 20px;
-  color: #999;
-  font-size: 12px;
+.mona-thumbnail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: grab;
 }
-.mona-thumbnail-label.is-offset { position: relative; left: -4px; }
+.mona-thumbnail-item:active { cursor: grabbing; }
+.mona-thumbnail-container.is-drag-chosen { opacity: .72; }
+.mona-thumbnail-container.is-dragging { cursor: grabbing; opacity: .92; }
+.mona-thumbnail-container.is-drag-ghost { opacity: .32; }
+.mona-thumbnail-container.is-drop-target::before {
+  position: absolute;
+  z-index: 8;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--editor-selection-strong);
+  box-shadow: 0 0 0 2px #fff;
+  content: '';
+}
+.mona-thumbnail-container.is-drop-target[data-drop-side="before"]::before { left: 0; }
+.mona-thumbnail-container.is-drop-target[data-drop-side="after"]::before { right: 0; }
+.mona-thumbnail-list.is-drag-cancelled .mona-thumbnail-container { transition-duration: 100ms; }
+.mona-thumbnail-item .mona-scaled-slide {
+  /* Canva page tiles: genuinely rounded artwork (clipped), no border at
+     rest — just a hairline ring so white slides keep definition. Rings are
+     box-shadows: they follow the radius exactly, so no notched corners. */
+  overflow: hidden;
+  border-radius: var(--radius-surface);
+  outline: 0;
+  box-shadow: 0 0 0 1px rgb(16 18 25 / 7%);
+  transition: box-shadow 120ms ease;
+}
+.mona-thumbnail-item:hover .mona-scaled-slide { box-shadow: 0 0 0 1.5px rgb(16 18 25 / 25%); }
+.mona-thumbnail-item.is-active .mona-scaled-slide,
+.mona-thumbnail-item.is-selected .mona-scaled-slide {
+  /* Dark ring with a white gap, like Canva's selected page. */
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgb(16 18 25 / 85%);
+}
+.mona-thumbnail-item.is-active .mona-thumbnail-label { color: rgb(16 18 25); }
+.mona-thumbnail-item.is-active .mona-scaled-slide,
+.mona-thumbnail-item.is-selected .mona-scaled-slide { outline-color: var(--editor-selection); }
+.mona-thumbnail-item.is-hidden .mona-scaled-slide {
+  opacity: .55;
+  filter: grayscale(.25);
+}
+/* Canva keeps the page number INSIDE the tile, bottom-left, on a small
+   white badge so it stays legible over any slide art. */
+.mona-thumbnail-label {
+  position: absolute;
+  z-index: 1;
+  bottom: 4px;
+  left: 4px;
+  border-radius: var(--radius-control);
+  background: #fff;
+  box-shadow: 0 0 0 .5px rgb(16 18 25 / 10%), 0 1px 2px rgb(16 18 25 / 8%);
+  padding: 0 5px;
+  color: rgb(16 18 25 / 80%);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  cursor: grab;
+}
 .mona-thumbnail-label:active { cursor: grabbing; }
 .mona-thumbnail-note-flag {
   position: absolute;
-  top: 13px;
-  left: 8px;
+  z-index: 3;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
   width: 16px;
   height: 12px;
-  border-radius: 1px;
-  background: rgba(209, 68, 36, .75);
+  min-height: 12px;
+  border-radius: var(--radius-detail);
+  background: var(--editor-selection-strong);
+  padding: 0;
   color: #fff;
   font-size: 8px;
+  font-weight: 600;
   line-height: 12px;
   text-align: center;
   cursor: pointer;
 }
-.mona-thumbnail-note-flag::after {
+.mona-thumbnail-note-flag:hover,
+.mona-thumbnail-note-flag:focus-visible { background: var(--editor-selection); color: #fff; }
+.mona-thumbnail-visual:has(.mona-thumbnail-item.is-selected) .mona-thumbnail-note-flag { background: var(--editor-selection); }
+.mona-thumbnail-hidden-flag,
+.mona-thumbnail-duration-flag {
   position: absolute;
-  top: 10px;
-  left: 4px;
-  width: 0;
-  height: 0;
-  border: 4px solid transparent;
-  border-top-color: rgba(209, 68, 36, .75);
+  z-index: 2;
+  top: 4px;
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  gap: 3px;
+  border-radius: var(--radius-control);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 0 0 .5px rgb(16 18 25 / 10%);
+  padding: 0 5px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 9px;
+  font-weight: 600;
+}
+.mona-thumbnail-hidden-flag { left: 4px; }
+.mona-thumbnail-duration-flag { right: 4px; }
+.mona-thumbnail-hidden-flag svg,
+.mona-thumbnail-duration-flag svg { width: 11px; height: 11px; }
+.mona-page-boundary-actions {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  right: 0;
+  display: flex;
+  width: 18px;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-40%);
+  transition: opacity 120ms ease;
+}
+.mona-thumbnail-container:hover .mona-page-boundary-actions,
+.mona-page-boundary-actions:focus-within { opacity: 1; }
+.mona-page-boundary-actions button {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(16 18 25 / 18%);
+}
+.mona-page-boundary-actions button svg { width: 11px; height: 11px; }
+/* Last item of the scrollable row: sized inline to the exact tile geometry
+   (128 × 128·viewportRatio), so it always matches the thumbnails' shape. */
+.mona-filmstrip-add {
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-surface);
+  /* One step deeper than the workspace so the tile reads on #f3f4f7. */
+  background: #e7e9ee;
+  color: rgb(16 18 25 / 70%);
+  font-size: 15px;
+  /* Level with the tiles inside their containers' 5px ring padding. */
+  margin: 5px 0 5px 5px;
+}
+.mona-filmstrip-add:hover { background: #dde0e6; color: rgb(16 18 25); }
+
+.mona-editor-statusbar {
+  container-type: inline-size;
+  display: flex;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.mona-statusbar-item {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--radius-action);
+  padding: 0 10px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mona-statusbar-item svg { font-size: 15px; }
+.mona-statusbar-item:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
+.mona-statusbar-item.is-active { background: rgb(15 16 21 / 8%); color: rgb(15 16 21); }
+.mona-statusbar-spacer { flex: 1; }
+.mona-statusbar-zoom-slider { width: 110px; flex: 0 1 auto; min-width: 56px; }
+/* Squeezed by an open dock or panel, the bar sheds its button labels
+   before any control wraps or collapses. */
+@container (max-width: 1060px) {
+  .mona-statusbar-item > span { display: none; }
+  .mona-statusbar-item { padding: 0 8px; }
+}
+/* Quiet, Canva-like slider: light track, slightly darker fill, white thumb. */
+.mona-statusbar-zoom-slider [data-slot="slider-track"] { height: 4px; background: #e2e4e9; }
+.mona-statusbar-zoom-slider [data-slot="slider-range"] { background: #b9bdc7; }
+.mona-statusbar-zoom-slider [data-slot="slider-thumb"] {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(16 18 25 / 15%);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 15%);
+}
+.mona-statusbar-icon { width: 32px; height: 32px; border-radius: var(--radius-action); color: rgb(16 18 25 / 70%); font-size: 15px; }
+.mona-page-number-control {
+  display: flex;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mona-page-number-control input {
+  width: 38px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  padding: 0 3px;
+  text-align: right;
+  box-shadow: none;
+  font-weight: 600;
+  appearance: textfield;
+}
+.mona-page-number-control input::-webkit-inner-spin-button,
+.mona-page-number-control input::-webkit-outer-spin-button { margin: 0; appearance: none; }
+.mona-editor-timer {
+  display: flex;
+  width: 230px;
+  flex-direction: column;
+  gap: 10px;
+}
+.mona-editor-timer > span { color: var(--muted-foreground); font-size: 12px; }
+.mona-editor-timer output {
+  font-variant-numeric: tabular-nums;
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -.03em;
+}
+.mona-editor-timer > div { display: flex; gap: 6px; }
+.mona-editor-timer button { flex: 1; }
+.mona-editor-shortcuts { width: 250px; }
+.mona-editor-shortcuts > strong { display: block; margin-bottom: 8px; }
+.mona-editor-shortcuts dl { display: grid; gap: 2px; }
+.mona-editor-shortcuts dl > div {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.mona-editor-shortcuts dt { color: var(--muted-foreground); font-size: 12px; }
+.mona-editor-shortcuts dd {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-detail);
+  background: var(--muted);
+  padding: 2px 6px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.mona-page-settings {
+  display: flex;
+  width: 320px;
+  flex-direction: column;
+  gap: 14px;
+}
+.mona-page-settings-heading,
+.mona-page-settings-row,
+.mona-page-duration-input {
+  display: flex;
+  align-items: center;
+}
+.mona-page-settings-heading { justify-content: space-between; }
+.mona-page-settings-heading > span { color: var(--muted-foreground); font-size: 11px; }
+.mona-page-settings-field { display: grid; gap: 6px; }
+.mona-page-settings-field label,
+.mona-page-settings-row label { font-size: 12px; font-weight: 600; }
+.mona-page-settings-row { justify-content: space-between; gap: 20px; }
+.mona-page-settings-row p { margin-top: 3px; color: var(--muted-foreground); font-size: 10px; }
+.mona-page-duration-input { position: relative; gap: 7px; }
+.mona-page-duration-input > svg {
+  position: absolute;
+  left: 9px;
+  width: 15px;
+  height: 15px;
+  color: var(--muted-foreground);
+}
+.mona-page-duration-input input { padding-left: 30px; }
+.mona-page-duration-input > span { color: var(--muted-foreground); font-size: 11px; }
+
+.mona-page-grid-workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f3f4f7;
+  padding: 18px 22px 0;
+}
+.mona-page-grid-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 16px;
+}
+.mona-page-grid-header > div:first-child { min-width: 0; }
+.mona-page-grid-header h2 { margin: 0; font-size: 18px; font-weight: 650; }
+.mona-page-grid-header span { color: var(--muted-foreground); font-size: 11px; }
+.mona-page-grid-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.mona-page-grid-actions::-webkit-scrollbar { display: none; }
+.mona-page-grid {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-content: start;
+  gap: 22px;
+  overflow-y: auto;
+  padding: 4px 6px 28px;
+}
+.mona-page-grid-item {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+  outline: none;
+  transition: opacity 120ms ease, transform 180ms ease;
+}
+.mona-page-grid-item.is-drag-chosen { opacity: .72; }
+.mona-page-grid-item.is-dragging { cursor: grabbing; opacity: .92; }
+.mona-page-grid-item.is-drag-ghost { opacity: .3; }
+.mona-page-grid-item.is-drop-target::before {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  bottom: 22px;
+  width: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--editor-selection-strong);
+  box-shadow: 0 0 0 2px #fff;
   content: '';
 }
-.mona-thumbnail-item.is-selected .mona-thumbnail-note-flag { background: #d14424; }
-.mona-thumbnail-item.is-selected .mona-thumbnail-note-flag::after { border-top-color: #d14424; }
-.mona-thumbnail-page-number {
-  height: 40px;
-  flex: none;
-  border-top: 1px solid #e5e7eb;
-  color: #666;
-  font-size: 12px;
-  line-height: 40px;
+.mona-page-grid-item.is-drop-target[data-drop-side="before"]::before { left: -12px; }
+.mona-page-grid-item.is-drop-target[data-drop-side="after"]::before { right: -12px; }
+.mona-page-grid-preview {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: var(--radius-surface);
+  box-shadow: 0 0 0 1px rgb(16 18 25 / 9%);
+  transition: box-shadow 120ms ease, opacity 120ms ease;
+}
+.mona-page-grid-preview .mona-scaled-slide {
+  overflow: hidden;
+  border-radius: inherit;
+}
+.mona-page-grid-item:hover .mona-page-grid-preview { box-shadow: 0 0 0 2px rgb(16 18 25 / 24%); }
+.mona-page-grid-item.is-selected .mona-page-grid-preview,
+.mona-page-grid-item.is-active .mona-page-grid-preview { box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(16 18 25 / 82%); }
+.mona-page-grid-item.is-hidden .mona-page-grid-preview { opacity: .55; }
+.mona-page-grid-number {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  min-width: 20px;
+  border-radius: var(--radius-control);
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(16 18 25 / 15%);
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 650;
   text-align: center;
 }
-.mona-section-title {
-  height: 26px;
-  padding: 6px 8px 2px 18px;
-  color: #555;
+.mona-page-grid-hidden {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-control);
+  background: rgb(255 255 255 / 92%);
+  padding: 3px 6px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 9px;
+  font-weight: 650;
+}
+.mona-page-grid-hidden svg { width: 12px; height: 12px; }
+.mona-page-grid-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 2px 0;
+}
+.mona-page-grid-meta strong {
+  overflow: hidden;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mona-page-grid-meta span { flex: none; color: var(--muted-foreground); font-size: 10px; }
+/* Same tile language as the filmstrip's add button: a solid wash one step
+   deeper than the workspace — no dashed outlines in this chrome. */
+.mona-page-grid-add {
+  display: flex;
+  min-height: 170px;
+  flex-direction: column;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-surface);
+  background: #e7e9ee;
+  color: rgb(16 18 25 / 70%);
+}
+.mona-page-grid-add:hover { background: #dde0e6; color: rgb(16 18 25); }
+.mona-zoombar-count {
+  padding: 0 4px;
+  color: rgb(16 18 25 / 70%);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mona-zoombar-divider { width: 1px; height: 16px; flex: none; background: var(--border); margin: 0 4px; }
+.mona-section-title {
+  max-width: 128px;
+  height: 18px;
+  padding: 0 2px 6px;
+  color: #555;
+  font-size: 11px;
 }
 .mona-section-title-text {
   position: relative;
   display: flex;
+  width: 100%;
   min-width: 0;
   align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
 }
+.mona-section-title-text:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .mona-section-title-text::before {
   width: 0;
   height: 0;
@@ -541,261 +1756,100 @@
   line-height: normal;
 }
 
-.mona-thumbnail-template-popover {
-  z-index: 9999;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  outline: 0;
-  background: #fff;
-  padding: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 13px;
-  line-height: normal;
-  transform-origin: var(--radix-popover-content-transform-origin);
-  animation: mona-popover-scale-in 200ms ease;
-}
-.mona-templates { display: flex; width: 500px; height: 500px; user-select: none; }
-.mona-template-catalogs {
-  overflow: auto;
-  width: 108px;
-  margin-right: 10px;
-  border-right: 1px solid #e5e7eb;
-  padding-right: 10px;
-}
-.mona-template-catalog {
-  border-radius: 2px;
-  padding: 7px 8px;
-  cursor: pointer;
-}
-.mona-template-catalog + .mona-template-catalog { margin-top: 3px; }
-.mona-template-catalog:hover { background: #f5f5f5; }
-.mona-template-catalog.is-active {
-  border-right: 2px solid #d14424;
-  background: rgba(209, 68, 36, .05);
-  color: #d14424;
-  font-weight: 700;
-}
-.mona-template-content { position: relative; display: flex; flex-direction: column; }
-.mona-template-header {
+/* Canva-style template browser: search/generate stubs on top, a grid of
+   nameless cover cards; clicking one opens a detail view (back, title,
+   meta, Apply-all, the full page grid). */
+.mona-templates { user-select: none; }
+.mona-template-toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.mona-template-searchbox {
   display: flex;
+  height: 40px;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  padding-right: 4px;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
+  background: var(--background);
+  padding: 0 10px 0 12px;
 }
-.mona-template-types { display: flex; }
-.mona-template-type {
-  border-radius: 2px;
-  padding: 3px 8px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.mona-template-type + .mona-template-type { margin-left: 4px; }
-.mona-template-type:hover { background: #f5f5f5; }
-.mona-template-type.is-active { background: rgba(209, 68, 36, .05); color: #d14424; font-weight: 700; }
-.mona-template-insert-all {
-  opacity: 0;
-  color: #d14424;
-  font-size: 12px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.mona-template-header:hover .mona-template-insert-all { opacity: 1; transition: opacity 200ms; }
-.mona-template-list {
-  position: relative;
-  display: flex;
-  overflow: auto;
-  width: 392px;
-  min-height: 0;
-  flex: 1;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: space-between;
-  margin-right: -10px;
-  padding: 2px 10px 2px 2px;
-}
-.mona-template-slide-item { position: relative; width: 48%; margin-bottom: 4%; }
-.mona-template-slide-item .mona-scaled-slide {
-  width: 100% !important;
-  border-radius: 2px;
-  outline: 2px solid #e5e7eb;
-  transition: outline 200ms;
-  cursor: pointer;
-}
-.mona-template-slide-buttons {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  opacity: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-  background: rgba(0, 0, 0, .25);
-  transition: opacity 200ms;
-}
-.mona-template-slide-item:hover .mona-template-slide-buttons { opacity: 1; }
-.mona-template-slide-item:hover .mona-scaled-slide { outline-color: #d14424; }
-.mona-template-slide-buttons button {
-  height: 24px;
-  border: 1px solid #d14424;
-  border-radius: 2px;
-  background: #d14424;
-  padding: 0 8px;
-  color: #fff;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.mona-template-loading {
-  position: absolute;
-  z-index: 99;
-  inset: 0;
-  overflow: hidden;
-}
-.mona-template-loading::before {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -12px;
-  margin-left: -12px;
-  border: 2px solid #d14424;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: mona-template-loading .8s linear infinite;
-  content: '';
-}
-.mona-template-loading.has-text::before { margin-top: -30px; }
-.mona-template-loading::after {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, .75);
-  color: #d14424;
-  content: var(--mona-template-loading-text, '');
-  font-size: 12px;
-  padding-top: 24px;
-}
-@keyframes mona-template-loading {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.mona-canvas-tool {
-  position: relative;
-  display: flex;
+.mona-template-searchbox:focus-within { border-color: var(--ring); }
+.mona-template-searchbox > svg { flex: none; color: rgb(16 18 25 / 55%); font-size: 15px; }
+.mona-template-search-input {
   min-width: 0;
-  align-items: stretch;
-  justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
-  padding: 0 10px;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  font-size: 13px;
-  line-height: normal;
-  user-select: none;
-}
-.mona-canvas-tool button {
+  flex: 1;
   border: 0;
+  outline: 0;
   background: transparent;
   color: inherit;
   font-family: inherit;
-  font-style: normal;
-  font-weight: 400;
-  line-height: normal;
-  letter-spacing: normal;
+  font-size: 13px;
 }
-.mona-canvas-tool-left,
-.mona-canvas-tool-more,
-.mona-canvas-tool-right {
+.mona-template-search-input::placeholder { color: rgb(16 18 25 / 40%); }
+.mona-template-actions { display: flex; gap: 8px; }
+.mona-template-generate-group { flex: 1; border-radius: var(--radius-action); }
+.mona-template-generate {
+  flex: 1;
+  gap: 6px;
+  border-radius: var(--radius-action) 0 0 var(--radius-action);
+  font-weight: 600;
+}
+.mona-template-generate svg { font-size: 15px; }
+.mona-template-generate-arrow { width: 26px; padding: 0; border-radius: 0 var(--radius-action) var(--radius-action) 0; }
+.mona-template-generate-arrow svg { font-size: 11px; }
+.mona-template-search-button { flex: 1; border-radius: var(--radius-action); font-weight: 600; }
+.mona-template-grid,
+.mona-template-pages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  user-select: none;
+}
+.mona-template-card,
+.mona-template-page {
   display: flex;
-  align-items: center;
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  border-radius: var(--radius-surface);
+  padding: 0;
 }
-.mona-canvas-tool-left,
-.mona-canvas-tool-right { z-index: 1; }
-.mona-canvas-tool-more { min-width: 0; }
-.mona-canvas-handler-item {
-  display: flex;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  margin: 0 2px;
-  border-radius: 2px;
-  padding: 0 8px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.mona-canvas-handler-item[aria-disabled="true"] { opacity: .5; }
-.mona-canvas-handler-item.is-active,
-.mona-canvas-handler-item:not([aria-disabled="true"]):hover { background: #f1f1f1; }
-.mona-canvas-tool-divider {
-  width: 1px;
-  height: 20px;
-  margin: 0 8px;
-  border-left: 1px solid rgba(5, 5, 5, .06);
-}
-.mona-canvas-more-icon { display: none; }
-.mona-canvas-tool-add-elements {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  transform: translate(-50%, -50%);
-}
-.mona-canvas-insert-item {
-  display: flex;
-  height: 30px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
+.mona-template-card:hover,
+.mona-template-page:hover { background: transparent; }
+.mona-template-card .mona-scaled-slide,
+.mona-template-page .mona-scaled-slide {
   overflow: hidden;
-  margin: 0 2px;
-  border-radius: 2px;
-  padding: 0 10px;
-  font-size: 14px;
-  cursor: pointer;
+  border-radius: var(--radius-surface);
+  box-shadow: 0 0 0 1px rgb(16 18 25 / 7%);
+  transition: box-shadow 120ms ease;
 }
-.mona-canvas-insert-item:not(.is-group):hover,
-.mona-canvas-insert-item.is-active { background: #f1f1f1; }
-.mona-canvas-insert-item.is-group {
-  margin-right: 6px;
-  padding: 0;
+.mona-template-card:hover .mona-scaled-slide,
+.mona-template-page:hover .mona-scaled-slide { box-shadow: 0 0 0 2px rgb(16 18 25 / 30%); }
+.mona-template-card-skeleton { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-surface); }
+.mona-template-detail { user-select: none; }
+.mona-template-detail-head { display: flex; align-items: center; margin: -4px 0 4px -6px; }
+.mona-template-back { color: rgb(16 18 25 / 70%); font-size: 15px; }
+.mona-template-detail-title { margin: 0 2px; font-size: 15px; font-weight: 700; line-height: 1.35; }
+.mona-template-detail-meta { margin: 3px 2px 12px; color: rgb(16 18 25 / 55%); font-size: 12px; }
+.mona-template-apply {
+  width: 100%;
+  margin-bottom: 12px;
+  border-radius: var(--radius-action);
+  font-weight: 600;
 }
-.mona-canvas-insert-item.is-group:hover { background: #f3f3f3; }
-.mona-canvas-group-main,
-.mona-canvas-group-arrow {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.mona-canvas-group-main { padding: 0 5px; }
-.mona-canvas-group-arrow { padding: 0 1px; font-size: 12px; }
-.mona-canvas-group-main:hover,
-.mona-canvas-group-arrow:hover { background: #e9e9e9; }
-.mona-canvas-tool-icon { margin-right: 4px; }
-.mona-canvas-tool-right .mona-canvas-zoom-text {
+
+.mona-canvas-zoom-text {
   display: inline-block;
-  width: 40px;
+  width: 44px;
   padding: 0;
+  color: #41464b;
+  font-size: 12px;
   text-align: center;
   cursor: pointer;
 }
-.mona-canvas-handler-item.is-viewport-size { font-size: 13px; }
 
 .mona-canvas-tool-popover {
   z-index: 120;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 10px;
   color: #41464b;
@@ -810,7 +1864,7 @@
   min-width: 80px;
   justify-content: center;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 8px 10px;
   color: #41464b;
@@ -819,13 +1873,10 @@
 }
 .mona-canvas-tool-menu-item:hover { background: #f1f1f1; }
 .mona-canvas-tool-menu-item + .mona-canvas-tool-menu-item { margin-top: 2px; }
-.mona-canvas-tool-menu.is-image-menu .mona-canvas-tool-menu-item + .mona-canvas-tool-menu-item { margin-top: 0; }
 .mona-canvas-tool-menu-item > svg { margin-right: 8px; font-size: 18px; }
 .mona-canvas-tool-menu.is-zoom-menu .mona-canvas-tool-menu-item { padding-right: 16px; padding-left: 16px; }
 
-.mona-canvas-tool-popover.is-table-generator { padding-top: 10px; }
-.mona-canvas-tool-popover.is-media-input { padding: 10px; }
-.mona-media-input { width: 480px; }
+.mona-media-input { width: 100%; }
 .mona-media-tabs {
   display: flex;
   align-items: center;
@@ -846,18 +1897,18 @@
   text-align: center;
   cursor: pointer;
 }
-.mona-media-tabs > button.is-active { border-bottom-color: #d14424; }
+.mona-media-tabs > button[data-state="on"] { border-bottom-color: var(--foreground); background: transparent; color: var(--foreground); }
 .mona-media-url-input {
   display: flex;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0 5px;
   font-size: 13px;
   transition: border-color .25s;
 }
 .mona-media-url-input:hover,
-.mona-media-url-input:focus-within { border-color: #d14424; }
+.mona-media-url-input:focus-within { border-color: var(--ring); }
 .mona-media-url-input > input {
   min-width: 0;
   height: 30px;
@@ -880,29 +1931,17 @@
 .mona-media-confirm-actions { display: flex; }
 .mona-media-button {
   height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  outline: 0;
-  background: #fff;
+  border-radius: var(--radius-control);
   padding: 0 15px;
-  color: #41464b;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
-  text-align: center;
   letter-spacing: 1px;
-  cursor: pointer;
-  user-select: none;
 }
 .mona-media-file-input { display: none; }
-.mona-media-button:hover { border-color: #d14424; color: #d14424; }
-.mona-media-button.is-primary { border-color: #d14424; background: #d14424; color: #fff; }
-.mona-media-button.is-primary:hover { border-color: #bb3d22; background: #bb3d22; color: #fff; }
 .mona-media-confirm-actions > .mona-media-button + .mona-media-button { margin-left: 10px; }
 .mona-media-button > svg { overflow: hidden; vertical-align: -.125em; }
 .mona-table-generator {
   width: 100%;
-  margin-top: -10px;
   color: #41464b;
   font-size: 13px;
 }
@@ -911,23 +1950,13 @@
   height: 28px;
   align-items: center;
   justify-content: space-between;
-  margin: 0 -10px 10px;
-  border-radius: 2px 2px 0 0;
+  margin: -12px -12px 10px;
   background: #f9f9f9;
   padding: 0 14px;
   font-size: 12px;
   line-height: 28px;
   user-select: none;
 }
-.mona-table-generator-title button {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-}
-.mona-table-generator-title button:hover { color: #d14424; }
 .mona-table-generator > table { border-collapse: separate; border-spacing: 0; }
 .mona-table-generator > table td {
   box-sizing: border-box;
@@ -944,72 +1973,47 @@
   height: 100%;
   border: 1px solid #dcdcdc;
 }
-.mona-table-generator > table td > div.is-active { border-color: #d14424; background: rgba(209, 68, 36, .1); }
+.mona-table-generator > table td > div.is-active { border-color: var(--editor-selection); background: var(--editor-selection-soft); }
 .mona-table-generator-custom { width: 230px; }
 .mona-table-generator-row { display: flex; align-items: center; }
 .mona-table-generator-row + .mona-table-generator-row { margin-top: 10px; }
 .mona-table-generator-row > div { width: 25%; }
 .mona-table-generator-row > .mona-panel-number { width: 75%; }
-.mona-table-generator-actions { margin-top: 10px; text-align: right; }
-.mona-table-generator-actions button {
-  height: 32px;
-  margin-left: 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  padding: 0 15px;
-  color: #41464b;
-  font: inherit;
-  cursor: pointer;
-}
-.mona-table-generator-actions button:hover { border-color: #d14424; color: #d14424; }
-.mona-table-generator-actions button.is-primary { border-color: #d14424; background: #d14424; color: #fff; }
+.mona-table-generator-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
 
-.mona-canvas-shape-pool {
-  width: 340px;
-  max-height: 520px;
-  overflow: auto;
-  margin: -8px -10px -8px 0;
-  padding-top: 10px;
-  padding-right: 10px;
-}
-.mona-canvas-line-pool {
-  width: 220px;
-  overflow: auto;
-  margin-right: -12px;
-  margin-bottom: -12px;
-  padding-right: 12px;
-}
+.mona-canvas-shape-pool { width: 100%; }
+.mona-canvas-line-pool { width: 100%; }
+/* Plain ink section labels — the banded headers came from the legacy
+   panels and don't belong in this chrome. */
 .mona-canvas-pool-category-name {
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 10px;
-  border-left: 4px solid #bbb;
-  background: #f1f1f1;
-  padding: 3px 0 3px 8px;
-  color: #555;
+  margin-bottom: 8px;
+  padding: 2px 0;
+  color: rgb(16 18 25 / 70%);
   font-size: 12px;
+  font-weight: 600;
 }
 .mona-canvas-shape-list,
 .mona-canvas-line-list { display: flex; flex-wrap: wrap; align-content: flex-start; margin-bottom: 10px; }
 .mona-canvas-shape-item {
   position: relative;
   display: flex;
-  width: 8%;
+  width: 11.5%;
   height: 0;
-  flex: 0 0 8%;
+  flex: 0 0 11.5%;
   align-items: center;
   justify-content: center;
-  margin-bottom: calc(20% / 9);
+  margin-bottom: calc(8% / 7);
   border: 0;
   background: transparent;
-  padding: 0 0 8%;
+  padding: 0 0 11.5%;
   cursor: pointer;
 }
-.mona-canvas-shape-item:not(:nth-child(10n)) { margin-right: calc(20% / 9); }
+.mona-canvas-shape-item:not(:nth-child(8n)) { margin-right: calc(8% / 7); }
 .mona-canvas-shape-item > svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.mona-canvas-shape-item:hover path:not(.is-outlined) { stroke: #d14424; }
-.mona-canvas-shape-item:hover path.is-outlined { fill: #d14424; }
+.mona-canvas-shape-item:hover path:not(.is-outlined) { stroke: var(--editor-selection); }
+.mona-canvas-shape-item:hover path.is-outlined { fill: var(--editor-selection); }
 .mona-canvas-line-item {
   position: relative;
   display: flex;
@@ -1027,30 +2031,30 @@
 }
 .mona-canvas-line-item:not(:nth-child(5n)) { margin-right: calc(5% / 4); }
 .mona-canvas-line-item > svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.mona-canvas-line-item:hover { color: #d14424; }
+.mona-canvas-line-item:hover { color: var(--editor-selection); }
 
+/* Speaker notes live in the floating side panel, like every other panel:
+   a slide label on top, the editor filling the rest. */
 .mona-editor-remark {
-  position: relative;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 6px;
 }
-.mona-editor-remark-resize {
-  position: absolute;
-  z-index: 2;
-  top: -3px;
-  right: 0;
-  left: 0;
-  height: 7px;
-  cursor: n-resize;
+.mona-remark-slide-label {
+  flex: none;
+  color: rgb(16 18 25 / 55%);
+  font-size: 12px;
+  font-weight: 600;
 }
-.mona-remark-editor { height: 100%; overflow: auto; cursor: text; }
+.mona-remark-editor { flex: 1; min-height: 240px; cursor: text; }
 .mona-remark-editor > .ProseMirror {
   height: 100%;
-  overflow: auto;
-  padding: 8px;
+  padding: 2px 0 8px;
   outline: 0;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.6;
 }
 .mona-remark-editor > .ProseMirror > p[data-placeholder]::before {
   position: absolute;
@@ -1064,7 +2068,7 @@
   z-index: 9999;
   display: flex;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   padding: 6px 4px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
@@ -1077,7 +2081,7 @@
   justify-content: center;
   margin: 0 3px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   outline: 0;
   background-color: #fff;
   padding: 3px;
@@ -1086,7 +2090,7 @@
 }
 .mona-remark-menu button:hover,
 .mona-remark-menu label:hover,
-.mona-remark-menu button.is-active { background-color: #d14424; color: #fff; }
+.mona-remark-menu button[data-state="on"] { background-color: var(--editor-selection); color: var(--primary-foreground); }
 .mona-remark-menu input[type='color'] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .mona-shape-create-canvas {
   position: absolute;
@@ -1103,29 +2107,29 @@
   overflow: visible;
 }
 
-@media screen and (width <= 1600px) {
-  .mona-canvas-tool-add-elements .mona-canvas-tool-icon { margin-right: 0; }
-  .mona-canvas-tool-add-elements .mona-canvas-insert-item span,
-  .mona-canvas-tool-add-elements .mona-canvas-group-main span { display: none; }
-}
-@media screen and (width <= 1366px) {
-  .mona-canvas-insert-item { padding: 0 6px; }
-}
+/* On narrow viewports the rail keeps its icons and drops the labels. */
 @media screen and (width <= 1200px) {
-  .mona-canvas-tool-right .mona-canvas-zoom-text { display: none; }
-  .mona-canvas-tool-more > .mona-canvas-handler-item:not(.mona-canvas-more-icon) { display: none; }
-  .mona-canvas-more-icon { display: flex; }
+  .mona-editor-rail { --sidebar-width: 48px; }
+  .mona-rail-item { height: 40px; }
+  .mona-rail-item-label { display: none; }
 }
 @media screen and (width <= 1000px) {
-  .mona-canvas-tool-left,
-  .mona-canvas-tool-right { display: none; }
+  .mona-zoombar-count,
+  .mona-zoombar-divider { display: none; }
+}
+@media screen and (width <= 1100px) {
+  .mona-editor-shell:has(.mona-agent-dock) .mona-editor-drawer,
+  .mona-editor-shell:has(.mona-agent-dock) .mona-drawer-toggle { display: none; }
+  .mona-editor-shell:has(.mona-agent-dock) .mona-editor-header-center { padding-inline: 4px; }
 }
 
 .mona-editor-stage {
   position: relative;
   padding: 0;
   outline: 0;
-  background: #f9f9f9;
+  /* Canva's measured workspace color; the context bar shares it so the
+     toolbar pill reads as floating over one continuous surface. */
+  background: #f3f4f7;
   touch-action: none;
   user-select: none;
 }
@@ -1142,7 +2146,7 @@
   position: relative;
   flex: none;
   overflow: visible;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 1%), 0 0 12px 0 rgb(0 0 0 / 10%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%), 0 6px 20px rgb(0 0 0 / 8%);
 }
 
 .mona-drag-mask {
@@ -1162,6 +2166,10 @@
    opts out so the surrounding UI never animates. Browsers without the View
    Transitions API ignore all of this and switch instantly. */
 :root { view-transition-name: none; }
+/* The transition overlay must never intercept input: without this, hit
+   testing resolves to the overlay for the animation's lifetime (~250ms
+   measured) and a fast navigate-then-click/drag gets silently eaten. */
+::view-transition { pointer-events: none; }
 .mona-editor-viewport-frame { view-transition-name: mona-editor-slide; }
 ::view-transition-old(mona-editor-slide),
 ::view-transition-new(mona-editor-slide) {
@@ -1181,25 +2189,17 @@
   font-size: 13px;
   text-align: center;
 }
-.mona-surface-error-retry {
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  padding: 4px 14px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.mona-surface-error-retry:hover { border-color: #d14424; color: #d14424; }
+.mona-surface-error-retry { font-size: 12px; }
 
 .mona-link-handler {
   position: absolute;
   display: flex;
   height: 30px;
   align-items: center;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   padding: 0 10px;
-  color: #d14424;
+  color: var(--editor-selection);
   font-size: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
 }
@@ -1238,6 +2238,30 @@
   background-color: #e5e5e5;
 }
 
+.mona-selection-actions {
+  position: absolute;
+  z-index: 104;
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--radius-overlay);
+  background: var(--background);
+  padding: 3px 4px;
+  box-shadow:
+    0 0 0 .5px rgb(64 79 109 / 9%),
+    0 2px 5px rgb(21 30 130 / 12%),
+    0 6px 12px rgb(21 30 130 / 7%);
+  color: rgb(16 18 25 / 70%);
+}
+.mona-selection-actions button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-action);
+}
+.mona-selection-actions button:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
+.mona-selection-actions button svg { width: 16px; height: 16px; }
+
 .mona-animation-index {
   position: absolute;
   font-size: 12px;
@@ -1248,49 +2272,35 @@
   height: 18px;
   align-items: center;
   justify-content: center;
-  border: 1px solid #d14424;
+  border: 1px solid var(--editor-selection);
   background-color: #fff;
-  color: #d14424;
+  color: var(--editor-selection);
 }
 .mona-animation-index-item + .mona-animation-index-item { margin-top: 5px; }
 
-.mona-floating-toolbar {
-  position: absolute;
-  display: flex;
-  box-sizing: border-box;
-  width: max-content;
-  height: 40px;
-  align-items: center;
-  border: 1px solid rgba(217, 217, 217, .2);
-  border-radius: 2px;
-  background-color: #fff;
-  padding: 0 5px;
-  color: #41464b;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-  text-size-adjust: auto;
-}
 .mona-editor-float-layer {
   position: absolute;
   z-index: 102;
   top: 0;
   left: 0;
 }
-.mona-floating-popover-wrapper { height: 30px; }
-.mona-floating-toolbar-content {
+.mona-contextual-control-row {
   display: inline-flex;
   width: max-content;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
 }
-.mona-floating-toolbar * {
+.mona-contextual-controls * {
   border-style: none;
   border-color: currentcolor;
   outline-color: currentcolor;
 }
-.mona-floating-toolbar .mona-floating-toolbar-button {
+/* The blanket reset above strips the color swatch's outline; restore it (more
+   specific than the reset) so a white/pale fill stays visible on the pill. */
+.mona-contextual-controls .mona-contextual-color-dot { border: 1px solid rgb(16 18 25 / 35%); }
+.mona-contextual-controls .mona-contextual-stroke-dot { border-style: solid; border-width: 3px; }
+.mona-contextual-controls .mona-contextual-control {
   display: inline-flex;
   min-width: 30px;
   height: 30px;
@@ -1298,7 +2308,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 0 5px;
   color: #41464b;
@@ -1311,52 +2321,52 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.mona-floating-toolbar .mona-floating-toolbar-button:hover { background: #f9f9f9; }
-.mona-floating-toolbar .mona-floating-toolbar-button.is-active { background-color: rgba(209, 68, 36, .12); color: #d14424; }
-.mona-floating-toolbar .mona-floating-toolbar-button.is-text-color { flex-direction: column; font-size: 13px; }
-.mona-floating-toolbar .mona-floating-toolbar-button.is-labeled { font-size: 16px; }
-.mona-floating-toolbar .mona-floating-toolbar-button.is-border { font-family: inherit; }
-.mona-floating-toolbar .mona-floating-toolbar-button.is-labeled > span {
+.mona-contextual-controls .mona-contextual-control:hover { background: #f9f9f9; }
+.mona-contextual-controls .mona-contextual-control.is-active { background-color: var(--editor-selection-soft); color: var(--editor-selection); }
+.mona-contextual-controls .mona-contextual-control.is-text-color { flex-direction: column; font-size: 13px; }
+.mona-contextual-controls .mona-contextual-control.is-labeled { font-size: 16px; }
+.mona-contextual-controls .mona-contextual-control.is-border { font-family: inherit; }
+.mona-contextual-controls .mona-contextual-control.is-labeled > span {
   flex-shrink: 0;
   margin-left: 5px;
   font-size: 12px;
 }
-.mona-floating-border-panel { width: 218px; user-select: none; }
-.mona-floating-border-panel .mona-panel-row:last-child { margin-bottom: 0; }
-.mona-floating-line-style-list {
+.mona-contextual-border-panel { width: 218px; user-select: none; }
+.mona-contextual-border-panel .mona-panel-row:last-child { margin-bottom: 0; }
+.mona-contextual-line-style-list {
   display: flex;
   width: 98px;
   flex-direction: column;
   gap: 4px;
 }
-.mona-floating-line-style-list > button {
+.mona-contextual-line-style-list > button {
   height: 32px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 0 10px;
   color: #41464b;
   cursor: pointer;
 }
-.mona-floating-line-style-list > button:hover { background: rgba(209, 68, 36, .05); }
-.mona-floating-line-style-list > button.is-active { color: #d14424; }
-.mona-floating-line-width { width: 120px; flex-shrink: 0; padding: 0 8px; }
-.mona-floating-text-color {
+.mona-contextual-line-style-list > button:hover { background: var(--editor-selection-subtle); }
+.mona-contextual-line-style-list > button.is-active { color: var(--editor-selection); }
+.mona-contextual-line-width { width: 120px; flex-shrink: 0; padding: 0 8px; }
+.mona-contextual-text-color {
   width: 15px;
   height: 4px;
   margin-top: 1px;
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAAXNSR0IArs4c6QAAACdJREFUGFdjfPbs2X8GBgYGSUlJEMXAiCHw//9/sIrnz59DVKALAADNxxVfaiODNQAAAABJRU5ErkJggg==);
 }
-.mona-floating-text-color.is-white { height: 5px; border: 1px solid #ddd; }
-.mona-floating-text-color > span { display: block; width: 100%; height: 100%; }
-.mona-floating-divider { width: 1px; height: 18px; flex-shrink: 0; margin: 0 4px; background: #e5e7eb; }
+.mona-contextual-text-color.is-white { height: 5px; border: 1px solid #ddd; }
+.mona-contextual-text-color > span { display: block; width: 100%; height: 100%; }
+.mona-contextual-divider { width: 1px; height: 18px; flex-shrink: 0; margin: 0 4px; background: #e5e7eb; }
 .mona-table-command-menu { width: 100px; }
 .mona-table-command-menu > button {
   display: block;
   width: 100%;
   height: 30px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 0 10px;
   color: #41464b;
@@ -1366,23 +2376,32 @@
   cursor: pointer;
 }
 .mona-table-command-menu > button:hover { background: #f1f1f1; }
-.mona-floating-toolbar .mona-panel-select {
+.mona-contextual-controls .mona-panel-select {
   height: 30px;
   border: 0;
   background: #f9f9f9;
 }
-.mona-floating-toolbar .mona-panel-select-label { height: 30px; line-height: 30px; }
-.mona-floating-toolbar .mona-panel-select-icon { height: 30px; line-height: normal; }
-.mona-floating-toolbar .i-icon {
+.mona-contextual-controls .mona-panel-select-label { height: 30px; line-height: 30px; }
+.mona-contextual-controls .mona-panel-select-icon { height: 30px; line-height: normal; }
+.mona-contextual-controls .i-icon {
   flex-shrink: 1;
   border-style: none;
   border-color: currentcolor;
   tab-size: 8;
   -webkit-tap-highlight-color: rgb(0 0 0 / 18%);
 }
-.mona-floating-toolbar .i-icon * { box-sizing: content-box; }
-.mona-floating-toolbar .mona-floating-font-select { width: 110px; margin-right: 1px; }
-.mona-floating-toolbar .mona-floating-fontsize-select { width: 80px; }
+.mona-contextual-controls .i-icon * { box-sizing: content-box; }
+.mona-contextual-controls .mona-contextual-font-select { width: 110px; margin-right: 1px; }
+.mona-contextual-controls .mona-contextual-fontsize-select { width: 80px; }
+/* Inside the pill every control is a ghost: the select triggers drop their
+   field chrome and pick up the shared hover wash instead. */
+.mona-contextual-controls .mona-panel-select {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.mona-contextual-controls .mona-panel-select:hover { background: rgb(15 16 21 / 6%); }
+.mona-contextual-controls .mona-panel-select[data-state="open"] { background: rgb(15 16 21 / 8%); }
 
 .mona-element-hit-target {
   position: absolute;
@@ -1407,7 +2426,7 @@
   position: absolute;
   inset: 0;
   box-sizing: border-box;
-  border: 0 dashed #d14424;
+  border: 0 dashed var(--editor-selection);
   pointer-events: auto;
 }
 
@@ -1478,7 +2497,6 @@
 }
 
 .mona-element-inspector {
-  height: 100%;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -1497,7 +2515,12 @@
 .mona-inspector-tabs {
   height: 40px;
   display: flex;
+  width: 100%;
   flex: none;
+  gap: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   font-size: 12px;
   line-height: 1;
   user-select: none;
@@ -1521,9 +2544,10 @@
   border-left: 1px solid #e5e7eb;
 }
 
-.mona-inspector-tabs > button.is-active {
+.mona-inspector-tabs > button[data-state="active"] {
   border-bottom-color: transparent;
   background: transparent;
+  box-shadow: none;
 }
 
 .mona-inspector-content {
@@ -1534,9 +2558,14 @@
   font-size: 13px;
   line-height: normal;
 }
+/* Same treatment vertically for the panel's scrollable content. */
+.mona-inspector-content[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to bottom, transparent, #000 28px); }
+.mona-inspector-content[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+.mona-inspector-content[data-fade-start][data-fade-end] { mask-image: linear-gradient(to bottom, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
 
 .mona-slide-transition-pool {
   display: flex;
+  width: 100%;
   flex-wrap: wrap;
   margin-bottom: 10px;
 }
@@ -1555,10 +2584,10 @@
   color: inherit;
   font: inherit;
 }
-.mona-slide-transition-item.is-active {
+.mona-slide-transition-item[data-state="on"] {
   z-index: 1;
-  border-color: #d14424;
-  background-color: rgb(209 68 36 / 5%);
+  border-color: var(--editor-selection);
+  background-color: var(--editor-selection-subtle);
 }
 .mona-slide-transition-item:nth-child(2n) { margin-left: -1px; }
 .mona-slide-transition-item:nth-child(n + 3) { margin-top: -1px; }
@@ -1582,9 +2611,9 @@
   height: 100%;
   align-items: center;
   justify-content: center;
-  background: #d14424;
+  background: var(--editor-selection);
   color: #fff;
-  content: 'PPTist';
+  content: 'Mona';
   animation-duration: .5s;
   animation-timing-function: linear;
 }
@@ -1598,7 +2627,15 @@
 .mona-slide-transition-block.is-scaleX:hover::after { animation-name: mona-transition-scale-x; }
 .mona-slide-transition-block.is-scale:hover::after { animation-name: mona-transition-scale; }
 .mona-slide-transition-block.is-scaleReverse:hover::after { animation-name: mona-transition-scale-reverse; }
-.mona-slide-transition-text { color: #333; font-size: 12px; text-align: center; }
+.mona-slide-transition-text {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  padding: 0 4px;
+  color: #333;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
 @keyframes mona-transition-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes mona-transition-slide-x { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @keyframes mona-transition-slide-y { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -1610,57 +2647,27 @@
 @keyframes mona-transition-scale { from { transform: scale(.25); } to { transform: scale(1); } }
 @keyframes mona-transition-scale-reverse { from { transform: scale(2); } to { transform: scale(1); } }
 
-.mona-source-modal,
-.mona-source-modal * { box-sizing: border-box; }
-.mona-source-modal {
-  position: fixed;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  outline: 0;
-  background: transparent;
-  padding: 0;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-  animation: mona-source-modal-fade-in .25s both ease-in;
-}
+.mona-source-modal-content,
+.mona-source-modal-content * { box-sizing: border-box; }
 .mona-source-modal-mask {
-  position: absolute;
   z-index: 5000;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
   background: rgb(0 0 0 / 25%);
-  padding: 0;
 }
 .mona-source-modal-content {
-  position: relative;
   z-index: 5001;
+  display: block;
+  width: auto;
+  max-width: calc(100vw - 2rem);
   overflow: hidden;
-  border-radius: 2px;
-  background: #fff;
+  gap: 0;
+  border-radius: var(--radius-overlay);
+  background: var(--popover);
   padding: 20px;
+  color: var(--popover-foreground);
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  animation: mona-source-modal-zoom-in .25s both cubic-bezier(.4, 0, 0, 1.5);
+  font-family: var(--font-ui);
+  line-height: normal;
 }
-.mona-source-modal.is-closing { animation: mona-source-modal-fade-out .25s both ease-out; }
-.mona-source-modal.is-closing .mona-source-modal-content { animation: mona-source-modal-zoom-out .25s both; }
-@keyframes mona-source-modal-fade-in { from { opacity: 0; } }
-@keyframes mona-source-modal-fade-out { to { opacity: 0; } }
-@keyframes mona-source-modal-zoom-in { from { transform: scale3d(.3, .3, .3); } }
-@keyframes mona-source-modal-zoom-out { to { transform: scale3d(.3, .3, .3); } }
 
 .mona-slide-design-panel { user-select: none; }
 .mona-design-title {
@@ -1703,11 +2710,11 @@
   height: 0;
   margin-bottom: 10px;
   border: 1px dashed #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   padding-bottom: 56.25%;
   transition: border-color .25s, color .25s;
 }
-.mona-background-image-upload:hover { border-color: #d14424; color: #d14424; }
+.mona-background-image-upload:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
 .mona-background-image-upload input { display: none; }
 .mona-background-image-upload > span {
   position: absolute;
@@ -1726,12 +2733,12 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0;
   color: inherit;
 }
-.mona-theme-color-list:hover { border-color: #d14424; color: #d14424; }
+.mona-theme-color-list:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
 .mona-theme-color-blocks {
   display: flex;
   height: 20px;
@@ -1752,7 +2759,7 @@
   position: relative;
   width: 48%;
   margin-bottom: 4%;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   padding-bottom: 27%;
 }
 .mona-preset-theme:not(:nth-child(2n)) { margin-right: 4%; }
@@ -1763,7 +2770,7 @@
   flex-direction: column;
   justify-content: center;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   padding: 8px;
 }
 .mona-preset-theme-text { font-size: 15px; }
@@ -1783,16 +2790,16 @@
 .mona-preset-theme:hover .mona-preset-theme-actions { opacity: 1; }
 .mona-preset-theme-actions button {
   height: 24px;
-  border: 1px solid #d14424;
-  border-radius: 2px;
-  background: #d14424;
+  border: 1px solid var(--editor-selection);
+  border-radius: var(--radius-control);
+  background: var(--editor-selection);
   padding: 0 7px;
   color: #fff;
   font-size: 12px;
   line-height: 24px;
 }
 .mona-preset-theme-actions button + button { margin-top: 3px; }
-.mona-preset-theme-actions button:hover { border-color: #bb3d22; background: #bb3d22; }
+.mona-preset-theme-actions button:hover { border-color: var(--editor-selection-hover); background: var(--editor-selection-hover); }
 
 .mona-design-modal-title { margin-bottom: 15px; font-size: 17px; font-weight: 700; }
 .mona-viewport-setting-row {
@@ -1831,7 +2838,7 @@
   color: inherit;
   font: inherit;
 }
-.mona-extract-tabs button[aria-selected="true"] { border-bottom-color: #d14424; }
+.mona-extract-tabs button[data-state="active"] { border-bottom-color: var(--editor-selection); }
 .mona-extract-content { overflow: auto; flex: 1; margin-right: -20px; padding-right: 20px; }
 .mona-extract-config { border-bottom: 1px dashed #f5f5f5; padding: 12px 0 10px; font-size: 13px; }
 .mona-extract-label { display: flex; align-items: center; margin-bottom: 5px; }
@@ -1843,7 +2850,7 @@
   width: 150px;
   height: 25px;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   padding: 0 5px;
   font-size: 12px;
   line-height: 25px;
@@ -1855,14 +2862,14 @@
 .mona-extract-handler > span { font-size: 15px; opacity: 0; }
 .mona-extract-handler > span.is-active { opacity: 1; }
 .mona-extract-handler button { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: start; }
-.mona-extract-handler button:hover { color: #d14424; }
+.mona-extract-handler button:hover { color: var(--editor-selection); }
 .mona-extract-colors { display: flex; flex-wrap: wrap; align-content: flex-start; }
 .mona-extract-colors button {
   position: relative;
   width: 9%;
   height: 25px;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   margin: 0 1.111111% 1.111111% 0;
   padding: 0;
 }
@@ -1896,14 +2903,19 @@
   width: 10px;
   height: 18px;
   border: 2px solid #fff;
-  border-radius: 1px;
+  border-radius: var(--radius-detail);
   outline: 1px solid #d9d9d9;
   padding: 0;
   box-shadow: 0 0 2px 2px #d9d9d9;
 }
-.mona-design-gradient-bar-point.is-active { outline-color: #d14424; box-shadow: 0 0 2px 2px #d14424; }
+.mona-design-gradient-bar-point.is-active { outline-color: var(--editor-selection); box-shadow: 0 0 2px 2px var(--editor-selection); }
 
 .mona-position-title { margin-bottom: 10px; line-height: 16px; }
+.mona-position-tabs { min-height: 0; }
+.mona-position-tabs-list { width: 100%; margin-bottom: 4px; }
+.mona-position-tabs-list > button { flex: 1; }
+.mona-position-layers { min-height: 260px; }
+.mona-selection-panel.is-embedded { min-height: 260px; height: calc(100vh - 170px); }
 .mona-position-row {
   display: flex;
   width: 100%;
@@ -1929,7 +2941,7 @@
   cursor: pointer;
   font-size: 16px;
 }
-.mona-position-icon-button.is-active { color: #d14424; }
+.mona-position-icon-button.is-active { color: var(--editor-selection); }
 .mona-position-text-button {
   display: block;
   height: 30px;
@@ -1943,7 +2955,7 @@
   line-height: 30px;
 }
 .mona-position-text-button:hover { background: #efefef; }
-.mona-position-text-button:hover { border-radius: 2px; }
+.mona-position-text-button:hover { border-radius: var(--radius-control); }
 .mona-position-text-button svg {
   display: inline-block;
   box-sizing: content-box;
@@ -1976,7 +2988,7 @@
   z-index: 9999;
   box-sizing: border-box;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   outline: 0;
   background: #fff;
   padding: 10px;
@@ -1991,8 +3003,12 @@
 }
 .mona-animation-pool-tabs {
   display: flex;
+  height: auto;
   margin-bottom: 20px;
   border-bottom: 1px solid #d9d9d9;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   font-size: 13px;
   line-height: 1;
   user-select: none;
@@ -2008,7 +3024,7 @@
   font: inherit;
   text-align: center;
 }
-.mona-animation-pool-tabs > button.is-active { border-bottom-color: var(--animation-color); }
+.mona-animation-pool-tabs > button[data-state="active"] { border-bottom-color: var(--animation-color); box-shadow: none; }
 .mona-animation-pool {
   position: relative;
   width: 400px;
@@ -2053,7 +3069,7 @@
   text-align: center;
 }
 .mona-animation-pool-item:not(:nth-child(4n)) { margin-right: 1.333333%; }
-.mona-animation-pool-item > span { display: block; border-radius: 2px; background: #f9f9f9; }
+.mona-animation-pool-item > span { display: block; border-radius: var(--radius-control); background: #f9f9f9; }
 .mona-animation-sequence {
   flex: 1;
   overflow: auto;
@@ -2063,7 +3079,7 @@
 .mona-animation-sequence-item {
   margin-bottom: 8px;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   padding: 8px;
   transition: all .5s;
 }
@@ -2180,49 +3196,32 @@
 }
 
 .mona-image-library-panel {
-  position: fixed;
-  z-index: 901;
   display: flex;
   box-sizing: border-box;
-  width: 360px;
-  height: 580px;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
   flex-direction: column;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  background-color: #fff;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
   color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   font-size: 13px;
   line-height: normal;
 }
-.mona-moveable-panel-header {
+.mona-image-library-header {
   display: flex;
   height: 40px;
   flex-shrink: 0;
   align-items: center;
+  gap: 4px;
   border-bottom: 1px solid #f0f0f0;
-  cursor: move;
-  user-select: none;
 }
-.mona-moveable-panel-title {
-  flex: 1;
-  padding-left: 10px;
+.mona-image-library-header h3 {
+  overflow: hidden;
+  margin: 0;
   font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.mona-moveable-panel-close {
-  display: flex;
-  width: 40px;
-  height: 40px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  font-size: 13px;
-}
-.mona-moveable-panel-close:hover { color: #d14424; }
 .mona-image-library-content {
   display: flex;
   min-height: 0;
@@ -2246,14 +3245,14 @@
 .mona-image-library-input {
   display: flex;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   padding: 0 5px;
   font-size: 13px;
   transition: border-color .25s;
 }
 .mona-image-library-input:hover,
-.mona-image-library-input:focus-within { border-color: #d14424; }
+.mona-image-library-input:focus-within { border-color: var(--editor-selection); }
 .mona-image-library-input > input {
   min-width: 0;
   height: 30px;
@@ -2286,11 +3285,11 @@
 .mona-image-library-orientation { padding: 0 0 0 5px; }
 .mona-image-library-orientation .i-icon { margin-left: 4px; }
 .mona-image-library-search { width: 24px; padding: 0; }
-.mona-image-library-search:hover { color: #d14424; }
+.mona-image-library-search:hover { color: var(--editor-selection); }
 .mona-image-library-orientation-menu {
   z-index: 902;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
   padding: 10px;
@@ -2301,7 +3300,7 @@
   display: block;
   min-width: 80px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 6px 10px;
   color: inherit;
@@ -2313,7 +3312,7 @@
 }
 .mona-image-library-orientation-menu > button:hover { background-color: #f1f1f1; }
 .mona-image-library-orientation-menu > button + button { margin-top: 2px; }
-.mona-image-library-orientation-menu > button.is-active { color: #d14424; }
+.mona-image-library-orientation-menu > button.is-active { color: var(--editor-selection); }
 .mona-image-library-waterfall {
   min-height: 0;
   flex: 1;
@@ -2327,7 +3326,7 @@
 .mona-image-library-item {
   position: absolute;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   text-align: center;
 }
 .mona-image-library-item > img {
@@ -2345,12 +3344,13 @@
   background: rgba(0, 0, 0, .25);
 }
 .mona-image-library-item:hover .mona-image-library-mask { display: flex; }
+.mona-image-library-item:focus-within .mona-image-library-mask { display: flex; }
 .mona-image-library-mask > button {
   height: 24px;
-  border: 1px solid #d14424;
-  border-radius: 2px;
+  border: 1px solid var(--editor-selection);
+  border-radius: var(--radius-control);
   outline: 0;
-  background-color: #d14424;
+  background-color: var(--editor-selection);
   padding: 0 7px;
   color: #fff;
   cursor: pointer;
@@ -2360,7 +3360,30 @@
   text-align: center;
   user-select: none;
 }
-.mona-image-library-mask > button:hover { border-color: #db654a; background-color: #db654a; }
+.mona-image-library-mask > button:hover { border-color: var(--editor-selection-hover); background-color: var(--editor-selection-hover); }
+.mona-image-library-state,
+.mona-image-library-error {
+  display: flex;
+  min-height: 160px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  color: var(--color-muted-foreground);
+  text-align: center;
+}
+.mona-image-library-state {
+  position: absolute;
+  inset: 0;
+}
+.mona-image-library-error.is-inline {
+  min-height: 0;
+  flex-direction: row;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border);
+  padding: 8px 2px 0;
+}
 .mona-image-library-loading {
   position: absolute;
   z-index: 99;
@@ -2376,9 +3399,9 @@
   height: 24px;
   margin-top: -30px;
   margin-left: -12px;
-  border: 2px solid #d14424;
+  border: 2px solid var(--editor-selection);
   border-top-color: transparent;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   animation: mona-image-library-loading .8s linear infinite;
   content: '';
 }
@@ -2389,7 +3412,7 @@
   align-items: center;
   justify-content: center;
   background-color: rgba(255, 255, 255, .75);
-  color: #d14424;
+  color: var(--editor-selection);
   content: var(--mona-loading-text, '');
   font-size: 12px;
   padding-top: 24px;
@@ -2402,7 +3425,7 @@
 .mona-inspector-button {
   height: 32px;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   outline: 0;
   background: #fff;
   padding: 0 15px;
@@ -2416,8 +3439,8 @@
 }
 
 .mona-inspector-button:hover {
-  border-color: #d14424;
-  color: #d14424;
+  border-color: var(--editor-selection);
+  color: var(--editor-selection);
 }
 
 .mona-image-crop-button {
@@ -2427,7 +3450,7 @@
   justify-content: center;
   gap: 4px;
   margin-bottom: 10px;
-  border-radius: 4px 0 0 4px;
+  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
 }
 
 .mona-text-style-panel {
@@ -2489,8 +3512,8 @@
   overflow: visible;
   transform: translate(-50%, -50%);
 }
-.mona-shape-thumbnail:hover path:not(.is-outlined) { stroke: #d14424; }
-.mona-shape-thumbnail:hover path.is-outlined { fill: #d14424; }
+.mona-shape-thumbnail:hover path:not(.is-outlined) { stroke: var(--editor-selection); }
+.mona-shape-thumbnail:hover path.is-outlined { fill: var(--editor-selection); }
 
 .mona-panel-split-row.mona-shape-fill-row { display: flex; gap: 0; }
 .mona-shape-fill-control { min-width: auto; flex: 1 1 0%; }
@@ -2514,12 +3537,12 @@
   width: 10px;
   height: 18px;
   border: 2px solid #fff;
-  border-radius: 1px;
+  border-radius: var(--radius-detail);
   outline: 1px solid #d9d9d9;
   box-shadow: 0 0 2px 2px #d9d9d9;
   cursor: pointer;
 }
-.mona-gradient-stop.is-active { outline-color: #d14424; box-shadow: 0 0 2px 2px #d14424; }
+.mona-gradient-stop.is-active { outline-color: var(--editor-selection); box-shadow: 0 0 2px 2px var(--editor-selection); }
 
 .mona-pattern-image-wrapper { margin-bottom: 10px; }
 .mona-pattern-image {
@@ -2529,7 +3552,7 @@
   align-items: center;
   justify-content: center;
   border: 1px dashed #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: transparent;
   background-position: center;
   background-repeat: no-repeat;
@@ -2538,7 +3561,7 @@
   cursor: pointer;
   transition: all .25s;
 }
-.mona-pattern-image:hover { border-color: #d14424; color: #d14424; }
+.mona-pattern-image:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
 
 .mona-line-type-pool {
   display: flex;
@@ -2567,7 +3590,7 @@
 }
 .mona-line-type-item:not(:nth-child(6n)) { margin-right: 3.2%; }
 .mona-line-type-item svg { position: absolute; top: 50%; left: 50%; overflow: visible; transform: translate(-50%, -50%); }
-.mona-line-type-item:hover { color: #d14424; }
+.mona-line-type-item:hover { color: var(--editor-selection); }
 
 .mona-element-outline-controls .mona-panel-row,
 .mona-element-shadow-controls .mona-panel-row { height: 30px; }
@@ -2599,18 +3622,21 @@
 
 .mona-text-preset:hover {
   z-index: 1;
-  border-color: #d14424;
-  color: #d14424;
+  border-color: var(--editor-selection);
+  color: var(--editor-selection);
 }
 
 .mona-text-preset:nth-child(2n) { margin-left: -1px; }
 .mona-text-preset:nth-child(n + 3) { margin-top: -1px; }
-.mona-text-preset.is-large-title { font-size: 26px; font-weight: 700; }
-.mona-text-preset.is-small-title { font-size: 22px; font-weight: 700; }
-.mona-text-preset.is-body { font-size: 20px; }
-.mona-text-preset.is-small-body { font-size: 18px; }
-.mona-text-preset.is-caption-one { font-size: 16px; font-style: italic; }
-.mona-text-preset.is-caption-two { font-size: 16px; text-decoration: underline; }
+/* Preview sizes keep the hierarchy but always FIT the 50px tile with
+   English two-word labels (26px bold used to overflow and clip). */
+.mona-text-preset { overflow: hidden; padding: 2px 6px; line-height: 1.1; align-items: center; justify-content: center; text-align: center; }
+.mona-text-preset.is-large-title { font-size: 19px; font-weight: 700; }
+.mona-text-preset.is-small-title { font-size: 16px; font-weight: 700; }
+.mona-text-preset.is-body { font-size: 15px; }
+.mona-text-preset.is-small-body { font-size: 13px; }
+.mona-text-preset.is-caption-one { font-size: 12px; font-style: italic; }
+.mona-text-preset.is-caption-two { font-size: 12px; text-decoration: underline; }
 
 .mona-panel-divider {
   width: 100%;
@@ -2621,12 +3647,13 @@
 .mona-panel-popover-content {
   z-index: 9999;
   box-sizing: border-box;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  width: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
   outline: 0;
-  background: #fff;
+  background: var(--popover);
   padding: 10px;
-  color: #41464b;
+  color: var(--popover-foreground);
   box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   font-size: 13px;
@@ -2647,7 +3674,7 @@
   width: 50px;
   height: 50px;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 5px 4px 5px 18px;
   color: inherit;
@@ -2656,8 +3683,8 @@
 }
 
 .mona-list-style-option:hover {
-  border-color: #d14424;
-  color: #d14424;
+  border-color: var(--editor-selection);
+  color: var(--editor-selection);
 }
 
 .mona-list-style-option ul {
@@ -2681,7 +3708,7 @@
 .mona-panel-popover-menu-item {
   min-width: 80px;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 6px 10px;
   color: #333;
@@ -2695,9 +3722,9 @@
   width: 16px;
   height: 16px;
   margin-top: 8px;
-  border: 1px solid #d14424;
+  border: 1px solid var(--editor-selection);
   border-top-color: transparent;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   animation: mona-ai-writing-spinner .8s linear infinite;
 }
 @keyframes mona-ai-writing-spinner { to { transform: rotate(360deg); } }
@@ -2709,7 +3736,7 @@
   width: 100%;
   height: 32px;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   outline: 0;
   padding: 0 10px;
   color: #333;
@@ -2718,12 +3745,12 @@
   transition: border-color .25s;
 }
 .mona-text-link-popover > input:hover,
-.mona-text-link-popover > input:focus { border-color: #d14424; }
+.mona-text-link-popover > input:focus { border-color: var(--editor-selection); }
 .mona-text-link-actions { margin-top: 10px; text-align: right; }
 .mona-text-link-actions button {
   height: 24px;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0 7px;
   color: #333;
@@ -2732,10 +3759,10 @@
   line-height: 22px;
 }
 .mona-text-link-actions button + button { margin-left: 5px; }
-.mona-text-link-actions button:hover:not(:disabled) { border-color: #d14424; color: #d14424; }
+.mona-text-link-actions button:hover:not(:disabled) { border-color: var(--editor-selection); color: var(--editor-selection); }
 .mona-text-link-actions button:disabled { background: #f5f5f5; color: #b7b7b7; cursor: default; }
-.mona-text-link-actions button.is-primary { border-color: #d14424; background: #d14424; color: #fff; }
-.mona-text-link-actions button.is-primary:hover { border-color: #bb3d22; background: #bb3d22; color: #fff; }
+.mona-text-link-actions button.is-primary { border-color: var(--editor-selection); background: var(--editor-selection); color: #fff; }
+.mona-text-link-actions button.is-primary:hover { border-color: var(--editor-selection-hover); background: var(--editor-selection-hover); color: #fff; }
 
 .mona-panel-row,
 .mona-panel-row-full,
@@ -2753,8 +3780,8 @@
   align-items: center;
 }
 
-.mona-panel-row-label { width: 40%; }
-.mona-panel-row-control { width: 60%; }
+.mona-panel-row-label { width: 48%; font-size: 12px; }
+.mona-panel-row-control { width: 52%; }
 .mona-panel-row-control > * { width: 100%; }
 .mona-panel-switch-wrapper { width: 100%; text-align: right; }
 .mona-inspector-divider { width: 100%; margin: 24px 0; border-top: 1px solid rgba(5, 5, 5, .06); }
@@ -2764,85 +3791,18 @@
 .mona-table-style-panel .mona-panel-row-control > .mona-panel-button-group { width: 100%; }
 .mona-table-theme-switch { margin-bottom: 18px; }
 .mona-table-theme-options { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
-.mona-panel-checkbox {
-  position: relative;
+.mona-inspector-checkbox {
   display: flex;
-  width: 50%;
   height: 20px;
   align-items: center;
   cursor: pointer;
 }
-.mona-panel-checkbox > input { position: absolute; z-index: -1; width: 0; height: 0; margin: 0; opacity: 0; }
-.mona-panel-checkbox-control {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  transition: border-color .15s cubic-bezier(.71, -.46, .29, 1.46), background-color .15s cubic-bezier(.71, -.46, .29, 1.46);
-}
-.mona-panel-checkbox-control::after {
-  position: absolute;
-  top: 1px;
-  left: 4px;
-  width: 6px;
-  height: 9px;
-  border: 2px solid #fff;
-  border-top: 0;
-  border-left: 0;
-  content: '';
-  transform: rotate(45deg) scaleY(0);
-  transform-origin: center;
-  transition: transform .15s ease-in .05s;
-}
-.mona-panel-checkbox > span:last-child { margin-left: 5px; font-size: 13px; line-height: 20px; user-select: none; }
-.mona-panel-checkbox > input:checked + .mona-panel-checkbox-control { border-color: #d14424; background: #d14424; }
-.mona-panel-checkbox > input:checked + .mona-panel-checkbox-control::after { transform: rotate(45deg) scaleY(1); }
-.mona-panel-checkbox > input:checked ~ span:last-child { color: #d14424; }
+.mona-inspector-checkbox > span:last-child { margin-left: 5px; font-size: 13px; line-height: 20px; user-select: none; }
+.mona-panel-checkbox { width: 50%; }
 
 .mona-panel-button {
-  display: inline-block;
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  padding: 0 15px;
-  color: #41464b;
   font-family: Arial;
-  font-size: 13px;
-  line-height: 32px;
-  text-align: center;
   letter-spacing: 1px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.mona-panel-button:not(.is-active):hover {
-  border-color: #d14424;
-  color: #d14424;
-}
-
-.mona-panel-button.is-active {
-  border-color: #d14424;
-  background: #d14424;
-  color: #fff;
-}
-
-.mona-panel-button.is-active:hover {
-  border-color: #bb3d22;
-  background: #bb3d22;
-}
-
-.mona-panel-button:disabled,
-.mona-panel-button:disabled:hover {
-  border-color: #d9d9d9;
-  background: #f5f5f5;
-  color: #b7b7b7;
-  cursor: default;
 }
 
 .mona-font-size-button { padding: 0; }
@@ -2872,16 +3832,16 @@
 }
 
 .mona-panel-button-group > :first-child {
-  border-top-left-radius: 2px;
-  border-bottom-left-radius: 2px;
+  border-top-left-radius: var(--radius-control);
+  border-bottom-left-radius: var(--radius-control);
 }
 
 .mona-panel-button-group > :last-child {
-  border-top-right-radius: 2px;
-  border-bottom-right-radius: 2px;
+  border-top-right-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
   border-right-width: 1px;
 }
-.mona-panel-button-group > .mona-popover-split-button.is-source-detached { border-radius: 2px; }
+.mona-panel-button-group > .mona-popover-split-button.is-source-detached { border-radius: var(--radius-control); }
 
 .mona-panel-select-group > .mona-panel-select {
   border-right-width: 0;
@@ -2891,88 +3851,59 @@
 .mona-panel-select-group > .mona-panel-select + .mona-panel-select { border-left-width: 1px; }
 .mona-panel-select-group > .mona-panel-select:first-child {
   border-left-width: 1px;
-  border-top-left-radius: 2px;
-  border-bottom-left-radius: 2px;
+  border-top-left-radius: var(--radius-control);
+  border-bottom-left-radius: var(--radius-control);
 }
 .mona-panel-select-group > .mona-panel-select:last-child {
   border-right-width: 1px;
-  border-top-right-radius: 2px;
-  border-bottom-right-radius: 2px;
+  border-top-right-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
 }
 
 .mona-panel-select {
-  appearance: none;
   position: relative;
-  display: block;
-  box-sizing: border-box;
   width: 100%;
   height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  padding-right: 32px;
-  color: #41464b;
+  justify-content: space-between;
+  border-radius: var(--radius-control);
   font-family: inherit;
   font-size: 13px;
-  line-height: normal;
   text-align: start;
-  cursor: pointer;
-  transition: border-color .25s;
 }
 
-.mona-panel-select:hover { border-color: #d14424; }
 .mona-panel-select-label {
-  display: block;
   min-width: 0;
-  height: 30px;
   overflow: hidden;
-  padding-left: 10px;
-  line-height: 30px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mona-line-style-preview { display: block; }
 
 .mona-panel-select-icon {
-  position: absolute;
-  top: 0;
-  right: 0;
   display: flex;
-  width: 32px;
-  height: 30px;
   align-items: center;
   justify-content: center;
-  color: #bfbfbf;
+  color: var(--muted-foreground);
 }
 
 .mona-panel-select-popover {
   z-index: 9999;
   box-sizing: border-box;
-  width: calc(var(--radix-popover-trigger-width) + 2px);
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  /* At least as wide as its trigger, but grows so long entries (font names,
+     the search field) never truncate. */
+  width: max-content;
+  min-width: var(--radix-popover-trigger-width, var(--radix-select-trigger-width));
+  max-width: 300px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-overlay);
   outline: 0;
-  background: #fff;
+  background: var(--popover);
   padding: 0;
-  color: #333;
+  color: var(--popover-foreground);
   box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%);
   font-size: 13px;
   transform-origin: var(--radix-popover-content-transform-origin);
 }
-.mona-panel-select-search { display: flex; padding: 0 5px; }
-.mona-panel-select-search input {
-  min-width: 0;
-  height: 30px;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  padding: 0 5px;
-  color: #333;
-  font: inherit;
-  line-height: 30px;
-}
-.mona-panel-select-search input::placeholder { color: #bfbfbf; }
-.mona-panel-select-divider { border-block-start: 1px solid rgb(5 5 5 / 6%); }
 .mona-panel-select-options {
   max-height: 260px;
   overflow: auto;
@@ -2982,12 +3913,13 @@
   user-select: none;
 }
 .mona-panel-select-option {
-  display: block;
+  display: flex;
   width: 100%;
   height: 32px;
+  align-items: center;
   overflow: hidden;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 0 5px;
   color: #333;
@@ -2997,9 +3929,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mona-panel-select-option:disabled { color: #b7b7b7; }
-.mona-panel-select-option:not(:disabled, .is-selected):hover { background: rgb(209 68 36 / 5%); }
-.mona-panel-select-option.is-selected { color: #d14424; font-weight: 700; }
+.mona-panel-select-option:disabled,
+.mona-panel-select-option[data-disabled="true"] { color: var(--muted-foreground); }
+.mona-panel-select-option:not(:disabled, [data-disabled="true"], .is-selected):hover { background: var(--accent); }
+.mona-panel-select-option.is-selected,
+.mona-panel-select-option[data-state="checked"] { color: var(--foreground); font-weight: 700; }
 
 .mona-panel-color-button {
   position: relative;
@@ -3010,14 +3944,14 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0;
   color: #41464b;
   cursor: pointer;
 }
 
-.mona-panel-color-button:hover { border-color: #d14424; color: #d14424; }
+.mona-panel-color-button:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
 .mona-panel-color-button.is-text-color { flex-direction: column; }
 .mona-panel-text-color-strip {
   width: 17px;
@@ -3077,7 +4011,7 @@
   display: block;
   width: 4px;
   height: 4px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   box-shadow: 0 0 0 1.5px #fff, inset 0 0 1px 1px rgb(0 0 0 / 30%), 0 0 1px 2px rgb(0 0 0 / 40%);
   transform: translate(-2px, -2px);
 }
@@ -3206,42 +4140,78 @@
 .mona-panel-split-row > .mona-panel-button-group { min-width: 0; }
 .mona-panel-split-row.is-insets > * { width: 100%; }
 
+/* Inset (margin) cells stack the label above the field: the English labels
+   ("Bottom margin:") do not fit beside a value in a half-width column. */
+.mona-panel-split-row.is-insets .mona-panel-number {
+  display: flex;
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  border: 0;
+  background: none;
+  padding-left: 0;
+  gap: 4px;
+}
+.mona-panel-split-row.is-insets .mona-panel-number-prefix {
+  flex: none;
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+.mona-panel-split-row.is-insets .mona-panel-number-input-wrap {
+  height: 32px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: var(--background);
+  transition: border-color .25s;
+}
+.mona-panel-split-row.is-insets .mona-panel-number:not(.is-disabled):hover .mona-panel-number-input-wrap,
+.mona-panel-split-row.is-insets .mona-panel-number.is-focused .mona-panel-number-input-wrap {
+  border-color: var(--ring);
+}
+
 .mona-panel-number {
   display: inline-flex;
   box-sizing: border-box;
   min-width: 0;
   height: 32px;
   align-items: center;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: var(--background);
   padding-left: 5px;
   font-size: 13px;
   transition: border-color .25s;
 }
 
 .mona-panel-number:not(.is-disabled):hover,
-.mona-panel-number.is-focused { border-color: #d14424; }
+.mona-panel-number.is-focused { border-color: var(--ring); }
 .mona-panel-number-prefix {
-  flex: none;
+  /* The label yields (ellipsis) before the value does: "Bottom margin: 10"
+     must never render as "Bottom margin: 1". */
+  overflow: hidden;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
   line-height: 30px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mona-panel-number-input-wrap {
   position: relative;
-  min-width: 0;
-  flex: 1;
+  flex: 1 0 36px;
   padding-left: 5px;
   color: #41464b;
 }
-.mona-panel-number input {
+.mona-panel-number [data-slot="input"] {
   box-sizing: content-box;
   width: calc(100% - 5px);
   min-width: 0;
   height: 30px;
   border: 0;
   outline: 0;
-  background: #fff;
+  background: transparent;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   font-size: 13.3333px;
@@ -3256,8 +4226,8 @@
   display: flex;
   width: 20px;
   flex-direction: column;
-  background: #fff;
-  color: #999;
+  background: var(--background);
+  color: var(--muted-foreground);
   font-size: 6px;
   opacity: 0;
   transition: opacity .25s;
@@ -3270,46 +4240,47 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-left: 1px solid #d9d9d9;
-  background: #fff;
+  border-left: 1px solid var(--border);
+  background: var(--background);
   padding: 0;
   color: inherit;
   cursor: pointer;
 }
-.mona-panel-number-handlers button + button { border-top: 1px solid #d9d9d9; }
-.mona-panel-number-handlers button:hover { color: #d14424; }
+.mona-panel-number-handlers button + button { border-top: 1px solid var(--border); }
+.mona-panel-number-handlers button:hover { color: var(--foreground); }
 .mona-panel-number.is-disabled {
   border-color: #dcdcdc;
   background: #f5f5f5;
   color: #b7b7b7;
 }
-.mona-panel-number.is-disabled input { color: #b7b7b7; }
+.mona-panel-number.is-disabled [data-slot="input"] { color: #b7b7b7; }
 
 .mona-panel-switch {
   display: inline-block;
   width: 40px;
   height: 20px;
-  border: 1px solid #d9d9d9;
-  border-radius: 10px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-pill);
   outline: 0;
-  background: #d9d9d9;
+  background: var(--input);
   padding: 0;
   cursor: pointer;
   transition: border-color .3s, background-color .3s;
   vertical-align: middle;
 }
 
-.mona-panel-switch > span {
+.mona-panel-switch > [data-slot="switch-thumb"] {
   display: block;
   width: 16px;
   height: 16px;
   margin: 1px;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: var(--radius-pill);
+  background: var(--background);
   transition: transform .3s;
+  translate: none;
 }
-.mona-panel-switch.is-active { border-color: #d14424; background: #d14424; }
-.mona-panel-switch.is-active > span { transform: translateX(20px); }
+.mona-panel-switch.is-active { border-color: var(--primary); background: var(--primary); }
+.mona-panel-switch.is-active > [data-slot="switch-thumb"] { transform: translateX(20px); }
 
 .mona-panel-slider {
   width: 100%;
@@ -3318,45 +4289,44 @@
   cursor: pointer;
   user-select: none;
 }
-.mona-panel-slider-bar {
+.mona-panel-slider [data-slot="slider-track"] {
   position: relative;
   width: calc(100% - 10px);
   height: 4px;
   margin-left: 5px;
-  border-radius: 2px;
-  background: #f5f5f5;
+  border-radius: var(--radius-pill);
+  background: var(--muted);
   transition: background-color .2s;
 }
-.mona-panel-slider:hover .mona-panel-slider-bar { background: #f0f0f0; }
-.mona-panel-slider-track {
+.mona-panel-slider:hover [data-slot="slider-track"] { background: var(--accent); }
+.mona-panel-slider [data-slot="slider-range"] {
   position: absolute;
   top: 0;
   left: 0;
   height: 100%;
-  background: #d14424;
+  background: var(--primary);
   transition: background-color .2s;
 }
-.mona-panel-slider-track:hover { background: #bb3d22; }
-.mona-panel-slider-thumb {
+.mona-panel-slider [data-slot="slider-thumb"] {
   position: absolute;
   z-index: 100;
   top: 50%;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  outline: 2px solid #d14424;
-  background: #fff;
-  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 2px solid var(--primary);
+  background: var(--background);
 }
-.mona-panel-slider-thumb:hover,
-.mona-panel-slider-thumb:active { outline: 4px solid #d14424; }
-.mona-panel-slider-thumb::before {
+.mona-panel-slider [data-slot="slider-thumb"]:hover,
+.mona-panel-slider [data-slot="slider-thumb"]:active { outline: 4px solid var(--primary); }
+.mona-panel-slider [data-slot="slider-thumb"]::before {
   position: absolute;
   bottom: 24px;
   left: 50%;
   display: none;
   min-width: 28px;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   background: #262626;
   padding: 6px 5px;
   color: #fff;
@@ -3365,7 +4335,7 @@
   text-align: center;
   transform: translateX(-50%);
 }
-.mona-panel-slider-thumb::after {
+.mona-panel-slider [data-slot="slider-thumb"]::after {
   position: absolute;
   bottom: 15px;
   left: 50%;
@@ -3375,10 +4345,10 @@
   content: '';
   transform: translateX(-50%);
 }
-.mona-panel-slider-thumb:hover::before,
-.mona-panel-slider-thumb:hover::after,
-.mona-panel-slider-thumb:active::before,
-.mona-panel-slider-thumb:active::after { display: block; }
+.mona-panel-slider [data-slot="slider-thumb"]:hover::before,
+.mona-panel-slider [data-slot="slider-thumb"]:hover::after,
+.mona-panel-slider [data-slot="slider-thumb"]:active::before,
+.mona-panel-slider [data-slot="slider-thumb"]:active::after { display: block; }
 
 .mona-crop-highlight,
 .mona-crop-highlight img,
@@ -3422,7 +4392,7 @@
   box-sizing: border-box;
   width: var(--mona-handle-size);
   height: var(--mona-handle-size);
-  border: var(--mona-outline-width) solid #d14424;
+  border: var(--mona-outline-width) solid var(--editor-selection);
   border-radius: var(--mona-border-radius, 1px);
   background: #fff;
   padding: 0;
@@ -3576,7 +4546,7 @@
   position: absolute;
   z-index: 100;
   display: block;
-  border: 0 dashed #d14424;
+  border: 0 dashed var(--editor-selection);
   pointer-events: none;
 }
 
@@ -3594,13 +4564,13 @@
 .mona-create-selection {
   position: absolute;
   box-sizing: border-box;
-  border: 1px solid #d14424;
+  border: 1px solid var(--editor-selection);
   pointer-events: none;
 }
 
 .mona-lasso-selection {
   z-index: 200;
-  background: rgb(209 68 36 / 10%);
+  background: var(--editor-selection-soft);
 }
 
 .mona-create-selection {
@@ -3732,7 +4702,7 @@
   left: 0;
 }
 
-.mona-ruler-range { background-color: rgb(209 68 36 / 10%); }
+.mona-ruler-range { background-color: var(--editor-selection-soft); }
 
 .mona-editor-context-menu-mask {
   position: fixed;
@@ -3755,7 +4725,7 @@
   width: 180px;
   margin: 0;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
   padding: 5px 0;
@@ -3763,7 +4733,12 @@
 }
 
 .mona-context-menu-entry {
+  display: block;
+  width: 100%;
   height: 30px;
+  justify-content: stretch;
+  border: 0;
+  border-radius: 0;
   background-color: #fff;
   padding: 0 20px;
   color: #333;
@@ -3774,7 +4749,9 @@
   transition: all .1s;
 }
 
-.mona-context-menu-entry:hover:not(.is-disabled) { background-color: rgb(209 68 36 / 15%); }
+.mona-context-menu-entry > .mona-context-menu-item-content { width: 100%; }
+
+.mona-context-menu-entry:hover:not(.is-disabled) { background-color: var(--editor-selection-medium); }
 .mona-context-menu-entry.is-disabled { color: #b1b1b1; cursor: no-drop; }
 .mona-context-menu-entry.is-divider {
   height: 1px;
@@ -3835,24 +4812,22 @@
 .mona-context-menu-entry:not(.is-disabled):hover > .mona-context-menu-item-content > .mona-editor-context-submenu {
   display: block;
 }
+.mona-context-menu-entry:not(.is-disabled):focus-within > .mona-context-menu-item-content > .mona-editor-context-submenu {
+  display: block;
+}
 
 .mona-link-dialog-backdrop {
-  position: fixed;
-  z-index: 5000;
-  display: grid;
-  inset: 0;
-  place-items: center;
   background: rgb(0 0 0 / 25%);
 }
 
 .mona-link-dialog {
-  position: relative;
-  z-index: 5001;
   box-sizing: border-box;
   width: min(540px, calc(100vw - 48px));
+  max-width: none;
+  gap: 0;
   margin: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-overlay);
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
   padding: 20px;
@@ -3870,7 +4845,11 @@
   align-items: center;
   justify-content: flex-start;
   margin-bottom: 20px;
+  height: auto;
+  border-radius: 0;
   border-bottom: 1px solid #e5e7eb;
+  background: transparent;
+  padding: 0;
   font-size: 13px;
   line-height: 1;
   user-select: none;
@@ -3888,37 +4867,31 @@
   cursor: pointer;
 }
 
-.mona-link-type-tab[aria-selected="true"] {
-  border-bottom-color: #d14424;
+.mona-link-type-tab[data-state="active"] {
+  border-bottom-color: var(--foreground);
+  background: transparent;
+  box-shadow: none;
 }
 
-.mona-link-type-tab.is-disabled {
+.mona-link-type-tab:disabled {
   opacity: 0.35;
   cursor: default;
 }
+
+.mona-link-dialog [data-slot="tabs-content"] { margin-top: 0; }
 
 .mona-link-field {
   display: grid;
   box-sizing: border-box;
   width: 100%;
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  padding: 0 5px;
-  transition: border-color 0.25s;
+  height: auto;
 }
 
-.mona-link-field:focus-within,
-.mona-link-field:hover { border-color: #d14424; }
-
-.mona-link-field input,
-.mona-link-field select {
+.mona-link-field input {
   min-width: 0;
   width: 100%;
   height: 30px;
-  border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-control);
   background: #fff;
   outline: 0;
   padding: 0 5px;
@@ -3935,7 +4908,7 @@
   width: 100%;
   height: 32px;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   padding: 0 32px 0 10px;
   color: #41464b;
@@ -3946,130 +4919,38 @@
   transition: border-color .25s;
   user-select: none;
 }
-.mona-link-select:hover { border-color: #d14424; }
-.mona-link-select-label {
-  display: block;
-  min-width: 50px;
-  overflow: hidden;
-  height: 30px;
-  line-height: 30px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-link-select-icon {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  width: 32px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  color: #bfbfbf;
-}
-.mona-link-select-icon svg {
-  display: inline-block;
-  color: inherit;
-  font-style: normal;
-  line-height: 0;
-  outline: 0;
-  text-align: center;
-  text-rendering: optimizeLegibility;
-  text-transform: none;
-  vertical-align: -.125em;
-  -webkit-font-smoothing: antialiased;
-}
+.mona-link-select:hover { border-color: var(--ring); }
 .mona-link-select-popover {
-  position: fixed;
   z-index: 9999;
   box-sizing: border-box;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-overlay);
   background: #fff;
   box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%);
-  transform-origin: top center;
-}
-.mona-link-select-popover.is-open {
-  animation: mona-link-select-popover-in .2s ease both;
-}
-.mona-link-select-popover.is-closing {
-  animation: mona-link-select-popover-out .2s ease both;
-}
-.mona-link-select-options {
-  max-height: 260px;
-  overflow: auto;
-  padding: 5px;
-  font-size: 13px;
-  text-align: left;
-  user-select: none;
-}
-.mona-link-select-option {
-  overflow: hidden;
-  height: 32px;
-  border-radius: 2px;
-  padding: 0 5px;
-  line-height: 32px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-link-select-option.is-disabled { color: #b7b7b7; }
-.mona-link-select-option:not(.is-disabled, .is-selected):hover { background-color: rgb(209 68 36 / 5%); cursor: pointer; }
-.mona-link-select-option.is-selected { color: #d14424; font-weight: 700; }
-
-@keyframes mona-link-select-popover-in {
-  from { opacity: 0; transform: scale(.5); }
-  to { opacity: 1; transform: scale(1); }
-}
-@keyframes mona-link-select-popover-out {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(.5); }
 }
 
 .mona-link-slide-preview { margin-top: 12px; }
 .mona-link-slide-preview .mona-scaled-slide {
   margin-top: 5px;
-  border: 1px solid rgb(209 68 36 / 15%);
-  border-radius: 2px;
+  border: 1px solid var(--editor-selection-medium);
+  border-radius: var(--radius-surface);
 }
 
 .mona-link-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
   margin-top: 20px;
   text-align: right;
 }
 
 .mona-link-dialog-actions button {
-  appearance: auto;
   height: 32px;
-  border-radius: 2px;
-  outline: 0;
+  border-radius: var(--radius-control);
   padding: 0 15px;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
   letter-spacing: 1px;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.mona-link-dialog-actions .is-default {
-  margin-right: 10px;
-  border: 1px solid #d9d9d9;
-  background: #fff;
-  color: #41464b;
-}
-.mona-link-dialog-actions .is-default:hover { border-color: #d14424; color: #d14424; }
-.mona-link-dialog-actions .is-primary {
-  border: 1px solid #d14424;
-  background: #d14424;
-  color: #fff;
-}
-
-.mona-link-dialog-actions button:disabled {
-  border: 1px solid #d9d9d9;
-  background: #f5f5f5;
-  color: #b7b7b7;
-  cursor: default;
 }
 
 .mona-message-wrap {
@@ -4098,7 +4979,7 @@
   min-width: 50px;
   align-items: center;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   box-shadow: 0 1px 8px rgb(0 0 0 / 15%);
   padding: 10px;
@@ -4137,80 +5018,39 @@
   white-space: nowrap;
 }
 
-/* SVG path editor — a literal React port of CanvasTool/SVGPathEditor.vue. */
-.mona-svg-path-modal,
-.mona-svg-path-modal * {
-  box-sizing: border-box;
-}
-
-.mona-svg-path-modal {
-  position: fixed;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  outline: 0;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-  animation: mona-svg-path-modal-fade-in .25s both ease-in;
-}
-
+/* SVG path editor. The canvas is custom geometry; its surrounding controls use
+   the shared component layer. */
 .mona-svg-path-mask {
-  position: absolute;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   background: rgb(0 0 0 / 25%);
 }
 
 .mona-svg-path-modal-content {
-  position: relative;
-  z-index: 5001;
   overflow: hidden;
   width: 800px;
-  border-radius: 2px;
+  max-width: none;
+  gap: 0;
+  border-radius: var(--radius-overlay);
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
   padding: 20px;
-  animation: mona-svg-path-modal-zoom-in .25s both cubic-bezier(.4, 0, 0, 1.5);
 }
 
-@keyframes mona-svg-path-modal-fade-in {
-  from { opacity: 0; }
-}
-
-@keyframes mona-svg-path-modal-zoom-in {
-  from { transform: scale3d(.3, .3, .3); }
-}
-
-/* Chart insertion, editing, and style surfaces — literal ports of PPTist's chart editor. */
+/* Chart insertion, editing, and style surfaces — literal ports of the established editor's chart editor. */
 .mona-chart-pool {
-  display: flex;
-  width: 240px;
-  flex-wrap: wrap;
-  margin: 0 0 -5px;
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 .mona-chart-pool-item {
   position: relative;
-  width: 24%;
   height: 0;
-  flex: 0 0 24%;
-  flex-shrink: 0;
-  margin-bottom: calc(4% / 3);
-  padding-bottom: 25%;
+  padding-bottom: 82%;
   cursor: pointer;
 }
-.mona-chart-pool-item:not(:nth-child(4n)) { margin-right: calc(4% / 3); }
 .mona-chart-pool-content {
   position: absolute;
   inset: 0;
@@ -4225,60 +5065,35 @@
   cursor: pointer;
   font: inherit;
 }
-.mona-chart-pool-content:hover { color: #d14424; }
+.mona-chart-pool-content:hover { color: var(--editor-selection); }
+.mona-chart-pool-name {
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+}
 .mona-chart-pool-icon { display: flex; font-size: 24px; }
 .mona-chart-pool-item:last-child .mona-chart-pool-icon { font-size: 23px; }
 .mona-chart-pool-icon svg { width: 1em; height: 1em; }
 .mona-chart-pool-name { margin-top: 4px; text-align: start; }
 
-.mona-chart-data-modal,
-.mona-chart-data-modal *,
-.mona-chart-theme-modal,
-.mona-chart-theme-modal * { box-sizing: border-box; }
-.mona-chart-data-modal,
-.mona-chart-theme-modal {
-  position: fixed;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  outline: 0;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  font-size: 16px;
-  line-height: normal;
-  animation: mona-chart-modal-fade-in .25s both ease-in;
-}
 .mona-chart-data-mask,
 .mona-chart-theme-mask {
-  position: absolute;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   background: rgb(0 0 0 / 25%);
 }
 .mona-chart-data-modal-content,
 .mona-chart-theme-modal-content {
-  position: relative;
-  z-index: 5001;
   overflow: hidden;
-  border-radius: 2px;
+  max-width: none;
+  gap: 0;
+  border-radius: var(--radius-overlay);
   background: #fff;
   padding: 20px;
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  animation: mona-chart-modal-zoom-in .25s both cubic-bezier(.4, 0, 0, 1.5);
 }
 .mona-chart-data-modal-content { width: 640px; }
 .mona-chart-theme-modal-content { width: 310px; }
-@keyframes mona-chart-modal-fade-in { from { opacity: 0; } }
-@keyframes mona-chart-modal-zoom-in { from { transform: scale3d(.3, .3, .3); } }
 
 .mona-chart-data-editor {
   position: relative;
@@ -4314,7 +5129,7 @@
   left: 0;
   width: 0;
   height: 0;
-  border: 0 solid #d14424;
+  border: 0 solid var(--editor-selection);
 }
 .mona-chart-range-line.is-top { border-top-width: 1px; }
 .mona-chart-range-line.is-bottom { border-bottom-width: 1px; }
@@ -4334,7 +5149,7 @@
   right: 0;
   width: 4px;
   height: 12px;
-  background-color: #d14424;
+  background-color: var(--editor-selection);
   content: '';
 }
 .mona-chart-range-resizable::before {
@@ -4343,7 +5158,7 @@
   bottom: 0;
   width: 12px;
   height: 4px;
-  background-color: #d14424;
+  background-color: var(--editor-selection);
   content: '';
 }
 .mona-chart-data-table {
@@ -4362,7 +5177,7 @@
   text-align: center;
   vertical-align: middle;
 }
-.mona-chart-data-table td.is-head { background-color: rgb(209 68 36 / 8%); }
+.mona-chart-data-table td.is-head { background-color: var(--editor-selection-soft); }
 .mona-chart-data-item {
   width: 100%;
   height: 100%;
@@ -4424,34 +5239,18 @@
 .mona-chart-editor-change:hover { text-decoration: underline; }
 .mona-chart-editor-buttons-right .mona-chart-editor-button { margin-left: 10px; }
 .mona-chart-editor-button {
-  appearance: auto;
-  tab-size: 8;
-  touch-action: manipulation;
-  text-size-adjust: auto;
-  -webkit-tap-highlight-color: rgb(0 0 0 / 18%);
   height: 32px;
-  border-radius: 2px;
-  outline: 0;
+  border-radius: var(--radius-control);
   padding: 0 15px;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
   letter-spacing: 1px;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
 }
-.mona-chart-editor-button.is-default { border: 1px solid #d9d9d9; background-color: #fff; color: #41464b; }
-.mona-chart-editor-button.is-default:hover { border-color: #d14424; color: #d14424; }
-.mona-chart-editor-button.is-primary { border: 1px solid #d14424; background-color: #d14424; color: #fff; }
-.mona-chart-editor-button.is-primary:hover { border-color: #bb3d22; background-color: #bb3d22; }
-.mona-chart-editor-button:disabled,
-.mona-chart-editor-button.is-disabled { border: 1px solid #d9d9d9; background-color: #f5f5f5; color: #b7b7b7; cursor: default; }
 
 .mona-chart-type-menu {
   z-index: 9999;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-overlay);
   background: #fff;
   padding: 10px;
   color: #41464b;
@@ -4461,13 +5260,13 @@
   line-height: normal;
 }
 .mona-chart-type-menu.is-data-editor { width: 136.671875px; translate: -2px 0; }
-.mona-chart-type-menu.is-floating { width: 142px; }
+.mona-chart-type-menu.is-contextual { width: 142px; }
 .mona-chart-type-menu > button {
   display: block;
   min-width: 80px;
   width: 100%;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 6px 10px;
   color: inherit;
@@ -4479,39 +5278,8 @@
 .mona-chart-type-menu > button + button { margin-top: 2px; }
 
 .mona-chart-style-panel { color: #41464b; font-size: 13px; line-height: normal; user-select: none; }
-.mona-chart-edit-button { appearance: auto; display: inline-block; width: 100%; border-radius: 2px; color: #41464b; font-family: Arial; }
+.mona-chart-edit-button { display: inline-flex; width: 100%; border-radius: var(--radius-control); color: #41464b; font-family: Arial; }
 .mona-chart-style-checkbox-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
-.mona-chart-checkbox { position: relative; display: flex; height: 20px; align-items: center; cursor: pointer; }
-.mona-chart-checkbox > input { position: absolute; z-index: -1; width: 0; height: 0; margin: 0; opacity: 0; }
-.mona-chart-checkbox-control {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  transition: border-color .15s cubic-bezier(.71, -.46, .29, 1.46), background-color .15s cubic-bezier(.71, -.46, .29, 1.46);
-}
-.mona-chart-checkbox-control::after {
-  position: absolute;
-  top: 1px;
-  left: 4px;
-  width: 6px;
-  height: 9px;
-  border: 2px solid #fff;
-  border-top: 0;
-  border-left: 0;
-  content: '';
-  transform: rotate(45deg) scaleY(0);
-  transform-origin: center;
-  transition: transform .15s ease-in .05s;
-}
-.mona-chart-checkbox > span:last-child { margin-left: 5px; font-size: 13px; line-height: 20px; user-select: none; }
-.mona-chart-checkbox > input:checked + .mona-chart-checkbox-control { border-color: #d14424; background: #d14424; }
-.mona-chart-checkbox > input:checked + .mona-chart-checkbox-control::after { transform: rotate(45deg) scaleY(1); }
-.mona-chart-checkbox > input:checked ~ span:last-child { color: #d14424; }
 .mona-chart-style-panel .mona-element-outline-controls .mona-panel-row:last-child { margin-bottom: 0; }
 .mona-chart-theme-button,
 .mona-chart-custom-color-button {
@@ -4522,7 +5290,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0;
   color: #41464b;
@@ -4530,7 +5298,7 @@
 }
 .mona-chart-custom-color-button { appearance: auto; font-family: Arial; }
 .mona-chart-theme-button:hover,
-.mona-chart-custom-color-button:hover { border-color: #d14424; color: #d14424; }
+.mona-chart-custom-color-button:hover { border-color: var(--ring); color: inherit; }
 .mona-chart-theme-button > svg,
 .mona-chart-custom-color-button > svg { width: 32px; flex-shrink: 0; color: #bfbfbf; font-size: 13px; }
 .mona-chart-theme-blocks {
@@ -4556,13 +5324,13 @@
   height: 26px;
   margin-bottom: 4%;
   border: 1px solid #ccc;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 2px;
   cursor: pointer;
 }
 .mona-chart-preset-theme:nth-child(odd) { margin-right: 4%; }
-.mona-chart-preset-theme:hover { border-color: #d14424; transition: border-color .15s; }
+.mona-chart-preset-theme:hover { border-color: var(--ring); transition: border-color .15s; }
 .mona-chart-preset-theme > span { height: 20px; flex: 1; }
 .mona-chart-preset-themes.is-slide-theme { margin-bottom: -10px; }
 .mona-chart-theme-divider { width: 100%; margin: 10px 0; border-top: 1px solid rgb(5 5 5 / 6%); }
@@ -4571,8 +5339,8 @@
 .mona-chart-theme-setting-title { margin-bottom: 15px; font-size: 17px; font-weight: 700; }
 .mona-chart-theme-setting-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
 .mona-chart-theme-setting-label { width: 40%; font-size: 13px; }
-.mona-chart-theme-setting-row > [data-radix-popper-content-wrapper],
-.mona-chart-theme-setting-row > button { width: 60%; }
+.mona-chart-theme-setting-row > [data-slot="button-group"] { width: 60%; }
+.mona-chart-custom-color-group .mona-chart-custom-color-button { min-width: 0; flex: 1; }
 .mona-chart-custom-color-button > span {
   height: 20px;
   margin-left: 8px;
@@ -4581,73 +5349,27 @@
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAEBJREFUOE9jfPbs2X8GIoCkpCQRqhgYGEcNxBlOo2GIM2iGQLL5//8/UTnl+fPnxOWUUQNxhtNoGOLOKYM+2QAAh2Nq10DwkukAAAAASUVORK5CYII=);
 }
 .mona-chart-custom-color-button > span > i { display: block; width: 100%; height: 100%; }
-.mona-chart-custom-color-button > b {
-  position: absolute;
-  top: 2px;
-  right: 1px;
-  bottom: 2px;
-  display: flex;
-  width: 30px;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  font-weight: 400;
-  cursor: pointer;
-}
 .mona-chart-theme-add { display: inline-block; width: 100%; }
 .mona-chart-theme-add > svg { position: relative; left: .015625px; }
 .mona-chart-theme-confirm { width: 100%; margin-top: 12px; }
 
-/* LaTeX insertion/editing and symbol surfaces — literal ports of PPTist's
-   LaTeXEditor, LatexStylePanel, LatexToolbar, and SymbolPanel. */
-.mona-latex-modal,
-.mona-latex-modal *,
+/* LaTeX insertion/editing and symbol surfaces. */
 .mona-symbol-panel,
 .mona-symbol-panel * { box-sizing: border-box; }
 
-.mona-latex-modal {
-  position: fixed;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  outline: 0;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-  animation: mona-latex-modal-fade-in .25s both ease-in;
-}
 .mona-latex-modal-mask {
-  position: absolute;
-  z-index: 5000;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
   background: rgb(0 0 0 / 25%);
 }
 .mona-latex-modal-content {
-  position: relative;
-  z-index: 5001;
   overflow: hidden;
   width: 880px;
-  border-radius: 2px;
+  max-width: none;
+  gap: 0;
+  border-radius: var(--radius-overlay);
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
   padding: 20px;
-  animation: mona-latex-modal-zoom-in .25s both cubic-bezier(.4, 0, 0, 1.5);
 }
-@keyframes mona-latex-modal-fade-in { from { opacity: 0; } }
-@keyframes mona-latex-modal-zoom-in { from { transform: scale3d(.3, .3, .3); } }
-.mona-latex-modal.is-closing { animation: mona-latex-modal-fade-out .25s both ease-out; }
-.mona-latex-modal.is-closing .mona-latex-modal-content { animation: mona-latex-modal-zoom-out .25s both; }
-@keyframes mona-latex-modal-fade-out { to { opacity: 0; } }
-@keyframes mona-latex-modal-zoom-out { to { transform: scale3d(.3, .3, .3); } }
 .mona-latex-editor { height: 560px; }
 .mona-latex-editor-container { display: flex; height: calc(100% - 50px); }
 .mona-latex-editor-left {
@@ -4664,7 +5386,7 @@
   height: 100%;
   resize: none;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   outline: 0;
   background-color: #fff;
   padding: 10px;
@@ -4682,7 +5404,7 @@
   justify-content: center;
   margin-top: 20px;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-surface);
   text-align: center;
   user-select: none;
 }
@@ -4704,13 +5426,14 @@
   flex-direction: column;
   margin-left: 20px;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-surface);
   background-color: #fff;
   user-select: none;
 }
 .mona-latex-editor-content { height: calc(100% - 40px); font-size: 13px; }
 .mona-latex-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   border-bottom: 1px solid #e5e7eb;
@@ -4730,7 +5453,7 @@
   text-align: center;
   cursor: pointer;
 }
-.mona-latex-tabs > button.is-active { border-bottom-color: #d14424; }
+.mona-latex-tabs > button.is-active { border-bottom-color: var(--foreground); }
 .mona-latex-tabs.is-card {
   height: 40px;
   flex-shrink: 0;
@@ -4761,7 +5484,7 @@
   display: flex;
   height: 60px;
   align-items: center;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #f9f9f9;
   padding: 5px;
   cursor: pointer;
@@ -4779,7 +5502,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
 }
 .mona-latex-symbol-item:hover { background-color: #f9f9f9; cursor: pointer; }
 .mona-latex-symbol-content svg { display: inline; vertical-align: baseline; }
@@ -4790,24 +5513,14 @@
   justify-content: flex-end;
 }
 .mona-latex-editor-button {
-  appearance: auto;
   height: 32px;
-  border-radius: 2px;
-  outline: 0;
+  border-radius: var(--radius-control);
   padding: 0 15px;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
   letter-spacing: 1px;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
 }
 .mona-latex-editor-button + .mona-latex-editor-button { margin-left: 10px; }
-.mona-latex-editor-button.is-default { border: 1px solid #d9d9d9; background-color: #fff; color: #41464b; }
-.mona-latex-editor-button.is-default:hover { border-color: #d14424; color: #d14424; }
-.mona-latex-editor-button.is-primary { border: 1px solid #d14424; background-color: #d14424; color: #fff; }
-.mona-latex-editor-button.is-primary:hover { border-color: #db654a; background-color: #db654a; }
 .mona-latex-style-panel .mona-panel-row:first-child { margin-bottom: 10px; }
 
 .mona-media-switch-row { height: 32px; }
@@ -4821,14 +5534,14 @@
   width: 100%;
   height: 0;
   border: 1px dashed #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: transparent;
   padding: 0 0 56.25%;
   color: #41464b;
   cursor: pointer;
   transition: all .3s;
 }
-.mona-video-poster:hover { border-color: #d14424; color: #d14424; }
+.mona-video-poster:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
 .mona-video-poster-content {
   position: absolute;
   inset: 0;
@@ -4841,51 +5554,20 @@
 }
 .mona-media-full-button { width: 100%; flex: 1; }
 .mona-media-full-button > svg { margin-right: 1px; }
-.mona-latex-edit-button { appearance: auto; display: inline-block; width: 100%; flex: 1; border-radius: 2px; color: #41464b; font-family: Arial; }
+.mona-latex-edit-button { width: 100%; flex: 1; font-family: Arial; }
 
-.mona-symbol-panel {
-  position: fixed;
-  z-index: 901;
+/* Symbols fill the drawer: category tabs on top, scrolling glyph grid below. */
+.mona-drawer-symbols {
   display: flex;
-  width: 350px;
-  height: 560px;
+  height: 100%;
+  min-height: 0;
   flex-direction: column;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  background-color: #fff;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
   color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: normal;
 }
-.mona-symbol-panel-content {
-  position: relative;
-  display: flex;
-  overflow: hidden;
-  height: 100%;
-  flex: 1;
-  flex-direction: column;
-  padding: 10px;
-}
-.mona-symbol-panel-close {
-  position: absolute;
-  z-index: 1;
-  top: 8px;
-  right: 3px;
-  display: flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  color: #666;
-  font-size: 13px;
-  cursor: pointer;
-}
-.mona-symbol-panel-close:hover { color: #d14424; }
 .mona-symbol-tabs {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   margin-bottom: 8px;
@@ -4905,7 +5587,7 @@
   text-align: center;
   cursor: pointer;
 }
-.mona-symbol-tabs > button.is-active { border-bottom-color: #d14424; }
+.mona-symbol-tabs > button[data-state="on"] { border-bottom-color: var(--editor-selection); }
 .mona-symbol-emoji-types {
   display: flex;
   align-items: center;
@@ -4915,7 +5597,7 @@
 .mona-symbol-emoji-types > button {
   flex-shrink: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   background: transparent;
   padding: 2px 4px;
   color: inherit;
@@ -4924,13 +5606,13 @@
   cursor: pointer;
   user-select: none;
 }
-.mona-symbol-emoji-types > button.is-active { background-color: rgb(209 68 36 / 5%); color: #d14424; font-weight: 700; }
+.mona-symbol-emoji-types > button[data-state="on"] { background-color: var(--editor-selection-subtle); color: var(--editor-selection); font-weight: 700; }
 .mona-symbol-emoji-types > button + button { margin-left: 4px; }
 .mona-symbol-pool {
   overflow: auto;
   flex: 1;
-  margin: 0 -10px;
-  padding: 5px 10px 0;
+  margin: 0 -12px;
+  padding: 5px 12px 0;
   font-size: 18px;
   user-select: none;
 }
@@ -4949,7 +5631,7 @@
   cursor: pointer;
 }
 .mona-symbol-item:not(:nth-child(8n)) { margin-right: calc(4% / 7); }
-.mona-symbol-item:hover { border-color: #d14424; color: #d14424; transition: all .2s; }
+.mona-symbol-item:hover { border-color: var(--editor-selection); color: var(--editor-selection); transition: all .2s; }
 .mona-symbol-item > span {
   position: absolute;
   top: 0;
@@ -4959,7 +5641,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #fff;
+  background-color: var(--background);
 }
 
 .mona-svg-path-editor {
@@ -4979,7 +5661,7 @@
   height: 500px;
   flex: none;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-surface);
   user-select: none;
 }
 
@@ -4992,14 +5674,14 @@
 .mona-svg-grid-background { fill: #fff; stroke: #e5e7eb; stroke-width: 1; }
 .mona-svg-grid-lines line { stroke: #ececec; stroke-width: 1; }
 .mona-svg-path-preview {
-  stroke: #d14424;
+  stroke: var(--foreground);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.mona-svg-path-point { fill: #fff; stroke: #d14424; stroke-width: 2; }
-.mona-svg-path-point.is-start { stroke: #d14424; }
-.mona-svg-path-point.is-active { fill: #d14424; }
+.mona-svg-path-point { fill: #fff; stroke: var(--foreground); stroke-width: 2; }
+.mona-svg-path-point.is-start { stroke: var(--foreground); }
+.mona-svg-path-point.is-active { fill: var(--foreground); }
 .mona-svg-anchor-line { stroke: #999; stroke-width: 1; stroke-dasharray: 4 4; }
 .mona-svg-anchor-point { fill: #fff; stroke: #666; stroke-width: 2; }
 
@@ -5016,7 +5698,6 @@
   align-items: center;
 }
 
-.mona-svg-segment-type.is-disabled { pointer-events: none; }
 .mona-svg-segment-type button {
   display: inline-block;
   height: 32px;
@@ -5037,19 +5718,19 @@
   user-select: none;
 }
 .mona-svg-segment-type button:first-child {
-  border-top-left-radius: 2px;
-  border-bottom-left-radius: 2px;
+  border-top-left-radius: var(--radius-control);
+  border-bottom-left-radius: var(--radius-control);
 }
 .mona-svg-segment-type button:last-child {
   border-right-width: 1px;
-  border-top-right-radius: 2px;
-  border-bottom-right-radius: 2px;
+  border-top-right-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
 }
-.mona-svg-segment-type button:not(.is-checked, :disabled):hover { color: #d14424; }
-.mona-svg-segment-type button.is-checked {
-  border-color: #d14424;
-  background: #d14424;
-  color: #fff;
+.mona-svg-segment-type button:not([data-state="on"], :disabled):hover { background: var(--muted); }
+.mona-svg-segment-type button[data-state="on"] {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
 }
 .mona-svg-segment-type button:disabled {
   border-color: #d9d9d9;
@@ -5088,63 +5769,12 @@
   gap: 18px;
 }
 
-.mona-path-checkbox {
-  display: flex;
-  height: 20px;
-  align-items: center;
-  cursor: pointer;
-}
-.mona-path-checkbox-input {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background: #fff;
-  transition: border-color .15s cubic-bezier(.71, -.46, .29, 1.46), background-color .15s cubic-bezier(.71, -.46, .29, 1.46);
-  vertical-align: middle;
-}
-.mona-path-checkbox-input::after {
-  position: absolute;
-  top: 1px;
-  left: 4px;
-  width: 6px;
-  height: 9px;
-  border: 2px solid #fff;
-  border-top: 0;
-  border-left: 0;
-  content: "";
-  transform: rotate(45deg) scaleY(0);
-  transform-origin: center;
-  transition: transform .15s ease-in .05s;
-}
-.mona-path-checkbox > input {
-  position: absolute;
-  z-index: -1;
-  width: 0;
-  height: 0;
-  margin: 0;
-  outline: 0;
-  opacity: 0;
-}
-.mona-path-checkbox-label {
-  margin-left: 5px;
-  font-size: 13px;
-  line-height: 20px;
-  user-select: none;
-}
-.mona-path-checkbox.is-checked .mona-path-checkbox-input { border-color: #d14424; background: #d14424; }
-.mona-path-checkbox.is-checked .mona-path-checkbox-input::after { transform: rotate(45deg) scaleY(1); }
-.mona-path-checkbox.is-checked .mona-path-checkbox-label { color: #d14424; }
-
 .mona-svg-path-content {
   width: 100%;
   height: 80px;
   overflow: auto;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fafafa;
   padding: 8px 10px;
   color: #666;
@@ -5174,40 +5804,26 @@
 .mona-svg-path-footer-actions { display: flex; gap: 8px; }
 .mona-path-button {
   height: 32px;
-  border-radius: 2px;
-  outline: 0;
+  border-radius: var(--radius-control);
   padding: 0 15px;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
   letter-spacing: 1px;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
 }
-.mona-path-button.is-default { border: 1px solid #d9d9d9; background: #fff; color: #41464b; }
-.mona-path-button.is-default:hover { border-color: #d14424; color: #d14424; }
-.mona-path-button.is-primary { border: 1px solid #d14424; background: #d14424; color: #fff; }
-.mona-path-button.is-primary:hover { border-color: #db654a; background: #db654a; }
-.mona-path-button:disabled {
-  border: 1px solid #d9d9d9;
-  background: #f5f5f5;
-  color: #b7b7b7;
-  cursor: default;
-}
-.mona-moveable-panel {
+.mona-svg-path-context-menu { z-index: 5100; min-width: 180px; }
+.mona-screen-moveable-panel {
   position: fixed;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
   display: flex;
   flex-direction: column;
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  color: #41464b;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  line-height: normal;
 }
-.mona-moveable-panel-header {
+.mona-screen-moveable-panel-header {
   display: flex;
   height: 40px;
   align-items: center;
@@ -5215,8 +5831,19 @@
   cursor: move;
   user-select: none;
 }
-.mona-moveable-panel-title { flex: 1; padding-left: 10px; font-size: 13px; }
-.mona-moveable-panel-close {
+.mona-screen-moveable-panel-title {
+  height: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 0 0 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: move;
+}
+.mona-screen-moveable-panel-close {
   display: flex;
   width: 40px;
   height: 40px;
@@ -5226,17 +5853,20 @@
   font-size: 13px;
   cursor: pointer;
 }
-.mona-moveable-panel-close:hover { color: #d14424; }
-.mona-moveable-panel-content { overflow: auto; flex: 1; padding: 10px; }
-.mona-moveable-panel-resizer {
+.mona-screen-moveable-panel-close:hover { color: var(--editor-selection); }
+.mona-screen-moveable-panel-content { overflow: auto; flex: 1; padding: 10px; }
+.mona-screen-moveable-panel-resizer {
   position: absolute;
   right: 0;
   bottom: 0;
   width: 10px;
   height: 10px;
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: se-resize;
 }
-.mona-moveable-panel-resizer::after {
+.mona-screen-moveable-panel-resizer::after {
   position: absolute;
   right: -4px;
   bottom: -4px;
@@ -5250,6 +5880,7 @@
 }
 
 .mona-notes-panel { height: 100%; font-size: 12px; user-select: none; }
+.mona-notes-panel.is-embedded { min-height: 420px; }
 .mona-notes-container { display: flex; height: 100%; flex-direction: column; }
 .mona-notes-list { overflow: auto; flex: 1; margin: 0 -10px; padding: 2px 12px; }
 .mona-notes-empty {
@@ -5261,11 +5892,33 @@
   color: #999;
   font-style: italic;
 }
-.mona-note { border: 1px solid #eee; border-radius: 4px; padding: 10px; }
+.mona-note { border: 1px solid #eee; border-radius: var(--radius-surface); padding: 10px; }
 .mona-note + .mona-note { margin-top: 10px; }
 .mona-note.is-active { background-color: #f7f7f7; }
 .mona-note-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-.mona-note-user { display: flex; align-items: center; }
+.mona-note-user,
+.mona-note-select {
+  display: flex;
+  height: auto;
+  align-items: center;
+}
+.mona-note-select {
+  justify-content: flex-start;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+}
+.mona-note-select-content {
+  display: block;
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  padding: 0;
+  color: inherit;
+  font-weight: inherit;
+  text-align: left;
+  white-space: normal;
+}
 .mona-note-avatar {
   display: flex;
   width: 30px;
@@ -5273,7 +5926,7 @@
   align-items: center;
   justify-content: center;
   margin-right: 10px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background-color: #42ba97;
   color: #fff;
   font-size: 18px;
@@ -5281,9 +5934,11 @@
 .mona-note-username { font-size: 14px; }
 .mona-note-time { color: #aaa; font-size: 12px; }
 .mona-note-actions { display: flex; align-items: center; opacity: 0; }
-.mona-note-header:hover .mona-note-actions { opacity: 1; }
-.mona-note-actions > div { margin-left: 5px; cursor: pointer; }
-.mona-note-actions > div:hover { color: #d14424; text-decoration: underline; }
+.mona-note-header:hover .mona-note-actions,
+.mona-note-header:focus-within .mona-note-actions,
+.mona-note:focus-within .mona-note-actions { opacity: 1; }
+.mona-note-actions > button { height: 28px; margin-left: 2px; padding-inline: 6px; font-size: 12px; }
+.mona-note-actions > button:hover { color: var(--editor-selection); text-decoration: underline; }
 .mona-note-replies { margin-top: 15px; margin-left: 20px; }
 .mona-note-reply-item { margin-top: 10px; }
 .mona-note-reply-item .mona-note-content { margin-top: 5px; }
@@ -5302,7 +5957,7 @@
   box-sizing: border-box;
   width: 100%;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   outline: 0;
   background-color: #fff;
   padding: 6px;
@@ -5312,30 +5967,19 @@
   resize: none;
   transition: border-color .25s;
 }
-.mona-notes-panel textarea:focus { border-color: #d14424; background-color: #fff; }
+.mona-notes-panel textarea:focus { border-color: var(--ring); background-color: #fff; }
 .mona-notes-panel textarea::placeholder { color: #bfbfbf; }
 .mona-notes-footer { display: flex; align-items: center; margin-top: 10px; }
 .mona-notes-footer button,
 .mona-note-reply-buttons button {
   height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  outline: 0;
-  background: #fff;
+  border-radius: var(--radius-control);
   padding: 0 15px;
-  color: #333;
   font-family: Arial;
   font-size: 13px;
-  line-height: 32px;
-  text-align: center;
   letter-spacing: 1px;
-  cursor: pointer;
-  user-select: none;
 }
-.mona-note-reply-buttons button { height: 24px; padding: 0 7px; font-size: 12px; line-height: 24px; letter-spacing: 0; }
-.mona-notes-footer button.is-primary,
-.mona-note-reply-buttons button.is-primary,
-.mona-notes-add { border-color: #d14424 !important; background-color: #d14424 !important; color: #fff !important; }
+.mona-note-reply-buttons button { height: 24px; padding: 0 7px; font-size: 12px; letter-spacing: 0; }
 .mona-notes-footer .mona-notes-clear {
   display: flex;
   flex: 1;
@@ -5359,7 +6003,7 @@
   height: 24px;
   margin-right: 5px;
   border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 0 7px;
   color: #333;
@@ -5369,105 +6013,45 @@
   cursor: pointer;
 }
 .mona-selection-order { display: flex; height: 100%; flex: 1; align-items: center; justify-content: flex-end; }
-.mona-selection-order span { display: flex; width: 16px; height: 100%; align-items: center; justify-content: center; cursor: pointer; }
-.mona-selection-order span:hover { color: #d14424; }
+.mona-selection-order button { width: 20px; height: 100%; padding: 0; }
+.mona-selection-order button:hover { color: var(--editor-selection); }
 .mona-selection-empty { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: #999; font-style: italic; }
 .mona-selection-list { overflow: auto; height: calc(100% - 32px); margin-right: -10px; padding-right: 10px; }
-.mona-selection-item { display: flex; align-items: center; border-radius: 2px; padding: 5px; font-size: 12px; cursor: pointer; }
-.mona-selection-item.is-active { background-color: rgb(209 68 36 / 10%); }
-.mona-selection-item.is-group-active { background-color: rgb(209 68 36 / 20%); }
-.mona-selection-item.is-locked { cursor: default; }
-.mona-selection-item:not(.is-locked):hover { background-color: rgb(209 68 36 / 25%); transition: background-color 200ms; }
+.mona-selection-item { display: flex; align-items: center; border-radius: var(--radius-control); padding: 5px; font-size: 12px; }
+.mona-selection-item.is-active { background-color: var(--editor-selection-soft); }
+.mona-selection-item.is-group-active { background-color: var(--editor-selection-medium); }
+.mona-selection-item:not(.is-locked):hover { background-color: var(--editor-selection-medium); transition: background-color 200ms; }
 .mona-selection-name { overflow: hidden; height: 18px; flex: 1; text-overflow: ellipsis; white-space: nowrap; line-height: 18px; }
+.mona-selection-select {
+  justify-content: flex-start;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
 .mona-selection-icons { display: flex; align-items: center; justify-content: flex-end; margin-left: 10px; }
-.mona-selection-icons > svg,
-.mona-selection-icons > span { width: 14px; margin-left: 6px; cursor: pointer; }
-.mona-selection-item.is-locked .mona-selection-icons > svg:first-child { height: 14px; font-size: 14px; }
-.mona-selection-icons > svg:last-child { width: 17px; font-size: 17px; }
-.mona-selection-icons > svg:hover { color: #d14424; }
+.mona-selection-icons > button,
+.mona-selection-icons > span { width: 20px; height: 20px; margin-left: 2px; padding: 2px; }
+.mona-selection-icons > button svg { width: 16px; height: 16px; }
+.mona-selection-icons > button:hover { color: var(--editor-selection); }
 .mona-selection-group { padding: 5px 0; }
 .mona-selection-group-title { margin-bottom: 5px; padding: 0 5px; }
 .mona-selection-group .mona-selection-item { margin-left: 15px; }
 .mona-selection-item input { width: 100%; height: 16px; flex: 1; border: 0; outline: 0; background: transparent; padding: 0; font-size: 12px; }
 
 .mona-markup-panel { height: 100%; font-size: 12px; user-select: none; }
+.mona-markup-panel.is-embedded { min-height: 140px; }
 .mona-markup-container { display: flex; height: 100%; flex-direction: column; }
 .mona-markup-row { display: flex; width: 100%; align-items: center; }
 .mona-markup-row + .mona-markup-row { margin-top: 5px; }
 .mona-markup-row > div { width: 40%; }
-.mona-markup-row .mona-pptist-select {
-  width: 60%;
-}
-.mona-pptist-select {
-  position: relative;
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  background-color: #fff;
-  padding-right: 32px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color .25s;
-  user-select: none;
-}
-.mona-pptist-select:hover { border-color: #d14424; }
-.mona-pptist-select-value {
-  overflow: hidden;
-  min-width: 50px;
-  height: 30px;
-  padding-left: 10px;
-  line-height: 30px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-pptist-select-icon {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  width: 32px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  color: #bfbfbf;
-}
-.mona-pptist-select-popover {
-  position: fixed;
-  z-index: 1100;
-  border: 1px solid #e5e7eb;
-  border-radius: 2px;
-  background: #fff;
-  box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%);
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-}
-.mona-pptist-select-options {
-  overflow: auto;
-  max-height: 260px;
-  padding: 5px;
-  font-size: 13px;
-  text-align: left;
-  user-select: none;
-}
-.mona-pptist-select-option {
-  overflow: hidden;
-  height: 32px;
-  border-radius: 2px;
-  padding: 0 5px;
-  line-height: 32px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-pptist-select-option:not(.is-disabled, .is-selected):hover { background-color: rgb(209 68 36 / 5%); cursor: pointer; }
-.mona-pptist-select-option.is-selected { color: #d14424; font-weight: 700; }
-.mona-pptist-select-option.is-disabled { color: #b7b7b7; }
-.mona-pptist-select-option:focus-visible {
-  outline: 1px solid #d14424;
-  outline-offset: -1px;
-}
-.mona-markup-placeholder { height: 30px; margin-top: 5px; border: 1px dashed #ccc; border-radius: 2px; color: #999; font-style: italic; line-height: 30px; text-align: center; }
+.mona-markup-select { width: 60%; }
+.mona-markup-placeholder { height: 30px; margin-top: 5px; border: 1px dashed #ccc; border-radius: var(--radius-control); color: #999; font-style: italic; line-height: 30px; text-align: center; }
 
 .mona-search-panel { font-size: 13px; }
+.mona-search-panel.is-embedded { min-height: 180px; }
 .mona-search-close {
   position: absolute;
   top: 8px;
@@ -5481,45 +6065,95 @@
   font-size: 13px;
   cursor: pointer;
 }
-.mona-search-close:hover { color: #d14424; }
-.mona-search-tabs { display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid #e5e7eb; font-size: 13px; line-height: 1; user-select: none; }
-.mona-search-tabs > div { border-bottom: 2px solid transparent; padding: 8px 10px; text-align: center; cursor: pointer; }
-.mona-search-tabs > div.is-active { border-bottom-color: #d14424; }
-.mona-search-content { display: flex; flex-direction: column; justify-content: space-between; }
+.mona-search-close:hover { color: var(--foreground); }
+.mona-search-tabs { display: flex; height: auto; align-items: center; justify-content: flex-start; border: 0; border-bottom: 1px solid #e5e7eb; border-radius: 0; background: transparent; padding: 0; font-size: 13px; line-height: 1; user-select: none; }
+.mona-search-tabs > button { height: auto; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 10px; box-shadow: none; text-align: center; }
+.mona-search-tabs > button[data-state="active"] { border-bottom-color: var(--foreground); background: transparent; color: var(--foreground); box-shadow: none; }
+.mona-search-content { display: flex; flex-direction: column; justify-content: space-between; margin-top: 0; }
 .mona-search-input {
-  display: flex;
   margin-top: 10px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
-  padding: 0 5px;
   font-size: 13px;
-  transition: border-color .25s;
 }
 .mona-search-input:hover,
-.mona-search-input:focus-within { border-color: #d14424; }
+.mona-search-input:focus-within { border-color: var(--ring); }
 .mona-search-input input { min-width: 0; height: 30px; flex: 1; border: 0; outline: 0; padding: 0 5px; color: #333; font: inherit; line-height: 30px; }
 .mona-search-input input::placeholder { color: #bfbfbf; }
-.mona-search-input > span { display: flex; align-items: center; justify-content: center; line-height: 30px; user-select: none; }
+.mona-search-suffix { gap: 2px; padding-right: 3px; }
 .mona-search-count { margin-right: 8px; font-size: 12px; }
-.mona-search-input > i { position: relative; display: inline-block; height: 1em; margin: auto 8px; border-inline-start: 1px solid rgb(5 5 5 / 6%); }
+.mona-search-suffix [data-slot="separator"] { height: 1em; margin: auto 4px; }
 .mona-search-case { font-size: 12px; cursor: pointer; }
-.mona-search-case.is-active { color: #d14424; }
+.mona-search-case[aria-pressed="true"] { background: var(--muted); color: var(--foreground); }
 .mona-search-next { width: 22px; height: 100%; cursor: pointer; }
-.mona-search-next:hover { color: #d14424; }
+.mona-search-next:hover { color: var(--foreground); }
+.mona-search-replace-input { height: 32px; margin-top: 10px; border-radius: var(--radius-control); }
 .mona-search-footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 10px; }
-.mona-search-footer button {
-  height: 32px;
-  margin-left: 5px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
+.mona-search-footer button { margin-left: 5px; }
+.mona-editor-slide-canvas mark.active { background-color: #ff9632; }
+
+/* Working-copy restore banner (editor-persistence) */
+.mona-restore-banner {
+  /* Anchored to the editor inset (the canvas column), not the viewport, so
+     it centers on the slide regardless of the rail/drawer to the left. */
+  position: absolute;
+  /* Clears the filmstrip bottom bar. */
+  bottom: 148px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 14px;
+  border: 1px solid #e2e2e2;
+  border-radius: var(--radius-overlay);
   background: #fff;
-  padding: 0 15px;
-  color: #333;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
   font-size: 13px;
-  letter-spacing: 1px;
+  color: #333;
+}
+
+.mona-restore-banner-action {
+  border: 1px solid var(--editor-selection);
+  border-radius: var(--radius-surface);
+  background: #fff;
+  color: var(--editor-selection);
+  font-size: 12px;
+  padding: 2px 8px;
   cursor: pointer;
 }
-.mona-search-footer button.is-primary { border-color: #d14424; background: #d14424; color: #fff; }
-.mona-search-footer button:disabled { border-color: #d9d9d9; background: #f5f5f5; color: #b7b7b7; cursor: default; }
-.mona-editor-slide-canvas mark.active { background-color: #ff9632; }
+
+.mona-restore-banner-action:hover {
+  background: var(--editor-selection);
+  color: #fff;
+}
+
+.mona-restore-banner-close {
+  border: 0;
+  background: transparent;
+  color: #999;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+/* Flip controls: fixed two-column grid so long localized labels shrink and
+   ellipsize inside the inspector instead of pushing past its edge. */
+.mona-panel-flip-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.mona-panel-flip-group > button { min-width: 0; }
+
+/* Rows whose control is a switch: let the label take the free width so
+   English labels ("Enable shadow:") stay on one line. */
+.mona-panel-row:has([data-slot="switch"]) > .mona-panel-row-label {
+  width: auto;
+  flex: 1;
+  white-space: nowrap;
+}
+/* Keep the slider thumb's overhang inside the panel edge. */
+.mona-panel-row-control > [data-slot="slider"] { width: calc(100% - 8px); }

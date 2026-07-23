@@ -1,10 +1,9 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- exact timer chrome uses PPTist's compact pointer-first spans. */
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import CloseIcon from '~icons/icon-park-outline/close'
 
-import { EditorMoveablePanel } from '@/features/editor/EditorMoveablePanel'
+import { ScreenMoveablePanel } from '@/features/screen/ScreenMoveablePanel'
 
 const fillDigit = (value: number, length: number) => String(value).padStart(length, '0')
 
@@ -22,6 +21,7 @@ export function ScreenCountdownTimer({
   const [countdown, setCountdown] = useState(false)
   const [time, setTime] = useState(0)
   const timerRef = useRef<number | null>(null)
+  const startButtonRef = useRef<HTMLButtonElement | null>(null)
   const timeRef = useRef(0)
   const minute = Math.floor(time / 60)
   const second = time % 60
@@ -75,28 +75,38 @@ export function ScreenCountdownTimer({
     else input.value = type === 'minute' ? fillDigit(minute, 2) : fillDigit(second, 2)
   }
   useEffect(() => clearTimer, [])
+  useEffect(() => {
+    startButtonRef.current?.focus()
+    const keydown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onClose()
+    }
+    document.addEventListener('keydown', keydown)
+    return () => document.removeEventListener('keydown', keydown)
+  }, [onClose])
   const inputKeyDown = (event: KeyboardEvent<HTMLInputElement>, type: 'minute' | 'second') => {
     event.stopPropagation()
     if (event.key === 'Enter') changeTime(event, type)
   }
 
   return (
-    <EditorMoveablePanel className="mona-screen-countdown" height={110} left={left} top={top} width={180}>
+    <ScreenMoveablePanel ariaLabel={t('screen.timer')} className="mona-screen-countdown" height={110} left={left} top={top} width={180}>
       <div className="mona-screen-timer-header">
-        <span onClick={() => timing ? pause() : start()}>{t(timing ? 'timer.pause' : 'timer.start')}</span>
-        <span onClick={reset}>{t('common.reset')}</span>
-        <span className={countdown ? 'is-active' : ''} onClick={toggleCountdown}>{t('timer.countdown')}</span>
+        <button onClick={() => timing ? pause() : start()} ref={startButtonRef} type="button">{t(timing ? 'timer.pause' : 'timer.start')}</button>
+        <button onClick={reset} type="button">{t('common.reset')}</button>
+        <button aria-pressed={countdown} className={countdown ? 'is-active' : ''} onClick={toggleCountdown} type="button">{t('timer.countdown')}</button>
       </div>
       <div className="mona-screen-timer-content">
         <div className="mona-screen-timer-circle">
-          <input disabled={inputsDisabled} key={`minute-${minute}-${inputsDisabled}`} maxLength={3} onBlur={event => changeTime(event, 'minute')} onKeyDown={event => inputKeyDown(event, 'minute')} onMouseDown={event => event.stopPropagation()} type="text" defaultValue={fillDigit(minute, 2)} />
+          <input aria-label={t('timer.minutes')} disabled={inputsDisabled} key={`minute-${minute}-${inputsDisabled}`} maxLength={3} onBlur={event => changeTime(event, 'minute')} onKeyDown={event => inputKeyDown(event, 'minute')} onMouseDown={event => event.stopPropagation()} type="text" defaultValue={fillDigit(minute, 2)} />
         </div>
         <div className="mona-screen-timer-colon">:</div>
         <div className="mona-screen-timer-circle">
-          <input disabled={inputsDisabled} key={`second-${second}-${inputsDisabled}`} maxLength={3} onBlur={event => changeTime(event, 'second')} onKeyDown={event => inputKeyDown(event, 'second')} onMouseDown={event => event.stopPropagation()} type="text" defaultValue={fillDigit(second, 2)} />
+          <input aria-label={t('timer.seconds')} disabled={inputsDisabled} key={`second-${second}-${inputsDisabled}`} maxLength={3} onBlur={event => changeTime(event, 'second')} onKeyDown={event => inputKeyDown(event, 'second')} onMouseDown={event => event.stopPropagation()} type="text" defaultValue={fillDigit(second, 2)} />
         </div>
       </div>
-      <div aria-label={t('common.close')} className="mona-screen-timer-close" onClick={onClose}><CloseIcon /></div>
-    </EditorMoveablePanel>
+      <button aria-label={t('common.close')} className="mona-screen-timer-close" onClick={onClose} type="button"><CloseIcon /></button>
+    </ScreenMoveablePanel>
   )
 }

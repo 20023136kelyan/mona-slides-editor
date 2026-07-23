@@ -3,12 +3,13 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { selectPresentation } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
 
-import { EditorNoticeStack, type EditorNoticeValue } from '@/features/editor/EditorContextMenu'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { ScreenSlideList } from '@/features/screen/ScreenSlideList'
 import { ScreenBaseView, ScreenPresenterView } from '@/features/screen/ScreenViews'
 import { SCREEN_LASER_POINTER } from '@/features/screen/screen-assets'
+import { projectPresentationForScreen, resolveSourceSlideIndex } from '@/features/screen/screen-presentation'
 import { AUDIENCE_SYNC_CHANNEL, type ScreenPresentationController, type ScreenSyncMessage, type ScreenViewMode } from '@/features/screen/screen-types'
 import { useScreenPlayback } from '@/features/screen/use-screen-playback'
 import { useScreenSlideSize } from '@/features/screen/use-screen-slide-size'
@@ -75,23 +76,17 @@ const useFullscreenLifecycle = (onExit: () => void) => {
   return { enterFullscreen, fullscreen, manualExitFullscreen }
 }
 
-function ScreenNotices() {
-  const idRef = useRef(0)
-  const [notices, setNotices] = useState<Array<EditorNoticeValue & { id: number }>>([])
-  useEffect(() => {
-    const listener = (event: Event) => {
-      const notice = (event as CustomEvent<EditorNoticeValue | null>).detail
-      if (notice) setNotices(current => [...current, { ...notice, id: ++idRef.current }])
-    }
-    window.addEventListener('mona:notice', listener)
-    return () => window.removeEventListener('mona:notice', listener)
-  }, [])
-  return <EditorNoticeStack notices={notices} onClose={id => setNotices(current => current.filter(notice => notice.id !== id))} />
-}
-
 function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: EditorRuntime }) {
-  const presentation = useEditorSelector(runtime.store, selectPresentation)
-  const setSlideIndex = useCallback((index: number) => runtime.focusSlide(index), [runtime])
+  const { notifications } = useEditorApplication()
+  const sourcePresentation = useEditorSelector(runtime.store, selectPresentation)
+  const presentation = useMemo(
+    () => projectPresentationForScreen(sourcePresentation),
+    [sourcePresentation],
+  )
+  const setSlideIndex = useCallback((index: number) => {
+    const sourceIndex = resolveSourceSlideIndex(sourcePresentation, presentation, index)
+    if (sourceIndex !== -1) runtime.focusSlide(sourceIndex)
+  }, [presentation, runtime, sourcePresentation])
   const controller = useMemo<ScreenPresentationController>(() => ({
     presentation,
     setSlideIndex,
@@ -102,11 +97,11 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
   // Playback and fullscreen state live here so toggling base/presenter view
   // keeps autoplay, loop, and animation progress. (Vue re-created them per
   // view; deliberate improvement.)
-  const playback = useScreenPlayback({ controller })
+  const playback = useScreenPlayback({ controller, notify: notifications.notify })
   const fullscreen = useFullscreenLifecycle(onExit)
   const openAudience = () => {
     fullscreen.manualExitFullscreen()
-    window.open(`${location.origin}${location.pathname}?mode=audience`, 'pptist-audience', 'popup')
+    window.open(`${location.origin}${location.pathname}?mode=audience`, 'mona-audience', 'popup')
   }
   // Vue's exitScreening leaves browser fullscreen before unmounting the show.
   const exitShow = () => {
@@ -129,21 +124,21 @@ function PresenterScreen({ onExit, runtime }: { onExit: () => void; runtime: Edi
   }, [onExit])
 
   return (
-    <div className="mona-pptist-screen">
-      {/* Deliberately conditional (not dual <Activity>): the gate-6 parity
-          contracts — like Vue — require exactly one mounted screen view, and
-          keeping both in the DOM duplicates every #screen-element-* node.
+    <div className="mona-screen">
+      {/* Deliberately conditional (not dual <Activity>): exactly one screen
+          view may be mounted because keeping both in the DOM duplicates every
+          #screen-element-* node.
           Playback/fullscreen state survives the toggle because it is hoisted
           here. */}
       {viewMode === 'base'
         ? <ScreenBaseView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={changeViewMode} />
         : <ScreenPresenterView {...fullscreen} controller={controller} onExit={exitShow} openAudience={openAudience} playback={playback} presentation={presentation} setViewMode={changeViewMode} />}
-      <ScreenNotices />
     </div>
   )
 }
 
 function AudienceScreen({ initialPresentation }: { initialPresentation: PresentationState }) {
+  const { notifications } = useEditorApplication()
   const [presentation, setPresentation] = useState<PresentationState>(() => ({
     ...structuredClone(initialPresentation),
     slideIndex: 0,
@@ -157,7 +152,7 @@ function AudienceScreen({ initialPresentation }: { initialPresentation: Presenta
     presentation,
     setSlideIndex,
   }), [presentation, setSlideIndex])
-  const playback = useScreenPlayback({ audience: true, controller })
+  const playback = useScreenPlayback({ audience: true, controller, notify: notifications.notify })
   const { height: slideHeight, width: slideWidth } = useScreenSlideSize(presentation.viewportRatio)
   const [writing, setWriting] = useState({ blackboard: false, dataURL: '', visible: false })
   const [laser, setLaser] = useState({ visible: false, x: 0, y: 0 })
@@ -212,6 +207,6 @@ export function ScreenView({ onExit, runtime }: { onExit: () => void; runtime: E
   const initialPresentation = useEditorSelector(runtime.store, selectPresentation)
   const audience = new URLSearchParams(window.location.search).get('mode') === 'audience'
   return audience
-    ? <div className="mona-pptist-screen"><AudienceScreen initialPresentation={initialPresentation} /></div>
+    ? <div className="mona-screen"><AudienceScreen initialPresentation={initialPresentation} /></div>
     : <PresenterScreen onExit={onExit} runtime={runtime} />
 }

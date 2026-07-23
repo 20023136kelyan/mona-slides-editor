@@ -1,4 +1,3 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the slideshow chrome mirrors PPTist's pointer-first full-screen controls. */
 import { useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -27,11 +26,6 @@ import { ScreenWritingBoard } from '@/features/screen/ScreenWritingBoard'
 import type { ScreenPresentationController } from '@/features/screen/screen-types'
 import type { ScreenPlayback } from '@/features/screen/use-screen-playback'
 import { useScreenSlideSize } from '@/features/screen/use-screen-slide-size'
-
-const replaceLegacy = (message: string, values: Record<string, number | string>) => Object.entries(values).reduce(
-  (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
-  message,
-)
 
 interface CommonViewProps {
   controller: ScreenPresentationController
@@ -64,6 +58,17 @@ export function ScreenBaseView({
   const [bottomThumbnailsVisible, setBottomThumbnailsVisible] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const currentSlide = presentation.slides[presentation.slideIndex]!
+  const toolbarButton = (label: string, icon: React.ReactNode, onClick: () => void, active = false) => (
+    <ScreenTooltip content={label}>
+      <button
+        aria-label={label}
+        aria-pressed={active || undefined}
+        className={`mona-screen-tool-button${active ? ' is-active' : ''}`}
+        onClick={onClick}
+        type="button"
+      >{icon}</button>
+    </ScreenTooltip>
+  )
 
   const exit = () => {
     playback.broadcastExit()
@@ -80,7 +85,7 @@ export function ScreenBaseView({
       children: [2500, 5000, 7500, 10000].map(interval => ({
         action: `autoplay-${interval}`,
         handler: () => playback.setAutoPlayInterval(interval),
-        label: replaceLegacy(t('screen.seconds'), { value: interval / 1000 }),
+        label: t('screen.seconds', { value: interval / 1000 }),
         shortcut: playback.autoPlayInterval === interval ? '√' : '',
       })),
       handler: playback.autoPlayActive ? playback.closeAutoPlay : playback.autoPlay,
@@ -113,20 +118,25 @@ export function ScreenBaseView({
       {allSlidesVisible ? <ScreenAllSlides onClose={() => setAllSlidesVisible(false)} presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} /> : null}
       {writingVisible ? <ScreenWritingBoard onClose={() => setWritingVisible(false)} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} /> : null}
       {timerVisible ? <ScreenCountdownTimer onClose={() => setTimerVisible(false)} /> : null}
-      <div className="mona-screen-tools-left"><LeftIcon onClick={() => playback.execPrev()} /><RightIcon onClick={playback.execNext} /></div>
+      <div className="mona-screen-tools-left">
+        <button aria-label={t('screen.previousSlide')} disabled={presentation.slideIndex <= 0} onClick={() => playback.execPrev()} type="button"><LeftIcon /></button>
+        <button aria-label={t('screen.nextSlide')} disabled={presentation.slideIndex >= presentation.slides.length - 1} onClick={playback.execNext} type="button"><RightIcon /></button>
+      </div>
       <div className={`mona-screen-tools-right${rightToolsVisible ? ' is-visible' : ''}`} onMouseEnter={() => setRightToolsVisible(true)} onMouseLeave={() => setRightToolsVisible(false)}>
         <div className="mona-screen-tools-right-content">
-          <div className="mona-screen-tool-button mona-screen-page-number" onClick={() => setAllSlidesVisible(true)}>{replaceLegacy(t('screen.slideNumber'), { current: presentation.slideIndex + 1, total: presentation.slides.length })}</div>
-          <ScreenTooltip content={t('screen.penTools')}><PenIcon className="mona-screen-tool-button" onClick={() => setWritingVisible(true)} /></ScreenTooltip>
-          <ScreenTooltip content={t('screen.laserPointer')}><LaserIcon className={`mona-screen-tool-button${playback.laserPen ? ' is-active' : ''}`} onClick={() => playback.setLaserPen(!playback.laserPen)} /></ScreenTooltip>
-          <ScreenTooltip content={t('screen.timer')}><StopwatchIcon className={`mona-screen-tool-button${timerVisible ? ' is-active' : ''}`} onClick={() => setTimerVisible(current => !current)} /></ScreenTooltip>
-          <ScreenTooltip content={t('screen.presenterView')}><ListIcon className="mona-screen-tool-button" onClick={() => setViewMode('presenter')} /></ScreenTooltip>
-          <ScreenTooltip content={t('screen.audienceView')}><PeopleIcon className="mona-screen-tool-button" onClick={openAudience} /></ScreenTooltip>
-          {fullscreen ? <ScreenTooltip content={t('screen.exitFullscreen')}><OffscreenIcon className="mona-screen-tool-button" onClick={manualExitFullscreen} /></ScreenTooltip> : <ScreenTooltip content={t('screen.enterFullscreen')}><FullscreenIcon className="mona-screen-tool-button" onClick={enterFullscreen} /></ScreenTooltip>}
-          <ScreenTooltip content={t('screen.endSlideshow')}><PowerIcon className="mona-screen-tool-button" onClick={exit} /></ScreenTooltip>
+          <button aria-label={t('screen.allSlides')} className="mona-screen-tool-button mona-screen-page-number" onClick={() => setAllSlidesVisible(true)} type="button">{t('screen.slideNumber', { current: presentation.slideIndex + 1, total: presentation.slides.length })}</button>
+          {toolbarButton(t('screen.penTools'), <PenIcon />, () => setWritingVisible(true))}
+          {toolbarButton(t('screen.laserPointer'), <LaserIcon />, () => playback.setLaserPen(!playback.laserPen), playback.laserPen)}
+          {toolbarButton(t('screen.timer'), <StopwatchIcon />, () => setTimerVisible(current => !current), timerVisible)}
+          {toolbarButton(t('screen.presenterView'), <ListIcon />, () => setViewMode('presenter'))}
+          {toolbarButton(t('screen.audienceView'), <PeopleIcon />, openAudience)}
+          {fullscreen
+            ? toolbarButton(t('screen.exitFullscreen'), <OffscreenIcon />, manualExitFullscreen)
+            : toolbarButton(t('screen.enterFullscreen'), <FullscreenIcon />, enterFullscreen)}
+          {toolbarButton(t('screen.endSlideshow'), <PowerIcon />, exit)}
         </div>
       </div>
-      {bottomThumbnailsVisible ? <ScreenBottomThumbnails controller={controller} /> : null}
+      {bottomThumbnailsVisible ? <ScreenBottomThumbnails controller={controller} turnSlideToIndex={playback.turnSlideToIndex} /> : null}
       {contextMenu ? <ScreenContextMenu items={menu} onDismiss={() => setContextMenu(null)} position={contextMenu} /> : null}
     </div>
   )
@@ -171,7 +181,14 @@ export function ScreenPresenterView({
     { action: 'exit', handler: exit, label: t('screen.endSlideshow'), shortcut: 'ESC' },
   ]
 
-  const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void) => <div className={`mona-screen-presenter-tool${active ? ' is-active' : ''}`} onClick={onClick}>{icon}<span>{label}</span></div>
+  const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void) => (
+    <button
+      aria-pressed={active || undefined}
+      className={`mona-screen-presenter-tool${active ? ' is-active' : ''}`}
+      onClick={onClick}
+      type="button"
+    >{icon}<span>{label}</span></button>
+  )
   return (
     <div className="mona-screen-presenter">
       <div className="mona-screen-presenter-toolbar">
@@ -206,8 +223,8 @@ export function ScreenPresenterView({
         <div className="mona-screen-presenter-remark-header"><span>{t('screen.speakerNotes')}</span><span>P {presentation.slideIndex + 1} / {presentation.slides.length}</span></div>
         <div className={`mona-screen-presenter-remark-content ProseMirror-static${remark ? '' : ' is-empty'}`} dangerouslySetInnerHTML={{ __html: remark || t('screen.noNotes') }} style={{ fontSize: remarkFontSize }} />
         <div className="mona-screen-presenter-remark-scale">
-          <div className={remarkFontSize === 12 ? 'is-disabled' : ''} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))}><MinusIcon /></div>
-          <div className={remarkFontSize === 40 ? 'is-disabled' : ''} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))}><PlusIcon /></div>
+          <button aria-label={t('common.decrease')} disabled={remarkFontSize === 12} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))} type="button"><MinusIcon /></button>
+          <button aria-label={t('common.increase')} disabled={remarkFontSize === 40} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))} type="button"><PlusIcon /></button>
         </div>
       </div>
       {contextMenu ? <ScreenContextMenu items={menu} onDismiss={() => setContextMenu(null)} position={contextMenu} /> : null}

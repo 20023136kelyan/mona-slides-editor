@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Preserve PPTist's click-anywhere gradient track while the individual stops remain semantic buttons. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Preserve the established editor's click-anywhere gradient track while the individual stops remain semantic buttons. */
 import { useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
 import type { GradientColor } from '@mona/presentation-core/model'

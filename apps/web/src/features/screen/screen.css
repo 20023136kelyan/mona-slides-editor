@@ -1,4 +1,4 @@
-.mona-pptist-screen {
+.mona-screen {
   width: 100%;
   height: 100svh;
   overflow: hidden;
@@ -85,6 +85,12 @@
 .mona-screen-slide-background { position: absolute; width: 100%; height: 100%; background-position: center; }
 .mona-screen-element.is-link { cursor: pointer; }
 .mona-screen-element > .mona-element { z-index: inherit; }
+.mona-screen-element-link {
+  position: absolute;
+  z-index: inherit;
+  display: block;
+  transform-origin: center;
+}
 .mona-video-screen-content { width: 100%; height: 100%; }
 .mona-audio-content.is-screen .mona-audio-icon { cursor: pointer; }
 .mona-audio-content.is-screen .mona-audio-player { display: none; }
@@ -98,9 +104,19 @@
   color: #666;
   font-size: 25px;
 }
-.mona-screen-tools-left > svg { opacity: .1; cursor: pointer; transition: opacity .2s; }
-.mona-screen-tools-left > svg:hover { opacity: 1; }
-.mona-screen-tools-left > svg + svg { margin-left: 8px; }
+.mona-screen-tools-left > button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  opacity: .1;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.mona-screen-tools-left > button:hover,
+.mona-screen-tools-left > button:focus-visible { opacity: 1; }
+.mona-screen-tools-left > button:disabled { cursor: default; opacity: .05; }
+.mona-screen-tools-left > button + button { margin-left: 8px; }
 .mona-screen-tools-right {
   position: fixed;
   right: 0;
@@ -111,6 +127,7 @@
   transition: bottom .2s;
 }
 .mona-screen-tools-right.is-visible { bottom: 0; }
+.mona-screen-tools-right:focus-within { bottom: 0; }
 .mona-screen-tools-right::after {
   position: absolute;
   top: -66px;
@@ -126,16 +143,23 @@
   align-items: center;
   justify-content: center;
   border: 1px solid #e2e6ed;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #fff;
   padding: 8px 10px;
   color: #41464b;
   box-shadow: 0 2px 12px 0 rgb(56 56 56 / 20%);
   font-size: 25px;
 }
-.mona-screen-tool-button { cursor: pointer; }
+.mona-screen-tool-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .mona-screen-tool-button:hover,
-.mona-screen-tool-button.is-active { color: #d14424; }
+.mona-screen-tool-button.is-active { color: var(--editor-selection); }
 .mona-screen-tool-button + .mona-screen-tool-button { margin-left: 15px; }
 .mona-screen-page-number { height: 15px; padding: 0 12px; font-size: 12px; line-height: normal; }
 
@@ -160,8 +184,8 @@
 }
 .mona-screen-thumbnail { display: inline-block; outline: 2px solid #aaa; }
 .mona-screen-thumbnail + .mona-screen-thumbnail { margin-left: 10px; }
-.mona-screen-thumbnail:hover { outline-color: #d14424; }
-.mona-screen-thumbnail.is-active { outline: 3px solid #d14424; }
+.mona-screen-thumbnail:hover { outline-color: var(--editor-selection); }
+.mona-screen-thumbnail.is-active { outline: 3px solid var(--editor-selection); }
 .mona-screen-bottom-thumbnail-list::-webkit-scrollbar,
 .mona-screen-presenter-thumbnails::-webkit-scrollbar { width: 0; height: 0; }
 
@@ -176,7 +200,7 @@
 }
 .mona-screen-all-slides-return { height: 60px; padding: 20px 30px 0; }
 .mona-screen-all-slides-return svg { color: #fff; font-size: 36px; cursor: pointer; }
-.mona-screen-all-slides-return svg:hover { color: #d14424; }
+.mona-screen-all-slides-return svg:hover { color: var(--editor-selection); }
 .mona-screen-all-slides-content {
   display: flex;
   height: calc(100% - 100px);
@@ -197,10 +221,22 @@
   background-color: #fff;
   font-size: 12px;
 }
-.mona-screen-presenter-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+.mona-screen-presenter-tool {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .mona-screen-presenter-tool + .mona-screen-presenter-tool { margin-top: 22px; }
 .mona-screen-presenter-tool:hover,
-.mona-screen-presenter-tool.is-active { color: #d14424; }
+.mona-screen-presenter-tool.is-active { color: var(--editor-selection); }
 .mona-screen-presenter-tool > svg { margin-bottom: 8px; font-size: 22px; }
 .mona-screen-presenter-divider { width: 70%; margin: 24px 15%; border-block-start: 1px solid rgb(5 5 5 / 6%); }
 .mona-screen-presenter-content { width: calc(100% - 430px); height: 100%; background-color: #1d1d1d; }
@@ -234,22 +270,75 @@
 .mona-screen-presenter-remark-content { height: calc(100% - 60px); overflow: overlay; padding: 20px; line-height: 1.5; }
 .mona-screen-presenter-remark-content.is-empty { color: #999; font-style: italic; }
 .mona-screen-presenter-remark-scale { position: absolute; right: 5px; bottom: 5px; display: flex; font-size: 22px; }
-.mona-screen-presenter-remark-scale > div { display: flex; width: 40px; height: 40px; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
-.mona-screen-presenter-remark-scale > div.is-disabled { color: #666; cursor: no-drop; }
-.mona-screen-presenter-remark-scale > div:not(.is-disabled):hover { background-color: #333; }
+.mona-screen-presenter-remark-scale > button {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+.mona-screen-presenter-remark-scale > button:disabled { color: #666; cursor: not-allowed; }
+.mona-screen-presenter-remark-scale > button:not(:disabled):hover,
+.mona-screen-presenter-remark-scale > button:not(:disabled):focus-visible { background-color: #333; }
 
 .mona-screen-countdown { user-select: none; }
 .mona-screen-countdown { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%); }
 .mona-screen-timer-header { display: flex; height: 16px; align-items: center; margin-bottom: 16px; font-size: 13px; }
-.mona-screen-timer-header span { margin-right: 8px; cursor: pointer; }
-.mona-screen-timer-header span:hover,
-.mona-screen-timer-header span.is-active { color: #d14424; }
+.mona-screen-timer-header button {
+  margin-right: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.mona-screen-timer-header button:hover,
+.mona-screen-timer-header button:focus-visible,
+.mona-screen-timer-header button.is-active { color: var(--editor-selection); }
 .mona-screen-timer-content { display: flex; justify-content: space-between; padding: 0 5px; }
-.mona-screen-timer-circle { width: 54px; height: 54px; overflow: hidden; border-radius: 50%; background-color: rgb(209 68 36 / 5%); }
+.mona-screen-timer-circle { width: 54px; height: 54px; overflow: hidden; border-radius: var(--radius-pill); background-color: var(--editor-selection-subtle); }
 .mona-screen-timer-circle input { box-sizing: content-box; width: 100%; height: 100%; border: 0; outline: 0; background: transparent; padding: 1px 2px; text-align: center; font-family: Arial; font-size: 22px; }
 .mona-screen-timer-colon { height: 54px; font-size: 22px; line-height: 54px; }
-.mona-screen-timer-close { position: absolute; top: 0; right: 0; padding: 10px; line-height: 1; cursor: pointer; }
-.mona-screen-timer-close:hover { color: #d14424; }
+.mona-screen-timer-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  border: 0;
+  background: transparent;
+  padding: 10px;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.mona-screen-timer-close:hover,
+.mona-screen-timer-close:focus-visible { color: var(--editor-selection); }
+.mona-screen-thumbnail {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+}
+.mona-screen-all-slides-return button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.mona-screen-moveable-panel-close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
 
 .mona-screen-writing-board { position: absolute; inset: 0; z-index: 10; font-size: 12px; }
 .mona-screen-writing-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
@@ -258,26 +347,42 @@
 .mona-screen-writing-canvas-element { position: absolute; top: 0; left: 0; }
 .mona-screen-eraser-cursor,
 .mona-screen-pen-cursor { position: absolute; z-index: 9; pointer-events: none; }
-.mona-screen-eraser-cursor { display: flex; align-items: center; justify-content: center; border: 4px solid rgb(85 85 85 / 15%); border-radius: 50%; color: rgb(85 85 85 / 75%); }
+.mona-screen-eraser-cursor { display: flex; align-items: center; justify-content: center; border: 4px solid rgb(85 85 85 / 15%); border-radius: var(--radius-pill); color: rgb(85 85 85 / 75%); }
 .mona-screen-pen-cursor svg { filter: drop-shadow(2px 2px 2px #555); }
 .mona-screen-writing-tools-panel { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%); }
 .mona-screen-writing-tools { display: flex; width: 100%; height: 100%; align-items: center; justify-content: space-between; }
 .mona-screen-writing-tool-content { display: flex; align-items: center; }
 .mona-screen-writing-tool-wrap { position: relative; }
-.mona-screen-writing-btn { margin-right: 5px; border-radius: 2px; padding: 5px; cursor: pointer; }
-.mona-screen-writing-btn:hover { color: #d14424; }
-.mona-screen-writing-btn.is-active { background-color: rgb(209 68 36 / 50%); color: #fff; }
+.mona-screen-writing-btn {
+  margin-right: 5px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  padding: 5px;
+  font: inherit;
+  cursor: pointer;
+}
+.mona-screen-writing-btn:hover { color: var(--editor-selection); }
+.mona-screen-writing-btn.is-active { background-color: var(--editor-selection-strong); color: #fff; }
 .mona-screen-writing-btn.is-close { margin-right: 0; margin-left: 5px; }
 .mona-screen-writing-btn > svg { font-size: 20px; }
 .mona-screen-writing-colors { display: flex; padding: 0 5px; }
-.mona-screen-writing-color { width: 16px; height: 16px; border-radius: 2px; cursor: pointer; }
+.mona-screen-writing-color {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 0;
+  cursor: pointer;
+}
 .mona-screen-writing-color + .mona-screen-writing-color { margin-left: 8px; }
 .mona-screen-writing-color:hover { transform: scale(1.15); }
 .mona-screen-writing-color.is-active { transform: scale(1.3); }
 .mona-screen-writing-color.is-white { border: 1px solid #f1f1f1; }
 .mona-screen-writing-setting-popover {
   border: 1px solid #e5e7eb;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background: #fff;
   padding: 10px;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
@@ -292,10 +397,27 @@
 .mona-screen-writing-setting > span { width: 70px; }
 .mona-screen-writing-setting .mona-panel-slider { flex: 1; }
 .mona-screen-writing-shapes { display: flex; align-items: center; }
-.mona-screen-writing-shapes svg { font-size: 20px; cursor: pointer; }
-.mona-screen-writing-shapes svg + svg { margin-left: 6px; }
-.mona-screen-writing-shapes svg.is-active { color: #d14424; }
+.mona-screen-writing-shapes button {
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.mona-screen-writing-shapes button + button { margin-left: 6px; }
+.mona-screen-writing-shapes button.is-active { color: var(--editor-selection); }
+.mona-screen-writing-shapes svg { font-size: 20px; }
 .mona-screen-writing-divider { position: relative; display: inline-block; height: 1em; margin: 0 8px; border-inline-start: 1px solid rgb(5 5 5 / 6%); }
+
+.mona-context-menu-entry.is-divider > hr {
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: currentcolor;
+}
 
 .mona-screen-audience-writing-overlay { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
 .mona-screen-audience-writing-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
@@ -328,7 +450,7 @@
 
 .tippy-box[data-theme~='popover'] { border: 0; outline: 0; }
 .tippy-box[data-theme~='tooltip'] {
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: #262626;
   color: #fff;
   padding: 8px;

@@ -1,4 +1,4 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/media-has-caption, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- PPTist's pointer-first custom media controls, captionless user media, and composite video control surface are parity requirements; a semantic button cannot contain the player's nested buttons. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/media-has-caption, jsx-a11y/no-static-element-interactions, jsx-a11y/prefer-tag-over-role -- user media may be captionless and the composite player surface contains nested controls. */
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -8,6 +8,8 @@ import VolumeMuteIcon from '~icons/icon-park-outline/volume-mute'
 import VolumeNoticeIcon from '~icons/icon-park-outline/volume-notice'
 import VolumeSmallIcon from '~icons/icon-park-outline/volume-small'
 import type { PPTAudioElement, PPTVideoElement } from '@mona/presentation-core/model'
+
+import { useOptionalEditorApplication } from '@/features/editor/services/editor-application'
 
 export interface MediaElementEditor {
   active: boolean
@@ -53,7 +55,15 @@ function StaticVolumeIcon() {
 // React 19: ref is a regular prop, no forwardRef wrapper needed.
 function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autoplay?: boolean; element: PPTAudioElement; ref?: Ref<AudioPlayerHandle>; scale: number; style: React.CSSProperties }) {
   const { t } = useTranslation()
+  const application = useOptionalEditorApplication()
   const audioRef = useRef<HTMLAudioElement>(null)
+
+  // Effects detach when <Activity> hides the surface (display:none does not
+  // stop media): playing editor audio must not keep sounding behind a
+  // slideshow. Also covers real unmounts.
+  useEffect(() => () => {
+    audioRef.current?.pause()
+  }, [])
   const playBarRef = useRef<HTMLDivElement>(null)
   const volumeBarRef = useRef<HTMLDivElement>(null)
   const [volume, setVolumeState] = useState(.5)
@@ -66,7 +76,7 @@ function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autopla
   useLayoutEffect(() => {
     const audio = audioRef.current
     if (!audio || element.src) return
-    // PPTist renders an explicit empty src attribute. Preserve that observable
+    // the source editor renders an explicit empty src attribute. Preserve that observable
     // media/error lifecycle without asking React to render src="" (which emits
     // a React-only warning before the DOM reaches the source state).
     audio.setAttribute('src', '')
@@ -156,7 +166,7 @@ function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autopla
         onEnded={() => element.loop ? (seek(0), play()) : pause()}
         onError={event => {
           event.stopPropagation()
-          window.dispatchEvent(new CustomEvent('mona:notice', { detail: { text: t('player.loadFailed'), type: 'error' } }))
+          application?.notifications.notify({ text: t('player.loadFailed'), type: 'error' })
         }}
         onPlay={() => setPaused(false)}
         onProgress={event => {
@@ -209,6 +219,11 @@ function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autopla
 function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean; element: PPTVideoElement; scale: number }) {
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // See AudioPlayer: pause when <Activity> hides the surface.
+  useEffect(() => () => {
+    videoRef.current?.pause()
+  }, [])
   const backgroundCanvasRef = useRef<HTMLCanvasElement>(null)
   const playBarRef = useRef<HTMLDivElement>(null)
   const volumeBarRef = useRef<HTMLDivElement>(null)
@@ -231,7 +246,7 @@ function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean;
     const video = videoRef.current
     if (!video || element.src) return
     // See AudioPlayer: the empty attribute is source behaviour and is also
-    // what drives PPTist's failed-media state for an empty fixture URL.
+    // what drives the established editor's failed-media state for an empty fixture URL.
     video.setAttribute('src', '')
     video.load()
   }, [element.src])

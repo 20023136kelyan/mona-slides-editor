@@ -26,7 +26,7 @@
 }
 
 .mona-thumbnail-button[aria-pressed="true"] .mona-scaled-slide {
-  outline: 2px solid #d14424;
+  outline: 2px solid var(--editor-selection);
   outline-offset: 0;
 }
 
@@ -161,7 +161,7 @@
 
 .ProseMirror ::selection,
 .ProseMirror-static ::selection {
-  background-color: rgba(209, 68, 36, 0.25);
+  background-color: var(--editor-selection-medium);
   color: inherit;
 }
 
@@ -186,12 +186,12 @@
 
 :is(.ProseMirror, .ProseMirror-static) ul { list-style-type: disc; }
 :is(.ProseMirror, .ProseMirror-static) ol { list-style-type: decimal; }
-/* PPTist serializes custom markers as inline list-style-type on ul/ol; li must inherit it. */
+/* the source editor serializes custom markers as inline list-style-type on ul/ol; li must inherit it. */
 :is(.ProseMirror, .ProseMirror-static) ul li { list-style-type: inherit; }
 :is(.ProseMirror, .ProseMirror-static) ol li { list-style-type: inherit; }
 :is(.ProseMirror, .ProseMirror-static) code {
   margin: 0 1px;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   background: #f1f1f1;
   padding: 2px 6px;
   font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
@@ -373,7 +373,7 @@
   bottom: 0;
   width: 3px;
   margin-left: -1px;
-  background: #d14424;
+  background: var(--editor-selection);
   cursor: col-resize;
   opacity: 0;
   pointer-events: auto;
@@ -478,7 +478,7 @@
   z-index: 2;
   top: -20px;
   left: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-surface);
   background-color: rgba(0, 0, 0, .62);
   padding: 5px 7px;
   color: #fff;
@@ -505,7 +505,7 @@
   height: 11px;
   margin-top: -4px;
   margin-right: -10px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: #fff;
   cursor: pointer;
   transform: scale(0);
@@ -599,7 +599,7 @@
 .mona-video-speed-menu > button:hover { background: #393833; color: #fff; }
 .mona-video-speed-menu > button.is-active { color: #fff; font-weight: 700; }
 .mona-video-bezel { position: absolute; z-index: 3; inset: 0; color: #fff; font-size: 22px; pointer-events: none; }
-.mona-video-bezel > span { position: absolute; top: 50%; left: 50%; display: flex; width: 52px; height: 52px; align-items: center; justify-content: center; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(0, 0, 0, .5); padding: 12px; font-size: 40px; opacity: 0; }
+.mona-video-bezel > span { position: absolute; top: 50%; left: 50%; display: flex; width: 52px; height: 52px; align-items: center; justify-content: center; margin: -26px 0 0 -26px; border-radius: var(--radius-pill); background: rgba(0, 0, 0, .5); padding: 12px; font-size: 40px; opacity: 0; }
 .mona-video-bezel > span.is-active { animation: mona-video-bezel-hide .5s linear; }
 @keyframes mona-video-bezel-hide {
   from { opacity: 1; transform: scale(1); }

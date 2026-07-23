@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import Icons from 'unplugin-icons/vite'
+import { FileSystemIconLoader } from 'unplugin-icons/loaders'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
 
@@ -13,6 +14,10 @@ export default defineConfig({
         resolve: {
           alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),
+            '@excalidraw/mermaid-to-excalidraw': fileURLToPath(new URL(
+              './src/features/editor/drawing/excalidraw-mermaid-disabled.ts',
+              import.meta.url,
+            )),
           },
         },
         test: {
@@ -29,15 +34,22 @@ export default defineConfig({
             jsx: 'react',
             defaultClass: 'i-icon',
             scale: 1,
+            customCollections: {
+              custom: FileSystemIconLoader(fileURLToPath(new URL('./src/assets/icons', import.meta.url))),
+            },
           }),
           tailwindcss(),
         ],
         optimizeDeps: {
-          include: ['tinycolor2'],
+          include: ['lodash/throttle', 'react-dom/client', 'react-router', 'tinycolor2'],
         },
         resolve: {
           alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),
+            '@excalidraw/mermaid-to-excalidraw': fileURLToPath(new URL(
+              './src/features/editor/drawing/excalidraw-mermaid-disabled.ts',
+              import.meta.url,
+            )),
           },
         },
         test: {

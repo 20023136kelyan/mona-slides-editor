@@ -1,14 +1,13 @@
-/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/control-has-associated-label, jsx-a11y/no-noninteractive-element-interactions -- PPTist's table/td generator interaction and DOM geometry are preserved for parity; the containing table has an accessible name. */
+/* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/control-has-associated-label, jsx-a11y/no-noninteractive-element-interactions -- the table-size grid is a pointer-selection surface with an accessible table name. */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
 import { InspectorNumberInput } from '@/features/editor/EditorInspectorPrimitives'
 
 export function EditorTableGenerator({
-  onClose,
   onInsert,
 }: {
-  onClose: () => void
   onInsert: (rows: number, columns: number) => void
 }) {
   const { t } = useTranslation()
@@ -20,7 +19,7 @@ export function EditorTableGenerator({
     <div className="mona-table-generator">
       <div className="mona-table-generator-title">
         <div>{hovered ? t('foundation.editor.table.dimensions', { rows: hovered[0], columns: hovered[1] }) : t('foundation.editor.canvasTool.table')}</div>
-        <button onClick={() => setCustom(value => !value)} type="button">{t(custom ? 'foundation.editor.table.back' : 'foundation.editor.table.custom')}</button>
+        <Button onClick={() => setCustom(value => !value)} size="xs" type="button" variant="ghost">{t(custom ? 'foundation.editor.table.back' : 'foundation.editor.table.custom')}</Button>
       </div>
       {!custom ? (
         <table
@@ -53,8 +52,7 @@ export function EditorTableGenerator({
             <InspectorNumberInput ariaLabel={t('foundation.editor.table.columns')} max={20} min={1} onChange={setColumns} value={columns} />
           </div>
           <div className="mona-table-generator-actions">
-            <button onClick={onClose} type="button">{t('foundation.editor.table.cancel')}</button>
-            <button className="is-primary" onClick={() => onInsert(rows, columns)} type="button">{t('foundation.editor.table.confirm')}</button>
+            <Button onClick={() => onInsert(rows, columns)} size="editor" type="button">{t('foundation.editor.table.confirm')}</Button>
           </div>
         </div>
       )}

@@ -23,10 +23,12 @@ import ItalicIcon from '~icons/icon-park-outline/text-italic'
 import UnderlineIcon from '~icons/icon-park-outline/text-underline'
 import { selectHandleElement, selectPresentation } from '@mona/editor-state'
 import type { PPTElement, TableCell } from '@mona/presentation-core/model'
-import { Popover as PopoverPrimitive } from 'radix-ui'
 
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
-import { alignElementsToCanvasLikePptist, orderElementLikePptist } from '@/features/editor/editor-geometry'
+import { alignElementsToCanvas, orderElement } from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { MobileButton, MobileButtonGroup, MobileDivider } from '@/features/mobile/MobilePrimitives'
@@ -39,18 +41,16 @@ function ColorRows({ color, label, onChange }: { color: string; label: string; o
       <div className="mona-mobile-row-label">{label}:</div>
       <div className="mona-mobile-colors">
         {COLORS.map(value => (
-          <button aria-label={`${label} ${value}`} className="mona-mobile-color" key={value} onClick={() => onChange(value)} type="button"><i style={{ backgroundColor: value }} /></button>
+          <Button aria-label={`${label} ${value}`} className="mona-mobile-color" key={value} onClick={() => onChange(value)} size="icon-sm" variant="ghost"><i style={{ backgroundColor: value }} /></Button>
         ))}
-        <PopoverPrimitive.Root>
-          <PopoverPrimitive.Trigger asChild>
-            <button aria-label={`${label} custom`} className="mona-mobile-color is-custom" type="button"><i /></button>
-          </PopoverPrimitive.Trigger>
-          <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content className="mona-mobile-color-popover" collisionPadding={5} side="top" sideOffset={8}>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button aria-label={`${label} custom`} className="mona-mobile-color is-custom" size="icon-sm" variant="ghost"><i /></Button>
+          </PopoverTrigger>
+          <PopoverContent className="mona-mobile-color-popover" collisionPadding={5} side="top" sideOffset={8}>
               <EditorColorPicker onChange={onChange} value={color || '#ffffff'} />
-            </PopoverPrimitive.Content>
-          </PopoverPrimitive.Portal>
-        </PopoverPrimitive.Root>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   )
@@ -86,13 +86,13 @@ export function MobileElementToolbar({ runtime }: { runtime: EditorRuntime }) {
   const order = (command: 'bottom' | 'down' | 'top' | 'up') => {
     const slide = presentation.slides[presentation.slideIndex]
     if (!slide) return
-    const elements = orderElementLikePptist(slide.elements, handleElement.id, command)
+    const elements = orderElement(slide.elements, handleElement.id, command)
     if (elements) commitElements(elements, `Order element ${command}`)
   }
   const align = (command: 'bottom' | 'horizontal' | 'left' | 'right' | 'top' | 'vertical') => {
     const slide = presentation.slides[presentation.slideIndex]
     if (!slide) return
-    const elements = alignElementsToCanvasLikePptist({
+    const elements = alignElementsToCanvas({
       command,
       elements: slide.elements,
       selectedIds: new Set([handleElement.id]),
@@ -126,10 +126,12 @@ export function MobileElementToolbar({ runtime }: { runtime: EditorRuntime }) {
 
   return (
     <div className="mona-mobile-element-toolbar">
-      <div className="mona-mobile-tabs" role="tablist">
-        <button aria-selected={activeTab === 'style'} onClick={() => setActiveTab('style')} role="tab" type="button">{t('common.style')}</button>
-        <button aria-selected={activeTab === 'common'} onClick={() => setActiveTab('common')} role="tab" type="button">{t('mobile.layout')}</button>
-      </div>
+      <Tabs onValueChange={value => setActiveTab(value as 'common' | 'style')} value={activeTab}>
+        <TabsList className="mona-mobile-tabs">
+          <TabsTrigger value="style">{t('common.style')}</TabsTrigger>
+          <TabsTrigger value="common">{t('mobile.layout')}</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className="mona-mobile-element-content">
         {activeTab === 'style' ? (
           <div className="mona-mobile-element-style">

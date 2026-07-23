@@ -25,8 +25,8 @@ export type PresentationCommand =
   | { type: 'slide.properties.remove'; payload: RemovePropertyPayload }
   | { type: 'slide.delete'; slideIds: string | string[] }
   | { type: 'slide.focus'; index: number }
-  | { type: 'element.add'; elements: PPTElement | PPTElement[] }
-  | { type: 'element.delete'; elementIds: string | string[] }
+  | { type: 'element.add'; elements: PPTElement | PPTElement[]; slideId?: string }
+  | { type: 'element.delete'; elementIds: string | string[]; slideId?: string }
   | { type: 'element.update'; payload: UpdateElementPayload }
   | { type: 'element.properties.remove'; payload: RemovePropertyPayload }
 
@@ -200,9 +200,17 @@ export const applyPresentationCommand = (
     }
     case 'element.add': {
       const additions = Array.isArray(command.elements) ? command.elements : [command.elements]
-      const slideIndex = findSlideIndex(state)
+      const slideIndex = findSlideIndex(state, command.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
+      const existingIds = new Set(currentSlide.elements.map(element => element.id))
+      const additionIds = new Set<string>()
+      for (const element of additions) {
+        if (existingIds.has(element.id) || additionIds.has(element.id)) {
+          throw new PresentationCommandError(`Duplicate element id: ${element.id}`)
+        }
+        additionIds.add(element.id)
+      }
       const slide = { ...currentSlide, elements: [...currentSlide.elements, ...additions] }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
@@ -216,9 +224,12 @@ export const applyPresentationCommand = (
     case 'element.delete': {
       const elementIds = Array.isArray(command.elementIds) ? command.elementIds : [command.elementIds]
       const deleted = new Set(elementIds)
-      const slideIndex = findSlideIndex(state)
+      const slideIndex = findSlideIndex(state, command.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
+      const present = new Set(currentSlide.elements.map(element => element.id))
+      const missing = elementIds.find(id => !present.has(id))
+      if (missing) throw new PresentationCommandError(`Element not found: ${missing}`)
       const slide = {
         ...currentSlide,
         elements: currentSlide.elements.filter(element => !deleted.has(element.id)),
@@ -235,6 +246,9 @@ export const applyPresentationCommand = (
       const slideIndex = findSlideIndex(state, command.payload.slideId)
       const currentSlide = state.slides[slideIndex]
       if (!currentSlide) throw new PresentationCommandError('Target slide not found')
+      const present = new Set(currentSlide.elements.map(element => element.id))
+      const missing = elementIds.find(id => !present.has(id))
+      if (missing) throw new PresentationCommandError(`Element not found: ${missing}`)
       const elements = currentSlide.elements.map(element => {
         return targetIds.has(element.id) ? { ...element, ...command.payload.props } as PPTElement : element
       })

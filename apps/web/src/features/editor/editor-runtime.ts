@@ -1,15 +1,21 @@
 import { createInteractionController } from '@mona/editor-interactions'
 import { createEditorStore, editorActions, type EditorStore } from '@mona/editor-state'
 import {
+  applyPresentationTransaction,
   createPresentationId,
   createPresentationTransaction,
+  validateImportedSlides,
   type PresentationCommand,
   type PresentationState,
+  type PresentationTransaction,
+  type PresentationTransactionOrigin,
+  type PresentationTransactionResult,
 } from '@mona/presentation-core'
 import type { Gradient, PPTElement, PPTElementOutline, PPTElementShadow, PPTShapeElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { parseEditorClipboard, serializeEditorClipboard } from '@/features/editor/editor-clipboard'
-import { getPptistActionElementBounds } from '@/features/editor/editor-geometry'
+import { getActionElementBounds } from '@/features/editor/editor-geometry'
+import { sanitizeElements, sanitizeSlides } from '@/lib/deck-sanitizer'
 import {
   createEditorRichTextRuntime,
   type EditorRichTextRuntime,
@@ -19,6 +25,7 @@ export const MONA_CLIPBOARD_MIME = 'application/x-mona-presentation-elements+jso
 
 export interface CommitOptions {
   historyKey?: string
+  origin?: PresentationTransactionOrigin
   recordHistory?: boolean
 }
 
@@ -35,6 +42,7 @@ export interface EditorRuntime {
   canRedo: () => boolean
   canUndo: () => boolean
   commit: (label: string, commands: PresentationCommand[], options?: CommitOptions) => boolean
+  commitTransaction: (transaction: PresentationTransaction, options?: Omit<CommitOptions, 'origin'>) => PresentationTransactionResult
   copySelection: () => string | undefined
   copySlides: () => string | undefined
   createSection: () => string | null
@@ -53,6 +61,7 @@ export interface EditorRuntime {
   insertImportedSlides: (slides: readonly Slide[]) => string[]
   paste: (serialized?: string) => string[]
   pasteSlides: (serialized?: string) => string[]
+  previewTransaction: (transaction: PresentationTransaction) => PresentationTransactionResult
   removeAllSections: () => boolean
   removeSection: (sectionId: string) => boolean
   removeSectionSlides: (sectionId: string) => boolean
@@ -83,25 +92,37 @@ const serializeClipboard = (elements: PPTElement[]): string => serializeEditorCl
 const parseClipboard = (serialized: string): PPTElement[] | undefined => {
   const payload = parseEditorClipboard(serialized)
   if (typeof payload === 'string' || payload.type !== 'elements') return undefined
-  return payload.data
+  // Clipboard payloads can come from any page via the system clipboard, so
+  // they pass the same structural + markup gates as imported files.
+  const candidates = Array.isArray(payload.data) ? payload.data : []
+  if (!validateImportedSlides([{ id: 'clipboard', elements: candidates }]).valid) return undefined
+  return sanitizeElements(candidates)
 }
 
 export const createEditorRuntime = (presentation: PresentationState): EditorRuntime => {
   const store = createEditorStore({ presentation })
   const interaction = createInteractionController()
   const richText = createEditorRichTextRuntime()
-  interface HistorySnapshot {
-    slideIndex: number
-    slides: PresentationState['slides']
-  }
-  const toSnapshot = (state: PresentationState): HistorySnapshot => ({
-    slideIndex: state.slideIndex,
-    slides: structuredClone(state.slides),
-  })
-  const snapshots: HistorySnapshot[] = [toSnapshot(presentation)]
+  // Snapshots hold REFERENCES into the store's immer-produced state, not
+  // clones: RTK state is immutable (reducers copy-on-write, and immer freezes
+  // it in development), so complete-document history retains structural
+  // sharing while still restoring title, theme, viewport, templates, slides,
+  // and every future serializable presentation field atomically.
+  type HistorySnapshot = PresentationState
+  const snapshots: HistorySnapshot[] = [store.getState().presentation]
   let snapshotCursor = 0
   const historyTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const historyListeners = new Set<() => void>()
+  const notifyHistoryListeners = () => {
+    for (const listener of historyListeners) listener()
+  }
+  const getVirtualHistoryState = () => {
+    const hasPendingSnapshot = historyTimers.size > 0
+    return {
+      cursor: snapshotCursor + (hasPendingSnapshot ? 1 : 0),
+      length: snapshots.length + (hasPendingSnapshot ? 1 : 0),
+    }
+  }
   let clipboardText: string | undefined
   let shapeFormatPainter: ShapeFormatPainter | null = null
   const shapeFormatPainterListeners = new Set<() => void>()
@@ -110,7 +131,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
   }
 
   const addHistorySnapshot = () => {
-    const current = toSnapshot(store.getState().presentation)
+    const current = store.getState().presentation
     snapshots.splice(snapshotCursor + 1)
     if (snapshots[snapshotCursor]) {
       snapshots[snapshotCursor] = {
@@ -121,16 +142,22 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     snapshots.push(current)
     if (snapshots.length > 20) snapshots.shift()
     snapshotCursor = snapshots.length - 1
-    for (const listener of historyListeners) listener()
+    notifyHistoryListeners()
   }
 
   const scheduleHistorySnapshot = (historyKey = 'manual') => {
     const pending = historyTimers.get(historyKey)
     if (pending !== undefined) clearTimeout(pending)
+    const hadPendingSnapshot = historyTimers.size > 0
     historyTimers.set(historyKey, setTimeout(() => {
       historyTimers.delete(historyKey)
       addHistorySnapshot()
     }, 300))
+    // Undo must become available as soon as a real document mutation lands,
+    // not 300 ms later when the coalescing timer settles. The virtual history
+    // state represents the pending boundary without forcing high-frequency
+    // slider/text updates to allocate a snapshot per event.
+    if (!hadPendingSnapshot) notifyHistoryListeners()
   }
 
   // Undo/redo inside the debounce window must not skip the pending edit or
@@ -143,28 +170,50 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
   }
 
   const restoreHistorySnapshot = (snapshot: HistorySnapshot) => {
-    const current = store.getState().presentation
-    store.dispatch(editorActions.historyRestored({
-      ...current,
-      slideIndex: Math.min(snapshot.slideIndex, Math.max(snapshot.slides.length - 1, 0)),
-      slides: structuredClone(snapshot.slides),
-    }))
+    // The complete snapshot re-enters the store by reference; immer treats it
+    // as a frozen base and copies only changed branches on the next write.
+    store.dispatch(editorActions.historyRestored(snapshot))
     store.dispatch(editorActions.selectionChanged([]))
+    store.dispatch(editorActions.pageSelectionChanged(true))
     for (const listener of historyListeners) listener()
+  }
+
+  const previewTransaction: EditorRuntime['previewTransaction'] = transaction => (
+    applyPresentationTransaction(store.getState().presentation, transaction)
+  )
+
+  const commitTransaction: EditorRuntime['commitTransaction'] = (transaction, options = {}) => {
+    const before = store.getState().presentation
+    const preview = applyPresentationTransaction(before, transaction)
+    if (!preview.ok) return preview
+
+    const recordHistory = options.recordHistory ?? true
+    const historyKey = options.historyKey ?? transaction.label
+    // A different user action is a real undo boundary even when it follows the
+    // previous action inside the 300 ms coalescing window. Settle the previous
+    // action before applying the next one; repeated updates from the same
+    // slider/text source continue to coalesce.
+    if (recordHistory && historyTimers.size && !historyTimers.has(historyKey)) {
+      flushPendingHistorySnapshots()
+    }
+    store.dispatch(editorActions.transactionCommitted(transaction))
+    const after = store.getState().presentation
+    if (after !== before && recordHistory) {
+      scheduleHistorySnapshot(historyKey)
+    }
+    return preview
   }
 
   const commit: EditorRuntime['commit'] = (label, commands, options = {}) => {
     if (!commands.length) return false
-    const before = store.getState().presentation
-    store.dispatch(editorActions.transactionCommitted(createPresentationTransaction({
+    const transaction = createPresentationTransaction({
       label,
-      origin: 'user',
+      origin: options.origin ?? 'user',
       commands,
-    })))
-    const after = store.getState().presentation
-    if (after === before) return false
-    if (options.recordHistory ?? true) scheduleHistorySnapshot(options.historyKey ?? label)
-    return true
+    })
+    const before = store.getState().presentation
+    const result = commitTransaction(transaction, options)
+    return result.ok && store.getState().presentation !== before
   }
 
   const selectedElements = () => {
@@ -176,7 +225,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
   const copySelection = () => {
     const elements = selectedElements()
     if (!elements.length) return undefined
-    clipboardText = serializeClipboard(structuredClone(elements))
+    clipboardText = serializeClipboard(elements)
     return clipboardText
   }
 
@@ -189,7 +238,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
   const copySlides = () => {
     const slides = selectedSlides()
     if (!slides.length) return undefined
-    clipboardText = serializeEditorClipboard({ data: structuredClone(slides), type: 'slides' })
+    clipboardText = serializeEditorClipboard({ data: slides, type: 'slides' })
     return clipboardText
   }
 
@@ -242,6 +291,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     if (changed) {
       store.dispatch(editorActions.selectedSlideIndexesChanged([]))
       store.dispatch(editorActions.selectionChanged([]))
+      store.dispatch(editorActions.pageSelectionChanged(true))
     }
     return changed
   }
@@ -250,7 +300,8 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     if (!serialized) return []
     const payload = parseEditorClipboard(serialized)
     if (typeof payload === 'string' || payload.type !== 'slides' || !payload.data.length) return []
-    const slides = remapSlides(payload.data)
+    if (!validateImportedSlides(payload.data).valid) return []
+    const slides = remapSlides(sanitizeSlides(payload.data))
     if (!commit('Paste slides', [{ type: 'slide.add', slides }], { historyKey: 'clipboard-data' })) return []
     store.dispatch(editorActions.selectedSlideIndexesChanged([]))
     return slides.map(slide => slide.id)
@@ -282,8 +333,8 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     do {
       collision = currentElements.find(element => {
         if (element.type !== firstElement.type) return false
-        const existing = getPptistActionElementBounds(element)
-        const candidate = getPptistActionElementBounds({
+        const existing = getActionElementBounds(element)
+        const candidate = getActionElementBounds({
           ...firstElement,
           left: firstElement.left + offset,
           top: firstElement.top + offset,
@@ -346,9 +397,10 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       },
     },
     store,
-    canUndo: () => snapshotCursor > 0,
-    canRedo: () => snapshotCursor < snapshots.length - 1,
+    canUndo: () => getVirtualHistoryState().cursor > 0,
+    canRedo: () => !historyTimers.size && snapshotCursor < snapshots.length - 1,
     commit,
+    commitTransaction,
     copySelection,
     copySlides,
     createSection: () => {
@@ -361,7 +413,10 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     },
     createSlide: () => {
       const changed = commit('Create slide', [{ type: 'slide.add', slides: createEmptySlide() }], { historyKey: 'slide-handler' })
-      if (changed) store.dispatch(editorActions.selectionChanged([]))
+      if (changed) {
+        store.dispatch(editorActions.selectionChanged([]))
+        store.dispatch(editorActions.pageSelectionChanged(true))
+      }
       return changed
     },
     createSlideFromTemplate: source => {
@@ -379,6 +434,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       const changed = commit('Create slide from template', [{ type: 'slide.add', slides: slide }], { historyKey: 'slide-handler' })
       if (!changed) return null
       store.dispatch(editorActions.selectionChanged([]))
+      store.dispatch(editorActions.pageSelectionChanged(true))
       return slide.id
     },
     cutSelection: () => {
@@ -416,31 +472,49 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     },
     duplicateSlides: () => {
       const state = store.getState()
-      const current = state.presentation.slides[state.presentation.slideIndex]
-      if (!current) return []
-      const slides = remapSlides([current])
-      if (!commit('Paste slides', [{ type: 'slide.add', slides }], { historyKey: 'duplicate-slide' })) return []
-      store.dispatch(editorActions.selectedSlideIndexesChanged([]))
+      const selectedIndexes = Array.from(new Set([
+        ...state.session.selectedSlideIndexes,
+        state.presentation.slideIndex,
+      ])).sort((a, b) => a - b)
+      const sources = selectedIndexes.map(index => state.presentation.slides[index]).filter((slide): slide is Slide => Boolean(slide))
+      if (!sources.length) return []
+      const slides = remapSlides(sources)
+      const insertionIndex = selectedIndexes.at(-1)!
+      if (!commit('Duplicate slides', [
+        { type: 'slide.focus', index: insertionIndex },
+        { type: 'slide.add', slides },
+      ], { historyKey: 'duplicate-slide' })) return []
+      const firstDuplicateIndex = insertionIndex + 1
+      store.dispatch(editorActions.selectedSlideIndexesChanged(
+        slides.map((_, offset) => firstDuplicateIndex + offset),
+      ))
+      store.dispatch(editorActions.selectionChanged([]))
+      store.dispatch(editorActions.pageSelectionChanged(true))
       return slides.map(slide => slide.id)
     },
     deleteSelection,
     focusSlide: index => {
       const state = store.getState()
-      if (index === state.presentation.slideIndex) return
-      commit('Focus slide', [{ type: 'slide.focus', index }], { recordHistory: false })
+      if (index !== state.presentation.slideIndex) {
+        commit('Focus slide', [{ type: 'slide.focus', index }], { recordHistory: false })
+      }
       store.dispatch(editorActions.selectionChanged([]))
       store.dispatch(editorActions.cropElementChanged(null))
+      store.dispatch(editorActions.pageSelectionChanged(true))
     },
     getClipboardText: () => clipboardText,
-    getHistorySnapshot: () => `${snapshotCursor}:${snapshots.length}`,
-    getHistoryState: () => ({ cursor: snapshotCursor, length: snapshots.length }),
+    getHistorySnapshot: () => {
+      const { cursor, length } = getVirtualHistoryState()
+      return `${cursor}:${length}`
+    },
+    getHistoryState: getVirtualHistoryState,
     insertTemplateSlides: (source, theme) => {
       if (!source.length) return []
       const state = store.getState().presentation
       const isEmptySlide = state.slides.length === 1 && state.slides[0]?.elements.length === 0
       if (isEmptySlide) {
         const slides = structuredClone([...source])
-        if (!commit('Replace empty deck with template', [{ type: 'presentation.slides.replace', slides, theme }], { recordHistory: false })) return []
+        if (!commit('Replace empty deck with template', [{ type: 'presentation.slides.replace', slides, theme }], { historyKey: 'add-slides-or-elements' })) return []
         return slides.map(slide => slide.id)
       }
       const slides = remapSlides(source)
@@ -457,6 +531,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     },
     paste,
     pasteSlides,
+    previewTransaction,
     removeAllSections: () => {
       const state = store.getState().presentation
       if (!state.slides.some(slide => slide.sectionTag)) return false
@@ -484,7 +559,8 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     },
     recordHistorySnapshot: scheduleHistorySnapshot,
     reorderSlide: (oldIndex, newIndex) => {
-      const state = store.getState().presentation
+      const rootState = store.getState()
+      const state = rootState.presentation
       if (oldIndex === newIndex || oldIndex < 0 || newIndex < 0 || oldIndex >= state.slides.length || newIndex >= state.slides.length) return false
       const slides = structuredClone(state.slides)
       const movingSlide = slides[oldIndex]!
@@ -503,10 +579,21 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       }
       slides.splice(oldIndex, 1)
       slides.splice(newIndex, 0, movingSlide)
-      return commit('Reorder slide', [
+      const changed = commit('Reorder slide', [
         { type: 'presentation.slides.replace', slides },
         { type: 'slide.focus', index: newIndex },
-      ], { recordHistory: false })
+      ], { historyKey: `slide-reorder-${createPresentationId(8)}` })
+      if (!changed) return false
+      const remapIndex = (index: number) => {
+        if (index === oldIndex) return newIndex
+        if (oldIndex < newIndex && index > oldIndex && index <= newIndex) return index - 1
+        if (newIndex < oldIndex && index >= newIndex && index < oldIndex) return index + 1
+        return index
+      }
+      store.dispatch(editorActions.selectedSlideIndexesChanged(
+        rootState.session.selectedSlideIndexes.map(remapIndex),
+      ))
+      return true
     },
     redo: () => {
       flushPendingHistorySnapshots()

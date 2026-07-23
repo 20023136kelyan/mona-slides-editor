@@ -1,21 +1,25 @@
-# Mona Slides
+# Mona
 
 简体中文 | [English](./README.md)
 
-Mona Slides 是一个开源的浏览器演示文稿编辑器。它保留文字、图片、形状、
+Mona 是一个开源的浏览器演示文稿编辑器。它保留文字、图片、形状、
 线条、表格、图表、媒体和公式等可编辑对象，而不是把整页幻灯片扁平化为图片。
 
-当前仓库已经完成 PPTist 编辑器的 React 迁移。编辑器、移动端界面、放映、
-演讲者工具、导入导出流程以及中英文界面都已迁移到 React，并与原实现的冻结
-构建进行了双向验证。`tests/oracle/vue/` 中的 Vue 构建只用于测试，不是第二个
-生产应用。
+编辑器、移动端界面、放映、演讲者工具、导入导出流程以及中英文界面均使用
+React 实现。仓库现在使用 Mona 自有的产品测试和确定性测试数据，不再保留第二套
+前端框架作为参考运行时。
 
-## 当前产品边界
+## 智能代理编辑
 
-本阶段为 Mona 后续的智能代理工作流建立可靠且等价的编辑器基础。计划中的 AI
-演示文稿 SDK、云模型适配器和基于 Excalidraw 的绘图优先输入尚未在本阶段实现。
-未来这些能力必须修改与人工编辑器相同的原生演示文稿模型；截图只作为检查证据，
-不能取代可编辑的幻灯片数据。
+Mona 已支持绘图优先和文本优先的演示文稿代理流程。Excalidraw 草图按幻灯片保存，
+并可作为视觉意图交给 Mona。代理同时读取原生演示文稿结构和渲染后的幻灯片图像，
+生成受限的 JavaScript 演示文稿程序，预览结果、验证命令，并将用户接受的修改作为
+一次可撤销事务应用。最终生成的仍是普通、可编辑的演示文稿元素；截图仅用于检查，
+不会成为幻灯片数据。
+
+目前支持 OpenAI 帐户登录、Anthropic 帐户登录、用户自带 Google AI Studio 密钥，
+以及无需模型即可验证完整编辑流程的本地参考引擎。OAuth 凭据只在代理服务器中加密
+保存，不会进入编辑器或生成的演示文稿代码。
 
 ## 技术栈
 
@@ -35,36 +39,37 @@ npm install
 npm run dev
 ```
 
-访问 <http://127.0.0.1:5173/>。根目录的 `dev`、`build` 和 `preview` 命令都指向
-`apps/web` 中的 React 应用。
+访问 <http://127.0.0.1:5173/>。根目录的 `dev` 命令会同时启动 React 应用和本地
+代理服务器。托管提供商和生产环境密钥要求详见
+[`apps/agent-server/README.md`](./apps/agent-server/README.md)。
 
 ## 验证
 
 ```sh
 npm run type-check
+npm run check:architecture
 npm run lint
-npm run test:gate2
+npm run test:core
 npm run test:react
 npm run e2e:react
 npm run build
-npm run parity:gate8
 ```
-
-完整的双向一致性测试耗时较长。测试命令和最终证据记录在
-[`tests/parity/PARITY_MATRIX.md`](./tests/parity/PARITY_MATRIX.md) 以及
-[`doc/`](./doc/) 下的 Gate 4–8 记录中。
 
 ## 仓库结构
 
 ```text
 apps/web/                    React 生产应用
+apps/agent-server/           托管提供商、凭据和托管素材的安全边界
+packages/agent-protocol/     共享的代理程序与检查协议
 packages/presentation-core/ 演示文稿模型和领域逻辑
 packages/editor-state/      规范状态、事务和选择器
 packages/editor-interactions/ 几何和手势逻辑
 packages/rich-text/         与框架无关的富文本逻辑
-packages/parity-fixtures/   共享的确定性测试数据
-tests/oracle/vue/           仅用于测试的不可变编译基准
-tests/gate*/                双向一致性与稳定性测试
+packages/test-fixtures/     共享的确定性测试数据
+tests/core/                 与框架无关的集成测试
+tests/performance/          状态与交互性能预算
+tests/stability/            生产环境稳定性测试
+tests/corpus/               真实 PowerPoint 测试数据元信息
 ```
 
 界面本地化以英文为规范来源和回退语言，同时支持简体中文；法语、西班牙语、
@@ -73,5 +78,5 @@ tests/gate*/                双向一致性与稳定性测试
 
 ## 来源与许可
 
-Mona Slides 基于 [PPTist](https://github.com/pipipi-pikachu/PPTist) 开发，并保留
-原版权与许可声明。仓库许可条款见 [`LICENSE`](./LICENSE)。
+Mona 保留所采用开源软件的版权与许可声明。来源信息见 [`NOTICE.md`](./NOTICE.md)，
+仓库许可条款见 [`LICENSE`](./LICENSE)。
