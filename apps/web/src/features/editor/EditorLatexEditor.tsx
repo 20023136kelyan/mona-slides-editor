@@ -6,11 +6,11 @@ import { FORMULA_LIST, SYMBOL_LIST } from '@mona/presentation-core/latex-presets
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { renderLatex, renderLatexSymbol, type LatexRenderResult } from '@/features/editor/editor-latex'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
-import { cn } from '@/lib/utils'
 
 type FormulaToolbarState = 'formula' | 'symbol'
 
@@ -31,21 +31,14 @@ function FormulaSymbol({ latex }: { latex: string }) {
   return <div className="[&_svg]:inline [&_svg]:align-baseline" dangerouslySetInnerHTML={{ __html: svg }} />
 }
 
-function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }: {
-  card?: boolean
+function LatexCardTabs({ onChange, tabs, value }: {
   onChange: (value: string) => void
-  spaceBetween?: boolean
   tabs: ReadonlyArray<{ key: string; label: string }>
   value: string
 }) {
   return (
     <ToggleGroup
-      className={cn(
-        'w-full flex-wrap items-center justify-start gap-0 rounded-none',
-        !card && 'border-b',
-        spaceBetween && 'justify-between',
-        card && 'h-10 shrink-0 items-stretch',
-      )}
+      className="h-10 w-full shrink-0 flex-wrap items-stretch justify-start gap-0 rounded-none"
       onValueChange={next => {
         if (next) onChange(next)
       }}
@@ -54,12 +47,7 @@ function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }
     >
       {tabs.map(tab => (
         <ToggleGroupItem
-          className={cn(
-            'min-w-0 rounded-none font-normal data-[state=on]:bg-transparent',
-            card
-              ? 'h-auto flex-1 border-b bg-muted px-0 py-0 text-xs hover:bg-muted data-[state=on]:border-b-transparent [&:not(:first-child)]:border-l'
-              : 'h-auto border-b-2 border-transparent px-2.5 py-2 hover:bg-transparent data-[state=on]:border-b-foreground',
-          )}
+          className="h-auto min-w-0 flex-1 rounded-none border-b bg-muted px-0 py-0 text-xs font-normal hover:bg-muted data-[state=on]:border-b-transparent data-[state=on]:bg-transparent [&:not(:first-child)]:border-l"
           key={tab.key}
           value={tab.key}
         >
@@ -67,6 +55,24 @@ function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
+  )
+}
+
+function LatexLineTabs({ onChange, tabs, value }: {
+  onChange: (value: string) => void
+  tabs: ReadonlyArray<{ key: string; label: string }>
+  value: string
+}) {
+  return (
+    <Tabs className="w-full" onValueChange={onChange} value={value}>
+      <TabsList className="h-auto w-full flex-wrap justify-between gap-0 rounded-none bg-transparent p-0" variant="line">
+        {tabs.map(tab => (
+          <TabsTrigger className="flex-none rounded-none px-2.5 py-1.5 text-xs" key={tab.key} value={tab.key}>
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   )
 }
 
@@ -129,18 +135,18 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
               <div className="flex-1">
                 <Textarea className="h-full resize-none p-2.5 font-mono leading-relaxed" onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
               </div>
-              <div className="mt-5 flex h-40 items-center justify-center rounded-lg border text-center select-none">
+              <div className="mt-5 flex h-40 items-center justify-center rounded-[var(--radius-surface)] border text-center select-none">
                 {!latex ? <div className="text-sm text-muted-foreground">{t('foundation.editor.latex.preview')}</div> : (
                   <div className="flex h-full w-full items-center justify-center p-2.5"><FormulaContent height={138} latex={latex} width={518} /></div>
                 )}
               </div>
             </div>
-            <div className="ml-5 flex h-full w-[280px] flex-col overflow-hidden rounded-lg border bg-background select-none">
-              <LatexTabs card onChange={value => setToolbarState(value as FormulaToolbarState)} tabs={formulaTabs} value={toolbarState} />
+            <div className="ml-5 flex h-full w-[280px] flex-col overflow-hidden rounded-[var(--radius-surface)] border bg-background select-none">
+              <LatexCardTabs onChange={value => setToolbarState(value as FormulaToolbarState)} tabs={formulaTabs} value={toolbarState} />
               <div className="h-[calc(100%-40px)] text-sm">
                 {toolbarState === 'symbol' ? (
                   <div className="flex h-full flex-col">
-                    <div className="mx-2.5 mt-2.5"><LatexTabs onChange={setSelectedSymbolKey} spaceBetween tabs={symbolTabs} value={selectedSymbolKey} /></div>
+                    <div className="mx-2.5 mt-2.5"><LatexLineTabs onChange={setSelectedSymbolKey} tabs={symbolTabs} value={selectedSymbolKey} /></div>
                     <div className="flex flex-1 flex-wrap overflow-auto p-3">
                       {selectedSymbol.children.map(item => <div className="flex cursor-pointer items-center justify-center rounded-[var(--radius-control)] hover:bg-muted" key={item.latex} onClick={() => insertSymbol(item.latex)}><FormulaSymbol latex={item.latex} /></div>)}
                     </div>

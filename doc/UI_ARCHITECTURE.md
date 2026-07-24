@@ -162,14 +162,12 @@ Shared control registry: [`apps/web/src/components/ui`](../apps/web/src/componen
 
 | Area | Notes |
 | --- | --- |
-| Phase 3b creation pools | Explicitly deferred in `editor.css`: category tabs, shape/line/chart/symbol pools, template grid extras |
 | Contextual **control** skins | Shell migrated; control dots, selects, border panels still CSS |
 | Filmstrip | Geometry + tile language in CSS; some labels/flags use Tailwind in TSX |
-| Hotkey drawer | Full `.mona-hotkey-drawer*` skin until a later sheet migration |
-| Export | shadcn `Tabs`/`Slider`/`Switch` with dense `.mona-export-*` skin |
 | Panel region animation | `.mona-panel-region` width transition (geometry contract) |
 | Canvas / selection | Stage, viewport, handles, live region `.mona-editor-status` |
 | Residual `mona-panel-*` | Still referenced from style panels + inspector primitives |
+| Animation pool | Dense `.mona-animation-pool-*` skin (inspector / style-panel pass) |
 
 ### Document paint vs feature shells
 
@@ -294,13 +292,28 @@ Architecture boundary check: `npm run check:architecture` (see [`UI_SYSTEM.md`](
 
 Inventory only — not work owned by this document. Same look, simpler code (Tailwind + native shadcn), no redesign.
 
-Preferred order for a future chrome pass:
+Task-panel content chrome is settled: the shared panel kit in
+[`panel/EditorPanelPrimitives.tsx`](../apps/web/src/features/editor/panel/EditorPanelPrimitives.tsx)
+(`PanelChrome`/`PanelHeader`/`PanelBody`, `PanelSearchField`, `PanelBackHeader`,
+`PanelSectionHeader`, `PanelEmptyState`/`PanelLoadingRow`/`PanelErrorRow`,
+`PanelMasonry`) is the canonical construction path for drawer panels — new
+panels compose these primitives instead of hand-rolling search shells, back
+rows, section headers, empty states, or grids. Underline tabs use
+`Tabs variant="line"`; chips use `Button size="chip"`; trailing search-shell
+icon buttons use `Button size="header-icon"`.
 
-1. Phase 3b dense creation-pool skins (shape/line/chart/symbol/template pools)
-2. Contextual toolbar **control** skins (keep absolute geometry)
-3. Export dialog dense `.mona-export-*` skin
-4. Hotkey drawer → Sheet + Tailwind
-5. Filmstrip tile chrome (keep drag/drop/mask geometry)
-6. Retire residual `mona-panel-*` from style panels / `EditorInspectorPrimitives`
+Settled in the export / pools pass:
+
+- Hotkey drawer is `Sheet` + Tailwind (`EditorHotkeyDrawer`)
+- Export dialog chrome is Tailwind + shadcn (`EditorExportDialog`); no `.mona-export-*` skin
+- Creation pools (element category tiles, shape/line grids) and templates/symbols compose Tailwind in `EditorRail` / panel kit — charts already use `EditorChartsPanel`
+
+Preferred order for the remaining chrome pass:
+
+1. Contextual toolbar **control** skins (keep absolute geometry)
+2. Filmstrip tile chrome (keep drag/drop/mask geometry)
+3. Retire residual `mona-panel-*` from style panels / `EditorInspectorPrimitives`
+4. Style-panel / inspector density + modal policy unification (`EditorModal` vs raw Dialogs vs Sheet)
+5. Animation pool dense `.mona-animation-pool-*` skin
 
 Geometry that must stay in CSS: stage/viewport, selection and transform/crop handles, filmstrip drag markers and edge masks, `CollapsiblePanelRegion` width animation, color-picker pointers, rich-text document surface.

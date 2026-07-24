@@ -33,6 +33,9 @@ beforeEach(async () => {
 })
 
 test('edits named chart cells and saves the selected chart type as native data', async () => {
+  // The data-grid dialog is 640px wide; the default viewport would leave the
+  // footer buttons outside the clickable area.
+  await page.viewport(900, 700)
   const onClose = vi.fn<() => void>()
   const onSave = vi.fn<Parameters<typeof EditorChartDataEditor>[0]['onSave']>()
   await render(<EditorChartDataEditor element={chart} onClose={onClose} onSave={onSave} />)
@@ -42,9 +45,7 @@ test('edits named chart cells and saves the selected chart type as native data',
   await page.getByRole('textbox', { exact: true, name: 'Chart data cell B2' }).fill('42')
   await page.getByRole('button', { name: 'Click to change' }).click()
   await page.getByRole('button', { name: 'Line chart' }).click()
-  const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('.mona-chart-editor-buttons-right button'))
-    .find(button => button.textContent === 'Confirm')!
-  confirm.click()
+  await page.getByRole('button', { exact: true, name: 'Confirm' }).click()
 
   expect(onSave).toHaveBeenCalledWith({
     type: 'line',

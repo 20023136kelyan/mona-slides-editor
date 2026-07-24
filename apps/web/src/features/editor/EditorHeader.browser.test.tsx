@@ -274,11 +274,13 @@ test('keeps compact desktop header groups separate from the editable title', asy
     for (const name of ['File', 'View', 'Tools', 'Comments', 'Start slideshow (F5)', 'Generate presentation with AI', 'Export', 'Settings']) {
       await expect.element(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
+    // The compact header runs on a 28px control scale; every visible control
+    // must still clear the WCAG 2.2 minimum target size (24x24).
     for (const control of document.querySelectorAll<HTMLElement>('.mona-editor-header button')) {
       const rect = control.getBoundingClientRect()
       if (!rect.width || !rect.height) continue
-      expect(rect.width).toBeGreaterThanOrEqual(40)
-      expect(rect.height).toBeGreaterThanOrEqual(40)
+      expect(rect.width).toBeGreaterThanOrEqual(24)
+      expect(rect.height).toBeGreaterThanOrEqual(24)
     }
   }
   finally {

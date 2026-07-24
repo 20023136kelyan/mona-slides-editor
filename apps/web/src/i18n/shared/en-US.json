@@ -208,17 +208,6 @@
     "group": "Group",
     "empty": "This slide has no elements"
   },
-  "imageLibrary": {
-    "title": "Image library (from pexels.com)",
-    "searchPlaceholder": "Search images",
-    "insert": "Insert",
-    "all": "All",
-    "landscape": "Landscape",
-    "portrait": "Portrait",
-    "square": "Square",
-    "defaultQuery": "landscape",
-    "enterKeyword": "Enter an image search keyword"
-  },
   "elementTypes": {
     "text": "Text",
     "image": "Image",

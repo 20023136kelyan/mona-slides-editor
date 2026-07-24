@@ -42,6 +42,7 @@ const buttonVariants = cva(
           'h-7 min-w-7 gap-1 rounded-[var(--radius-action)] px-2 text-xs font-medium [&_svg:not([class*=\'size-\'])]:size-3.5',
         'header-icon':
           'size-7 rounded-[var(--radius-action)] [&_svg:not([class*=\'size-\'])]:size-3.5',
+        chip: 'h-7 gap-1 rounded-[var(--radius-pill)] px-3 text-xs [&_svg:not([class*=\'size-\'])]:size-3.5',
       },
     },
     defaultVariants: {

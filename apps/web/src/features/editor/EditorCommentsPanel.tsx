@@ -9,6 +9,7 @@ import { createPresentationId, type Note } from '@mona/presentation-core'
 
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { PanelEmptyState } from '@/features/editor/panel/EditorPanelPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { cn } from '@/lib/utils'
@@ -94,7 +95,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
         <div className="mx-[-10px] flex-1 space-y-2.5 overflow-auto px-3 py-0.5" ref={notesRef}>
           {notes.map(note => (
             <div
-              className={cn('group/note rounded-lg border p-2.5', activeNoteId === note.id && 'bg-muted')}
+              className={cn('group/note rounded-[var(--radius-surface)] border p-2.5', activeNoteId === note.id && 'bg-muted')}
               data-note-id={note.id}
               key={note.id}
             >
@@ -163,7 +164,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
               ) : null}
             </div>
           ))}
-          {!notes.length ? <div className="flex h-full w-full items-center justify-center text-muted-foreground italic">{t('foundation.editor.notes.empty')}</div> : null}
+          {!notes.length ? <PanelEmptyState message={t('foundation.editor.notes.empty')} /> : null}
         </div>
         <div className="flex h-[120px] shrink-0 flex-col justify-end text-right">
           <Textarea

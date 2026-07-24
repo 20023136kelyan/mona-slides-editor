@@ -11,6 +11,7 @@ import type { PPTElement } from '@mona/presentation-core'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PanelEmptyState } from '@/features/editor/panel/EditorPanelPrimitives'
 import { orderElement } from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -216,7 +217,7 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
             ) : renderItem(item))}
           </div>
         </>
-      ) : <div className="flex h-full w-full items-center justify-center italic text-muted-foreground">{t('foundation.editor.selection.empty')}</div>}
+      ) : <PanelEmptyState message={t('foundation.editor.selection.empty')} />}
     </>
   )
 

@@ -15,7 +15,7 @@ const excludeDevelopmentFixtures = () => ({
   },
 })
 
-import { monaImageSearchApi } from './src/features/editor/mona-image-search-api'
+import { monaImageSearchApi } from './src/features/editor/mona-image-search-api.js'
 
 // https://vite.dev/config/
 export default defineConfig({

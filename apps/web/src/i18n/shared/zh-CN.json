@@ -208,17 +208,6 @@
     "group": "组合",
     "empty": "本页无内容"
   },
-  "imageLibrary": {
-    "title": "图片库（来自 pexels.com）",
-    "searchPlaceholder": "搜索图片",
-    "insert": "插入",
-    "all": "全部",
-    "landscape": "横向",
-    "portrait": "纵向",
-    "square": "方形",
-    "defaultQuery": "风景",
-    "enterKeyword": "请输入搜索关键词"
-  },
   "elementTypes": {
     "text": "文本",
     "image": "图片",

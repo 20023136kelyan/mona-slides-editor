@@ -443,16 +443,6 @@
       "clearDescription": "This removes every drawn mark on the current slide. The slide content itself will not change."
     },
     "media": {
-      "video": "Video",
-      "audio": "Audio",
-      "videoPlaceholder": "Enter a video URL, e.g. https://example.com/video.mp4",
-      "audioPlaceholder": "Enter an audio URL, e.g. https://example.com/audio.mp3",
-      "uploadVideo": "Upload video",
-      "uploadAudio": "Upload audio",
-      "invalidVideo": "Enter a valid video URL first",
-      "invalidAudio": "Enter a valid audio URL first",
-      "cancel": "Cancel",
-      "confirm": "Confirm",
       "iconColor": "Icon color:",
       "autoplay": "Autoplay:",
       "loop": "Loop:",
@@ -673,11 +663,13 @@
       "crop": "Crop",
       "replace": "Replace"
     },
+    "panel": {
+      "seeAll": "See all"
+    },
     "charts": {
       "search": "Search charts",
       "searchPlaceholder": "Search charts",
       "startWithData": "Start with data",
-      "seeAll": "See all",
       "back": "Back to charts",
       "noResults": "No charts match your search.",
       "categories": {
@@ -712,7 +704,6 @@
     "photos": {
       "search": "Search photos",
       "searchPlaceholder": "Search millions of photos",
-      "seeAll": "See all",
       "back": "Back to photos",
       "recentlyUsed": "Recently used",
       "moreCategories": "More categories",
@@ -760,25 +751,6 @@
       "foldersComingSoon": "Folders are coming soon.",
       "unsupportedType": "That file type is not supported yet.",
       "insertItem": "Insert {{name}}"
-    },
-    "imageLibrary": {
-      "title": "Image library (from pexels.com)",
-      "back": "Back to uploads",
-      "close": "Close image library",
-      "searchPlaceholder": "Search images",
-      "search": "Search",
-      "orientation": "Image orientation",
-      "insert": "Insert",
-      "all": "All",
-      "landscape": "Landscape",
-      "portrait": "Portrait",
-      "square": "Square",
-      "defaultQuery": "landscape",
-      "enterKeyword": "Please enter a search keyword",
-      "loading": "Loading...",
-      "noResults": "No images found. Try another search.",
-      "searchError": "Images could not be loaded.",
-      "retry": "Try again"
     },
     "filters": {
       "blur": "Blur",

@@ -1,11 +1,10 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitives render divs; landmark roles are applied explicitly on them. */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, LayoutTemplate } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 
 import ConnectionIcon from '~icons/icon-park-outline/connection'
 import FormulaIcon from '~icons/icon-park-outline/formula'
-import LeftChevronIcon from '~icons/icon-park-outline/left'
 import GraphicDesignIcon from '~icons/icon-park-outline/graphic-design'
 import InsertTableIcon from '~icons/icon-park-outline/insert-table'
 import SymbolIcon from '~icons/icon-park-outline/symbol'
@@ -19,6 +18,7 @@ import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 import { Button } from '@/components/ui/button'
 import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { LinePointMarker } from '@/features/editor/ElementStyleCommons'
 import { EditorChartsPanel } from '@/features/editor/EditorChartsPanel'
@@ -27,6 +27,7 @@ import { EditorPhotosPanel } from '@/features/editor/EditorPhotosPanel'
 import { EditorUploadsPanel } from '@/features/editor/EditorUploadsPanel'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
 import type { CreateChartElementOptions } from '@/features/editor/editor-chart'
+import { PanelBackHeader, PanelSearchField } from '@/features/editor/panel/EditorPanelPrimitives'
 import type { EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
@@ -35,6 +36,11 @@ export type EditorRailPanel = EditorTaskPanelRoute
 
 const EMOJI_TYPES = ['face', 'gesture', 'nature', 'food', 'travel', 'activity', 'object', 'symbol'] as const
 
+const poolCategoryLabelClassName = 'mb-2 w-full box-border px-0 py-0.5 text-xs font-semibold text-foreground/70'
+const shapeItemClassName = 'relative mb-[calc(8%/7)] flex h-0 w-[11.5%] flex-[0_0_11.5%] items-center justify-center border-0 bg-transparent p-0 pb-[11.5%] [&:not(:nth-child(8n))]:mr-[calc(8%/7)] [&>svg]:absolute [&>svg]:top-1/2 [&>svg]:left-1/2 [&>svg]:-translate-x-1/2 [&>svg]:-translate-y-1/2 hover:[&_path:not(.is-outlined)]:stroke-[var(--editor-selection)] hover:[&_path.is-outlined]:fill-[var(--editor-selection)]'
+const lineItemClassName = 'relative mb-[calc(5%/4)] flex h-0 w-[19%] flex-[0_0_19%] items-center justify-center border-0 bg-transparent p-0 pb-[19%] text-[#999] [&:not(:nth-child(5n))]:mr-[calc(5%/4)] [&>svg]:absolute [&>svg]:top-1/2 [&>svg]:left-1/2 [&>svg]:-translate-x-1/2 [&>svg]:-translate-y-1/2 hover:text-[var(--editor-selection)]'
+const elementCategoryTabsClassName = 'mona-element-category-tabs mb-2.5 grid h-auto w-full grid-cols-3 gap-1 rounded-none bg-transparent p-0 [&_button]:flex [&_button]:h-[50px] [&_button]:min-w-0 [&_button]:flex-col [&_button]:gap-1 [&_button]:rounded-[var(--radius-action)] [&_button]:border-0 [&_button]:text-[10px] [&_button]:text-foreground/70 [&_button]:hover:bg-foreground/[0.06] [&_button]:hover:text-foreground [&_button]:data-[state=on]:bg-foreground/[0.08] [&_button]:data-[state=on]:font-semibold [&_button]:data-[state=on]:text-foreground [&_button_svg]:size-[17px]'
+
 function ShapeThumbnail({ category, index, onSelect, shape }: {
   category: string
   index: number
@@ -42,7 +48,7 @@ function ShapeThumbnail({ category, index, onSelect, shape }: {
   shape: ShapePoolItem
 }) {
   return (
-    <Button aria-label={shape.title || `${category} shape ${index + 1}`} className="mona-canvas-shape-item" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
+    <Button aria-label={shape.title || `${category} shape ${index + 1}`} className={shapeItemClassName} onClick={onSelect} size="editor-icon" type="button" variant="ghost">
       <svg height="18" overflow="visible" width="18">
         <g transform={`scale(${18 / shape.viewBox[0]}, ${18 / shape.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`}>
           <path
@@ -64,11 +70,11 @@ function ShapeThumbnail({ category, index, onSelect, shape }: {
 function ShapePool({ onSelect }: { onSelect: (shape: ShapePoolItem) => void }) {
   const { t } = useTranslation()
   return (
-    <div className="mona-canvas-shape-pool">
+    <div className="mt-3 w-full">
       {SHAPE_LIST.map(category => (
-        <section className="mona-canvas-pool-category" key={category.type}>
-          <div className="mona-canvas-pool-category-name">{t(`foundation.editor.canvasTool.shapeGroups.${category.type}`)}</div>
-          <div className="mona-canvas-shape-list">
+        <section key={category.type}>
+          <div className={poolCategoryLabelClassName}>{t(`foundation.editor.canvasTool.shapeGroups.${category.type}`)}</div>
+          <div className="mb-2.5 flex flex-wrap content-start">
             {category.children.map((shape, index) => (
               <ShapeThumbnail category={category.type} index={index} key={`${category.type}-${index}`} onSelect={() => onSelect(shape)} shape={shape} />
             ))}
@@ -82,15 +88,15 @@ function ShapePool({ onSelect }: { onSelect: (shape: ShapePoolItem) => void }) {
 function LinePool({ onSelect }: { onSelect: (line: LinePoolItem) => void }) {
   const { t } = useTranslation()
   return (
-    <div className="mona-canvas-line-pool">
+    <div className="w-full">
       {LINE_LIST.map((category, categoryIndex) => (
-        <section className="mona-canvas-pool-category" key={category.type}>
-          <div className="mona-canvas-pool-category-name">{t(`foundation.editor.canvasTool.lineGroups.${category.type}`)}</div>
-          <div className="mona-canvas-line-list">
+        <section key={category.type}>
+          <div className={poolCategoryLabelClassName}>{t(`foundation.editor.canvasTool.lineGroups.${category.type}`)}</div>
+          <div className="mb-2.5 flex flex-wrap content-start">
             {category.children.map((line, index) => {
               const id = `mona-create-line-${categoryIndex}-${index}`
               return (
-                <Button aria-label={`${category.type} line ${index + 1}`} className="mona-canvas-line-item" key={id} onClick={() => onSelect(line)} size="editor-icon" type="button" variant="ghost">
+                <Button aria-label={`${category.type} line ${index + 1}`} className={lineItemClassName} key={id} onClick={() => onSelect(line)} size="editor-icon" type="button" variant="ghost">
                   <svg height="20" overflow="visible" width="20">
                     <defs>
                       {line.points[0] ? <LinePointMarker baseSize={2} color="currentColor" id={id} position="start" preview type={line.points[0]} /> : null}
@@ -132,11 +138,15 @@ function SymbolPool({ onSelect }: { onSelect: (value: string) => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col text-foreground">
-      <ToggleGroup className="mb-2 w-full flex-wrap items-center justify-start rounded-none border-b text-[13px] select-none" onValueChange={value => {
-        if (value) setSelectedSymbolKey(value)
-      }} spacing={0} type="single" value={selectedSymbolKey}>
-        {SYMBOL_LIST.map(item => <ToggleGroupItem className="h-auto min-w-0 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 font-normal hover:bg-transparent data-[state=on]:border-b-foreground data-[state=on]:bg-transparent" key={item.key} value={item.key}>{t('foundation.editor.symbolPanel.tabs.' + item.key)}</ToggleGroupItem>)}
-      </ToggleGroup>
+      <Tabs className="mb-2 w-full shrink-0 select-none" onValueChange={setSelectedSymbolKey} value={selectedSymbolKey}>
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-0 rounded-none bg-transparent p-0" variant="line">
+          {SYMBOL_LIST.map(item => (
+            <TabsTrigger className="flex-none rounded-none px-2.5 py-1.5 text-xs" key={item.key} value={item.key}>
+              {t('foundation.editor.symbolPanel.tabs.' + item.key)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {selectedSymbolKey === 'emoji' ? (
         <ToggleGroup className="mb-[3px] items-center text-xs" onValueChange={value => {
           if (value) setSelectedEmojiTypeIndex(Number(value))
@@ -216,11 +226,11 @@ function TemplateCoverCard({ id, name, onOpen, theme }: {
   // Always lead with the template's cover page (first page as fallback).
   const cover = payload?.slides.find(slide => slide.type === 'cover') ?? payload?.slides[0]
   return (
-    <Button aria-label={name} className="flex h-auto flex-col items-stretch rounded-lg p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-lg [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" onClick={onOpen} size="editor" title={name} type="button" variant="ghost">
+    <Button aria-label={name} className="flex h-auto flex-col items-stretch rounded-[var(--radius-surface)] p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-[var(--radius-surface)] [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" onClick={onOpen} size="editor" title={name} type="button" variant="ghost">
       {cover ? (
         <ScaledSlide fixedWidth={128} slide={cover} theme={{ ...theme!, ...payload?.theme }} thumbnail viewportRatio={0.5625} viewportSize={1000} />
       ) : (
-        <Skeleton className="aspect-video w-full rounded-lg" />
+        <Skeleton className="aspect-video w-full rounded-[var(--radius-surface)]" />
       )}
     </Button>
   )
@@ -238,11 +248,13 @@ function TemplateDetail({ id, name, onBack, onInsertAll, onInsertOne, theme }: {
   const payload = useTemplatePayload(id)
   return (
     <div className="select-none">
-      <div className="mt-[-4px] mb-1 ml-[-6px] flex items-center">
-        <Button aria-label={t('foundation.editor.templates.back')} className="text-[15px] text-foreground/70" onClick={onBack} size="editor-icon" type="button" variant="ghost"><LeftChevronIcon /></Button>
-      </div>
-      <div className="mx-0.5 text-[15px] font-bold leading-[1.35]">{name}</div>
-      <div className="mx-0.5 mt-[3px] mb-3 text-xs text-foreground/55">{t('foundation.editor.templates.meta', { count: payload?.slides.length ?? 0 })}</div>
+      <PanelBackHeader
+        className="mb-1 ml-[-4px] p-0"
+        label={t('foundation.editor.templates.back')}
+        onBack={onBack}
+        title={name}
+      />
+      <div className="mx-0.5 mb-3 text-xs text-foreground/55">{t('foundation.editor.templates.meta', { count: payload?.slides.length ?? 0 })}</div>
       {payload ? (
         <>
           <Button className="mb-3 w-full rounded-[var(--radius-action)] font-semibold" onClick={() => onInsertAll(payload)} size="sm" type="button" variant="outline">
@@ -250,14 +262,14 @@ function TemplateDetail({ id, name, onBack, onInsertAll, onInsertOne, theme }: {
           </Button>
           <div className="grid grid-cols-2 gap-2">
             {payload.slides.map((slide, index) => (
-              <Button aria-label={`${t('foundation.editor.templates.insertTemplate')} ${index + 1}`} className="flex h-auto flex-col items-stretch rounded-lg p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-lg [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" key={slide.id} onClick={() => onInsertOne(slide)} size="editor" type="button" variant="ghost">
+              <Button aria-label={`${t('foundation.editor.templates.insertTemplate')} ${index + 1}`} className="flex h-auto flex-col items-stretch rounded-[var(--radius-surface)] p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-[var(--radius-surface)] [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" key={slide.id} onClick={() => onInsertOne(slide)} size="editor" type="button" variant="ghost">
                 <ScaledSlide fixedWidth={128} slide={slide} theme={{ ...theme!, ...payload.theme }} thumbnail viewportRatio={0.5625} viewportSize={1000} />
               </Button>
             ))}
           </div>
         </>
       ) : (
-        <Skeleton className="aspect-video w-full rounded-lg" />
+        <Skeleton className="aspect-video w-full rounded-[var(--radius-surface)]" />
       )}
     </div>
   )
@@ -293,18 +305,13 @@ function TemplatePanel({ onInsertAll, onInsertOne, templates, theme }: {
 
   return (
     <div className="select-none">
-      <div className="mb-[14px] flex flex-col gap-2">
-        <div className="flex h-10 items-center gap-2 rounded-[var(--radius-overlay)] border bg-background pr-2.5 pl-3 focus-within:border-ring [&>svg]:flex-none [&>svg]:text-[15px] [&>svg]:text-foreground/55">
-          <LayoutTemplate aria-hidden="true" />
-          <input
-            aria-label={t('foundation.editor.templates.searchPlaceholder')}
-            className="min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-foreground/40"
-            onChange={event => setQuery(event.target.value)}
-            placeholder={t('foundation.editor.templates.searchPlaceholder')}
-            type="search"
-            value={query}
-          />
-        </div>
+      <div className="mb-[14px]">
+        <PanelSearchField
+          label={t('foundation.editor.templates.searchPlaceholder')}
+          onChange={setQuery}
+          placeholder={t('foundation.editor.templates.searchPlaceholder')}
+          value={query}
+        />
       </div>
       <div className="grid grid-cols-2 gap-2">
         {filteredTemplates.map(template => (
@@ -347,7 +354,7 @@ function DrawerCollapseButton({ onClose }: { onClose: () => void }) {
   return (
     <Button
       aria-label={t('foundation.editor.rail.collapse')}
-      className="mona-drawer-close absolute top-1/2 right-0 z-30 h-12! w-5! min-w-0 -translate-y-1/2 translate-x-1/2 rounded-full border border-border/70 bg-background p-0 text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.12)] hover:bg-background hover:text-foreground [&_svg]:size-3.5!"
+      className="mona-drawer-close absolute top-1/2 right-0 z-30 h-12! w-5! min-w-0 -translate-y-1/2 translate-x-1/2 rounded-[var(--radius-pill)] border border-border/70 bg-background p-0 text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.12)] hover:bg-background hover:text-foreground [&_svg]:size-3.5!"
       onClick={onClose}
       size="icon-xs"
       type="button"
@@ -451,7 +458,7 @@ export function EditorRailDrawer({
               <div className={drawerStackClassName}>
                 <ToggleGroup
                   aria-label={t('foundation.editor.rail.elementCategories')}
-                  className="mona-element-category-tabs"
+                  className={elementCategoryTabsClassName}
                   onValueChange={value => {
                     if (value) setElementCategory(value as typeof elementCategory)
                   }}

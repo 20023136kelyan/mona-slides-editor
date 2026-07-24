@@ -443,16 +443,6 @@
       "clearDescription": "这将移除当前幻灯片上的所有绘制标记，但不会更改幻灯片内容。"
     },
     "media": {
-      "video": "视频",
-      "audio": "音频",
-      "videoPlaceholder": "输入视频地址，例如：https://example.com/video.mp4",
-      "audioPlaceholder": "输入音频地址，例如：https://example.com/audio.mp3",
-      "uploadVideo": "上传视频",
-      "uploadAudio": "上传音频",
-      "invalidVideo": "请先输入正确的视频地址",
-      "invalidAudio": "请先输入正确的音频地址",
-      "cancel": "取消",
-      "confirm": "确认",
       "iconColor": "图标颜色：",
       "autoplay": "自动播放：",
       "loop": "循环播放：",
@@ -673,11 +663,13 @@
       "crop": "裁剪",
       "replace": "替换"
     },
+    "panel": {
+      "seeAll": "查看全部"
+    },
     "charts": {
       "search": "搜索图表",
       "searchPlaceholder": "搜索图表",
       "startWithData": "从数据开始",
-      "seeAll": "查看全部",
       "back": "返回图表",
       "noResults": "没有匹配的图表。",
       "categories": {
@@ -712,7 +704,6 @@
     "photos": {
       "search": "搜索照片",
       "searchPlaceholder": "搜索海量照片",
-      "seeAll": "查看全部",
       "back": "返回照片",
       "recentlyUsed": "最近使用",
       "moreCategories": "更多分类",
@@ -760,25 +751,6 @@
       "foldersComingSoon": "文件夹功能即将推出。",
       "unsupportedType": "暂不支持该文件类型。",
       "insertItem": "插入 {{name}}"
-    },
-    "imageLibrary": {
-      "title": "图片库（来自 pexels.com）",
-      "back": "返回上传",
-      "close": "关闭图片库",
-      "searchPlaceholder": "搜索图片",
-      "search": "搜索",
-      "orientation": "图片方向",
-      "insert": "插入",
-      "all": "全部",
-      "landscape": "横向",
-      "portrait": "纵向",
-      "square": "正方形",
-      "defaultQuery": "风景",
-      "enterKeyword": "请输入搜索关键词",
-      "loading": "加载中...",
-      "noResults": "未找到图片，请尝试其他搜索。",
-      "searchError": "无法加载图片。",
-      "retry": "重试"
     },
     "filters": {
       "blur": "模糊",

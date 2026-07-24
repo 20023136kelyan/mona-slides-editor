@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { beforeAll, beforeEach, expect, test } from 'vitest'
+import { beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
@@ -159,9 +159,9 @@ test('keeps the editor drawer closed until the user requests a task or contextua
 
   expect(document.querySelector('.mona-editor-drawer')).toBeNull()
 
-  await page.getByTestId('mona-editor-surface').getByRole('button', { name: 'Templates' }).click()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Templates' }).click()
   expect(document.querySelector('.mona-editor-drawer')).not.toBeNull()
-  await expect.element(page.getByText('Background fill')).toBeVisible()
+  await expect.element(page.getByPlaceholder('Describe your ideal design')).toBeVisible()
 
   // The border pill is the single collapse affordance (panels have no X).
   await page.getByRole('button', { name: 'Collapse panel' }).click()
@@ -291,7 +291,7 @@ test('routes creation, comments, search, layers, and speaker notes through one e
   // is named after the open panel via its aria-label.
   await rail.getByRole('button', { name: 'Elements' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
-  expect(document.querySelectorAll('.mona-element-category-tabs button')).toHaveLength(6)
+  expect(document.querySelectorAll('.mona-element-category-tabs button')).toHaveLength(5)
 
   await rail.getByRole('button', { name: 'Text' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Text' })).toBeVisible()
@@ -418,17 +418,18 @@ test('opens AI as a structural dock and collapses the left panel on a compact vi
   const initialWidth = stage.getBoundingClientRect().width
 
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
-  await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
+  // The dock is labelled by its slide-scope header (untitled in this fixture).
+  await expect.element(page.getByRole('complementary', { name: 'Untitled page' })).toBeVisible()
   expect(document.querySelector('.mona-agent-dialog')).toBeNull()
   // The dock is a real sidebar column, so opening it pushes the canvas.
   expect(stage.getBoundingClientRect().width).toBeLessThan(initialWidth)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
-  await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
+  await expect.element(page.getByRole('complementary', { name: 'Untitled page' })).toBeVisible()
   expect(document.querySelectorAll('.mona-editor-drawer')).toHaveLength(1)
   expect(getComputedStyle(document.querySelector<HTMLElement>('.mona-drawer-region')!).display).toBe('none')
 
-  await page.getByRole('complementary', { name: 'Mona AI' }).getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('complementary', { name: 'Untitled page' }).getByRole('button', { name: 'Close' }).click()
   expect(document.querySelector('.mona-agent-dock')).toBeNull()
 })
 
@@ -529,15 +530,21 @@ test('manages keyboard focus inside the filmstrip context menu', async () => {
   first.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2, clientX: 100, clientY: 100 }))
   await expect.element(page.getByRole('menu', { name: 'Slide menu' })).toBeVisible()
   await new Promise(resolve => requestAnimationFrame(resolve))
+  // Radix menus opened by pointer focus the menu container; ArrowDown then
+  // moves the roving focus onto the first item.
+  expect(document.activeElement?.getAttribute('role')).toBe('menu')
+  document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
   expect(document.activeElement?.getAttribute('role')).toBe('menuitem')
   expect(document.activeElement?.textContent).toContain('Cut')
 
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }))
-  expect(document.activeElement?.textContent).toContain('Copy')
+  // Roving focus moves items on a macrotask, so poll rather than assert inline.
+  await vi.waitFor(() => expect(document.activeElement?.textContent).toContain('Copy'))
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
-  await new Promise(resolve => requestAnimationFrame(resolve))
-  expect(document.querySelector('[role="menu"][aria-label="Slide menu"]')).toBeNull()
-  expect(document.activeElement).toBe(first)
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="menu"][aria-label="Slide menu"]')).toBeNull()
+    expect(document.activeElement).toBe(first)
+  })
 })
 
 test('edits section titles and opens section actions from the keyboard', async () => {
@@ -650,6 +657,12 @@ test('exposes explicit insertion and transition boundaries between pages', async
   await expect.element(page.getByText('Push vertically', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Collapse panel' }).click()
+  // The drawer region animates width over 260ms and the centered filmstrip
+  // re-centers throughout, so let the collapse finish before aiming a click
+  // at the boundary control — otherwise the click lands at stale coordinates.
+  await vi.waitFor(() => {
+    expect(document.querySelector('.mona-drawer-region')!.getBoundingClientRect().width).toBe(0)
+  })
   await page.getByRole('button', { name: 'Insert page after page 1' }).click()
   expect(runtime.store.getState().presentation.slides).toHaveLength(4)
   expect(runtime.store.getState().presentation.slideIndex).toBe(1)

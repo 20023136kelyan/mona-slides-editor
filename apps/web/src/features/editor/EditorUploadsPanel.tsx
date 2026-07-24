@@ -2,7 +2,6 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ChevronLeft,
   FileAudio,
   FileVideo,
   Folder,
@@ -14,12 +13,19 @@ import {
   UserRound,
   Video,
 } from 'lucide-react'
-import { VirtuosoMasonry } from '@virtuoso.dev/masonry'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
+import {
+  PanelBackHeader,
+  PanelBody,
+  PanelChrome,
+  PanelEmptyState,
+  PanelHeader,
+  PanelMasonry,
+  PanelSearchField,
+} from '@/features/editor/panel/EditorPanelPrimitives'
 import {
   addMediaLibraryFile,
   blobToDataUrl,
@@ -31,10 +37,6 @@ import {
 type UploadsView = 'main' | 'record'
 type UploadsTab = 'images' | 'videos' | 'audio' | 'folders'
 
-type MasonryContext = {
-  onInsert: (item: MediaLibraryItem) => void
-}
-
 const tabToKind = (tab: UploadsTab): MediaLibraryKind | undefined => {
   if (tab === 'images') return 'image'
   if (tab === 'videos') return 'video'
@@ -42,8 +44,11 @@ const tabToKind = (tab: UploadsTab): MediaLibraryKind | undefined => {
   return undefined
 }
 
+const mediaRatio = (item: MediaLibraryItem) =>
+  item.width && item.height ? item.height / item.width : 1
+
 function MediaThumb({ item }: { item: MediaLibraryItem }) {
-  const url = useMemo(() => URL.createObjectURL(item.blob), [item.blob, item.id])
+  const url = useMemo(() => URL.createObjectURL(item.blob), [item.blob])
 
   useEffect(() => () => URL.revokeObjectURL(url), [url])
 
@@ -61,29 +66,6 @@ function MediaThumb({ item }: { item: MediaLibraryItem }) {
   return (
     <div className="flex aspect-square items-center justify-center rounded-[var(--radius-control)] bg-muted text-muted-foreground">
       <FileAudio className="size-6" />
-    </div>
-  )
-}
-
-function GalleryItemContent({
-  context,
-  data,
-}: {
-  context: MasonryContext
-  data: MediaLibraryItem
-  index: number
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="box-border p-1">
-      <button
-        aria-label={t('foundation.editor.uploads.insertItem', { name: data.name })}
-        className="block w-full overflow-hidden rounded-[var(--radius-control)] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => context.onInsert(data)}
-        type="button"
-      >
-        <MediaThumb item={data} />
-      </button>
     </div>
   )
 }
@@ -113,20 +95,18 @@ export function EditorUploadsPanel({
     [] as MediaLibraryItem[],
   )
 
-  const masonryContext = useMemo<MasonryContext>(() => ({
-    onInsert: item => {
-      void (async () => {
-        if (item.kind === 'image') {
-          onInsertImageSource(await blobToDataUrl(item.blob))
-          return
-        }
-        const src = URL.createObjectURL(item.blob)
-        const ext = item.name.includes('.') ? item.name.split('.').pop()?.toLowerCase() : undefined
-        if (item.kind === 'video') onInsertVideo({ ...(ext ? { ext } : {}), src })
-        else onInsertAudio({ ...(ext ? { ext } : {}), src })
-      })()
-    },
-  }), [onInsertAudio, onInsertImageSource, onInsertVideo])
+  const insertItem = (item: MediaLibraryItem) => {
+    void (async () => {
+      if (item.kind === 'image') {
+        onInsertImageSource(await blobToDataUrl(item.blob))
+        return
+      }
+      const src = URL.createObjectURL(item.blob)
+      const ext = item.name.includes('.') ? item.name.split('.').pop()?.toLowerCase() : undefined
+      if (item.kind === 'video') onInsertVideo({ ...(ext ? { ext } : {}), src })
+      else onInsertAudio({ ...(ext ? { ext } : {}), src })
+    })()
+  }
 
   const uploadFiles = async (fileList: FileList | null) => {
     if (!fileList?.length) return
@@ -177,52 +157,47 @@ export function EditorUploadsPanel({
     ] as const
 
     return (
-      <div className="mona-uploads-panel flex min-h-0 flex-1 flex-col p-3">
-        <div className="mb-3 flex items-center gap-1">
-          <Button
-            aria-label={t('foundation.editor.uploads.back')}
-            onClick={() => {
-              setRecordNotice(null)
-              setView('main')
-            }}
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <h3 className="text-sm font-semibold">{t('foundation.editor.uploads.recordYourself')}</h3>
-        </div>
-        <div className="flex flex-col gap-2">
-          {options.map(option => {
-            const Icon = option.icon
-            return (
-              <Button
-                className="h-auto justify-start gap-3 rounded-[var(--radius-control)] border px-3 py-3 text-left font-medium whitespace-normal"
-                key={option.key}
-                onClick={() => setRecordNotice(t('foundation.editor.uploads.recordComingSoon'))}
-                type="button"
-                variant="ghost"
-              >
-                <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-muted text-foreground">
-                  <Icon className="size-5" />
-                </span>
-                <span className="text-sm">{option.label}</span>
-              </Button>
-            )
-          })}
-        </div>
-        {recordNotice ? (
-          <p className="mt-4 rounded-[var(--radius-control)] bg-muted px-3 py-2 text-xs text-muted-foreground" role="status">
-            {recordNotice}
-          </p>
-        ) : null}
-      </div>
+      <PanelChrome className="mona-uploads-panel">
+        <PanelBackHeader
+          label={t('foundation.editor.uploads.back')}
+          onBack={() => {
+            setRecordNotice(null)
+            setView('main')
+          }}
+          title={t('foundation.editor.uploads.recordYourself')}
+        />
+        <PanelBody className="overflow-y-auto">
+          <div className="flex flex-col gap-2">
+            {options.map(option => {
+              const Icon = option.icon
+              return (
+                <Button
+                  className="h-auto justify-start gap-3 rounded-[var(--radius-control)] border px-3 py-3 text-left font-medium whitespace-normal"
+                  key={option.key}
+                  onClick={() => setRecordNotice(t('foundation.editor.uploads.recordComingSoon'))}
+                  type="button"
+                  variant="ghost"
+                >
+                  <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-muted text-foreground">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="text-sm">{option.label}</span>
+                </Button>
+              )
+            })}
+          </div>
+          {recordNotice ? (
+            <output className="mt-4 block rounded-[var(--radius-control)] bg-muted px-3 py-2 text-xs text-muted-foreground">
+              {recordNotice}
+            </output>
+          ) : null}
+        </PanelBody>
+      </PanelChrome>
     )
   }
 
   return (
-    <div className="mona-uploads-panel flex min-h-0 flex-1 flex-col">
+    <PanelChrome className="mona-uploads-panel">
       <input
         accept="image/*,video/*,audio/*"
         aria-hidden="true"
@@ -234,80 +209,81 @@ export function EditorUploadsPanel({
         type="file"
       />
 
-      <div className="flex shrink-0 flex-col gap-2.5 px-3 pt-3 pb-2">
-      <div className="flex h-9 shrink-0 items-center gap-0.5 rounded-[var(--radius-action)] border border-input bg-background pl-2 pr-1">
-        <Search className="size-3.5 shrink-0 text-muted-foreground" />
-        <Input
-          aria-label={t('foundation.editor.uploads.search')}
-          className="h-8 min-w-0 flex-1 rounded-[var(--radius-action)] border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0"
-          onChange={event => setQuery(event.target.value)}
+      <PanelHeader>
+        <PanelSearchField
+          actions={(
+            <>
+              <Button
+                aria-label={uploading ? t('foundation.editor.uploads.uploading') : t('foundation.editor.uploads.uploadFiles')}
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                size="header-icon"
+                type="button"
+                variant="ghost"
+              >
+                <Upload />
+              </Button>
+              <Button
+                aria-label={t('foundation.editor.uploads.recordYourself')}
+                onClick={() => {
+                  setRecordNotice(null)
+                  setView('record')
+                }}
+                size="header-icon"
+                type="button"
+                variant="ghost"
+              >
+                <Video />
+              </Button>
+            </>
+          )}
+          label={t('foundation.editor.uploads.search')}
+          onChange={setQuery}
           placeholder={t('foundation.editor.uploads.searchPlaceholder')}
-          type="text"
           value={query}
         />
-        <Button
-          aria-label={uploading ? t('foundation.editor.uploads.uploading') : t('foundation.editor.uploads.uploadFiles')}
-          className="size-7 shrink-0 rounded-[var(--radius-action)]"
-          disabled={uploading}
-          onClick={() => fileInputRef.current?.click()}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <Upload className="size-3.5" />
-        </Button>
-        <Button
-          aria-label={t('foundation.editor.uploads.recordYourself')}
-          className="size-7 shrink-0 rounded-[var(--radius-action)]"
-          onClick={() => {
-            setRecordNotice(null)
-            setView('record')
-          }}
-          size="icon-xs"
-          type="button"
-          variant="ghost"
-        >
-          <Video className="size-3.5" />
-        </Button>
-      </div>
 
-      <Tabs className="shrink-0" onValueChange={value => setTab(value as UploadsTab)} value={tab}>
-        <TabsList className="h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0" variant="line">
-          {([
-            ['images', t('foundation.editor.uploads.tabImages')],
-            ['videos', t('foundation.editor.uploads.tabVideos')],
-            ['audio', t('foundation.editor.uploads.tabAudio')],
-            ['folders', t('foundation.editor.uploads.tabFolders')],
-          ] as const).map(([value, label]) => (
-            <TabsTrigger
-              className="flex-none rounded-none px-2.5 py-1.5 text-xs"
-              key={value}
-              value={value}
-            >
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      </div>
+        <Tabs className="shrink-0" onValueChange={value => setTab(value as UploadsTab)} value={tab}>
+          <TabsList className="h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0" variant="line">
+            {([
+              ['images', t('foundation.editor.uploads.tabImages')],
+              ['videos', t('foundation.editor.uploads.tabVideos')],
+              ['audio', t('foundation.editor.uploads.tabAudio')],
+              ['folders', t('foundation.editor.uploads.tabFolders')],
+            ] as const).map(([value, label]) => (
+              <TabsTrigger
+                className="flex-none rounded-none px-2.5 py-1.5 text-xs"
+                key={value}
+                value={value}
+              >
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </PanelHeader>
 
-      <div className="min-h-0 flex-1 overflow-x-hidden px-3 pb-3">
+      <PanelBody className="overflow-x-hidden overflow-y-auto">
         {tab === 'folders' || !items.length ? (
-          <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">
-            <EmptyIcon className="size-6 opacity-60" />
-            <p>{emptyMessage}</p>
-          </div>
+          <PanelEmptyState icon={EmptyIcon} message={emptyMessage} />
         ) : (
-          <VirtuosoMasonry
-            className="h-full"
-            columnCount={2}
-            context={masonryContext}
-            data={items}
-            ItemContent={GalleryItemContent}
-            style={{ height: '100%' }}
+          <PanelMasonry
+            estimateRatio={mediaRatio}
+            getKey={item => item.id}
+            items={items}
+            renderItem={item => (
+              <button
+                aria-label={t('foundation.editor.uploads.insertItem', { name: item.name })}
+                className="block w-full overflow-hidden rounded-[var(--radius-control)] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => insertItem(item)}
+                type="button"
+              >
+                <MediaThumb item={item} />
+              </button>
+            )}
           />
         )}
-      </div>
-    </div>
+      </PanelBody>
+    </PanelChrome>
   )
 }

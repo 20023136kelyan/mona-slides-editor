@@ -1,9 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, Search, Table2 } from 'lucide-react'
+import { Search, Table2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import {
+  PanelBackHeader,
+  PanelBody,
+  PanelChrome,
+  PanelEmptyState,
+  PanelHeader,
+  PanelSearchField,
+  PanelSectionHeader,
+} from '@/features/editor/panel/EditorPanelPrimitives'
 import {
   ALL_CHART_PRESETS,
   CHART_CATEGORIES,
@@ -156,26 +164,6 @@ function ChartPreviewGlyph({ preset }: { preset: ChartPreset }) {
   )
 }
 
-function SectionHeader({
-  onSeeAll,
-  title,
-}: {
-  onSeeAll?: () => void
-  title: string
-}) {
-  const { t } = useTranslation()
-  return (
-    <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {onSeeAll ? (
-        <Button className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground" onClick={onSeeAll} size="sm" type="button" variant="ghost">
-          {t('foundation.editor.charts.seeAll')}
-        </Button>
-      ) : null}
-    </div>
-  )
-}
-
 function PresetCard({
   onSelect,
   preset,
@@ -284,47 +272,33 @@ export function EditorChartsPanel({
       : (getChartCategory(view.categoryId)?.presets ?? [])
 
     return (
-      <div className="mona-charts-panel flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-1 px-3 pt-3 pb-2">
-          <Button
-            aria-label={t('foundation.editor.charts.back')}
-            onClick={() => setView({ kind: 'home' })}
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <h3 className="truncate text-sm font-semibold">{title}</h3>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <PanelChrome className="mona-charts-panel">
+        <PanelBackHeader
+          label={t('foundation.editor.charts.back')}
+          onBack={() => setView({ kind: 'home' })}
+          title={title}
+        />
+        <PanelBody className="overflow-y-auto">
           {presets.length ? (
             <PresetGrid onSelect={selectPreset} presets={presets} />
           ) : (
-            <p className="py-10 text-center text-xs text-muted-foreground">{t('foundation.editor.charts.noResults')}</p>
+            <PanelEmptyState icon={Search} message={t('foundation.editor.charts.noResults')} />
           )}
-        </div>
-      </div>
+        </PanelBody>
+      </PanelChrome>
     )
   }
 
   return (
-    <div className="mona-charts-panel flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-col gap-2.5 px-3 pt-3 pb-2">
-        <div className="flex h-9 shrink-0 items-center gap-0.5 rounded-[var(--radius-action)] border border-input bg-background pl-2.5 pr-1">
-          <Search className="size-3.5 shrink-0 text-muted-foreground" />
-          <Input
-            aria-label={t('foundation.editor.charts.search')}
-            className="h-8 min-w-0 flex-1 rounded-[var(--radius-action)] border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0"
-            onChange={event => setDraftQuery(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter') runSearch(draftQuery)
-            }}
-            placeholder={t('foundation.editor.charts.searchPlaceholder')}
-            type="text"
-            value={draftQuery}
-          />
-        </div>
+    <PanelChrome className="mona-charts-panel">
+      <PanelHeader>
+        <PanelSearchField
+          label={t('foundation.editor.charts.search')}
+          onChange={setDraftQuery}
+          onSubmit={() => runSearch(draftQuery)}
+          placeholder={t('foundation.editor.charts.searchPlaceholder')}
+          value={draftQuery}
+        />
         <Button
           className="h-9 w-full justify-start gap-2 rounded-[var(--radius-action)]"
           onClick={() => onInsertChart({ chartType: 'bar', seriesCount: 2, openDataEditor: true })}
@@ -334,19 +308,19 @@ export function EditorChartsPanel({
           <Table2 className="size-4" />
           {t('foundation.editor.charts.startWithData')}
         </Button>
-      </div>
+      </PanelHeader>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto px-3 pb-3">
+      <PanelBody className="space-y-5 overflow-x-hidden overflow-y-auto">
         {CHART_CATEGORIES.map(category => (
           <section className="shrink-0" key={category.id}>
-            <SectionHeader
+            <PanelSectionHeader
               onSeeAll={category.presets.length > 3 ? () => setView({ kind: 'category', categoryId: category.id }) : undefined}
               title={categoryLabel(category.id)}
             />
             <PresetStrip onSelect={selectPreset} presets={category.presets} />
           </section>
         ))}
-      </div>
-    </div>
+      </PanelBody>
+    </PanelChrome>
   )
 }

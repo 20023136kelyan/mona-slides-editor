@@ -359,7 +359,7 @@ export function LinkEditor({
               {selectedSlide ? (
                 <div className="mt-3">
                   <div className="text-muted-foreground">{t('foundation.editor.link.preview')}</div>
-                  <div className="mt-1.5 w-fit overflow-hidden rounded-lg border">
+                  <div className="mt-1.5 w-fit overflow-hidden rounded-[var(--radius-surface)] border">
                     <ScaledSlide
                       fixedWidth={500}
                       slide={selectedSlide}

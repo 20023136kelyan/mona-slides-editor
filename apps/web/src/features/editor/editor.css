@@ -11,110 +11,6 @@
 
 @keyframes mona-popover-scale-in { from { opacity: 0; transform: scale(.5); } }
 
-
-.mona-export-dialog,
-.mona-export-dialog * { box-sizing: border-box; }
-.mona-export-dialog {
-  gap: 0;
-  height: 500px;
-  margin: -20px;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-}
-.mona-export-tabs { display: flex; height: 40px; flex: none; font-size: 12px; line-height: 1; user-select: none; }
-.mona-export-tabs button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9f9f9;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.mona-export-tabs button + button { border-left: 1px solid #e5e7eb; }
-.mona-export-tabs button[data-state="active"] { border-bottom-color: transparent; background: transparent; }
-.mona-export-content { overflow: overlay; height: 460px; padding: 12px; font-size: 13px; }
-.mona-export-panel { position: relative; display: flex; overflow: hidden; height: 100%; align-items: center; justify-content: center; flex-direction: column; }
-.mona-export-thumbnails-view { position: absolute; inset: 0; }
-.mona-export-thumbnails-view::after { position: absolute; inset: 0; background: #fff; content: ''; }
-.mona-export-thumbnail { overflow: hidden; background: #fff; user-select: none; }
-.mona-export-pdf-thumbnail.break-page { break-after: page; }
-.mona-export-configs { z-index: 1; display: flex; height: calc(100% - 80px); justify-content: center; flex-direction: column; }
-.mona-export-configs.is-wide { width: 350px; }
-.mona-export-configs.is-pdf { width: 300px; }
-.mona-export-row { display: flex; align-items: center; justify-content: center; margin-bottom: 25px; }
-.mona-export-row-title { position: relative; width: 170px; }
-.mona-export-row-title::after { position: absolute; top: 20px; left: 0; content: attr(data-range); }
-.mona-export-row-control { min-width: 0; flex: 1; }
-.mona-export-row-control > .mona-panel-select { width: 100%; }
-.mona-export-row-control > .mona-export-switch { float: none; }
-.mona-export-radio { white-space: nowrap; }
-.mona-export-tip { margin-top: 25px; color: #aaa; font-size: 12px; line-height: 1.8; }
-.mona-export-tip.is-compact { margin-top: 10px; }
-.mona-export-buttons { z-index: 1; display: flex; width: 300px; height: 80px; align-items: center; justify-content: center; }
-.mona-export-button {
-  font-family: Arial, sans-serif;
-  letter-spacing: 1px;
-}
-.mona-export-submit { flex: 1; }
-.mona-export-close { width: 100px; margin-left: 10px; }
-.mona-export-button svg { vertical-align: -0.15em; }
-.mona-export-radio-group { display: flex; width: 100%; align-items: center; gap: 0; }
-.mona-export-radio {
-  width: 100%;
-  height: 32px;
-  flex: none;
-  border: 1px solid var(--border);
-  border-right-width: 0;
-  border-radius: 0;
-  background: var(--background);
-  padding: 0 15px;
-  color: var(--foreground);
-  font-size: 13px;
-  font-family: Arial, sans-serif;
-  letter-spacing: 1px;
-  white-space: normal;
-}
-.mona-export-radio:first-child:nth-last-child(2),
-.mona-export-radio:first-child:nth-last-child(2) ~ .mona-export-radio { width: 50%; }
-.mona-export-radio:first-child:nth-last-child(3),
-.mona-export-radio:first-child:nth-last-child(3) ~ .mona-export-radio { width: 33.33%; }
-.mona-export-radio:first-child { border-radius: var(--radius-control) 0 0 var(--radius-control); }
-.mona-export-radio:last-child { border-right-width: 1px; border-radius: 0 var(--radius-control) var(--radius-control) 0; }
-.mona-export-radio:not([data-state="on"]):hover { background: var(--muted); }
-.mona-export-radio[data-state="on"] { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
-.mona-export-switch { width: 40px; height: 20px; }
-.mona-export-switch > [data-slot="switch-thumb"] {
-  width: 16px;
-  height: 16px;
-  /* The skin owns thumb motion via transform; drop the primitive's separate
-     tailwind `translate` or the two add up and push the thumb off the track. */
-  translate: none;
-}
-.mona-export-switch[data-state="checked"] > [data-slot="switch-thumb"] { transform: translateX(20px); }
-.mona-export-slider { width: 100%; height: 12px; padding: 4px 0; user-select: none; cursor: pointer; }
-.mona-export-slider [data-slot="slider-track"] { position: relative; width: calc(100% - 10px); height: 4px; margin-left: 5px; border-radius: var(--radius-pill); background: var(--muted); transition: background-color .2s; user-select: none; }
-.mona-export-slider:hover [data-slot="slider-track"] { background: var(--accent); }
-.mona-export-slider [data-slot="slider-range"] { position: absolute; top: 0; left: 0; height: 100%; background: var(--primary); transition: background-color .2s; }
-.mona-export-slider [data-slot="slider-thumb"] { position: absolute; z-index: 100; top: 50%; width: 10px; height: 10px; border: 0; border-radius: var(--radius-pill); outline: 2px solid var(--primary); background: var(--background); }
-.mona-export-slider [data-slot="slider-thumb"]:hover,
-.mona-export-slider [data-slot="slider-thumb"]:active { outline: 4px solid var(--primary); }
-.mona-export-slider [data-slot="slider-thumb"]::before { position: absolute; bottom: 24px; left: 50%; display: none; min-width: 28px; border-radius: var(--radius-surface); background: #262626; padding: 6px 5px; color: #fff; content: attr(data-tooltip); font-size: 12px; text-align: center; transform: translateX(-50%); }
-.mona-export-slider [data-slot="slider-thumb"]::after { position: absolute; bottom: 15px; left: 50%; display: none; border: 5px solid transparent; border-top-color: #262626; content: ''; transform: translateX(-50%); }
-.mona-export-slider [data-slot="slider-thumb"]:hover::before,
-.mona-export-slider [data-slot="slider-thumb"]:hover::after,
-.mona-export-slider [data-slot="slider-thumb"]:active::before,
-.mona-export-slider [data-slot="slider-thumb"]:active::after { display: block; }
-.mona-export-json-preview { overflow: auto; width: 100%; height: calc(100% - 90px); margin-bottom: 10px; background: #f9f9f9; color: #0451a5; }
-.mona-export-json-preview pre { margin: 0; font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace; }
-.mona-export-json-preview::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
-.mona-export-json-preview::-webkit-scrollbar-thumb { border-radius: var(--radius-overlay); background: #e1e1e1; }
-
 /* Deck / workspace shell layout is geometry (canvas reflow). Rail/drawer
    visual chrome lives on the Sidebar components (Tailwind). */
 
@@ -183,36 +79,6 @@
   .mona-editor-workspace .mona-agent-dock { width: 18rem; }
   .mona-dock-region { --panel-region-w: 18rem; }
 }
-/* Phase 3b deferred: dense creation-pool skins stay in CSS for now. */
-.mona-drawer-stack + .mona-canvas-shape-pool { margin-top: 12px; }
-.mona-element-category-tabs {
-  display: grid;
-  width: 100%;
-  height: auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  margin-bottom: 10px;
-}
-/* Category tiles follow the chrome language: borderless washes, never
-   outlined cards. */
-.mona-element-category-tabs > button {
-  display: flex;
-  min-width: 0;
-  height: 50px;
-  flex-direction: column;
-  gap: 4px;
-  border: 0;
-  border-radius: var(--radius-action);
-  color: rgb(16 18 25 / 70%);
-  font-size: 10px;
-}
-.mona-element-category-tabs > button:hover { background: rgb(15 16 21 / 6%); color: rgb(15 16 21); }
-.mona-element-category-tabs > button[data-state="on"] {
-  background: rgb(15 16 21 / 8%);
-  color: rgb(15 16 21);
-  font-weight: 600;
-}
-.mona-element-category-tabs > button svg { width: 17px; height: 17px; }
 /* Edge-fade masks for the horizontal suggestion strip (data attrs from useEdgeFade). */
 .mona-agent-suggestions[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to right, transparent, #000 28px); }
 .mona-agent-suggestions[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
@@ -806,57 +672,6 @@
   outline-offset: -2px;
 }
 .mona-table-generator-row > .mona-panel-number { width: 75%; }
-.mona-canvas-shape-pool { width: 100%; }
-.mona-canvas-line-pool { width: 100%; }
-/* Plain ink section labels — the banded headers came from the legacy
-   panels and don't belong in this chrome. */
-.mona-canvas-pool-category-name {
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 8px;
-  padding: 2px 0;
-  color: rgb(16 18 25 / 70%);
-  font-size: 12px;
-  font-weight: 600;
-}
-.mona-canvas-shape-list,
-.mona-canvas-line-list { display: flex; flex-wrap: wrap; align-content: flex-start; margin-bottom: 10px; }
-.mona-canvas-shape-item {
-  position: relative;
-  display: flex;
-  width: 11.5%;
-  height: 0;
-  flex: 0 0 11.5%;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: calc(8% / 7);
-  border: 0;
-  background: transparent;
-  padding: 0 0 11.5%;
-  cursor: pointer;
-}
-.mona-canvas-shape-item:not(:nth-child(8n)) { margin-right: calc(8% / 7); }
-.mona-canvas-shape-item > svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.mona-canvas-shape-item:hover path:not(.is-outlined) { stroke: var(--editor-selection); }
-.mona-canvas-shape-item:hover path.is-outlined { fill: var(--editor-selection); }
-.mona-canvas-line-item {
-  position: relative;
-  display: flex;
-  width: 19%;
-  height: 0;
-  flex: 0 0 19%;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: calc(5% / 4);
-  border: 0;
-  background: transparent;
-  padding: 0 0 19%;
-  color: #999;
-  cursor: pointer;
-}
-.mona-canvas-line-item:not(:nth-child(5n)) { margin-right: calc(5% / 4); }
-.mona-canvas-line-item > svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.mona-canvas-line-item:hover { color: var(--editor-selection); }
 
 /* Speaker notes live in the floating side panel, like every other panel:
    a slide label on top, the editor filling the rest. */
@@ -1110,41 +925,6 @@
   border-color: currentcolor;
   outline-color: currentcolor;
 }
-/* The blanket reset above strips the color swatch's outline; restore it (more
-   specific than the reset) so a white/pale fill stays visible on the pill. */
-.mona-contextual-controls .mona-contextual-color-dot { border: 1px solid rgb(16 18 25 / 35%); }
-.mona-contextual-controls .mona-contextual-stroke-dot { border-style: solid; border-width: 3px; }
-.mona-contextual-controls .mona-contextual-control {
-  display: inline-flex;
-  min-width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 0 5px;
-  color: #41464b;
-  font-family: Arial;
-  font-size: 16px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: normal;
-  letter-spacing: normal;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.mona-contextual-controls .mona-contextual-control:hover { background: #f9f9f9; }
-.mona-contextual-controls .mona-contextual-control.is-active { background-color: var(--editor-selection-soft); color: var(--editor-selection); }
-.mona-contextual-controls .mona-contextual-control.is-text-color { flex-direction: column; font-size: 13px; }
-.mona-contextual-controls .mona-contextual-control.is-labeled { font-size: 16px; }
-.mona-contextual-controls .mona-contextual-control.is-border { font-family: inherit; }
-.mona-contextual-controls .mona-contextual-control.is-labeled > span {
-  flex-shrink: 0;
-  margin-left: 5px;
-  font-size: 12px;
-}
 .mona-contextual-border-panel { width: 218px; user-select: none; }
 .mona-contextual-border-panel .mona-panel-row:last-child { margin-bottom: 0; }
 .mona-contextual-line-style-list {
@@ -1205,8 +985,6 @@
   -webkit-tap-highlight-color: rgb(0 0 0 / 18%);
 }
 .mona-contextual-controls .i-icon * { box-sizing: content-box; }
-.mona-contextual-controls .mona-contextual-font-select { width: 110px; margin-right: 1px; }
-.mona-contextual-controls .mona-contextual-fontsize-select { width: 80px; }
 /* Inside the pill every control is a ghost: the select triggers drop their
    field chrome and pick up the shared hover wash instead. */
 .mona-contextual-controls .mona-panel-select {

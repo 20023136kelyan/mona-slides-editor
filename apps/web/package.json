@@ -23,7 +23,6 @@
     "@mona/presentation-core": "0.0.0",
     "@mona/rich-text": "0.0.0",
     "@tabler/icons-react": "^3.45.0",
-    "@virtuoso.dev/masonry": "^1.4.3",
     "animate.css": "^4.1.1",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
