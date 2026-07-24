@@ -39,7 +39,7 @@ function ChartEditorButton({ children, onClick, primary = false }: {
   onClick: () => void
   primary?: boolean
 }) {
-  return <Button className="mona-chart-editor-button" onClick={onClick} size="editor" variant={primary ? 'default' : 'outline'}>{children}</Button>
+  return <Button onClick={onClick} size="editor" variant={primary ? 'default' : 'outline'}>{children}</Button>
 }
 
 export function EditorChartDataEditor({ element, onClose, onSave }: {
@@ -175,7 +175,7 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
     <Dialog onOpenChange={open => {
       if (!open) onClose()
     }} open>
-      <DialogContent className="mona-chart-data-modal-content" overlayClassName="mona-chart-data-mask" showCloseButton={false}>
+      <DialogContent className="w-[640px] max-w-none gap-0 overflow-hidden p-5 sm:max-w-none" showCloseButton={false}>
         <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.chartStyle.editChart')}</DialogTitle></DialogHeader>
         <div className="mona-chart-data-editor" ref={rootRef}>
           <div className="mona-chart-editor-content">
@@ -228,17 +228,17 @@ export function EditorChartDataEditor({ element, onClose, onSave }: {
               </tbody>
             </table>
           </div>
-          <div className="mona-chart-editor-buttons">
-            <div className="mona-chart-editor-buttons-left">
+          <div className="mt-2.5 flex justify-between">
+            <div className="flex items-center text-xs">
               {t('foundation.editor.chartData.type', { type: t(`foundation.editor.chartTypes.${chartType}`) })}
               <Popover onOpenChange={setTypeMenuOpen} open={typeMenuOpen}>
-                <PopoverTrigger asChild><Button className="mona-chart-editor-change" size="xs" variant="link">{t('foundation.editor.chartData.change')}</Button></PopoverTrigger>
-                <PopoverContent aria-label={t('foundation.editor.chartData.change')} align="center" className="mona-chart-type-menu is-data-editor" side="top" sideOffset={8}>
-                  {CHART_TYPES.map(type => <PopoverClose asChild key={type}><Button onClick={() => setChartType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button></PopoverClose>)}
+                <PopoverTrigger asChild><Button className="ml-[5px] text-muted-foreground" size="xs" variant="link">{t('foundation.editor.chartData.change')}</Button></PopoverTrigger>
+                <PopoverContent aria-label={t('foundation.editor.chartData.change')} align="center" className="w-[137px] p-2.5" side="top" sideOffset={8}>
+                  {CHART_TYPES.map(type => <PopoverClose asChild key={type}><Button className="w-full justify-center" onClick={() => setChartType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button></PopoverClose>)}
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="mona-chart-editor-buttons-right">
+            <div className="flex gap-2.5">
               <ChartEditorButton onClick={onClose}>{t('foundation.editor.chartData.cancel')}</ChartEditorButton>
               <ChartEditorButton onClick={clear}>{t('foundation.editor.chartData.clear')}</ChartEditorButton>
               <ChartEditorButton onClick={save} primary>{t('foundation.editor.chartData.confirm')}</ChartEditorButton>

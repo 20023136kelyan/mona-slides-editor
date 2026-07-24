@@ -1,4 +1,9 @@
-import type { PPTElement, SlideBackground } from './model'
+import type {
+  PPTElement,
+  SlideBackground,
+  StructuredTextParagraphProperties,
+  StructuredTextRunProperties,
+} from './model'
 
 export type PowerPointPackagePartKind =
   | 'chart'
@@ -60,31 +65,87 @@ export interface PowerPointThemeColor {
   value: string
 }
 
+export interface PowerPointThemeFont {
+  complexScript?: string
+  eastAsian?: string
+  latin?: string
+  supplemental: Array<{
+    script: string
+    typeface: string
+  }>
+}
+
+export interface PowerPointColorScheme {
+  colors: PowerPointThemeColor[]
+  name?: string
+}
+
 export interface PowerPointTheme {
   colorSchemeName?: string
   colors: PowerPointThemeColor[]
+  extraColorSchemes?: PowerPointColorScheme[]
+  formatSchemeName?: string
   id: string
+  majorFont?: PowerPointThemeFont
   majorLatinFont?: string
+  minorFont?: PowerPointThemeFont
   minorLatinFont?: string
   name?: string
   packageId: string
   partPath: string
 }
 
+export type PowerPointColorMap = Record<string, string>
+
+export interface PowerPointHeaderFooterPolicy {
+  dateTime: boolean
+  footer: boolean
+  header: boolean
+  slideNumber: boolean
+}
+
+export interface PowerPointTextStyleLevel {
+  alignment?: string
+  bold?: boolean
+  bulletCharacter?: string
+  fontColor?: PowerPointThemeColor
+  fontFamily?: string
+  fontSize?: number
+  indent?: number
+  italic?: boolean
+  language?: string
+  level: number
+  marginLeft?: number
+  rightToLeft?: boolean
+  paragraph?: StructuredTextParagraphProperties
+  run?: StructuredTextRunProperties
+  underline?: string
+}
+
+export interface PowerPointMasterTextStyles {
+  body: PowerPointTextStyleLevel[]
+  other: PowerPointTextStyleLevel[]
+  title: PowerPointTextStyleLevel[]
+}
+
 export interface PowerPointSlideMaster {
   background?: SlideBackground
+  colorMap?: PowerPointColorMap
   elements?: PPTElement[]
+  headerFooter?: PowerPointHeaderFooterPolicy
   id: string
   layoutIds: string[]
   objectIds: string[]
   packageId: string
   partPath: string
   preserve: boolean
+  textStyles?: PowerPointMasterTextStyles
   themeId?: string
 }
 
 export interface PowerPointSlideLayout {
   background?: SlideBackground
+  colorMapOverride?: PowerPointColorMap
   elements?: PPTElement[]
   id: string
   matchingName?: string
@@ -100,14 +161,18 @@ export interface PowerPointSlideLayout {
 }
 
 export interface PowerPointPlaceholder {
+  elementId?: string
   index?: string
+  layer: 'layout' | 'master' | 'slide'
   objectId: string
   partId: string
   partPath: string
+  textStyleKind?: 'body' | 'other' | 'title'
   type?: string
 }
 
 export interface PowerPointHierarchy {
+  defaultTextStyle?: PowerPointTextStyleLevel[]
   layouts: PowerPointSlideLayout[]
   masters: PowerPointSlideMaster[]
   placeholders: PowerPointPlaceholder[]
@@ -143,6 +208,8 @@ export interface PowerPointPackageIssue {
 }
 
 export interface PowerPointSlideDependency {
+  backgroundSource?: 'default' | 'layout' | 'master' | 'slide'
+  colorMapOverride?: PowerPointColorMap
   layoutId?: string
   layoutPart?: string
   masterId?: string
@@ -254,6 +321,8 @@ export interface PowerPointElementSource {
   nativeShapeId?: string
   packageId: string
   placeholderIndex?: string
+  placeholderLayoutObjectId?: string
+  placeholderMasterObjectId?: string
   placeholderType?: string
   slidePart: string
   stableId: string

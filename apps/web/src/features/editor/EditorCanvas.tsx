@@ -1798,7 +1798,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                   )
                 })
               })() : null}
-              {!mobileInteraction && contextualCapabilities.selectionKind !== 'empty' ? (
+              {!mobileInteraction && contextualCapabilities.selectionKind !== 'empty' && contextualCapabilities.selectionKind !== 'page' ? (
                 <EditorSelectionActions
                   capabilities={contextualCapabilities}
                   elements={contextualActionElements}

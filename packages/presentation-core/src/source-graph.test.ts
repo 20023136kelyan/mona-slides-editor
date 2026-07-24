@@ -16,6 +16,7 @@ const sourcePackage: PowerPointPackageReference = {
     placeholders: [
       {
         index: '1',
+        layer: 'layout',
         objectId: 'layout-title',
         partId: 'layout-1',
         partPath: 'ppt/slideLayouts/slideLayout1.xml',
@@ -23,6 +24,7 @@ const sourcePackage: PowerPointPackageReference = {
       },
       {
         index: '1',
+        layer: 'master',
         objectId: 'master-title',
         partId: 'master-1',
         partPath: 'ppt/slideMasters/slideMaster1.xml',

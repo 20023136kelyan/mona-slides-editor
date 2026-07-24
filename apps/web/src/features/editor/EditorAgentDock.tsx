@@ -33,7 +33,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -41,6 +40,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+} from '@/components/ui/sidebar'
 import { Textarea } from '@/components/ui/textarea'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
@@ -321,7 +326,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   const entryIdRef = useRef(0)
   const endRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
-  const slideNumber = useEditorSelector(runtime.store, state => state.presentation.slideIndex + 1)
+  const slideTitle = useEditorSelector(runtime.store, state => state.presentation.slides[state.presentation.slideIndex]?.title)
   const openaiStatus = useAgentAuthStatus('openai-chatgpt')
   const anthropicStatus = useAgentAuthStatus('anthropic-claude')
   const managedStatus = useManagedAgentStatus()
@@ -447,7 +452,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   }
 
   return (
-    <aside aria-labelledby="mona-agent-dock-title" className="mona-agent-dock" id="mona-agent-dock">
+    <Sidebar aria-labelledby="mona-agent-dock-title" className="mona-agent-dock w-[var(--dock-w)] shrink-0 overflow-hidden border-l border-sidebar-border" collapsible="none" id="mona-agent-dock" role="complementary" side="right">
       {/* The provider Popover wraps the whole dock: its content is portaled,
           and the trigger sits inside the composer, the way current assistant
           UIs place their model picker. The root renders no DOM node. */}
@@ -462,13 +467,10 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         open={providerOpen}
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
-      <header className="flex min-h-[46px] items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
-        <div className="flex min-w-0 items-baseline gap-[7px]">
-          <h2 className="m-0 text-[13px] font-bold" id="mona-agent-dock-title">{t('foundation.editor.agent.title')}</h2>
-          <p className="m-0 overflow-hidden text-[11px] text-ellipsis whitespace-nowrap text-muted-foreground">{t('foundation.editor.agent.scope', { slide: slideNumber })}</p>
-        </div>
+      <SidebarHeader className="flex min-h-[46px] flex-row items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
+        <h2 className="m-0 min-w-0 truncate text-[13px] font-medium" id="mona-agent-dock-title" title={slideTitle || t('foundation.editor.statusBar.untitledPage')}>{slideTitle || t('foundation.editor.statusBar.untitledPage')}</h2>
         <Button aria-label={t('common.close')} onClick={closeAgent} size="editor-icon" type="button" variant="ghost"><X /></Button>
-      </header>
+      </SidebarHeader>
           <PopoverContent
             aria-label={t('foundation.editor.agent.chooseProvider')}
             align="start"
@@ -571,7 +573,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             )}
           </PopoverContent>
 
-      <ScrollArea className="mona-agent-conversation min-h-0">
+      <SidebarContent>
         <div aria-live="polite" className="flex min-h-full flex-1 flex-col gap-2.5 p-3">
           {!entries.length && !candidate && !handoff ? (
             <div className="flex min-h-full flex-1 flex-col items-center justify-center px-2.5 py-7 text-center">
@@ -615,7 +617,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
 
           {progress ? (
             <output className="flex items-center gap-2.5 rounded-[var(--radius-overlay)] bg-[rgb(15_16_21/4%)] px-3 py-2.5">
-              <span className="mona-agent-progress-spinner size-[15px] shrink-0 rounded-[var(--radius-pill)] border-2 border-border border-t-foreground" />
+              <span className="size-[15px] shrink-0 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none motion-reduce:border-muted-foreground" />
               <div className="grid gap-0.5">
                 <strong className="text-[11.5px]">{t(`foundation.editor.agent.progress.${progress}`)}</strong>
                 <small className="text-[9.5px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.progress.detail')}</small>
@@ -677,11 +679,11 @@ export function EditorAgentDock({ handoff = null, runtime }: {
           ) : null}
           <div ref={endRef} />
         </div>
-      </ScrollArea>
+      </SidebarContent>
 
-      <footer className="px-3 pt-1 pb-2.5">
+      <SidebarFooter className="gap-0 px-3 pt-1 pb-2.5">
         <form
-          className="overflow-hidden rounded-[calc(var(--radius-overlay)+4px)] border border-border bg-card shadow-[0_6px_18px_-6px_rgb(21_30_130/14%),0_2px_5px_-2px_rgb(21_30_130/8%)] focus-within:border-ring focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_18%,transparent)]"
+          className="overflow-hidden rounded-[calc(var(--radius-overlay)+4px)] border border-border bg-card shadow-[0_6px_18px_-6px_rgb(21_30_130/14%),0_2px_5px_-2px_rgb(21_30_130/8%)] focus-within:border-foreground/25"
           onSubmit={event => {
             event.preventDefault()
             void submit()
@@ -689,7 +691,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         >
           <Textarea
             aria-label={t('foundation.editor.agent.composerLabel')}
-            className="max-h-[220px] min-h-[50px] field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-[13px] leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none"
+            className="max-h-[220px] min-h-[50px] field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-[13px] leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0"
             disabled={busy}
             onChange={event => setDraft(event.target.value)}
             onKeyDown={event => {
@@ -778,8 +780,8 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             ? t('foundation.editor.agent.reviewNotice')
             : t('foundation.editor.agent.connectionRequired')}</p>
         )}
-      </footer>
+      </SidebarFooter>
       </Popover>
-    </aside>
+    </Sidebar>
   )
 }

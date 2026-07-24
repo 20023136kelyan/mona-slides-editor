@@ -1,6 +1,21 @@
 /* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- the slideshow canvas is an application focus target: Enter/arrow playback and Shift+F10 context-menu commands intentionally live on the canvas while nested slide links remain independently focusable. */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  ChevronFirst,
+  ChevronLast,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Monitor,
+  PanelBottom,
+  PanelRight,
+  Pen,
+  Power,
+  Presentation,
+  Repeat,
+  Timer,
+} from 'lucide-react'
 
 import type { PresentationState } from '@mona/presentation-core'
 
@@ -130,31 +145,32 @@ export function ScreenBaseView({
     setContextMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
   }
   const menu: ScreenContextMenuItem[] = [
-    { action: 'previous', disabled: presentation.slideIndex <= 0, handler: playback.turnPrevSlide, label: t('screen.previousSlide'), shortcut: '↑ ←' },
-    { action: 'next', disabled: presentation.slideIndex >= presentation.slides.length - 1, handler: playback.turnNextSlide, label: t('screen.nextSlide'), shortcut: '↓ →' },
-    { action: 'first', disabled: presentation.slideIndex === 0, handler: () => playback.turnSlideToIndex(0), label: t('screen.firstSlide') },
-    { action: 'last', disabled: presentation.slideIndex === presentation.slides.length - 1, handler: () => playback.turnSlideToIndex(presentation.slides.length - 1), label: t('screen.lastSlide') },
+    { action: 'previous', disabled: presentation.slideIndex <= 0, handler: playback.turnPrevSlide, icon: ChevronLeft, label: t('screen.previousSlide'), shortcut: '↑ ←' },
+    { action: 'next', disabled: presentation.slideIndex >= presentation.slides.length - 1, handler: playback.turnNextSlide, icon: ChevronRight, label: t('screen.nextSlide'), shortcut: '↓ →' },
+    { action: 'first', disabled: presentation.slideIndex === 0, handler: () => playback.turnSlideToIndex(0), icon: ChevronFirst, label: t('screen.firstSlide') },
+    { action: 'last', disabled: presentation.slideIndex === presentation.slides.length - 1, handler: () => playback.turnSlideToIndex(presentation.slides.length - 1), icon: ChevronLast, label: t('screen.lastSlide') },
     { divider: true },
     {
       action: 'autoplay',
       children: [2500, 5000, 7500, 10000].map(interval => ({
         action: `autoplay-${interval}`,
+        checked: playback.autoPlayInterval === interval,
         handler: () => playback.setAutoPlayInterval(interval),
         label: t('screen.seconds', { value: interval / 1000 }),
-        shortcut: playback.autoPlayInterval === interval ? '√' : '',
       })),
       handler: playback.autoPlayActive ? playback.closeAutoPlay : playback.autoPlay,
+      icon: Timer,
       label: t(playback.autoPlayActive ? 'screen.cancelAutoPlay' : 'screen.autoPlay'),
     },
-    { action: 'loop', handler: () => playback.setLoopPlay(!playback.loopPlay), label: t('screen.loopSlideshow'), shortcut: playback.loopPlay ? '√' : '' },
+    { action: 'loop', checked: playback.loopPlay, handler: () => playback.setLoopPlay(!playback.loopPlay), icon: Repeat, label: t('screen.loopSlideshow') },
     { divider: true },
-    { action: 'show-toolbar', handler: () => setRightToolsVisible(true), label: t('screen.showToolbar') },
-    { action: 'all-slides', handler: () => setAllSlidesVisible(true), label: t('screen.allSlides') },
-    { action: 'bottom-thumbnails', handler: () => setBottomThumbnailsVisible(current => !current), label: t('screen.bottomThumbnails'), shortcut: bottomThumbnailsVisible ? '√' : '' },
-    { action: 'pen', handler: () => setWritingVisible(true), label: t('screen.penTools') },
-    { action: 'presenter', handler: () => setViewMode('presenter'), label: t('screen.presenterView') },
+    { action: 'show-toolbar', handler: () => setRightToolsVisible(true), icon: PanelRight, label: t('screen.showToolbar') },
+    { action: 'all-slides', handler: () => setAllSlidesVisible(true), icon: LayoutGrid, label: t('screen.allSlides') },
+    { action: 'bottom-thumbnails', checked: bottomThumbnailsVisible, handler: () => setBottomThumbnailsVisible(current => !current), icon: PanelBottom, label: t('screen.bottomThumbnails') },
+    { action: 'pen', handler: () => setWritingVisible(true), icon: Pen, label: t('screen.penTools') },
+    { action: 'presenter', handler: () => setViewMode('presenter'), icon: Presentation, label: t('screen.presenterView') },
     { divider: true },
-    { action: 'exit', handler: exit, label: t('screen.endSlideshow'), shortcut: 'ESC' },
+    { action: 'exit', handler: exit, icon: Power, label: t('screen.endSlideshow'), shortcut: 'ESC' },
   ]
 
   return (
@@ -236,15 +252,15 @@ export function ScreenPresenterView({
     playback.broadcastExit(); onExit() 
   }
   const menu: ScreenContextMenuItem[] = [
-    { action: 'previous', disabled: presentation.slideIndex <= 0, handler: playback.turnPrevSlide, label: t('screen.previousSlide'), shortcut: '↑ ←' },
-    { action: 'next', disabled: presentation.slideIndex >= presentation.slides.length - 1, handler: playback.turnNextSlide, label: t('screen.nextSlide'), shortcut: '↓ →' },
-    { action: 'first', disabled: presentation.slideIndex === 0, handler: () => playback.turnSlideToIndex(0), label: t('screen.firstSlide') },
-    { action: 'last', disabled: presentation.slideIndex === presentation.slides.length - 1, handler: () => playback.turnSlideToIndex(presentation.slides.length - 1), label: t('screen.lastSlide') },
+    { action: 'previous', disabled: presentation.slideIndex <= 0, handler: playback.turnPrevSlide, icon: ChevronLeft, label: t('screen.previousSlide'), shortcut: '↑ ←' },
+    { action: 'next', disabled: presentation.slideIndex >= presentation.slides.length - 1, handler: playback.turnNextSlide, icon: ChevronRight, label: t('screen.nextSlide'), shortcut: '↓ →' },
+    { action: 'first', disabled: presentation.slideIndex === 0, handler: () => playback.turnSlideToIndex(0), icon: ChevronFirst, label: t('screen.firstSlide') },
+    { action: 'last', disabled: presentation.slideIndex === presentation.slides.length - 1, handler: () => playback.turnSlideToIndex(presentation.slides.length - 1), icon: ChevronLast, label: t('screen.lastSlide') },
     { divider: true },
-    { action: 'pen', handler: () => setWritingVisible(true), label: t('screen.penTools') },
-    { action: 'normal', handler: () => setViewMode('base'), label: t('screen.normalView') },
+    { action: 'pen', handler: () => setWritingVisible(true), icon: Pen, label: t('screen.penTools') },
+    { action: 'normal', handler: () => setViewMode('base'), icon: Monitor, label: t('screen.normalView') },
     { divider: true },
-    { action: 'exit', handler: exit, label: t('screen.endSlideshow'), shortcut: 'ESC' },
+    { action: 'exit', handler: exit, icon: Power, label: t('screen.endSlideshow'), shortcut: 'ESC' },
   ]
 
   const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void, buttonRef?: React.Ref<HTMLButtonElement>) => (

@@ -1,42 +1,32 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitives render divs; landmark roles are applied explicitly on them. */
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LayoutTemplate, X } from 'lucide-react'
+import { ChevronLeft, LayoutTemplate } from 'lucide-react'
 
-import ChartIcon from '~icons/icon-park-outline/chart-proportion'
-import ChartHistogramIcon from '~icons/icon-park-outline/chart-histogram'
-import ChartHistogramOneIcon from '~icons/icon-park-outline/chart-histogram-one'
-import ChartLineIcon from '~icons/icon-park-outline/chart-line'
-import ChartLineAreaIcon from '~icons/icon-park-outline/chart-line-area'
-import ChartPieIcon from '~icons/icon-park-outline/chart-pie'
-import ChartRingIcon from '~icons/icon-park-outline/chart-ring'
-import ChartScatterIcon from '~icons/icon-park-outline/chart-scatter'
 import ConnectionIcon from '~icons/icon-park-outline/connection'
 import FormulaIcon from '~icons/icon-park-outline/formula'
 import LeftChevronIcon from '~icons/icon-park-outline/left'
 import GraphicDesignIcon from '~icons/icon-park-outline/graphic-design'
 import InsertTableIcon from '~icons/icon-park-outline/insert-table'
-import PictureIcon from '~icons/icon-park-outline/picture'
-import RadarChartIcon from '~icons/icon-park-outline/radar-chart'
 import SymbolIcon from '~icons/icon-park-outline/symbol'
 import TextRotationDownIcon from '~icons/icon-park-outline/text-rotation-down'
 import TextRotationNoneIcon from '~icons/icon-park-outline/text-rotation-none'
-import UploadIcon from '~icons/icon-park-outline/upload'
 import WritingIcon from '~icons/icon-park-outline/writing-fluently'
 import { LINE_LIST, SHAPE_LIST, type LinePoolItem, type ShapePoolItem } from '@mona/presentation-core'
 import { SYMBOL_LIST } from '@mona/presentation-core/symbol-presets'
-import type { ChartType, Slide, SlideTheme } from '@mona/presentation-core/model'
+import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { LinePointMarker } from '@/features/editor/ElementStyleCommons'
-import { EditorImageLibrary } from '@/features/editor/EditorImageLibrary'
-import { EditorMediaInput } from '@/features/editor/EditorMediaInput'
+import { EditorChartsPanel } from '@/features/editor/EditorChartsPanel'
 import { EditorTableGenerator } from '@/features/editor/EditorTableGenerator'
-import { CHART_TYPES } from '@/features/editor/editor-chart'
+import { EditorPhotosPanel } from '@/features/editor/EditorPhotosPanel'
+import { EditorUploadsPanel } from '@/features/editor/EditorUploadsPanel'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
+import type { CreateChartElementOptions } from '@/features/editor/editor-chart'
 import type { EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
@@ -126,32 +116,6 @@ function LinePool({ onSelect }: { onSelect: (line: LinePoolItem) => void }) {
   )
 }
 
-function ChartPool({ onSelect }: { onSelect: (chart: ChartType) => void }) {
-  const { t } = useTranslation()
-  const icon = (type: ChartType) => {
-    if (type === 'line') return <ChartLineIcon />
-    if (type === 'bar') return <ChartHistogramIcon />
-    if (type === 'pie') return <ChartPieIcon />
-    if (type === 'column') return <ChartHistogramOneIcon />
-    if (type === 'area') return <ChartLineAreaIcon />
-    if (type === 'ring') return <ChartRingIcon />
-    if (type === 'scatter') return <ChartScatterIcon />
-    return <RadarChartIcon />
-  }
-  return (
-    <ul className="mona-chart-pool">
-      {CHART_TYPES.map(type => (
-        <li className="mona-chart-pool-item" key={type}>
-          <Button className="mona-chart-pool-content" onClick={() => onSelect(type)} size="editor" type="button" variant="ghost">
-            <span className="mona-chart-pool-icon">{icon(type)}</span>
-            <span className="mona-chart-pool-name">{t(`foundation.editor.chartTypes.${type}`)}</span>
-          </Button>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function SymbolPool({ onSelect }: { onSelect: (value: string) => void }) {
   const { t } = useTranslation()
   const [selectedSymbolKey, setSelectedSymbolKey] = useState(SYMBOL_LIST[0]!.key)
@@ -167,25 +131,25 @@ function SymbolPool({ onSelect }: { onSelect: (value: string) => void }) {
   }, [selectedEmojiTypeIndex, selectedSymbolKey])
 
   return (
-    <div className="mona-drawer-symbols">
-      <ToggleGroup className="mona-symbol-tabs" onValueChange={value => {
+    <div className="flex h-full min-h-0 flex-col text-foreground">
+      <ToggleGroup className="mb-2 w-full flex-wrap items-center justify-start rounded-none border-b text-[13px] select-none" onValueChange={value => {
         if (value) setSelectedSymbolKey(value)
       }} spacing={0} type="single" value={selectedSymbolKey}>
-        {SYMBOL_LIST.map(item => <ToggleGroupItem key={item.key} value={item.key}>{t('foundation.editor.symbolPanel.tabs.' + item.key)}</ToggleGroupItem>)}
+        {SYMBOL_LIST.map(item => <ToggleGroupItem className="h-auto min-w-0 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 font-normal hover:bg-transparent data-[state=on]:border-b-foreground data-[state=on]:bg-transparent" key={item.key} value={item.key}>{t('foundation.editor.symbolPanel.tabs.' + item.key)}</ToggleGroupItem>)}
       </ToggleGroup>
       {selectedSymbolKey === 'emoji' ? (
-        <ToggleGroup className="mona-symbol-emoji-types" onValueChange={value => {
+        <ToggleGroup className="mb-[3px] items-center text-xs" onValueChange={value => {
           if (value) setSelectedEmojiTypeIndex(Number(value))
         }} spacing={1} type="single" value={String(selectedEmojiTypeIndex)}>
-          {EMOJI_TYPES.map((type, index) => <ToggleGroupItem key={type} value={String(index)}>{t('foundation.editor.symbolPanel.categories.' + type)}</ToggleGroupItem>)}
+          {EMOJI_TYPES.map((type, index) => <ToggleGroupItem className="h-auto min-w-0 px-1 py-0.5 font-normal data-[state=on]:bg-[var(--editor-selection-subtle)] data-[state=on]:font-bold data-[state=on]:text-[var(--editor-selection)]" key={type} value={String(index)}>{t('foundation.editor.symbolPanel.categories.' + type)}</ToggleGroupItem>)}
         </ToggleGroup>
       ) : null}
-      <div className="mona-symbol-pool" ref={poolRef}>
+      <div className="mx-[-12px] flex-1 overflow-auto px-3 pt-[5px] text-[18px] select-none" ref={poolRef}>
         {symbolPool.map((group, groupIndex) => (
-          <div className="mona-symbol-group" key={groupIndex}>
+          <div className="flex flex-wrap content-start [&:not(:first-child)]:mt-2 [&:not(:first-child)]:border-t [&:not(:first-child)]:pt-2.5" key={groupIndex}>
             {group.map((item, index) => (
               <Button
-                className="mona-symbol-item"
+                className="relative mb-[calc(4%/7)] h-[38px] w-[12%] rounded-none border p-0 transition-colors hover:border-foreground hover:text-foreground [&:not(:nth-child(8n))]:mr-[calc(4%/7)]"
                 key={item + '-' + index}
                 onClick={() => onSelect(item)}
                 onMouseDown={event => event.preventDefault()}
@@ -193,7 +157,7 @@ function SymbolPool({ onSelect }: { onSelect: (value: string) => void }) {
                 type="button"
                 variant="ghost"
               >
-                <span>{item}</span>
+                <span className="absolute inset-0 flex items-center justify-center bg-background">{item}</span>
               </Button>
             ))}
           </div>
@@ -252,11 +216,11 @@ function TemplateCoverCard({ id, name, onOpen, theme }: {
   // Always lead with the template's cover page (first page as fallback).
   const cover = payload?.slides.find(slide => slide.type === 'cover') ?? payload?.slides[0]
   return (
-    <Button aria-label={name} className="mona-template-card" onClick={onOpen} size="editor" title={name} type="button" variant="ghost">
+    <Button aria-label={name} className="flex h-auto flex-col items-stretch rounded-lg p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-lg [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" onClick={onOpen} size="editor" title={name} type="button" variant="ghost">
       {cover ? (
         <ScaledSlide fixedWidth={128} slide={cover} theme={{ ...theme!, ...payload?.theme }} thumbnail viewportRatio={0.5625} viewportSize={1000} />
       ) : (
-        <Skeleton className="mona-template-card-skeleton" />
+        <Skeleton className="aspect-video w-full rounded-lg" />
       )}
     </Button>
   )
@@ -273,27 +237,27 @@ function TemplateDetail({ id, name, onBack, onInsertAll, onInsertOne, theme }: {
   const { t } = useTranslation()
   const payload = useTemplatePayload(id)
   return (
-    <div className="mona-template-detail">
-      <div className="mona-template-detail-head">
-        <Button aria-label={t('foundation.editor.templates.back')} className="mona-template-back" onClick={onBack} size="editor-icon" type="button" variant="ghost"><LeftChevronIcon /></Button>
+    <div className="select-none">
+      <div className="mt-[-4px] mb-1 ml-[-6px] flex items-center">
+        <Button aria-label={t('foundation.editor.templates.back')} className="text-[15px] text-foreground/70" onClick={onBack} size="editor-icon" type="button" variant="ghost"><LeftChevronIcon /></Button>
       </div>
-      <div className="mona-template-detail-title">{name}</div>
-      <div className="mona-template-detail-meta">{t('foundation.editor.templates.meta', { count: payload?.slides.length ?? 0 })}</div>
+      <div className="mx-0.5 text-[15px] font-bold leading-[1.35]">{name}</div>
+      <div className="mx-0.5 mt-[3px] mb-3 text-xs text-foreground/55">{t('foundation.editor.templates.meta', { count: payload?.slides.length ?? 0 })}</div>
       {payload ? (
         <>
-          <Button className="mona-template-apply" onClick={() => onInsertAll(payload)} size="sm" type="button" variant="outline">
+          <Button className="mb-3 w-full rounded-[var(--radius-action)] font-semibold" onClick={() => onInsertAll(payload)} size="sm" type="button" variant="outline">
             {t('foundation.editor.templates.applyAll', { count: payload.slides.length })}
           </Button>
-          <div className="mona-template-pages">
+          <div className="grid grid-cols-2 gap-2">
             {payload.slides.map((slide, index) => (
-              <Button aria-label={`${t('foundation.editor.templates.insertTemplate')} ${index + 1}`} className="mona-template-page" key={slide.id} onClick={() => onInsertOne(slide)} size="editor" type="button" variant="ghost">
+              <Button aria-label={`${t('foundation.editor.templates.insertTemplate')} ${index + 1}`} className="flex h-auto flex-col items-stretch rounded-lg p-0 hover:bg-transparent [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-lg [&_.mona-scaled-slide]:ring-1 [&_.mona-scaled-slide]:ring-foreground/[0.07] [&_.mona-scaled-slide]:transition-shadow hover:[&_.mona-scaled-slide]:ring-2 hover:[&_.mona-scaled-slide]:ring-foreground/30" key={slide.id} onClick={() => onInsertOne(slide)} size="editor" type="button" variant="ghost">
                 <ScaledSlide fixedWidth={128} slide={slide} theme={{ ...theme!, ...payload.theme }} thumbnail viewportRatio={0.5625} viewportSize={1000} />
               </Button>
             ))}
           </div>
         </>
       ) : (
-        <Skeleton className="mona-template-card-skeleton" />
+        <Skeleton className="aspect-video w-full rounded-lg" />
       )}
     </div>
   )
@@ -328,13 +292,13 @@ function TemplatePanel({ onInsertAll, onInsertOne, templates, theme }: {
   }
 
   return (
-    <div className="mona-templates">
-      <div className="mona-template-toolbar">
-        <div className="mona-template-searchbox">
+    <div className="select-none">
+      <div className="mb-[14px] flex flex-col gap-2">
+        <div className="flex h-10 items-center gap-2 rounded-[var(--radius-overlay)] border bg-background pr-2.5 pl-3 focus-within:border-ring [&>svg]:flex-none [&>svg]:text-[15px] [&>svg]:text-foreground/55">
           <LayoutTemplate aria-hidden="true" />
           <input
             aria-label={t('foundation.editor.templates.searchPlaceholder')}
-            className="mona-template-search-input"
+            className="min-w-0 flex-1 border-0 bg-transparent text-[13px] outline-none placeholder:text-foreground/40"
             onChange={event => setQuery(event.target.value)}
             placeholder={t('foundation.editor.templates.searchPlaceholder')}
             type="search"
@@ -342,7 +306,7 @@ function TemplatePanel({ onInsertAll, onInsertOne, templates, theme }: {
           />
         </div>
       </div>
-      <div className="mona-template-grid">
+      <div className="grid grid-cols-2 gap-2">
         {filteredTemplates.map(template => (
           <TemplateCoverCard
             id={template.id}
@@ -352,7 +316,7 @@ function TemplatePanel({ onInsertAll, onInsertOne, templates, theme }: {
             theme={theme}
           />
         ))}
-        {!filteredTemplates.length ? <p className="mona-template-empty">{t('foundation.editor.templates.noResults')}</p> : null}
+        {!filteredTemplates.length ? <p className="col-span-full my-6 text-center text-xs text-muted-foreground">{t('foundation.editor.templates.noResults')}</p> : null}
       </div>
     </div>
   )
@@ -378,6 +342,22 @@ const drawerHintClassName = 'mona-drawer-hint mx-0.5 mt-0.5 text-xs leading-norm
 const drawerActionGridClassName = 'mona-drawer-action-grid grid grid-cols-2 gap-2 [&_.mona-drawer-action]:min-w-0 [&_.mona-drawer-action]:justify-start'
 const contextualDrawerHeaderClassName = 'mona-contextual-drawer-header flex min-h-10 shrink-0 items-center gap-1.5 border-b border-border pr-2 [&_.mona-inspector-tabs-header]:min-w-0 [&_.mona-inspector-tabs-header]:flex-1 [&_.mona-inspector-tabs-header]:border-b-0'
 
+function DrawerCollapseButton({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <Button
+      aria-label={t('foundation.editor.rail.collapse')}
+      className="mona-drawer-close absolute top-1/2 right-0 z-30 h-12! w-5! min-w-0 -translate-y-1/2 translate-x-1/2 rounded-full border border-border/70 bg-background p-0 text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.12)] hover:bg-background hover:text-foreground [&_svg]:size-3.5!"
+      onClick={onClose}
+      size="icon-xs"
+      type="button"
+      variant="outline"
+    >
+      <ChevronLeft className="size-3.5" strokeWidth={2.5} />
+    </Button>
+  )
+}
+
 export function EditorRailDrawer({
   activePanel,
   children,
@@ -388,7 +368,6 @@ export function EditorRailDrawer({
   onDrawCustomShape,
   onInsertAudio,
   onInsertChart,
-  onInsertImage,
   onInsertImageSource,
   onInsertSymbol,
   onInsertTable,
@@ -410,8 +389,7 @@ export function EditorRailDrawer({
   onCreateToolChange: (tool: EditorCreateTool | null) => void
   onDrawCustomShape: () => void
   onInsertAudio: (payload: { ext?: string; src: string }) => void
-  onInsertChart: (type: ChartType) => void
-  onInsertImage: (file: File) => void
+  onInsertChart: (spec: CreateChartElementOptions & { openDataEditor?: boolean }) => void
   onInsertImageSource: (src: string) => void
   onInsertSymbol: (value: string) => void
   onInsertTable: (rows: number, columns: number) => void
@@ -426,29 +404,17 @@ export function EditorRailDrawer({
   theme: SlideTheme
 }) {
   const { t } = useTranslation()
-  const imageInputRef = useRef<HTMLInputElement>(null)
   const poolScrollRef = useRef<HTMLDivElement>(null)
-  const [elementCategory, setElementCategory] = useState<'charts' | 'equations' | 'lines' | 'shapes' | 'symbols' | 'tables'>('shapes')
-  const [uploadState, setUploadState] = useState<{
-    route: EditorRailPanel | null
-    view: 'library' | 'main'
-  }>({ route: null, view: 'main' })
-  const uploadView = uploadState.route === activePanel ? uploadState.view : 'main'
+  const [elementCategory, setElementCategory] = useState<'equations' | 'lines' | 'shapes' | 'symbols' | 'tables'>('shapes')
   // Fade the top/bottom edge wherever pool content is cut off.
   useEdgeFade(poolScrollRef, 'y', activePanel)
-
-  const selectImageFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (file) onInsertImage(file)
-  }
 
   if (!activePanel && !contextualOpen) return null
 
   return (
     <Sidebar
       aria-label={activePanel && panelTitle ? panelTitle : t('foundation.editor.inspector')}
-      className="mona-editor-drawer w-72 shrink-0 overflow-hidden border-r border-sidebar-border"
+      className="mona-editor-drawer relative w-[22rem] shrink-0 overflow-visible border-r border-sidebar-border"
       collapsible="none"
       onKeyDown={event => {
         if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -459,17 +425,11 @@ export function EditorRailDrawer({
       role="complementary"
       side="left"
     >
+      <DrawerCollapseButton onClose={onClose} />
       {activePanel ? (
         <>
-          {/* Extension header, from the block: title + close, border-b px-4. */}
-          <SidebarHeader className="flex flex-row items-center justify-between border-b border-sidebar-border px-4">
-            <h3 className="font-medium">{panelTitle}</h3>
-            <Button aria-label={t('foundation.editor.rail.collapse')} className="size-6 rounded-md hover:bg-sidebar-accent" onClick={onClose} size="icon-xs" type="button" variant="ghost">
-              <X className="h-4 w-4" />
-            </Button>
-          </SidebarHeader>
           <SidebarContent
-            className="mona-inspector-content mona-drawer-content block min-h-0 has-[.mona-image-library-panel]:flex has-[.mona-image-library-panel]:overflow-hidden has-[.mona-image-library-panel]:p-0"
+            className="mona-inspector-content mona-drawer-content block min-h-0 has-[.mona-uploads-panel,.mona-photos-panel,.mona-charts-panel]:flex has-[.mona-uploads-panel,.mona-photos-panel,.mona-charts-panel]:overflow-hidden has-[.mona-uploads-panel,.mona-photos-panel,.mona-charts-panel]:p-0"
             ref={poolScrollRef}
           >
             {activePanel === 'design' ? (
@@ -501,7 +461,6 @@ export function EditorRailDrawer({
                 >
                   <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.shape')} value="shapes"><GraphicDesignIcon />{t('foundation.editor.canvasTool.shape')}</ToggleGroupItem>
                   <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.line')} value="lines"><ConnectionIcon />{t('foundation.editor.canvasTool.line')}</ToggleGroupItem>
-                  <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.chart')} value="charts"><ChartIcon />{t('foundation.editor.canvasTool.chart')}</ToggleGroupItem>
                   <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.table')} value="tables"><InsertTableIcon />{t('foundation.editor.canvasTool.table')}</ToggleGroupItem>
                   <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.symbol')} value="symbols"><SymbolIcon />{t('foundation.editor.canvasTool.symbol')}</ToggleGroupItem>
                   <ToggleGroupItem aria-label={t('foundation.editor.canvasTool.equation')} value="equations"><FormulaIcon />{t('foundation.editor.canvasTool.equation')}</ToggleGroupItem>
@@ -516,23 +475,23 @@ export function EditorRailDrawer({
                   </>
                 ) : null}
                 {elementCategory === 'lines' ? <LinePool onSelect={line => onCreateToolChange({ type: 'line', key: 'line', data: line })} /> : null}
-                {elementCategory === 'charts' ? <ChartPool onSelect={onInsertChart} /> : null}
                 {elementCategory === 'tables' ? <EditorTableGenerator onInsert={onInsertTable} /> : null}
                 {elementCategory === 'symbols' ? <SymbolPool onSelect={onInsertSymbol} /> : null}
                 {elementCategory === 'equations' ? <DrawerAction icon={<FormulaIcon />} onClick={onOpenLatexEditor}>{t('foundation.editor.canvasTool.insertEquation')}</DrawerAction> : null}
               </div>
             ) : null}
             {activePanel === 'uploads' ? (
-              uploadView === 'library'
-                ? <EditorImageLibrary onBack={() => setUploadState({ route: 'uploads', view: 'main' })} onInsert={onInsertImageSource} />
-                : (
-                    <div className={drawerStackClassName}>
-                      <input accept="image/*" aria-hidden="true" hidden onChange={selectImageFile} ref={imageInputRef} tabIndex={-1} type="file" />
-                      <DrawerAction icon={<UploadIcon />} onClick={() => imageInputRef.current?.click()}>{t('foundation.editor.canvasTool.uploadImage')}</DrawerAction>
-                      <DrawerAction icon={<PictureIcon />} onClick={() => setUploadState({ route: 'uploads', view: 'library' })}>{t('foundation.editor.canvasTool.onlineImages')}</DrawerAction>
-                      <EditorMediaInput onInsertAudio={onInsertAudio} onInsertVideo={onInsertVideo} />
-                    </div>
-                  )
+              <EditorUploadsPanel
+                onInsertAudio={onInsertAudio}
+                onInsertImageSource={onInsertImageSource}
+                onInsertVideo={onInsertVideo}
+              />
+            ) : null}
+            {activePanel === 'photos' ? (
+              <EditorPhotosPanel onInsertImageSource={onInsertImageSource} />
+            ) : null}
+            {activePanel === 'charts' ? (
+              <EditorChartsPanel onInsertChart={onInsertChart} />
             ) : null}
             {secondaryContent}
           </SidebarContent>
@@ -541,9 +500,6 @@ export function EditorRailDrawer({
         <>
           <div className={contextualDrawerHeaderClassName}>
             {contextualHeader}
-            <Button aria-label={t('foundation.editor.rail.collapse')} className="mona-drawer-close size-6 shrink-0 rounded-md hover:bg-sidebar-accent" onClick={onClose} size="icon-xs" type="button" variant="ghost">
-              <X className="h-4 w-4" />
-            </Button>
           </div>
           {children}
         </>

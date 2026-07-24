@@ -80,32 +80,32 @@ export function EditorMediaInput({
   }
 
   return (
-    <div className="mona-media-input">
-      <ToggleGroup className="mona-media-tabs" onValueChange={value => {
+    <div className="w-full">
+      <ToggleGroup className="mb-[15px] w-full flex-wrap items-center justify-start gap-0 rounded-none border-b text-[13px] select-none" onValueChange={value => {
         if (value) setType(value as MediaType)
       }} type="single" value={type}>
         {(['video', 'audio'] as const).map(value => (
           <ToggleGroupItem
-            className={type === value ? 'is-active' : ''}
+            className="h-auto min-w-0 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 font-normal hover:bg-transparent data-[state=on]:border-b-foreground data-[state=on]:bg-transparent data-[state=on]:text-foreground"
             key={value}
             value={value}
           >{t(`foundation.editor.media.${value}`)}</ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <div className="mona-media-url-input">
+      <div className="flex rounded-[var(--radius-control)] border border-input bg-background px-[5px] transition-colors hover:border-ring focus-within:border-ring">
         <Input
           aria-label={t(`foundation.editor.media.${type}Placeholder`)}
+          className="h-[30px] flex-1 border-0 bg-transparent px-[5px] shadow-none focus-visible:ring-0"
           onChange={event => type === 'video' ? setVideoSrc(event.target.value) : setAudioSrc(event.target.value)}
           placeholder={t(`foundation.editor.media.${type}Placeholder`)}
           type="text"
           value={type === 'video' ? videoSrc : audioSrc}
         />
       </div>
-      <div className="mona-media-actions">
+      <div className="mt-2.5 flex justify-between">
         <input
           accept={`${type}/*`}
           aria-hidden="true"
-          className="mona-media-file-input"
           hidden
           key={type}
           onChange={event => upload(event, type)}
@@ -113,11 +113,11 @@ export function EditorMediaInput({
           tabIndex={-1}
           type="file"
         />
-        <Button className="mona-media-button" onClick={() => (type === 'video' ? videoInputRef : audioInputRef).current?.click()} size="editor" variant="outline">
+        <Button onClick={() => (type === 'video' ? videoInputRef : audioInputRef).current?.click()} size="editor" variant="outline">
           <UploadIcon /> {t(`foundation.editor.media.upload${type === 'video' ? 'Video' : 'Audio'}`)}
         </Button>
-        <div className="mona-media-confirm-actions">
-          <Button className="mona-media-button" onClick={confirm} size="editor">{t('foundation.editor.media.confirm')}</Button>
+        <div className="flex">
+          <Button onClick={confirm} size="editor">{t('foundation.editor.media.confirm')}</Button>
         </div>
       </div>
     </div>

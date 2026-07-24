@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { editorActions, selectCurrentSlide, selectPresentation, selectSession } from '@mona/editor-state'
 import type { EditorToolbarState } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
-import type { ChartType, PPTAudioElement, PPTChartElement, PPTImageElement, PPTLatexElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, PPTVideoElement } from '@mona/presentation-core/model'
+import type { PPTAudioElement, PPTChartElement, PPTImageElement, PPTLatexElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, PPTVideoElement } from '@mona/presentation-core/model'
 
 
 import { SidebarContent, SidebarHeader, SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -20,9 +20,9 @@ import { createEditorRuntime, type EditorRuntime } from '@/features/editor/edito
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
-import { fileToDataUrl, fitImageToPresentation, getImageSize } from '@/features/editor/editor-image'
+import { fitImageToPresentation, getImageSize } from '@/features/editor/editor-image'
 import { createTableElement } from '@/features/editor/editor-table'
-import { createChartElement } from '@/features/editor/editor-chart'
+import { createChartElement, type CreateChartElementOptions } from '@/features/editor/editor-chart'
 import type { LatexRenderResult } from '@/features/editor/editor-latex'
 import { createLatexElement } from '@/features/editor/editor-latex-element'
 import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
@@ -297,7 +297,7 @@ function EditorDeckContent({
     const selectionChanged = previous.length !== session.activeElementIds.length
       || previous.some((id, index) => id !== session.activeElementIds[index])
     if (!selectionChanged || !taskPanelRoute) return
-    if (['design', 'elements', 'text', 'uploads'].includes(taskPanelRoute)) {
+    if (['design', 'elements', 'text', 'uploads', 'photos', 'charts'].includes(taskPanelRoute)) {
       closeTaskPanel({ restoreFocus: false })
     }
   }, [closeTaskPanel, session.activeElementIds, taskPanelRoute])
@@ -370,8 +370,6 @@ function EditorDeckContent({
     runtime.store.dispatch(editorActions.canvasFocusChanged(true))
   }
 
-  const insertImage = async (file: File) => insertImageSource(await fileToDataUrl(file))
-
   const insertTable = (rows: number, columns: number) => {
     const element = createTableElement({
       rows,
@@ -387,8 +385,8 @@ function EditorDeckContent({
     runtime.store.dispatch(editorActions.canvasFocusChanged(true))
   }
 
-  const insertChart = (type: ChartType) => {
-    const element = createChartElement(type, presentation.theme, {
+  const insertChart = (spec: CreateChartElementOptions & { openDataEditor?: boolean }) => {
+    const element = createChartElement(spec, presentation.theme, {
       category: number => t('foundation.editor.chartData.category', { number }),
       coordinate: number => t('foundation.editor.chartData.coordinate', { number }),
       series: number => t('foundation.editor.chartData.series', { number }),
@@ -397,6 +395,7 @@ function EditorDeckContent({
     if (!runtime.commit('Create chart', [{ type: 'element.add', elements: element }])) return
     runtime.store.dispatch(editorActions.selectionChanged([element.id]))
     runtime.store.dispatch(editorActions.canvasFocusChanged(true))
+    if (spec.openDataEditor) setEditingChartId(element.id)
   }
 
   const insertVideo = ({ ext, src }: { ext?: string; src: string }) => {
@@ -531,15 +530,11 @@ function EditorDeckContent({
         // overlays live under document.body, but the source editor does not treat their
         // pointer activity as leaving the editor-area focus scope.
         if (target.closest([
-          '.mona-editor-context-menu',
-          '.mona-editor-context-menu-mask',
-          '.mona-link-dialog-backdrop',
-          '.mona-link-select-popover',
+          '[data-slot="dropdown-menu-content"]',
+          '[data-slot="dialog-overlay"]',
+          '[data-slot="select-content"]',
           '.mona-editor-notice',
           '.mona-svg-path-modal',
-          '.mona-chart-data-modal',
-          '.mona-chart-theme-modal',
-          '.mona-latex-modal',
           '.mona-remark-menu',
         ].join(','))) return
         if (target.closest('.mona-thumbnail-rail')) {
@@ -575,7 +570,7 @@ function EditorDeckContent({
       />
       <CollapsiblePanelRegion className="mona-panel-region mona-drawer-region bg-sidebar" open={drawerOpen}>
       <Suspense fallback={(
-        <div aria-label={taskPanelTitle || t('foundation.editor.inspector')} className="mona-editor-drawer mona-agent-loading grid h-full w-72 shrink-0 place-items-center overflow-hidden text-xs text-muted-foreground" role="status">
+        <div aria-label={taskPanelTitle || t('foundation.editor.inspector')} className="mona-editor-drawer mona-agent-loading grid h-full w-[22rem] shrink-0 place-items-center overflow-hidden text-xs text-muted-foreground" role="status">
           {t('common.loading')}
         </div>
       )}>
@@ -599,7 +594,6 @@ function EditorDeckContent({
         }}
         onInsertAudio={insertAudio}
         onInsertChart={insertChart}
-        onInsertImage={file => void insertImage(file)}
         onInsertImageSource={src => void insertImageSource(src)}
         onInsertSymbol={insertSymbol}
         onInsertTable={insertTable}
@@ -700,7 +694,7 @@ function EditorDeckContent({
       </SidebarInset>
       <CollapsiblePanelRegion className="mona-panel-region mona-dock-region" open={agentOpen}>
         {agentOpen ? (
-          <Suspense fallback={<aside className="mona-agent-dock mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('foundation.editor.agent.loading')}</aside>}>
+          <Suspense fallback={<aside className="mona-agent-dock grid h-full w-[var(--dock-w)] shrink-0 place-items-center overflow-hidden border-l border-sidebar-border bg-sidebar text-xs text-muted-foreground" role="status">{t('foundation.editor.agent.loading')}</aside>}>
             <EditorAgentDock handoff={agentSketchHandoff} key={agentSketchHandoff?.updatedAt ?? 'text-only'} runtime={runtime} />
           </Suspense>
         ) : null}

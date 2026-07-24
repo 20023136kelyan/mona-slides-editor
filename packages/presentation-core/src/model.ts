@@ -159,6 +159,122 @@ export interface PPTBaseElement {
 export type TextType = 'title' | 'subtitle' | 'content' | 'item' | 'itemTitle' | 'notes' | 'header' | 'footer' | 'partNumber' | 'itemNumber'
 export type TextInset = [number, number, number, number]
 
+export interface StructuredTextColor {
+  alpha?: number
+  type: 'preset' | 'scheme' | 'srgb' | 'system'
+  value: string
+}
+
+export interface StructuredTextSpacing {
+  unit: 'percent' | 'points'
+  value: number
+}
+
+export interface StructuredTextTabStop {
+  alignment?: string
+  position: number
+}
+
+export interface StructuredTextBullet {
+  character?: string
+  color?: StructuredTextColor
+  fontFamily?: string
+  numberingScheme?: string
+  size?: StructuredTextSpacing
+  startAt?: number
+  type: 'auto-number' | 'character' | 'none' | 'picture'
+}
+
+export interface StructuredTextRunProperties {
+  alternativeLanguage?: string
+  baseline?: number
+  bold?: boolean
+  capitalization?: string
+  color?: StructuredTextColor
+  complexScriptFontFamily?: string
+  eastAsianFontFamily?: string
+  fontFamily?: string
+  fontSize?: number
+  italic?: boolean
+  language?: string
+  normalizeHeight?: boolean
+  spacing?: number
+  strike?: string
+  underline?: string
+}
+
+export interface StructuredTextParagraphProperties {
+  alignment?: string
+  bullet?: StructuredTextBullet
+  defaultRun?: StructuredTextRunProperties
+  defaultTabSize?: number
+  eastAsianLineBreak?: boolean
+  fontAlignment?: string
+  hangingPunctuation?: boolean
+  indent?: number
+  latinLineBreak?: boolean
+  lineSpacing?: StructuredTextSpacing
+  marginLeft?: number
+  rightToLeft?: boolean
+  spaceAfter?: StructuredTextSpacing
+  spaceBefore?: StructuredTextSpacing
+  tabs?: StructuredTextTabStop[]
+}
+
+export interface StructuredTextStyleLevel {
+  level: number
+  paragraph?: StructuredTextParagraphProperties
+}
+
+export interface StructuredTextRun {
+  fieldId?: string
+  fieldType?: string
+  hyperlink?: string
+  kind: 'break' | 'field' | 'tab' | 'text'
+  properties?: StructuredTextRunProperties
+  sourceId: string
+  text?: string
+}
+
+export interface StructuredTextParagraph {
+  endProperties?: StructuredTextRunProperties
+  level: number
+  properties?: StructuredTextParagraphProperties
+  runs: StructuredTextRun[]
+  sourceId: string
+}
+
+export interface StructuredTextBodyProperties {
+  anchor?: string
+  anchorCenter?: boolean
+  autoFit?: {
+    fontScale?: number
+    lineSpacingReduction?: number
+    type: 'none' | 'normal' | 'shape'
+  }
+  columnCount?: number
+  columnSpacing?: number
+  insets?: TextInset
+  rightToLeftColumns?: boolean
+  rotation?: number
+  verticalMode?: string
+  wrap?: string
+}
+
+/**
+ * Typed rich-text representation retained alongside Mona's current HTML
+ * compatibility adapter. Dimensional values are authored PowerPoint points;
+ * `scale` converts those values into Mona canvas units at render time.
+ */
+export interface StructuredTextBody {
+  bodyProperties?: StructuredTextBodyProperties
+  defaultParagraph?: StructuredTextParagraphProperties
+  listStyle: StructuredTextStyleLevel[]
+  paragraphs: StructuredTextParagraph[]
+  scale: number
+  schemaVersion: 1
+}
+
 /**
  * 文本元素
  *
@@ -197,6 +313,9 @@ export type TextInset = [number, number, number, number]
 export interface PPTTextElement extends PPTBaseElement {
   type: 'text'
   content: string
+  structuredText?: StructuredTextBody
+  columns?: number
+  columnGap?: number
   defaultFontName: string
   defaultColor: string
   outline?: PPTElementOutline
@@ -340,6 +459,9 @@ export interface PPTImageElement extends PPTBaseElement {
  */
 export interface ShapeText {
   content: string
+  structuredText?: StructuredTextBody
+  columns?: number
+  columnGap?: number
   defaultFontName: string
   defaultColor: string
   align: TextAlignVertical

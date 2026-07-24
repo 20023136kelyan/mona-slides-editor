@@ -76,20 +76,20 @@ const lineStyleOptions: Array<{ label: string; value: LineStyleType }> = [
 
 function LineStylePreview({ type }: { type: LineStyleType }) {
   const dashArray = type === 'dashed' ? '10 5' : type === 'dotted' ? '3.6 3.2' : '0 0'
-  return <svg aria-hidden="true" className="mona-line-style-preview" height="100%" viewBox="0 0 100 10" width="100%"><line stroke="#333" strokeDasharray={dashArray} strokeWidth="2" x1="0" x2="100" y1="5" y2="5" /></svg>
+  return <svg aria-hidden="true" height="100%" viewBox="0 0 100 10" width="100%"><line stroke="#333" strokeDasharray={dashArray} strokeWidth="2" x1="0" x2="100" y1="5" y2="5" /></svg>
 }
 
 function DesignRow({ children, label, style }: { children: React.ReactNode; label: string; style?: React.CSSProperties }) {
-  return <div className="mona-design-row" style={style}><div className="mona-design-row-label">{label}</div><div className="mona-design-row-control">{children}</div></div>
+  return <div className="mb-2.5 flex w-full items-center" style={style}><div className="w-2/5">{label}</div><div className="w-3/5 [&>*]:w-full">{children}</div></div>
 }
 
 function ThemeColorListButton({ colors, onClick }: { colors: readonly string[]; onClick: () => void }) {
   return (
-    <Button aria-label="Theme colors" className="mona-theme-color-list" onClick={onClick} size="editor" type="button" variant="outline">
-      <span className="mona-theme-color-blocks">
+    <Button aria-label="Theme colors" className="w-full justify-center" onClick={onClick} size="editor" type="button" variant="outline">
+      <span className="ml-2 flex h-5 flex-1 outline outline-1 outline-dashed outline-[rgb(102_102_102/0.12)]">
         {colors.slice(0, 12).map((color, index) => <span className="mona-theme-color-block" key={`${color}-${index}`}><span style={{ backgroundColor: color }} /></span>)}
       </span>
-      <PaletteIcon className="mona-theme-color-icon" />
+      <PaletteIcon className="w-8 text-muted-foreground" />
     </Button>
   )
 }
@@ -115,12 +115,12 @@ function ViewportSizeSetting({ runtime }: { runtime: EditorRuntime }) {
     close()
   }
   return (
-    <div className="mona-viewport-setting">
-      <div className="mona-design-modal-title">{t('designPanel.customCanvas')}</div>
-      <div className="mona-viewport-setting-row"><div>{t('toolbar.width')}</div><InspectorNumberInput ariaLabel={t('toolbar.width')} max={max} min={min} onChange={setWidth} onEnter={value => apply(value, height)} value={width} /></div>
-      <div className="mona-viewport-setting-row"><div>{t('toolbar.height')}</div><InspectorNumberInput ariaLabel={t('toolbar.height')} max={max} min={min} onChange={setHeight} onEnter={value => apply(width, value)} value={height} /></div>
-      <div className="mona-viewport-setting-tip">{t('designPanel.sizeRange', { min, max })}</div>
-      <div className="mona-design-modal-buttons">
+    <div>
+      <div className="mb-[15px] text-[17px] font-bold">{t('designPanel.customCanvas')}</div>
+      <div className="mb-2.5 flex w-full items-center text-[13px] [&>div:first-child]:w-[50px] [&>*:last-child]:flex-1"><div>{t('toolbar.width')}</div><InspectorNumberInput ariaLabel={t('toolbar.width')} max={max} min={min} onChange={setWidth} onEnter={value => apply(value, height)} value={width} /></div>
+      <div className="mb-2.5 flex w-full items-center text-[13px] [&>div:first-child]:w-[50px] [&>*:last-child]:flex-1"><div>{t('toolbar.height')}</div><InspectorNumberInput ariaLabel={t('toolbar.height')} max={max} min={min} onChange={setHeight} onEnter={value => apply(width, value)} value={height} /></div>
+      <div className="mb-[18px] text-xs text-muted-foreground">{t('designPanel.sizeRange', { min, max })}</div>
+      <div className="flex justify-end gap-2.5">
         <InspectorButton active ariaLabel={t('common.confirm')} onClick={apply}>{t('common.confirm')}</InspectorButton>
         <InspectorButton ariaLabel={t('common.cancel')} onClick={close}>{t('common.cancel')}</InspectorButton>
       </div>
@@ -180,11 +180,11 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
     close()
   }
   return (
-    <div className="mona-theme-colors-setting">
-      <div className="mona-design-modal-title">{t('designPanel.editThemeColors')}</div>
+    <div className="flex flex-col">
+      <div className="mb-[15px] text-[17px] font-bold">{t('designPanel.editThemeColors')}</div>
       {colors.map((color, index) => (
-        <div className="mona-theme-colors-row" key={index}>
-          <div className="mona-theme-colors-label" onPointerDown={event => startReorder(event, index)}>{t('designPanel.slideThemeColor', { number: index + 1 })}</div>
+        <div className="mona-theme-colors-row mb-2.5 flex w-full items-center [&>*:last-child]:w-3/5" key={index}>
+          <div className="w-2/5 cursor-move text-[13px]" onPointerDown={event => startReorder(event, index)}>{t('designPanel.slideThemeColor', { number: index + 1 })}</div>
           <InspectorColorButton ariaLabel={t('designPanel.slideThemeColor', { number: index + 1 })} color={color} onChange={value => setColors(current => current.map((item, itemIndex) => itemIndex === index ? value : item))} />
         </div>
       ))}
@@ -237,27 +237,27 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
     return (value.getAlpha() < 1 ? value.toHex8String() : value.toHexString()).toUpperCase()
   }
   const optionRows = [
-    { key: 'fontName' as const, label: `${t('common.font')}:`, values: styles.fontNames, visual: (value: string) => <span className="mona-extract-value" style={{ fontFamily: value }}>{fontOptions.find(item => item.value === value)?.label || value}</span>, apply: (value: string) => updateTheme({ fontName: value }) },
-    { key: 'fontColor' as const, label: `${t('toolbar.textColor')}:`, values: styles.fontColors, visual: (value: string) => <span className="mona-extract-value" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ fontColor: value }) },
-    { key: 'backgroundColor' as const, label: `${t('common.backgroundColor')}:`, values: styles.backgroundColors, visual: (value: string) => <span className="mona-extract-value" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ backgroundColor: value }) },
+    { key: 'fontName' as const, label: `${t('common.font')}:`, values: styles.fontNames, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ fontFamily: value }}>{fontOptions.find(item => item.value === value)?.label || value}</span>, apply: (value: string) => updateTheme({ fontName: value }) },
+    { key: 'fontColor' as const, label: `${t('toolbar.textColor')}:`, values: styles.fontColors, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ fontColor: value }) },
+    { key: 'backgroundColor' as const, label: `${t('common.backgroundColor')}:`, values: styles.backgroundColors, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ backgroundColor: value }) },
   ]
   return (
-    <div className="mona-theme-extract">
+    <div className="flex h-[500px] flex-col">
       <Tabs onValueChange={value => selectTab(value as 'single' | 'all')} value={activeTab}>
-        <TabsList className="mona-extract-tabs">
+        <TabsList className="w-full justify-start border-b" variant="line">
           <TabsTrigger value="single">{t('designPanel.extractCurrent')}</TabsTrigger>
           <TabsTrigger value="all">{t('designPanel.extractAll')}</TabsTrigger>
         </TabsList>
       </Tabs>
-      <div className="mona-extract-content">
+      <div className="mr-[-20px] flex-1 overflow-auto pr-5">
         {optionRows.map(row => row.values.length ? (
-          <div className="mona-extract-config" key={row.key}>
-            <div className="mona-extract-label">{row.label}</div>
+          <div className="border-b border-dashed pt-3 pb-2.5 text-[13px]" key={row.key}>
+            <div className="mb-[5px] flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{row.label}</div>
             {row.values.map((value, index) => (
-              <div className="mona-extract-value-wrap" key={value}>
+              <div className="mt-[3px] flex items-center justify-between" key={value}>
                 {row.visual(value)}
-                <div className="mona-extract-handler">
-                  <span className={selection[row.key] === index ? 'is-active' : ''}><CheckIcon /></span>
+                <div className="ml-2.5 flex flex-1 items-center justify-between text-xs">
+                  <span className={selection[row.key] === index ? 'text-[15px] opacity-100' : 'text-[15px] opacity-0'}><CheckIcon /></span>
                   <Button onClick={() => setSelection(current => ({ ...current, [row.key]: index }))} size="xs" type="button" variant="ghost">{t('common.select')}</Button>
                   <Button onClick={() => {
                     row.apply(value); setSelection(current => ({ ...current, [row.key]: index })) 
@@ -268,8 +268,8 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
           </div>
         ) : null)}
         {styles.themeColors.length ? (
-          <div className="mona-extract-config">
-            <div className="mona-extract-label">{`${t('common.themeColor')}: `}<span>({t('designPanel.excludeColorTip')})</span></div>
+          <div className="border-b border-dashed pt-3 pb-2.5 text-[13px]">
+            <div className="mb-[5px] flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{`${t('common.themeColor')}: `}<span>({t('designPanel.excludeColorTip')})</span></div>
             <div className="mona-extract-colors">
               {styles.themeColors.map((color, index) => (
                 <Toggle
@@ -341,9 +341,9 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
   const canvasSize = t('designPanel.canvasSize', { width: presentation.viewportSize, height: Math.round(presentation.viewportSize * presentation.viewportRatio * 100) / 100 })
 
   return (
-    <div className="mona-slide-design-panel">
-      <div className="mona-design-title">{t('designPanel.backgroundFill')}</div>
-      <div className="mona-design-split-row">
+    <div className="select-none">
+      <div className="mb-2.5 flex justify-between">{t('designPanel.backgroundFill')}</div>
+      <div className="mb-2.5 flex w-full items-center gap-2.5 [&>*]:min-w-0 [&>*]:flex-1">
         <InspectorSelect ariaLabel={t('designPanel.backgroundFill')} onChange={value => updateBackgroundType(value)} options={[
           { label: t('toolbar.solidFill'), value: 'solid' },
           { label: t('toolbar.imageFill'), value: 'image' },
@@ -361,28 +361,28 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
         ]} value={background.gradient?.type || 'linear'} /> : null}
       </div>
       {background.type === 'image' ? (
-        <label className="mona-background-image-upload">
-          <input accept="image/*" onChange={event => {
-            const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(src => updateImage({ src })) 
+        <label className="relative mb-2.5 block h-0 rounded-[var(--radius-control)] border border-dashed pb-[56.25%] transition-colors hover:border-foreground hover:text-foreground">
+          <input accept="image/*" hidden onChange={event => {
+            const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(src => updateImage({ src }))
           }} type="file" />
-          <span style={{ backgroundImage: `url(${background.image?.src})` }}><PlusIcon /></span>
+          <span className="absolute inset-0 flex items-center justify-center bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${background.image?.src})` }}><PlusIcon /></span>
         </label>
       ) : null}
       {background.type === 'gradient' && background.gradient ? (
-        <div className="mona-background-gradient">
-          <div className="mona-design-row-full"><EditorGradientBar index={Math.min(gradientIndex, background.gradient.colors.length - 1)} onChange={colors => updateGradient({ colors })} onIndexChange={setGradientIndex} value={background.gradient.colors} /></div>
+        <div>
+          <div className="flex w-full items-center mb-2.5"><EditorGradientBar index={Math.min(gradientIndex, background.gradient.colors.length - 1)} onChange={colors => updateGradient({ colors })} onIndexChange={setGradientIndex} value={background.gradient.colors} /></div>
           <DesignRow label={t('toolbar.currentStop')}><InspectorColorButton ariaLabel={t('toolbar.currentStop')} color={background.gradient.colors[gradientIndex]?.color || '#fff'} onChange={color => updateGradient({ colors: background.gradient!.colors.map((item, index) => index === gradientIndex ? { ...item, color } : item) })} /></DesignRow>
           {background.gradient.type === 'linear' ? <DesignRow label={t('toolbar.gradientAngle')}><InspectorSlider ariaLabel={t('toolbar.gradientAngle')} max={360} min={0} onChange={rotate => updateGradient({ rotate })} step={15} value={background.gradient.rotate || 0} /></DesignRow> : null}
         </div>
       ) : null}
-      <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyBackgroundAll')} onClick={applyBackgroundAll} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyBackgroundAll')}</InspectorButton></div>
+      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('designPanel.applyBackgroundAll')} onClick={applyBackgroundAll} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyBackgroundAll')}</InspectorButton></div>
       <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mona-design-row-full"><InspectorSelect ariaLabel={t('designPanel.customCanvas')} onChange={value => {
+      <div className="flex w-full items-center mb-2.5"><InspectorSelect ariaLabel={t('designPanel.customCanvas')} onChange={value => {
         if (value === 'custom') setViewportOpen(true); else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { historyKey: 'slide-design-viewport' }) 
       }} options={ratioOptions} value={ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'} /></div>
-      <div className="mona-design-canvas-size">{canvasSize}</div>
+      <div className="w-full text-center text-xs text-muted-foreground">{canvasSize}</div>
       <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mona-design-title"><span>{t('designPanel.globalTheme')}</span><Button className="mona-design-more" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
+      <div className="mb-2.5 flex justify-between"><span>{t('designPanel.globalTheme')}</span><Button className="gap-[3px] text-xs" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
       <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
       <DesignRow label={`${t('common.fontColor')}:`}><InspectorColorButton ariaLabel={t('common.fontColor')} color={presentation.theme.fontColor} onChange={fontColor => updateTheme({ fontColor })} /></DesignRow>
       <DesignRow label={`${t('common.backgroundColor')}:`}><InspectorColorButton ariaLabel={t('common.backgroundColor')} color={presentation.theme.backgroundColor} onChange={backgroundColor => updateTheme({ backgroundColor })} /></DesignRow>
@@ -398,20 +398,20 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
           <DesignRow label={t('toolbar.shadowColor')}><InspectorColorButton ariaLabel={t('toolbar.shadowColor')} color={presentation.theme.shadow.color} onChange={color => updateTheme({ shadow: { ...presentation.theme.shadow, color } })} /></DesignRow>
         </>
       ) : null}
-      <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyThemeAll')} onClick={() => runtime.commit('Apply theme to all slides', [{ type: 'presentation.slides.replace', slides: applyThemeToSlides(presentation.slides, presentation.theme, more) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyThemeAll')}</InspectorButton></div>
-      <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.applyFontAll')} onClick={() => runtime.commit('Apply font to all slides', [{ type: 'presentation.slides.replace', slides: applyFontToSlides(presentation.slides, presentation.theme.fontName) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyFontAll')}</InspectorButton></div>
-      <div className="mona-design-row-full"><InspectorButton ariaLabel={t('designPanel.extractTheme')} onClick={() => setThemeExtractOpen(true)} style={{ width: '100%' }}><PaletteIcon /> {t('designPanel.extractTheme')}</InspectorButton></div>
+      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('designPanel.applyThemeAll')} onClick={() => runtime.commit('Apply theme to all slides', [{ type: 'presentation.slides.replace', slides: applyThemeToSlides(presentation.slides, presentation.theme, more) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyThemeAll')}</InspectorButton></div>
+      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('designPanel.applyFontAll')} onClick={() => runtime.commit('Apply font to all slides', [{ type: 'presentation.slides.replace', slides: applyFontToSlides(presentation.slides, presentation.theme.fontName) }], { historyKey })} style={{ width: '100%' }}><CheckIcon /> {t('designPanel.applyFontAll')}</InspectorButton></div>
+      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('designPanel.extractTheme')} onClick={() => setThemeExtractOpen(true)} style={{ width: '100%' }}><PaletteIcon /> {t('designPanel.extractTheme')}</InspectorButton></div>
       <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mona-design-title">{t('designPanel.presetThemes')}</div>
-      <div className="mona-preset-theme-list">
+      <div className="mb-2.5 flex justify-between">{t('designPanel.presetThemes')}</div>
+      <div className="flex flex-wrap content-start">
         {PRESET_THEMES.map((preset, index) => (
-          <div className="mona-preset-theme" key={index} style={{ backgroundColor: preset.background, fontFamily: preset.fontname }}>
-            <div className="mona-preset-theme-content">
-              <div className="mona-preset-theme-text" style={{ color: preset.fontColor }}>{t('designPanel.sampleText')}</div>
-              <div className="mona-preset-theme-colors">{preset.colors.map((color, colorIndex) => <span key={colorIndex} style={{ backgroundColor: color }} />)}</div>
-              <div className="mona-preset-theme-actions">
-                <Button onClick={() => applyPreset(preset)} size="xs" type="button">{t('designPanel.set')}</Button>
-                <Button onClick={() => applyPreset(preset, true)} size="xs" type="button">{t('designPanel.setAndApply')}</Button>
+          <div className="group/preset relative mb-[4%] w-[48%] rounded-[var(--radius-control)] pb-[27%] [&:not(:nth-child(2n))]:mr-[4%]" key={index} style={{ backgroundColor: preset.background, fontFamily: preset.fontname }}>
+            <div className="absolute inset-0 flex flex-col justify-center rounded-[var(--radius-control)] border p-2">
+              <div className="text-[15px]" style={{ color: preset.fontColor }}>{t('designPanel.sampleText')}</div>
+              <div className="mt-1.5 flex [&>span]:mr-0.5 [&>span]:size-3">{preset.colors.map((color, colorIndex) => <span key={colorIndex} style={{ backgroundColor: color }} />)}</div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-[3px] bg-black/25 opacity-0 transition-opacity group-hover/preset:opacity-100">
+                <Button className="h-6 text-xs" onClick={() => applyPreset(preset)} size="xs" type="button">{t('designPanel.set')}</Button>
+                <Button className="h-6 text-xs" onClick={() => applyPreset(preset, true)} size="xs" type="button">{t('designPanel.setAndApply')}</Button>
               </div>
             </div>
           </div>

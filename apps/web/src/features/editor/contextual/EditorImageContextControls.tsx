@@ -11,6 +11,11 @@ import { editorActions } from '@mona/editor-state'
 
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
+import {
+  contextualControlIcon,
+  contextualControlLabeled,
+  contextualToggleFlat,
+} from '@/features/editor/contextual/contextual-control-styles'
 import { InspectorPopoverButton, InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
 import { getReplacementImageCommands } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -45,15 +50,15 @@ export function EditorImageContextControls({
   return (
     <div className="mona-contextual-controls mona-contextual-image-controls">
       <div className="mona-contextual-control-row">
-        <Button className="mona-contextual-control is-labeled" onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} size="editor" type="button" variant="ghost"><TailoringIcon /><span>{t('foundation.editor.image.crop')}</span></Button>
+        <Button className={contextualControlLabeled} onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} size="editor" type="button" variant="ghost"><TailoringIcon /><span>{t('foundation.editor.image.crop')}</span></Button>
         <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={inputRef} tabIndex={-1} type="file" />
-        <Button className="mona-contextual-control is-labeled" onClick={() => inputRef.current?.click()} size="editor" type="button" variant="ghost"><TransformIcon /><span>{t('foundation.editor.image.replace')}</span></Button>
+        <Button className={contextualControlLabeled} onClick={() => inputRef.current?.click()} size="editor" type="button" variant="ghost"><TransformIcon /><span>{t('foundation.editor.image.replace')}</span></Button>
         <div className="mona-contextual-divider" />
-        <Toggle aria-label={t('foundation.editor.shape.horizontalFlip')} className="mona-contextual-control" onPressedChange={() => update({ flipH: !element.flipH }, `image-flip-${element.id}`)} pressed={Boolean(element.flipH)}><FlipHorizontalIcon /></Toggle>
-        <Toggle aria-label={t('foundation.editor.shape.verticalFlip')} className="mona-contextual-control" onPressedChange={() => update({ flipV: !element.flipV }, `image-flip-${element.id}`)} pressed={Boolean(element.flipV)}><FlipVerticalIcon /></Toggle>
+        <Toggle aria-label={t('foundation.editor.shape.horizontalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipH: !element.flipH }, `image-flip-${element.id}`)} pressed={Boolean(element.flipH)}><FlipHorizontalIcon /></Toggle>
+        <Toggle aria-label={t('foundation.editor.shape.verticalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipV: !element.flipV }, `image-flip-${element.id}`)} pressed={Boolean(element.flipV)}><FlipVerticalIcon /></Toggle>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.contextual.transparencyLabel')}
-          className="mona-contextual-control is-labeled"
+          className={contextualControlLabeled}
           content={(
             <div className="mona-contextual-transparency-popover">
               <span>{transparency}%</span>

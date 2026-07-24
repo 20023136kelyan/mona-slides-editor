@@ -22,7 +22,10 @@ const matchingPlaceholder = (
     if (indexed) return indexed
   }
   if (source.placeholderType !== undefined) {
-    return candidates.find(placeholder => placeholder.type === source.placeholderType)
+    const type = source.placeholderType === 'ctrTitle' ? 'title' : source.placeholderType
+    return candidates.find(placeholder => (
+      (placeholder.type === 'ctrTitle' ? 'title' : placeholder.type) === type
+    ))
   }
   return undefined
 }
@@ -41,7 +44,9 @@ export const resolvePowerPointPlaceholderChain = (
   return {
     layout: element.sourceLayer === 'master'
       ? undefined
-      : matchingPlaceholder(placeholders, slide.layoutPart, element),
-    master: matchingPlaceholder(placeholders, slide.masterPart, element),
+      : placeholders.find(placeholder => placeholder.objectId === element.placeholderLayoutObjectId)
+        ?? matchingPlaceholder(placeholders, slide.layoutPart, element),
+    master: placeholders.find(placeholder => placeholder.objectId === element.placeholderMasterObjectId)
+      ?? matchingPlaceholder(placeholders, slide.masterPart, element),
   }
 }

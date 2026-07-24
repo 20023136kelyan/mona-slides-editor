@@ -103,4 +103,29 @@ describe('sanitizeElement / sanitizeSlides', () => {
     expect(clean!.remark).not.toContain('onerror')
     expect(clean!.background?.image?.src).toBe('')
   })
+
+  test('sanitizes imported structured-run hyperlinks without changing safe runs', () => {
+    const element: PPTTextElement = {
+      ...textElement('<p>linked text</p>'),
+      structuredText: {
+        listStyle: [],
+        paragraphs: [{
+          level: 0,
+          runs: [
+            { hyperlink: 'javascript:alert(1)', kind: 'text', sourceId: 'p0.r0', text: 'unsafe' },
+            { hyperlink: 'https://example.com', kind: 'text', sourceId: 'p0.r1', text: 'safe' },
+          ],
+          sourceId: 'p0',
+        }],
+        scale: 1,
+        schemaVersion: 1,
+      },
+    }
+
+    const clean = sanitizeElement(element) as PPTTextElement
+    expect(clean).not.toBe(element)
+    expect(clean.structuredText?.paragraphs[0]?.runs[0]?.hyperlink).toBeUndefined()
+    expect(clean.structuredText?.paragraphs[0]?.runs[1]).toBe(element.structuredText?.paragraphs[0]?.runs[1])
+    expect(clean.structuredText?.paragraphs[0]?.runs[1]?.hyperlink).toBe('https://example.com')
+  })
 })

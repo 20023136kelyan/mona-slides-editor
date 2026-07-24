@@ -196,7 +196,6 @@ test('drives save status from persistence and confirms a fully undoable new pres
   const saveFailed = page.getByRole('button', { name: 'Save failed' })
   await expect.element(saveFailed).toBeVisible()
   await saveFailed.click()
-  await page.getByRole('button', { name: 'Retry save' }).click()
   expect(retryCount).toBe(1)
 
   await page.getByRole('button', { name: 'File', exact: true }).click()

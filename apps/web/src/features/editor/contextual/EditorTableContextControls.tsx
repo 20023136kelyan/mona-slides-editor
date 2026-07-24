@@ -16,6 +16,10 @@ import {
   InspectorPopoverButton,
   InspectorSelect,
 } from '@/features/editor/EditorInspectorPrimitives'
+import {
+  contextualControlLabeled,
+  contextualControlLabeledBorder,
+} from '@/features/editor/contextual/contextual-control-styles'
 import { LinePreview, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
@@ -67,10 +71,10 @@ export function EditorTableContextControls({
   return (
     <div className="mona-contextual-controls mona-contextual-table-controls">
       <div className="mona-contextual-control-row">
-        <InspectorPopoverButton ariaLabel={t('foundation.editor.table.fill')} className="mona-contextual-control is-labeled" content={<EditorColorPicker onChange={backcolor => commit({ data: updateTableCellStyles(element, selectedCells, { backcolor }) }, 'Update table cell fill')} value={fill || '#ffffff'} />}><FillIcon /><span>{t('foundation.editor.table.fill')}</span></InspectorPopoverButton>
+        <InspectorPopoverButton ariaLabel={t('foundation.editor.table.fill')} className={contextualControlLabeled} content={<EditorColorPicker onChange={backcolor => commit({ data: updateTableCellStyles(element, selectedCells, { backcolor }) }, 'Update table cell fill')} value={fill || '#ffffff'} />}><FillIcon /><span>{t('foundation.editor.table.fill')}</span></InspectorPopoverButton>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.table.border')}
-          className="mona-contextual-control is-labeled is-border"
+          className={contextualControlLabeledBorder}
           content={(
             <div className="mona-contextual-border-panel">
               <PropertyRow label={t('foundation.editor.text.borderStyle')}><InspectorSelect<LineStyleType> ariaLabel={t('foundation.editor.text.borderStyle')} onChange={style => updateOutline({ style })} options={lineStyleOptions} renderLabel={option => <LinePreview type={option?.value || 'solid'} />} renderOption={option => <LinePreview type={option.value} />} value={element.outline.style || 'solid'} /></PropertyRow>
@@ -84,7 +88,7 @@ export function EditorTableContextControls({
         <div className="mona-contextual-divider" />
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.table.add')}
-          className="mona-contextual-control is-labeled"
+          className={contextualControlLabeled}
           content={(
             <div className="mona-table-command-menu">
               <Button onClick={() => command('insert-row', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.insertRowAbove')}</Button>
@@ -96,7 +100,7 @@ export function EditorTableContextControls({
         ><AddIcon /><span>{t('foundation.editor.table.add')}</span></InspectorPopoverButton>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.table.delete')}
-          className="mona-contextual-control is-labeled"
+          className={contextualControlLabeled}
           content={(
             <div className="mona-table-command-menu">
               <Button onClick={() => command('delete-row')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteRow')}</Button>

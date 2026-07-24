@@ -9,83 +9,8 @@
  * picker pointer geometry, rich-text document surface, and similar contracts.
  */
 
-/* GEOMETRY / OVERLAY: hotkey drawer remains specialized until a later sheet migration. */
-.mona-hotkey-drawer,
-.mona-hotkey-drawer * { box-sizing: border-box; }
-.mona-hotkey-drawer {
-  position: fixed;
-  z-index: 5000;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  width: 320px;
-  flex-direction: column;
-  gap: 0;
-  background: #fff;
-  box-shadow: -3px 0 6px -4px rgb(0 0 0 / 12%), -9px 0 28px 8px rgb(0 0 0 / 5%);
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-}
-.mona-hotkey-drawer-header { position: relative; display: flex; height: 50px; flex: none; align-items: center; padding: 0 15px; }
-.mona-hotkey-drawer-header button {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  display: flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  cursor: pointer;
-}
-.mona-hotkey-drawer-content { overflow: auto; flex: 1; padding: 0 15px; }
-.mona-hotkey-doc { overflow: auto; height: 100%; margin: 0 -15px; padding: 0 15px 15px; font-size: 12px; }
-.mona-hotkey-title { border-bottom: 1px solid #e5e5e5; padding: 25px 0 5px; font-size: 14px; font-weight: 700; }
-.mona-hotkey-group:first-child .mona-hotkey-title { padding-top: 0; }
-.mona-hotkey-item { display: flex; align-items: center; border-bottom: 1px solid #e5e5e5; padding: 15px 0 5px; }
-.mona-hotkey-label { overflow: hidden; width: 140px; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes mona-popover-scale-in { from { opacity: 0; transform: scale(.5); } }
 
-.mona-fullscreen-spin {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--editor-selection);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-}
-.mona-fullscreen-spin.is-masked { background-color: rgb(241 241 241 / 70%); }
-.mona-fullscreen-spin-content {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  display: flex;
-  width: 200px;
-  height: 200px;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  margin-top: -100px;
-  margin-left: -100px;
-}
-.mona-fullscreen-spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--editor-selection);
-  border-top-color: transparent;
-  border-radius: var(--radius-pill);
-  animation: mona-fullscreen-spinner 800ms linear infinite;
-}
-.mona-fullscreen-spin-text { margin-top: 20px; }
-@keyframes mona-fullscreen-spinner { to { transform: rotate(360deg); } }
 
 .mona-export-dialog,
 .mona-export-dialog * { box-sizing: border-box; }
@@ -245,7 +170,11 @@
 }
 .mona-panel-region[data-open="true"] { width: var(--panel-region-w); }
 /* Left drawer open width; surface fill is Tailwind `bg-sidebar` on the region. */
-.mona-drawer-region { --panel-region-w: 18rem; }
+.mona-drawer-region { --panel-region-w: 22rem; }
+.mona-drawer-region[data-open="true"] {
+  z-index: 20;
+  overflow: visible;
+}
 /* Right dock reveals from its right edge — content pinned right. */
 .mona-dock-region { --panel-region-w: var(--dock-w); justify-content: flex-end; }
 /* Narrow viewports: dock compact width (rail icon-collapse is Tailwind on the
@@ -284,34 +213,10 @@
   font-weight: 600;
 }
 .mona-element-category-tabs > button svg { width: 17px; height: 17px; }
-.mona-template-empty { grid-column: 1 / -1; margin: 24px 0; color: var(--muted-foreground); font-size: 12px; text-align: center; }
-/* The AI dock: fixed-width flex column that pushes the canvas. Visual chrome
-   lives on the component (Tailwind); this keeps workspace geometry shared with
-   the Suspense loading shell. */
-.mona-agent-dock {
-  display: grid;
-  width: var(--dock-w);
-  min-width: 0;
-  flex: none;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-columns: minmax(0, 1fr);
-  overflow: hidden;
-  border-left: 1px solid rgb(16 18 25 / 8%);
-  background: var(--background);
-  color: var(--foreground);
-}
-/* Radix wraps viewport content in a display:table div; a table context won't
-   let the thread's min-height:100% stretch, so the empty state can't center. */
-.mona-agent-conversation [data-slot="scroll-area-viewport"] > div { display: flex !important; min-height: 100%; flex-direction: column; }
 /* Edge-fade masks for the horizontal suggestion strip (data attrs from useEdgeFade). */
 .mona-agent-suggestions[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to right, transparent, #000 28px); }
 .mona-agent-suggestions[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 .mona-agent-suggestions[data-fade-start][data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
-.mona-agent-progress-spinner { animation: mona-agent-spin .75s linear infinite; }
-@keyframes mona-agent-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .mona-agent-progress-spinner { animation: none; border-color: var(--muted-foreground); }
-}
 
 /* GEOMETRY: contextual toolbar floats over the stage; pill chrome is Tailwind on the component. */
 .mona-editor-contextbar {
@@ -389,22 +294,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.mona-contextual-color-dot,
-.mona-contextual-stroke-dot {
-  display: inline-block;
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  flex: none;
-  border-radius: var(--radius-control);
-}
-.mona-contextual-color-dot { border: 1px solid rgb(16 18 25 / 35%); }
-.mona-contextual-stroke-dot { border: 3px solid; background: var(--background); }
-.mona-contextual-color-dot[data-mixed],
-.mona-contextual-stroke-dot[data-mixed] {
-  background: linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%);
-  border-color: #737780;
-}
 .mona-contextual-transparency-popover {
   display: flex;
   width: 220px;
@@ -472,18 +361,19 @@
 .mona-thumbnail-list[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
 .mona-thumbnail-list[data-fade-start][data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent); }
 .mona-thumbnail-container { transition: opacity 120ms ease, transform 200ms ease; }
-/* Skip layout/paint for offscreen thumbnails on large decks. The remembered
-   ("auto") intrinsic size keeps scroll geometry stable after first render;
-   browsers without content-visibility simply render everything as before. */
+/* content-visibility stays on the tile visual (with ring padding), not the
+   container — container paint-containment was clipping the between-slide
+   controls that must overhang the seam into the next tile. */
 .mona-thumbnail-container {
   position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
   justify-content: flex-end;
-  /* content-visibility's paint containment clips ink overflow at this
-     box's padding edge — without this padding, the tile's 4px selection
-     ring survives only as four corner arcs. */
+  overflow: visible;
+}
+.mona-thumbnail-visual {
+  /* Padding absorbs the selection ring so content-visibility doesn't clip it. */
   padding: 5px;
   content-visibility: auto;
   contain-intrinsic-size: auto 138px auto 82px;
@@ -606,27 +496,50 @@
 .mona-thumbnail-duration-flag svg { width: 11px; height: 11px; }
 .mona-page-boundary-actions {
   position: absolute;
-  z-index: 4;
+  z-index: 6;
   top: 50%;
+  /* Container right edge ≈ midpoint of the gutter between this tile and the
+     next; translate centers the stack on that seam so each control overlaps
+     both slides equally. */
   right: 0;
   display: flex;
-  width: 18px;
+  width: 26px;
   flex-direction: column;
-  gap: 2px;
+  overflow: hidden;
+  border: 1px solid rgb(16 18 25 / 12%);
+  border-radius: var(--radius-action);
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(16 18 25 / 18%);
   opacity: 0;
-  transform: translateY(-40%);
+  transform: translate(50%, -50%);
   transition: opacity 120ms ease;
 }
 .mona-thumbnail-container:hover .mona-page-boundary-actions,
-.mona-page-boundary-actions:focus-within { opacity: 1; }
-.mona-page-boundary-actions button {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-pill);
-  background: #fff;
-  box-shadow: 0 1px 4px rgb(16 18 25 / 18%);
+.mona-page-boundary-actions:focus-within {
+  z-index: 7;
+  opacity: 1;
 }
-.mona-page-boundary-actions button svg { width: 11px; height: 11px; }
+.mona-page-boundary-actions button {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgb(16 18 25 / 80%);
+}
+.mona-page-boundary-actions button + button {
+  border-top: 1px solid rgb(16 18 25 / 12%);
+}
+.mona-page-boundary-actions button:hover {
+  background: rgb(16 18 25 / 4%);
+  color: rgb(16 18 25);
+}
+.mona-page-boundary-actions button svg { width: 14px; height: 14px; }
 /* Last item of the scrollable row: sized inline to the exact tile geometry
    (128 × 128·viewportRatio), so it always matches the thumbnails' shape. */
 .mona-filmstrip-add {
@@ -859,166 +772,10 @@
   line-height: normal;
 }
 
-/* Canva-style template browser: search/generate stubs on top, a grid of
-   nameless cover cards; clicking one opens a detail view (back, title,
-   meta, Apply-all, the full page grid). */
-.mona-templates { user-select: none; }
-.mona-template-toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.mona-template-searchbox {
-  display: flex;
-  height: 40px;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-overlay);
-  background: var(--background);
-  padding: 0 10px 0 12px;
-}
-.mona-template-searchbox:focus-within { border-color: var(--ring); }
-.mona-template-searchbox > svg { flex: none; color: rgb(16 18 25 / 55%); font-size: 15px; }
-.mona-template-search-input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: 13px;
-}
-.mona-template-search-input::placeholder { color: rgb(16 18 25 / 40%); }
-.mona-template-actions { display: flex; gap: 8px; }
-.mona-template-generate-group { flex: 1; border-radius: var(--radius-action); }
-.mona-template-generate {
-  flex: 1;
-  gap: 6px;
-  border-radius: var(--radius-action) 0 0 var(--radius-action);
-  font-weight: 600;
-}
-.mona-template-generate svg { font-size: 15px; }
-.mona-template-generate-arrow { width: 26px; padding: 0; border-radius: 0 var(--radius-action) var(--radius-action) 0; }
-.mona-template-generate-arrow svg { font-size: 11px; }
-.mona-template-search-button { flex: 1; border-radius: var(--radius-action); font-weight: 600; }
-.mona-template-grid,
-.mona-template-pages {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  user-select: none;
-}
-.mona-template-card,
-.mona-template-page {
-  display: flex;
-  height: auto;
-  flex-direction: column;
-  align-items: stretch;
-  border-radius: var(--radius-surface);
-  padding: 0;
-}
-.mona-template-card:hover,
-.mona-template-page:hover { background: transparent; }
-.mona-template-card .mona-scaled-slide,
-.mona-template-page .mona-scaled-slide {
-  overflow: hidden;
-  border-radius: var(--radius-surface);
-  box-shadow: 0 0 0 1px rgb(16 18 25 / 7%);
-  transition: box-shadow 120ms ease;
-}
-.mona-template-card:hover .mona-scaled-slide,
-.mona-template-page:hover .mona-scaled-slide { box-shadow: 0 0 0 2px rgb(16 18 25 / 30%); }
-.mona-template-card-skeleton { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-surface); }
-.mona-template-detail { user-select: none; }
-.mona-template-detail-head { display: flex; align-items: center; margin: -4px 0 4px -6px; }
-.mona-template-back { color: rgb(16 18 25 / 70%); font-size: 15px; }
-.mona-template-detail-title { margin: 0 2px; font-size: 15px; font-weight: 700; line-height: 1.35; }
-.mona-template-detail-meta { margin: 3px 2px 12px; color: rgb(16 18 25 / 55%); font-size: 12px; }
-.mona-template-apply {
-  width: 100%;
-  margin-bottom: 12px;
-  border-radius: var(--radius-action);
-  font-weight: 600;
-}
-
-.mona-media-input { width: 100%; }
-.mona-media-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #d9d9d9;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-.mona-media-tabs > button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 8px 10px;
-  color: #41464b;
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-}
-.mona-media-tabs > button[data-state="on"] { border-bottom-color: var(--foreground); background: transparent; color: var(--foreground); }
-.mona-media-url-input {
-  display: flex;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background: #fff;
-  padding: 0 5px;
-  font-size: 13px;
-  transition: border-color .25s;
-}
-.mona-media-url-input:hover,
-.mona-media-url-input:focus-within { border-color: var(--ring); }
-.mona-media-url-input > input {
-  min-width: 0;
-  height: 30px;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  padding: 0 5px;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  font-size: 13px;
-  line-height: 30px;
-  vertical-align: top;
-}
-.mona-media-url-input > input::placeholder { color: #bfbfbf; }
-.mona-media-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-.mona-media-confirm-actions { display: flex; }
-.mona-media-button {
-  height: 32px;
-  border-radius: var(--radius-control);
-  padding: 0 15px;
-  font-family: Arial;
-  font-size: 13px;
-  letter-spacing: 1px;
-}
-.mona-media-file-input { display: none; }
-.mona-media-confirm-actions > .mona-media-button + .mona-media-button { margin-left: 10px; }
-.mona-media-button > svg { overflow: hidden; vertical-align: -.125em; }
 .mona-table-generator {
   width: 100%;
   color: #41464b;
   font-size: 13px;
-}
-.mona-table-generator-title {
-  display: flex;
-  height: 28px;
-  align-items: center;
-  justify-content: space-between;
-  margin: -12px -12px 10px;
-  background: #f9f9f9;
-  padding: 0 14px;
-  font-size: 12px;
-  line-height: 28px;
-  user-select: none;
 }
 .mona-table-generator > table { border-collapse: separate; border-spacing: 0; }
 .mona-table-generator > table td {
@@ -1048,13 +805,7 @@
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
-.mona-table-generator-custom { width: 230px; }
-.mona-table-generator-row { display: flex; align-items: center; }
-.mona-table-generator-row + .mona-table-generator-row { margin-top: 10px; }
-.mona-table-generator-row > div { width: 25%; }
 .mona-table-generator-row > .mona-panel-number { width: 75%; }
-.mona-table-generator-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-
 .mona-canvas-shape-pool { width: 100%; }
 .mona-canvas-line-pool { width: 100%; }
 /* Plain ink section labels — the banded headers came from the legacy
@@ -1559,13 +1310,6 @@
   height: 100%;
 }
 
-.mona-element-inspector {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  color: #41464b;
-}
-
 .mona-render-inspector {
   display: flex;
   flex-direction: column;
@@ -1573,44 +1317,6 @@
   color: #41464b;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   line-height: normal;
-}
-
-.mona-inspector-tabs {
-  height: 40px;
-  display: flex;
-  width: 100%;
-  flex: none;
-  gap: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  font-size: 12px;
-  line-height: 1;
-  user-select: none;
-}
-
-.mona-inspector-tabs > button {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9f9f9;
-  padding: 0;
-  color: #41464b;
-  font: inherit;
-  cursor: pointer;
-}
-
-.mona-inspector-tabs > button + button {
-  border-left: 1px solid #e5e7eb;
-}
-
-.mona-inspector-tabs > button[data-state="active"] {
-  border-bottom-color: transparent;
-  background: transparent;
-  box-shadow: none;
 }
 
 .mona-inspector-content {
@@ -1710,105 +1416,7 @@
 @keyframes mona-transition-scale { from { transform: scale(.25); } to { transform: scale(1); } }
 @keyframes mona-transition-scale-reverse { from { transform: scale(2); } to { transform: scale(1); } }
 
-.mona-source-modal-content,
-.mona-source-modal-content * { box-sizing: border-box; }
-.mona-source-modal-mask {
-  z-index: 5000;
-  background: rgb(0 0 0 / 25%);
-}
-.mona-source-modal-content {
-  z-index: 5001;
-  display: block;
-  width: auto;
-  max-width: calc(100vw - 2rem);
-  overflow: hidden;
-  gap: 0;
-  border-radius: var(--radius-overlay);
-  background: var(--popover);
-  padding: 20px;
-  color: var(--popover-foreground);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  font-family: var(--font-ui);
-  line-height: normal;
-}
 
-.mona-slide-design-panel { user-select: none; }
-.mona-design-title {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.mona-design-more {
-  display: flex;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-}
-.mona-design-more span { margin-right: 3px; font-size: 12px; }
-.mona-design-row,
-.mona-design-row-full,
-.mona-design-split-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.mona-design-split-row { gap: 10px; }
-.mona-design-split-row > * { min-width: 0; flex: 1; }
-.mona-design-row-label { width: 40%; }
-.mona-design-row-control { width: 60%; }
-.mona-design-row-control > * { width: 100%; }
-.mona-design-canvas-size {
-  width: 100%;
-  color: #888;
-  font-size: 12px;
-  text-align: center;
-}
-.mona-background-image-upload {
-  position: relative;
-  display: block;
-  height: 0;
-  margin-bottom: 10px;
-  border: 1px dashed #e5e7eb;
-  border-radius: var(--radius-control);
-  padding-bottom: 56.25%;
-  transition: border-color .25s, color .25s;
-}
-.mona-background-image-upload:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
-.mona-background-image-upload input { display: none; }
-.mona-background-image-upload > span {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-}
-.mona-theme-color-list {
-  display: flex;
-  width: 100%;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background: #fff;
-  padding: 0;
-  color: inherit;
-}
-.mona-theme-color-list:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
-.mona-theme-color-blocks {
-  display: flex;
-  height: 20px;
-  flex: 1;
-  margin-left: 8px;
-  outline: 1px dashed rgb(102 102 102 / 12%);
-}
 .mona-theme-color-block {
   height: 20px;
   flex: 1;
@@ -1816,116 +1424,11 @@
 }
 .mona-theme-color-block + .mona-theme-color-block { margin-left: 2px; }
 .mona-theme-color-block > span { display: block; width: 100%; height: 100%; }
-.mona-theme-color-icon { width: 32px; color: #bfbfbf; font-size: 13px; }
-.mona-preset-theme-list { display: flex; flex-wrap: wrap; align-content: flex-start; }
-.mona-preset-theme {
-  position: relative;
-  width: 48%;
-  margin-bottom: 4%;
-  border-radius: var(--radius-control);
-  padding-bottom: 27%;
-}
-.mona-preset-theme:not(:nth-child(2n)) { margin-right: 4%; }
-.mona-preset-theme-content {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  padding: 8px;
-}
-.mona-preset-theme-text { font-size: 15px; }
-.mona-preset-theme-colors { display: flex; margin-top: 6px; }
-.mona-preset-theme-colors > span { width: 12px; height: 12px; margin-right: 2px; }
-.mona-preset-theme-actions {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  background: rgb(0 0 0 / 25%);
-  opacity: 0;
-  transition: opacity .25s;
-}
-.mona-preset-theme:hover .mona-preset-theme-actions { opacity: 1; }
-.mona-preset-theme-actions button {
-  height: 24px;
-  border: 1px solid var(--editor-selection);
-  border-radius: var(--radius-control);
-  background: var(--editor-selection);
-  padding: 0 7px;
-  color: #fff;
-  font-size: 12px;
-  line-height: 24px;
-}
-.mona-preset-theme-actions button + button { margin-top: 3px; }
-.mona-preset-theme-actions button:hover { border-color: var(--editor-selection-hover); background: var(--editor-selection-hover); }
-
-.mona-design-modal-title { margin-bottom: 15px; font-size: 17px; font-weight: 700; }
-.mona-viewport-setting-row {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-.mona-viewport-setting-row > div:first-child { width: 50px; }
 .mona-viewport-setting-row > .mona-panel-number { flex: 1; }
-.mona-viewport-setting-tip { margin-bottom: 18px; color: #888; font-size: 12px; }
-.mona-design-modal-buttons { display: flex; justify-content: flex-end; }
-.mona-design-modal-buttons > button + button { margin-left: 10px; }
-.mona-theme-colors-setting { display: flex; flex-direction: column; }
 .mona-theme-colors-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
-.mona-theme-colors-label { width: 40%; font-size: 13px; cursor: move; }
 .mona-theme-colors-row > .mona-panel-popover-trigger { width: 60%; }
 
-.mona-theme-extract { display: flex; height: 500px; flex-direction: column; }
-.mona-extract-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-.mona-extract-tabs button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 8px 12px;
-  color: inherit;
-  font: inherit;
-}
-.mona-extract-tabs button[data-state="active"] { border-bottom-color: var(--editor-selection); }
-.mona-extract-content { overflow: auto; flex: 1; margin-right: -20px; padding-right: 20px; }
-.mona-extract-config { border-bottom: 1px dashed #f5f5f5; padding: 12px 0 10px; font-size: 13px; }
-.mona-extract-label { display: flex; align-items: center; margin-bottom: 5px; }
-.mona-extract-label span { color: #999; font-size: 12px; }
-.mona-extract-value-wrap { display: flex; align-items: center; justify-content: space-between; }
-.mona-extract-value-wrap + .mona-extract-value-wrap { margin-top: 3px; }
-.mona-extract-value {
-  overflow: hidden;
-  width: 150px;
-  height: 25px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  padding: 0 5px;
-  font-size: 12px;
-  line-height: 25px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-extract-handler { display: flex; flex: 1; align-items: center; justify-content: space-between; margin-left: 10px; font-size: 12px; }
-.mona-extract-handler > span { font-size: 15px; opacity: 0; }
 .mona-extract-handler > span.is-active { opacity: 1; }
-.mona-extract-handler button { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: start; }
-.mona-extract-handler button:hover { color: var(--editor-selection); }
 .mona-extract-colors { display: flex; flex-wrap: wrap; align-content: flex-start; }
 .mona-extract-colors button {
   position: relative;
@@ -2258,264 +1761,6 @@
   white-space: nowrap;
 }
 
-.mona-image-library-panel {
-  display: flex;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  color: #41464b;
-  font-size: 13px;
-  line-height: normal;
-}
-.mona-image-library-header {
-  display: flex;
-  height: 40px;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
-  border-bottom: 1px solid #f0f0f0;
-}
-.mona-image-library-header h3 {
-  overflow: hidden;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-image-library-content {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 10px;
-}
-.mona-image-library-container {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-}
-.mona-image-library-tools {
-  flex-shrink: 0;
-  margin-bottom: 10px;
-}
-.mona-image-library-input {
-  display: flex;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background-color: #fff;
-  padding: 0 5px;
-  font-size: 13px;
-  transition: border-color .25s;
-}
-.mona-image-library-input:hover,
-.mona-image-library-input:focus-within { border-color: var(--editor-selection); }
-.mona-image-library-input > input {
-  min-width: 0;
-  height: 30px;
-  flex: 1;
-  border: 0;
-  outline: 0;
-  padding: 0 5px;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  font-size: 13px;
-  line-height: 30px;
-  vertical-align: top;
-}
-.mona-image-library-input > input::placeholder { color: #bfbfbf; }
-.mona-image-library-orientation,
-.mona-image-library-search {
-  display: flex;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  color: #999;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 30px;
-  user-select: none;
-}
-.mona-image-library-orientation { padding: 0 0 0 5px; }
-.mona-image-library-orientation .i-icon { margin-left: 4px; }
-.mona-image-library-search { width: 24px; padding: 0; }
-.mona-image-library-search:hover { color: var(--editor-selection); }
-.mona-image-library-orientation-menu {
-  z-index: 902;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  background: #fff;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
-  padding: 10px;
-  color: #41464b;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
-.mona-image-library-orientation-menu > button {
-  display: block;
-  min-width: 80px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 6px 10px;
-  color: inherit;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: normal;
-  text-align: center;
-}
-.mona-image-library-orientation-menu > button:hover { background-color: #f1f1f1; }
-.mona-image-library-orientation-menu > button + button { margin-top: 2px; }
-.mona-image-library-orientation-menu > button.is-active { color: var(--editor-selection); }
-.mona-image-library-waterfall {
-  min-height: 0;
-  flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-.mona-image-library-waterfall-content {
-  position: relative;
-  width: 100%;
-}
-.mona-image-library-item {
-  position: absolute;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  text-align: center;
-}
-.mona-image-library-item > img {
-  display: block;
-  max-width: 100%;
-  margin: 0 auto;
-}
-.mona-image-library-mask {
-  position: absolute;
-  inset: 0;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, .25);
-}
-.mona-image-library-item:hover .mona-image-library-mask { display: flex; }
-.mona-image-library-item:focus-within .mona-image-library-mask { display: flex; }
-.mona-image-library-mask > button {
-  height: 24px;
-  border: 1px solid var(--editor-selection);
-  border-radius: var(--radius-control);
-  outline: 0;
-  background-color: var(--editor-selection);
-  padding: 0 7px;
-  color: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 24px;
-  text-align: center;
-  user-select: none;
-}
-.mona-image-library-mask > button:hover { border-color: var(--editor-selection-hover); background-color: var(--editor-selection-hover); }
-.mona-image-library-state,
-.mona-image-library-error {
-  display: flex;
-  min-height: 160px;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 10px;
-  padding: 20px;
-  color: var(--color-muted-foreground);
-  text-align: center;
-}
-.mona-image-library-state {
-  position: absolute;
-  inset: 0;
-}
-.mona-image-library-error.is-inline {
-  min-height: 0;
-  flex-direction: row;
-  justify-content: space-between;
-  border-top: 1px solid var(--color-border);
-  padding: 8px 2px 0;
-}
-.mona-image-library-loading {
-  position: absolute;
-  z-index: 99;
-  inset: 0;
-  overflow: hidden;
-}
-.mona-image-library-loading::before {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -30px;
-  margin-left: -12px;
-  border: 2px solid var(--editor-selection);
-  border-top-color: transparent;
-  border-radius: var(--radius-pill);
-  animation: mona-image-library-loading .8s linear infinite;
-  content: '';
-}
-.mona-image-library-loading::after {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(255, 255, 255, .75);
-  color: var(--editor-selection);
-  content: var(--mona-loading-text, '');
-  font-size: 12px;
-  padding-top: 24px;
-}
-@keyframes mona-image-library-loading {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.mona-inspector-button {
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-surface);
-  outline: 0;
-  background: #fff;
-  padding: 0 15px;
-  color: #333;
-  font-size: 13px;
-  line-height: 32px;
-  text-align: center;
-  letter-spacing: 1px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.mona-inspector-button:hover {
-  border-color: var(--editor-selection);
-  color: var(--editor-selection);
-}
-
-.mona-image-crop-button {
-  width: calc(100% - 32px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-bottom: 10px;
-  border-radius: var(--radius-surface) 0 0 var(--radius-surface);
-}
-
 .mona-text-style-panel {
   color: #41464b;
   font-size: 13px;
@@ -2779,18 +2024,6 @@
 }
 
 .mona-panel-popover-menu-item.is-centered { text-align: center; }
-.mona-ai-writing-menu { min-width: 120px; }
-.mona-ai-writing-loading {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  margin-top: 8px;
-  border: 1px solid var(--editor-selection);
-  border-top-color: transparent;
-  border-radius: var(--radius-pill);
-  animation: mona-ai-writing-spinner .8s linear infinite;
-}
-@keyframes mona-ai-writing-spinner { to { transform: rotate(360deg); } }
 .mona-panel-popover-menu-item:hover { background: #f1f1f1; }
 
 .mona-text-link-popover { width: 240px; }
@@ -3195,330 +2428,6 @@
 
 .mona-ruler-range { background-color: var(--editor-selection-soft); }
 
-.mona-editor-context-menu-mask {
-  position: fixed;
-  z-index: 9998;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-}
-
-.mona-editor-context-menu {
-  position: fixed;
-  z-index: 9999;
-  font-family: -apple-system, system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  text-size-adjust: auto;
-  user-select: none;
-}
-
-.mona-context-menu-content {
-  width: 180px;
-  margin: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  background: #fff;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
-  padding: 5px 0;
-  list-style: none;
-}
-
-.mona-context-menu-entry {
-  display: block;
-  width: 100%;
-  height: 30px;
-  justify-content: stretch;
-  border: 0;
-  border-radius: 0;
-  background-color: #fff;
-  padding: 0 20px;
-  color: #333;
-  font-size: 12px;
-  line-height: 30px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all .1s;
-}
-
-.mona-context-menu-entry > .mona-context-menu-item-content { width: 100%; }
-
-.mona-context-menu-entry:hover:not(.is-disabled) { background-color: var(--editor-selection-medium); }
-
-.mona-context-menu-entry.is-disabled { color: #b1b1b1; cursor: no-drop; }
-
-.mona-context-menu-entry.is-divider {
-  height: 1px;
-  overflow: hidden;
-  margin: 5px;
-  background-color: #e5e5e5;
-  padding: 0;
-  line-height: 0;
-}
-
-.mona-context-menu-item-content {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mona-context-menu-label { white-space: nowrap; }
-
-.mona-context-menu-shortcut { color: #666; opacity: 0.6; white-space: nowrap; }
-
-.mona-context-menu-item-content.has-children::before {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  width: 8px;
-  height: 8px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: #666 #666 transparent transparent;
-  content: "";
-  transform: translateY(-50%) rotate(45deg);
-}
-
-.mona-context-menu-item-content.has-children.has-handler::after {
-  position: absolute;
-  top: 3px;
-  right: 18px;
-  width: 1px;
-  height: 24px;
-  background-color: rgb(255 255 255 / 30%);
-  content: "";
-  transform: scale(0);
-  transition: transform .1s;
-}
-
-.mona-context-menu-entry:not(.is-disabled):hover > .mona-context-menu-item-content.has-children.has-handler::after {
-  transform: scale(1);
-}
-
-.mona-editor-context-submenu {
-  position: absolute;
-  display: none;
-  top: -6px;
-  left: 112%;
-  width: 120px;
-}
-
-.mona-context-menu-entry:not(.is-disabled):hover > .mona-context-menu-item-content > .mona-editor-context-submenu {
-  display: block;
-}
-
-.mona-context-menu-entry:not(.is-disabled):focus-within > .mona-context-menu-item-content > .mona-editor-context-submenu {
-  display: block;
-}
-
-.mona-link-dialog-backdrop {
-  background: rgb(0 0 0 / 25%);
-}
-
-.mona-link-dialog {
-  box-sizing: border-box;
-  width: min(540px, calc(100vw - 48px));
-  max-width: none;
-  gap: 0;
-  margin: 0;
-  border: 0;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  padding: 20px;
-  color: #41464b;
-}
-
-.mona-link-dialog form {
-  display: block;
-  font-size: 13px;
-  line-height: 1.675;
-}
-
-.mona-link-type-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 20px;
-  height: auto;
-  border-radius: 0;
-  border-bottom: 1px solid #e5e7eb;
-  background: transparent;
-  padding: 0;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-
-.mona-link-type-tab {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  padding: 8px 10px;
-  color: #41464b;
-  font-size: 13px;
-  line-height: 13px;
-  cursor: pointer;
-}
-
-.mona-link-type-tab[data-state="active"] {
-  border-bottom-color: var(--foreground);
-  background: transparent;
-  box-shadow: none;
-}
-
-.mona-link-type-tab:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.mona-link-dialog [data-slot="tabs-content"] { margin-top: 0; }
-
-.mona-link-field {
-  display: grid;
-  box-sizing: border-box;
-  width: 100%;
-  height: auto;
-}
-
-.mona-link-field input {
-  min-width: 0;
-  width: 100%;
-  height: 30px;
-  border-radius: var(--radius-control);
-  background: #fff;
-  outline: 0;
-  padding: 0 5px;
-  color: #41464b;
-  font: inherit;
-  font-size: 13px;
-  line-height: 30px;
-}
-
-.mona-link-field input::placeholder { color: #bfbfbf; }
-
-.mona-link-select-wrap { position: relative; width: 100%; height: 32px; }
-
-.mona-link-select {
-  position: relative;
-  width: 100%;
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background-color: #fff;
-  padding: 0 32px 0 10px;
-  color: #41464b;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color .25s;
-  user-select: none;
-}
-
-.mona-link-select:hover { border-color: var(--ring); }
-
-.mona-link-select-popover {
-  z-index: 9999;
-  box-sizing: border-box;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  box-shadow: 0 6px 16px 0 rgb(0 0 0 / 8%);
-}
-
-.mona-link-slide-preview { margin-top: 12px; }
-
-.mona-link-slide-preview .mona-scaled-slide {
-  margin-top: 5px;
-  border: 1px solid var(--editor-selection-medium);
-  border-radius: var(--radius-surface);
-}
-
-.mona-link-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-  text-align: right;
-}
-
-.mona-link-dialog-actions button {
-  height: 32px;
-  border-radius: var(--radius-control);
-  padding: 0 15px;
-  font-family: Arial;
-  font-size: 13px;
-  letter-spacing: 1px;
-}
-
-.mona-message-wrap {
-  position: fixed;
-  z-index: 6000;
-  top: 0;
-  left: 0;
-  display: flex;
-  box-sizing: border-box;
-  width: 100%;
-  flex-direction: column;
-  align-items: center;
-  background-color: rgb(255 255 255 / 0%);
-  padding: 15px;
-  pointer-events: none;
-  transition: all 1s ease-in-out;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-}
-
-.mona-message { max-width: 600px; animation: mona-message-fade-in-down .3s; }
-
-.mona-message.is-leaving { animation: mona-message-fade-out .3s; }
-
-.mona-message + .mona-message { margin-top: 15px; }
-
-.mona-message-container {
-  position: relative;
-  display: flex;
-  min-width: 50px;
-  align-items: center;
-  overflow: hidden;
-  border-radius: var(--radius-control);
-  background: #fff;
-  box-shadow: 0 1px 8px rgb(0 0 0 / 15%);
-  padding: 10px;
-  font-size: 13px;
-  pointer-events: all;
-}
-
-.mona-message-icon {
-  display: flex;
-  margin-right: 10px;
-  align-items: center;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-.mona-message-icon.is-success { color: #52c41a; }
-
-.mona-message-icon.is-error { color: #ff4d4f; }
-
-.mona-message-icon.is-warning { color: #faad14; }
-
-.mona-message-content { width: 100%; }
-
-.mona-message-description { color: #41464b; line-height: 1.5; }
-
-@keyframes mona-message-fade-in-down {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes mona-message-fade-out {
-  from { opacity: 1; margin-top: 0; }
-  to { opacity: 0; margin-top: -45px; }
-}
 
 .mona-editor-status {
   position: absolute;
@@ -3549,76 +2458,6 @@
 }
 
 /* Chart insertion, editing, and style surfaces — literal ports of the established editor's chart editor. */
-
-.mona-chart-pool {
-  display: grid;
-  width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.mona-chart-pool-item {
-  position: relative;
-  height: 0;
-  padding-bottom: 82%;
-  cursor: pointer;
-}
-
-.mona-chart-pool-content {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #999;
-  cursor: pointer;
-  font: inherit;
-}
-
-.mona-chart-pool-content:hover { color: var(--editor-selection); }
-
-.mona-chart-pool-name {
-  max-width: 100%;
-  font-size: 12px;
-  line-height: 1.15;
-  text-align: center;
-  white-space: normal;
-}
-
-.mona-chart-pool-icon { display: flex; font-size: 24px; }
-
-.mona-chart-pool-item:last-child .mona-chart-pool-icon { font-size: 23px; }
-
-.mona-chart-pool-icon svg { width: 1em; height: 1em; }
-
-.mona-chart-pool-name { margin-top: 4px; text-align: start; }
-
-.mona-chart-data-mask,
-.mona-chart-theme-mask {
-  background: rgb(0 0 0 / 25%);
-}
-
-.mona-chart-data-modal-content,
-.mona-chart-theme-modal-content {
-  overflow: hidden;
-  max-width: none;
-  gap: 0;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-}
-
-.mona-chart-data-modal-content { width: 640px; }
-
-.mona-chart-theme-modal-content { width: 310px; }
 
 .mona-chart-data-editor {
   position: relative;
@@ -3778,28 +2617,7 @@
 
 .mona-chart-corner-triangle { position: absolute; right: 4px; bottom: 4px; }
 
-.mona-chart-editor-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-
-.mona-chart-editor-buttons-left { display: flex; align-items: center; font-size: 12px; }
-
-.mona-chart-editor-change { margin-left: 5px; color: #ccc; cursor: pointer; user-select: none; }
-
-.mona-chart-editor-change:hover { text-decoration: underline; }
-
 .mona-chart-editor-buttons-right .mona-chart-editor-button { margin-left: 10px; }
-
-.mona-chart-editor-button {
-  height: 32px;
-  border-radius: var(--radius-control);
-  padding: 0 15px;
-  font-family: Arial;
-  font-size: 13px;
-  letter-spacing: 1px;
-}
 
 .mona-chart-type-menu {
   z-index: 9999;
@@ -3835,12 +2653,6 @@
 .mona-chart-type-menu > button:hover { background: #f1f1f1; }
 
 .mona-chart-type-menu > button + button { margin-top: 2px; }
-
-.mona-chart-style-panel { color: #41464b; font-size: 13px; line-height: normal; user-select: none; }
-
-.mona-chart-edit-button { display: inline-flex; width: 100%; border-radius: var(--radius-control); color: #41464b; font-family: Arial; }
-
-.mona-chart-style-checkbox-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
 
 .mona-chart-theme-button,
 .mona-chart-custom-color-button {
@@ -3886,8 +2698,6 @@
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
 }
 
-.mona-chart-theme-label { margin-bottom: 4px; font-size: 12px; }
-
 .mona-chart-preset-themes { display: flex; width: 250px; flex-wrap: wrap; }
 
 .mona-chart-preset-theme {
@@ -3910,20 +2720,6 @@
 
 .mona-chart-preset-themes.is-slide-theme { margin-bottom: -10px; }
 
-.mona-chart-theme-divider { width: 100%; margin: 10px 0; border-top: 1px solid rgb(5 5 5 / 6%); }
-
-.mona-chart-custom-theme-button { width: 100%; }
-
-.mona-chart-theme-setting { display: flex; flex-direction: column; }
-
-.mona-chart-theme-setting-title { margin-bottom: 15px; font-size: 17px; font-weight: 700; }
-
-.mona-chart-theme-setting-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
-
-.mona-chart-theme-setting-label { width: 40%; font-size: 13px; }
-
-.mona-chart-theme-setting-row > [data-slot="button-group"] { width: 60%; }
-
 .mona-chart-custom-color-group .mona-chart-custom-color-button { min-width: 0; flex: 1; }
 
 .mona-chart-custom-color-button > span {
@@ -3936,358 +2732,7 @@
 
 .mona-chart-custom-color-button > span > i { display: block; width: 100%; height: 100%; }
 
-.mona-chart-theme-add { display: inline-block; width: 100%; }
-
-.mona-chart-theme-add > svg { position: relative; left: .015625px; }
-
-.mona-chart-theme-confirm { width: 100%; margin-top: 12px; }
-
-/* LaTeX insertion/editing and symbol surfaces. */
-
-.mona-symbol-panel,
-.mona-symbol-panel * { box-sizing: border-box; }
-
-.mona-latex-modal-mask {
-  background: rgb(0 0 0 / 25%);
-}
-
-.mona-latex-modal-content {
-  overflow: hidden;
-  width: 880px;
-  max-width: none;
-  gap: 0;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 20%);
-  padding: 20px;
-}
-
-.mona-latex-editor { height: 560px; }
-
-.mona-latex-editor-container { display: flex; height: calc(100% - 50px); }
-
-.mona-latex-editor-left {
-  display: flex;
-  width: 540px;
-  height: 100%;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
-.mona-latex-input-area { flex: 1; }
-
-.mona-latex-input-area textarea {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  resize: none;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  outline: 0;
-  background-color: #fff;
-  padding: 10px;
-  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13.3333px;
-  line-height: 1.675;
-  transition: border-color .25s;
-}
-
-.mona-latex-input-area textarea:focus { border-color: #e5e7eb; box-shadow: none; }
-
-.mona-latex-input-area textarea::placeholder { color: #bfbfbf; }
-
-.mona-latex-preview {
-  display: flex;
-  height: 160px;
-  align-items: center;
-  justify-content: center;
-  margin-top: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-surface);
-  text-align: center;
-  user-select: none;
-}
-
-.mona-latex-preview-placeholder { color: #888; font-size: 13px; }
-
-.mona-latex-preview-content {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  padding: 10px;
-}
-
-.mona-latex-formula-content { overflow: hidden; }
-
-.mona-latex-editor-right {
-  display: flex;
-  overflow: hidden;
-  width: 280px;
-  height: 100%;
-  flex-direction: column;
-  margin-left: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-surface);
-  background-color: #fff;
-  user-select: none;
-}
-
-.mona-latex-editor-content { height: calc(100% - 40px); font-size: 13px; }
-
-.mona-latex-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-
-.mona-latex-tabs.is-space-between { justify-content: space-between; }
-
-.mona-latex-tabs > button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 8px 10px;
-  color: inherit;
-  font: inherit;
-  line-height: 1;
-  text-align: center;
-  cursor: pointer;
-}
-
-.mona-latex-tabs > button.is-active { border-bottom-color: var(--foreground); }
-
-.mona-latex-tabs.is-card {
-  height: 40px;
-  flex-shrink: 0;
-  align-items: stretch;
-  border: 0;
-  font-size: 12px;
-}
-
-.mona-latex-tabs.is-card > button {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #f9f9f9;
-  padding: 0;
-}
-
-.mona-latex-tabs.is-card > button.is-active { border-bottom-color: transparent; background-color: transparent; }
-
-.mona-latex-tabs.is-card > button + button { border-left: 1px solid #e5e7eb; }
-
-.mona-latex-formula-pane {
-  height: 100%;
-  overflow: auto;
-  padding: 12px;
-}
-
-.mona-latex-formula-item + .mona-latex-formula-item { margin-top: 10px; }
-
-.mona-latex-formula-title { margin-bottom: 5px; }
-
-.mona-latex-formula-item-content {
-  display: flex;
-  height: 60px;
-  align-items: center;
-  border-radius: var(--radius-control);
-  background-color: #f9f9f9;
-  padding: 5px;
-  cursor: pointer;
-}
-
-.mona-latex-symbol-pane { display: flex; height: 100%; flex-direction: column; }
-
-.mona-latex-symbol-tabs { margin: 10px 10px 0; }
-
-.mona-latex-symbol-pool {
-  display: flex;
-  overflow: auto;
-  flex: 1;
-  flex-wrap: wrap;
-  padding: 12px;
-}
-
-.mona-latex-symbol-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-}
-
-.mona-latex-symbol-item:hover { background-color: #f9f9f9; cursor: pointer; }
-
-.mona-latex-symbol-content svg { display: inline; vertical-align: baseline; }
-
-.mona-latex-editor-footer {
-  display: flex;
-  height: 50px;
-  align-items: flex-end;
-  justify-content: flex-end;
-}
-
-.mona-latex-editor-button {
-  height: 32px;
-  border-radius: var(--radius-control);
-  padding: 0 15px;
-  font-family: Arial;
-  font-size: 13px;
-  letter-spacing: 1px;
-}
-
-.mona-latex-editor-button + .mona-latex-editor-button { margin-left: 10px; }
-
-.mona-media-switch-row { height: 32px; }
-
-.mona-video-style-title { margin-bottom: 10px; }
-
-.mona-video-poster-wrapper { margin-bottom: 10px; }
-
-.mona-video-poster {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 0;
-  border: 1px dashed #d9d9d9;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 0 0 56.25%;
-  color: #41464b;
-  cursor: pointer;
-  transition: all .3s;
-}
-
-.mona-video-poster:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
-
-.mona-video-poster-content {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-position: center;
-  background-size: contain;
-  background-repeat: no-repeat;
-}
-
-.mona-media-full-button { width: 100%; flex: 1; }
-
-.mona-media-full-button > svg { margin-right: 1px; }
-
 .mona-latex-edit-button { width: 100%; flex: 1; font-family: Arial; }
-
-/* Symbols fill the drawer: category tabs on top, scrolling glyph grid below. */
-
-.mona-drawer-symbols {
-  display: flex;
-  height: 100%;
-  min-height: 0;
-  flex-direction: column;
-  color: #41464b;
-  line-height: normal;
-}
-
-.mona-symbol-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-
-.mona-symbol-tabs > button {
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 8px 10px;
-  color: inherit;
-  font: inherit;
-  line-height: 1;
-  text-align: center;
-  cursor: pointer;
-}
-
-.mona-symbol-tabs > button[data-state="on"] { border-bottom-color: var(--editor-selection); }
-
-.mona-symbol-emoji-types {
-  display: flex;
-  align-items: center;
-  margin-bottom: 3px;
-  font-size: 12px;
-}
-
-.mona-symbol-emoji-types > button {
-  flex-shrink: 0;
-  border: 0;
-  border-radius: var(--radius-surface);
-  background: transparent;
-  padding: 2px 4px;
-  color: inherit;
-  font: inherit;
-  text-align: center;
-  cursor: pointer;
-  user-select: none;
-}
-
-.mona-symbol-emoji-types > button[data-state="on"] { background-color: var(--editor-selection-subtle); color: var(--editor-selection); font-weight: 700; }
-
-.mona-symbol-emoji-types > button + button { margin-left: 4px; }
-
-.mona-symbol-pool {
-  overflow: auto;
-  flex: 1;
-  margin: 0 -12px;
-  padding: 5px 12px 0;
-  font-size: 18px;
-  user-select: none;
-}
-
-.mona-symbol-group { display: flex; flex-wrap: wrap; align-content: flex-start; }
-
-.mona-symbol-group + .mona-symbol-group { margin-top: 8px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
-
-.mona-symbol-item {
-  position: relative;
-  width: 12%;
-  height: 38px;
-  margin-bottom: calc(4% / 7);
-  border: 1px solid #e5e7eb;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.mona-symbol-item:not(:nth-child(8n)) { margin-right: calc(4% / 7); }
-
-.mona-symbol-item:hover { border-color: var(--editor-selection); color: var(--editor-selection); transition: all .2s; }
-
-.mona-symbol-item > span {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--background);
-}
 
 .mona-svg-path-editor {
   display: flex;
@@ -4544,185 +2989,6 @@
   transform-origin: center;
 }
 
-.mona-notes-panel { height: 100%; font-size: 12px; user-select: none; }
-
-.mona-notes-panel.is-embedded { min-height: 420px; }
-
-.mona-notes-container { display: flex; height: 100%; flex-direction: column; }
-
-.mona-notes-list { overflow: auto; flex: 1; margin: 0 -10px; padding: 2px 12px; }
-
-.mona-notes-empty {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-style: italic;
-}
-
-.mona-note { border: 1px solid #eee; border-radius: var(--radius-surface); padding: 10px; }
-
-.mona-note + .mona-note { margin-top: 10px; }
-
-.mona-note.is-active { background-color: #f7f7f7; }
-
-.mona-note-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-
-.mona-note-user,
-.mona-note-select {
-  display: flex;
-  height: auto;
-  align-items: center;
-}
-
-.mona-note-select {
-  justify-content: flex-start;
-  padding: 0;
-  color: inherit;
-  text-align: left;
-}
-
-.mona-note-select-content {
-  display: block;
-  width: 100%;
-  height: auto;
-  justify-content: flex-start;
-  padding: 0;
-  color: inherit;
-  font-weight: inherit;
-  text-align: left;
-  white-space: normal;
-}
-
-.mona-note-avatar {
-  display: flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  margin-right: 10px;
-  border-radius: var(--radius-pill);
-  background-color: #42ba97;
-  color: #fff;
-  font-size: 18px;
-}
-
-.mona-note-username { font-size: 14px; }
-
-.mona-note-time { color: #aaa; font-size: 12px; }
-
-.mona-note-actions { display: flex; align-items: center; opacity: 0; }
-
-.mona-note-header:hover .mona-note-actions,
-.mona-note-header:focus-within .mona-note-actions,
-.mona-note:focus-within .mona-note-actions { opacity: 1; }
-
-.mona-note-actions > button { height: 28px; margin-left: 2px; padding-inline: 6px; font-size: 12px; }
-
-.mona-note-actions > button:hover { color: var(--editor-selection); text-decoration: underline; }
-
-.mona-note-replies { margin-top: 15px; margin-left: 20px; }
-
-.mona-note-reply-item { margin-top: 10px; }
-
-.mona-note-reply-item .mona-note-content { margin-top: 5px; }
-
-.mona-note-reply-editor { margin-top: 15px; }
-
-.mona-note-reply-buttons { margin-top: 5px; text-align: right; }
-
-.mona-note-reply-buttons button { margin-left: 8px; }
-
-.mona-notes-send {
-  display: flex;
-  height: 120px;
-  flex-shrink: 0;
-  flex-direction: column;
-  justify-content: flex-end;
-  text-align: right;
-}
-
-.mona-notes-panel textarea {
-  box-sizing: border-box;
-  width: 100%;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  outline: 0;
-  background-color: #fff;
-  padding: 6px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  font-size: 13.3333px;
-  line-height: 1.675;
-  resize: none;
-  transition: border-color .25s;
-}
-
-.mona-notes-panel textarea:focus { border-color: var(--ring); background-color: #fff; }
-
-.mona-notes-panel textarea::placeholder { color: #bfbfbf; }
-
-.mona-notes-footer { display: flex; align-items: center; margin-top: 10px; }
-
-.mona-notes-footer button,
-.mona-note-reply-buttons button {
-  height: 32px;
-  border-radius: var(--radius-control);
-  padding: 0 15px;
-  font-family: Arial;
-  font-size: 13px;
-  letter-spacing: 1px;
-}
-
-.mona-note-reply-buttons button { height: 24px; padding: 0 7px; font-size: 12px; letter-spacing: 0; }
-
-.mona-notes-footer .mona-notes-clear {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  border: 0;
-  padding: 0;
-  color: #666;
-  font-size: 18px;
-}
-
-.mona-notes-add { flex: 12; margin-left: 8px; }
-
-.mona-selection-panel { height: 100%; font-size: 12px; user-select: none; }
-
-.mona-selection-handler {
-  display: flex;
-  height: 24px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.mona-selection-handler button {
-  height: 24px;
-  margin-right: 5px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background: #fff;
-  padding: 0 7px;
-  color: #333;
-  font-family: Arial;
-  font-size: 12px;
-  line-height: 24px;
-  cursor: pointer;
-}
-
-.mona-selection-order { display: flex; height: 100%; flex: 1; align-items: center; justify-content: flex-end; }
-
-.mona-selection-order button { width: 20px; height: 100%; padding: 0; }
-
-.mona-selection-order button:hover { color: var(--editor-selection); }
-
-.mona-selection-empty { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: #999; font-style: italic; }
-
-.mona-selection-list { overflow: auto; height: calc(100% - 32px); margin-right: -10px; padding-right: 10px; }
-
 .mona-selection-item { display: flex; align-items: center; border-radius: var(--radius-control); padding: 5px; font-size: 12px; }
 
 .mona-selection-item.is-active { background-color: var(--editor-selection-soft); }
@@ -4730,8 +2996,6 @@
 .mona-selection-item.is-group-active { background-color: var(--editor-selection-medium); }
 
 .mona-selection-item:not(.is-locked):hover { background-color: var(--editor-selection-medium); transition: background-color 200ms; }
-
-.mona-selection-name { overflow: hidden; height: 18px; flex: 1; text-overflow: ellipsis; white-space: nowrap; line-height: 18px; }
 
 .mona-selection-select {
   justify-content: flex-start;
@@ -4743,150 +3007,15 @@
   text-align: left;
 }
 
-.mona-selection-icons { display: flex; align-items: center; justify-content: flex-end; margin-left: 10px; }
-
-.mona-selection-icons > button,
-.mona-selection-icons > span { width: 20px; height: 20px; margin-left: 2px; padding: 2px; }
-
-.mona-selection-icons > button svg { width: 16px; height: 16px; }
-
-.mona-selection-icons > button:hover { color: var(--editor-selection); }
-
-.mona-selection-group { padding: 5px 0; }
-
-.mona-selection-group-title { margin-bottom: 5px; padding: 0 5px; }
-
 .mona-selection-group .mona-selection-item { margin-left: 15px; }
 
 .mona-selection-item input { width: 100%; height: 16px; flex: 1; border: 0; outline: 0; background: transparent; padding: 0; font-size: 12px; }
 
-.mona-markup-panel { height: 100%; font-size: 12px; user-select: none; }
-
 .mona-markup-panel.is-embedded { min-height: 140px; }
-
-.mona-markup-container { display: flex; height: 100%; flex-direction: column; }
-
-.mona-markup-row { display: flex; width: 100%; align-items: center; }
-
-.mona-markup-row + .mona-markup-row { margin-top: 5px; }
-
-.mona-markup-row > div { width: 40%; }
-
-.mona-markup-select { width: 60%; }
-
-.mona-markup-placeholder { height: 30px; margin-top: 5px; border: 1px dashed #ccc; border-radius: var(--radius-control); color: #999; font-style: italic; line-height: 30px; text-align: center; }
-
-.mona-search-panel { font-size: 13px; }
 
 .mona-search-panel.is-embedded { min-height: 180px; }
 
-.mona-search-close {
-  position: absolute;
-  top: 8px;
-  right: 3px;
-  display: flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.mona-search-close:hover { color: var(--foreground); }
-
-.mona-search-tabs { display: flex; height: auto; align-items: center; justify-content: flex-start; border: 0; border-bottom: 1px solid #e5e7eb; border-radius: 0; background: transparent; padding: 0; font-size: 13px; line-height: 1; user-select: none; }
-
-.mona-search-tabs > button { height: auto; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 8px 10px; box-shadow: none; text-align: center; }
-
-.mona-search-tabs > button[data-state="active"] { border-bottom-color: var(--foreground); background: transparent; color: var(--foreground); box-shadow: none; }
-
-.mona-search-content { display: flex; flex-direction: column; justify-content: space-between; margin-top: 0; }
-
-.mona-search-input {
-  margin-top: 10px;
-  border-radius: var(--radius-control);
-  background: #fff;
-  font-size: 13px;
-}
-
-.mona-search-input:hover,
-.mona-search-input:focus-within { border-color: var(--ring); }
-
-.mona-search-input input { min-width: 0; height: 30px; flex: 1; border: 0; outline: 0; padding: 0 5px; color: #333; font: inherit; line-height: 30px; }
-
-.mona-search-input input::placeholder { color: #bfbfbf; }
-
-.mona-search-suffix { gap: 2px; padding-right: 3px; }
-
-.mona-search-count { margin-right: 8px; font-size: 12px; }
-
-.mona-search-suffix [data-slot="separator"] { height: 1em; margin: auto 4px; }
-
-.mona-search-case { font-size: 12px; cursor: pointer; }
-
-.mona-search-case[aria-pressed="true"] { background: var(--muted); color: var(--foreground); }
-
-.mona-search-next { width: 22px; height: 100%; cursor: pointer; }
-
-.mona-search-next:hover { color: var(--foreground); }
-
-.mona-search-replace-input { height: 32px; margin-top: 10px; border-radius: var(--radius-control); }
-
-.mona-search-footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 10px; }
-
-.mona-search-footer button { margin-left: 5px; }
-
 .mona-editor-slide-canvas mark.active { background-color: #ff9632; }
-
-/* Working-copy restore banner (editor-persistence) */
-
-.mona-restore-banner {
-  /* Anchored to the editor inset (the canvas column), not the viewport, so
-     it centers on the slide regardless of the rail/drawer to the left. */
-  position: absolute;
-  /* Clears the filmstrip bottom bar. */
-  bottom: 148px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px 6px 14px;
-  border: 1px solid #e2e2e2;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
-  font-size: 13px;
-  color: #333;
-}
-
-.mona-restore-banner-action {
-  border: 1px solid var(--editor-selection);
-  border-radius: var(--radius-surface);
-  background: #fff;
-  color: var(--editor-selection);
-  font-size: 12px;
-  padding: 2px 8px;
-  cursor: pointer;
-}
-
-.mona-restore-banner-action:hover {
-  background: var(--editor-selection);
-  color: #fff;
-}
-
-.mona-restore-banner-close {
-  border: 0;
-  background: transparent;
-  color: #999;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 2px 4px;
-}
 
 /* Flip controls: fixed two-column grid so long localized labels shrink and
    ellipsize inside the inspector instead of pushing past its edge. */

@@ -42,7 +42,7 @@ export function EditorTableGenerator({
   }
   return (
     <div className="mona-table-generator">
-      <div className="mona-table-generator-title">
+      <div className="flex h-7 items-center justify-between -mx-3 -mt-3 mb-2.5 bg-[#f9f9f9] px-3.5 text-xs leading-7 select-none">
         <div>{hovered ? t('foundation.editor.table.dimensions', { rows: hovered[0], columns: hovered[1] }) : t('foundation.editor.canvasTool.table')}</div>
         <Button onClick={() => setCustom(value => !value)} size="xs" type="button" variant="ghost">{t(custom ? 'foundation.editor.table.back' : 'foundation.editor.table.custom')}</Button>
       </div>
@@ -86,16 +86,16 @@ export function EditorTableGenerator({
           </tbody>
         </table>
       ) : (
-        <div className="mona-table-generator-custom">
-          <div className="mona-table-generator-row">
-            <div>{t('foundation.editor.table.rows')}</div>
-            <InspectorNumberInput ariaLabel={t('foundation.editor.table.rows')} max={20} min={1} onChange={setRows} value={rows} />
+        <div className="w-[230px]">
+          <div className="flex items-center">
+            <div className="w-1/4">{t('foundation.editor.table.rows')}</div>
+            <InspectorNumberInput ariaLabel={t('foundation.editor.table.rows')} max={20} min={1} onChange={setRows} style={{ width: '75%' }} value={rows} />
           </div>
-          <div className="mona-table-generator-row">
-            <div>{t('foundation.editor.table.columns')}</div>
-            <InspectorNumberInput ariaLabel={t('foundation.editor.table.columns')} max={20} min={1} onChange={setColumns} value={columns} />
+          <div className="flex items-center mt-2.5">
+            <div className="w-1/4">{t('foundation.editor.table.columns')}</div>
+            <InspectorNumberInput ariaLabel={t('foundation.editor.table.columns')} max={20} min={1} onChange={setColumns} style={{ width: '75%' }} value={columns} />
           </div>
-          <div className="mona-table-generator-actions">
+          <div className="flex justify-end gap-2.5 mt-2.5">
             <Button onClick={() => onInsert(rows, columns)} size="editor" type="button">{t('foundation.editor.table.confirm')}</Button>
           </div>
         </div>

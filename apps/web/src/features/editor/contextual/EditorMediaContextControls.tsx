@@ -6,6 +6,10 @@ import type { PPTAudioElement, PPTVideoElement } from '@mona/presentation-core/m
 
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
+import {
+  contextualControlLabeled,
+  contextualToggleFlat,
+} from '@/features/editor/contextual/contextual-control-styles'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
 import { InspectorPopoverButton } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -44,22 +48,25 @@ export function EditorMediaContextControls({ element, runtime }: {
           tabIndex={-1}
           type="file"
         />
-        <Button className="mona-contextual-control is-labeled" onClick={() => fileRef.current?.click()} size="editor" type="button" variant="ghost">
+        <Button className={contextualControlLabeled} onClick={() => fileRef.current?.click()} size="editor" type="button" variant="ghost">
           <ImageUp /><span>{t('foundation.editor.contextual.replace')}</span>
         </Button>
         {element.type === 'audio' ? (
           <InspectorPopoverButton
             ariaLabel={t('foundation.editor.media.iconColor')}
-            className="mona-contextual-control is-labeled"
+            className={contextualControlLabeled}
             content={<EditorColorPicker onChange={color => update({ color }, 'Update audio icon color')} value={element.color} />}
           >
-            <span className="mona-contextual-color-dot" style={{ backgroundColor: element.color }} />
+            <span
+              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              style={{ backgroundColor: element.color, border: '1px solid rgb(16 18 25 / 35%)' }}
+            />
             <span>{t('foundation.editor.media.iconColor')}</span>
           </InspectorPopoverButton>
         ) : null}
         <Toggle
           aria-label={t('foundation.editor.media.autoplay')}
-          className="mona-contextual-control is-labeled"
+          className={`${contextualControlLabeled} ${contextualToggleFlat}`}
           onPressedChange={autoplay => update({ autoplay }, 'Update media autoplay')}
           pressed={element.autoplay}
         >
@@ -68,7 +75,7 @@ export function EditorMediaContextControls({ element, runtime }: {
         {element.type === 'audio' ? (
           <Toggle
             aria-label={t('foundation.editor.media.loop')}
-            className="mona-contextual-control is-labeled"
+            className={`${contextualControlLabeled} ${contextualToggleFlat}`}
             onPressedChange={loop => update({ loop }, 'Update audio loop')}
             pressed={element.loop}
           >

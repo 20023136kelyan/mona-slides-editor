@@ -1,6 +1,7 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the established editor's preset div is retained for its exact anonymous-flex text layout; keyboard button semantics are implemented below. */
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import AddTextIcon from '~icons/icon-park-outline/add-text'
 import AlignBothIcon from '~icons/icon-park-outline/align-text-both'
@@ -56,7 +57,6 @@ import {
   InspectorSwitch,
 } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
-import { EditorNotice } from '@/features/editor/EditorContextMenu'
 import { requestAIWriting } from '@/features/editor/ai-writing'
 
 const fontOptions = [
@@ -215,13 +215,12 @@ function TextLinkControl({
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
-  const [notice, setNotice] = useState<string | null>(null)
   const close = () => setOpen(false)
   const update = (event: FormEvent) => {
     event.preventDefault()
     const linkPattern = /^(https?):\/\/[\w-]+(\.[\w-]+)+([\w-.,@?^=%&:/~+#]*[\w-@?^=%&/~+#])?$/
     if (!draft || !linkPattern.test(draft)) {
-      setNotice(t('foundation.editor.text.invalidLink'))
+      toast.error(t('foundation.editor.text.invalidLink'))
       return
     }
     execute({ command: 'link', value: draft })
@@ -265,7 +264,6 @@ function TextLinkControl({
       >
         <LinkIcon />
       </InspectorPopoverButton>
-      {notice ? <EditorNotice notice={{ text: notice, type: 'error' }} onClose={() => setNotice(null)} /> : null}
     </>
   )
 }
@@ -284,7 +282,6 @@ function AIWritingControl({
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [isWriting, setIsWriting] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
   const writingRef = useRef(false)
 
   useEffect(() => () => {
@@ -295,12 +292,12 @@ function AIWritingControl({
     setOpen(false)
     const content = element.type === 'text' ? element.content : element.text?.content || ''
     if (!content) {
-      setNotice(t('foundation.editor.text.noTextContent'))
+      toast.error(t('foundation.editor.text.noTextContent'))
       return
     }
     const stream = await requestAIWriting({ command, content: htmlToText(content) })
     if (!(stream instanceof Response) && stream.state === -1) {
-      setNotice(t('foundation.editor.text.aiBusy'))
+      toast.error(t('foundation.editor.text.aiBusy'))
       return
     }
     if (!(stream instanceof Response) || !stream.body) return
@@ -328,7 +325,7 @@ function AIWritingControl({
       <InspectorPopoverButton
         ariaLabel={t('foundation.editor.text.aiAssist')}
         content={(
-          <div className="mona-ai-writing-menu">
+          <div className="min-w-[120px]">
             {([
               ['aiPolish', 'aiCommandPolish'],
               ['aiExpand', 'aiCommandExpand'],
@@ -351,9 +348,8 @@ function AIWritingControl({
         open={open}
         style={{ width: '25%' }}
       >
-        <span className={isWriting ? 'mona-ai-writing-loading' : ''}>{isWriting ? '' : 'AI'}</span>
+        <span className={isWriting ? 'mt-2 inline-block size-4 animate-spin rounded-full border border-foreground border-t-transparent' : ''}>{isWriting ? '' : 'AI'}</span>
       </InspectorPopoverButton>
-      {notice ? <EditorNotice notice={{ text: notice, type: 'error' }} onClose={() => setNotice(null)} /> : null}
     </>
   )
 }

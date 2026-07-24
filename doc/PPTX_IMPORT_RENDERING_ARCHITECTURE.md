@@ -195,6 +195,43 @@ The first compatibility foundation now exists:
     remapping, editor commands, and agent addressing traverse semantic element
     trees. UI selection and transforms operate on the group root; agent edits
     may address a stable nested child ID without flattening the group.
+27. Authored slide, layout, and master backgrounds are retained independently.
+    The compatibility `slide.background` remains the effective visual fallback,
+    while the shared render state resolves the semantic source layer.
+28. Theme color schemes, major/minor script font schemes, master color maps,
+    layout/slide color-map overrides, format-scheme names, nine-level master
+    text-style summaries, and header/footer policies are retained in the source
+    hierarchy.
+29. Slide placeholders record exact layout and master object ancestry by
+    native object ID. Matching uses placeholder index first and normalized type
+    only when an indexed match is unavailable.
+30. Canvas, thumbnails, read-only view, slideshow, mobile, export previews, and
+    agent previews now consume the same resolved hierarchy background and
+    slide-specific PowerPoint theme.
+31. Enabled date, footer, header, and slide-number placeholders render through
+    the selected layout without making inherited objects editable. Slide
+    numbers are materialized from retained presentation order, and a layout can
+    suppress a master field by omitting its placeholder.
+32. A human or agent background edit converts inherited background state into
+    a slide-local override and journals the source slide part as dirty.
+33. Text and shape text bodies retain typed paragraphs, runs, fields, explicit
+    breaks and tabs, end-paragraph properties, nine-level list styles, body
+    geometry, autofit metadata, run hyperlinks, and stable source IDs. Imported
+    HTML is now a compatibility adapter rather than the source of truth.
+34. The render graph compiles effective text properties through presentation
+    defaults, master styles, master/layout placeholder bodies, the local text
+    body, paragraph defaults, and individual runs. Theme font and color tokens
+    resolve at render time, including script-specific supplemental fonts.
+35. The compiled adapter preserves nested bullet levels, numbering schemes,
+    paragraph spacing/alignment/RTL metadata, relative line spacing, columns,
+    insets, body anchoring, vertical modes, autofit scaling, fields, and links
+    across every surface that consumes the shared render graph.
+36. Direct rich-text edits deliberately detach the imported structured body,
+    while geometry-only edits preserve it. This prevents inherited PowerPoint
+    formatting from overwriting a human or agent's explicit text edit. Undoing
+    back to the mounted import baseline restores the exact authored body and
+    compatibility HTML instead of leaving a visually reverted but semantically
+    detached object.
 
 The backing store is deliberately independent of PptxGenJS. PptxGenJS is an
 export generator and cannot improve import fidelity.
@@ -261,15 +298,15 @@ Status in this table refers to Mona today:
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| B01 | First-class themes | Partial | Model color schemes, font schemes, format/effect schemes, extra color schemes, and theme overrides | A theme-only change updates dependent slides without rewriting their objects |
-| B02 | Slide masters | Partial | Add master records with background, shape tree, text styles, placeholders, headers/footers, and theme reference | Master objects are stored once and used by every dependent layout |
-| B03 | Slide layouts | Partial | Add layout records with master reference, matching name/type, placeholder tree, visibility flags, and overrides | Slides reference a layout instead of owning copied `layoutElements` |
+| B01 | First-class themes | Partial | Color schemes, script font schemes, format-scheme names, and color-map overrides are typed and rendered; add typed fill/line/effect schemes, extra color schemes, and theme overrides | A theme-only change updates dependent slides without rewriting their objects |
+| B02 | Slide masters | Partial | Master background, shape tree, text-style levels, color map, placeholders, header/footer policy, and theme reference are stored once; complete structured style/effect inheritance | Master objects are stored once and used by every dependent layout |
+| B03 | Slide layouts | Partial | Layout records retain master reference, matching name/type, authored background, placeholder tree, visibility flags, and color-map overrides; remove the remaining parser compatibility adapter | Slides reference a layout instead of owning copied `layoutElements` |
 | B04 | Slide-to-layout-to-master graph | Done | Replace candidate paths with typed IDs and validated references; recover gracefully from broken relationships | Corpus slides resolve the same hierarchy as the OOXML relationship graph |
-| B05 | Placeholder matching and inheritance | Partial | Resolve placeholders by type/index through slide → layout → master; compile effective geometry, text style, and content | Title/body/date/footer/slide-number placeholders match reference output |
-| B06 | Layer and visibility semantics | Partial | Preserve background → master → layout → slide ordering plus `showMasterSp`, placeholder visibility, and background-follow flags | Layering tests cover hidden master/layout shapes and local overrides |
-| B07 | Slide backgrounds | Partial | Preserve solid, gradient, pattern, picture, transparency, and inherited background references | Backgrounds render without converting patterns to white or losing transforms |
+| B05 | Placeholder matching and inheritance | Partial | Exact slide → layout → master object ancestry, parser-compiled geometry, and master text-style levels are retained; replace HTML text with structured property compilation | Title/body/date/footer/slide-number placeholders match reference output |
+| B06 | Layer and visibility semantics | Done for static import rendering | Preserve background → master → layout → slide ordering, `showMasterSp`, non-painting prompt placeholders, layout field suppression, and local overrides | Layering tests cover hidden master/layout shapes and local overrides |
+| B07 | Slide backgrounds | Done for imported static backgrounds | Preserve authored solid, gradient, pattern, and picture backgrounds independently at slide/layout/master layers and resolve one effective background | Backgrounds render without converting patterns to white or losing transforms |
 | B08 | Presentation and slide properties | Partial | Model slide size, order, hidden state, sections, names, default text styles, custom shows, tags, and presentation/view properties | Nonvisual deck structure matches the source manifest |
-| B09 | Headers, footers, date, and slide numbers | Missing | Model master/layout header-footer policy, fields, formats, and per-slide suppression | Dynamic/static footer fields display in the correct inherited position |
+| B09 | Headers, footers, date, and slide numbers | Partial | Master policy and layout field placeholders render in inherited positions; add typed field content/date formats and explicit per-slide field editing | Dynamic/static footer fields display in the correct inherited position |
 | B10 | Notes hierarchy | Partial | Add notes masters and notes slides, relationships, placeholders, and rich note content; do not reduce notes to one string | Speaker notes and notes-page objects survive independently |
 | B11 | Comments and authors | Missing | Model modern/legacy comments, authors, replies, positions, timestamps, and relationships | Comment threads retain identity and slide/object anchoring |
 
@@ -309,15 +346,15 @@ only as a migration adapter while the renderer moves to the derived hierarchy.
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| D01 | Paragraph/run model | Missing | Replace import-time HTML flattening with typed paragraphs, runs, fields, breaks, tabs, end properties, and source IDs | Structured content round-trips internally without parsing generated HTML |
-| D02 | Style cascade | Missing | Compile effective run/paragraph properties across theme → master → layout → placeholder → shape → paragraph → run | Theme font/color changes update all inheriting text |
-| D03 | Bullets and numbering | Partial | Preserve bullet type, image bullet, autonumber scheme/start, level, hanging indent, margins, tab stops, and 9-level list styles | Three-plus-level lists match numbering and indentation |
-| D04 | Paragraph layout | Partial | Preserve alignment, RTL, East Asian/Latin rules, line spacing, before/after spacing, keep/widow properties, and default run properties | Mixed-language paragraphs match reference line and paragraph breaks |
-| D05 | Text-body geometry | Partial | Preserve insets, columns, column gap, word wrap, vertical anchor, vertical writing, rotation, overflow, warp, and shape text rectangle | Vertical/column/rotated text uses the correct clipping and bounds |
-| D06 | Autofit and measurement | Partial | Implement no-fit, shrink-text, and resize-shape semantics with deterministic font metrics and invalidation | Text fits the same bounds at editor, thumbnail, and read-only scales |
-| D07 | Fonts and substitution | Partial | Parse theme/document fonts, language/script metadata, embedded-font references, substitution policy, and fallback diagnostics | Missing fonts are reported and fallback is deterministic by script |
+| D01 | Paragraph/run model | Done for text and shape bodies | Extend the typed model to table cells, chart text, notes, and future content-part text without parsing generated HTML | Structured content round-trips internally without parsing generated HTML |
+| D02 | Style cascade | Done for imported text and shapes | Extend the same compiler to table/chart/notes text and add dependency-aware invalidation | Theme font/color changes update all inheriting text |
+| D03 | Bullets and numbering | Partial | Retained and rendered: character/autonumber type, scheme/start, level, margins, indents, tabs, and 9-level styles. Add picture-bullet assets and exact marker font/color/size layout | Three-plus-level lists match numbering and indentation |
+| D04 | Paragraph layout | Partial | Retained and rendered: alignment, RTL, East Asian/Latin rules, line and before/after spacing, tabs, indents, and default run properties. Add Office-compatible line breaking and keep/widow behavior | Mixed-language paragraphs match reference line and paragraph breaks |
+| D05 | Text-body geometry | Partial | Retained and rendered: insets, columns/gap, wrap metadata, vertical anchor/writing, rotation metadata, and autofit mode. Add overflow, text warp, shape text rectangles, and exact vertical/rotated clipping | Vertical/column/rotated text uses the correct clipping and bounds |
+| D06 | Autofit and measurement | Partial | Imported shrink factors and line-spacing reduction render consistently; add dynamic no-fit/shrink/resize measurement with deterministic font metrics and invalidation | Text fits the same bounds at editor, thumbnail, and read-only scales |
+| D07 | Fonts and substitution | Partial | Theme/document/script fonts, language metadata, and supplemental mappings are retained, resolved, and preloaded. Add embedded fonts, deterministic missing-font substitution, and diagnostics | Missing fonts are reported and fallback is deterministic by script |
 | D08 | Text color/effects and WordArt | Partial | Preserve scheme colors/transforms, gradient/picture text fills, outlines, shadows, and text warp | Styled display text is not reduced to an averaged solid color |
-| D09 | Fields and links | Partial | Preserve slide number/date/time/header/footer/custom fields and run-level hyperlinks/actions | Field semantics remain distinct from their current displayed string |
+| D09 | Fields and links | Partial | Fields and run-level hyperlinks remain typed; slide numbers materialize from presentation order. Add dynamic date/time/header/footer/custom field evaluation and run-level actions | Field semantics remain distinct from their current displayed string |
 
 HTML remains an editing-surface adapter until the rich-text editor consumes the
 structured model directly. It is not the PowerPoint source of truth.
@@ -411,16 +448,15 @@ The complete work should proceed in this order:
 9. **Export — X01–X06.** Add source-package patch export, update PptxGenJS for
    Mona-native generation, and require no-op/edit round-trip proof.
 
-The next code slice is now:
+The typed-text and inheritance portion of the structured-text vertical slice is
+now complete for ordinary text and shape bodies. The next text-layout work is:
 
-1. finish **A04**, **A06**, and **A08** with adversarial package fixtures,
-   complete command coverage, and exact parser-supplied native IDs for every
-   supported object;
-2. expand **B01–B06** from hierarchy references into semantic backgrounds,
-   master/layout shape trees, text styles, visibility flags, and compiled
-   placeholder properties;
-3. complete **F01–F03** by making the derived graph the common geometry source
-   for the canvas, thumbnails, selection, snapping, and read-only rendering.
+1. add deterministic Office-compatible font measurement, line breaking,
+   overflow, shrink-text, and resize-shape behavior;
+2. complete picture bullets, exact marker styling, vertical/rotated clipping,
+   text warp, embedded fonts, and substitution diagnostics;
+3. reuse the same structured-text compiler for table cells, chart text, notes,
+   and other content parts rather than introducing another HTML-only path.
 
 The original flat `Slide.elements` collection remains a compatibility adapter,
 not the long-term source of truth.
@@ -455,12 +491,24 @@ The July 24, 2026 verification pass establishes the following:
 - Representative screenshots are produced on demand with
   `MONA_WRITE_FIDELITY_SCREENSHOTS=1` and are written to
   `.artifacts/pptx-fidelity/`.
+- The real corporate deck retains authored hierarchy backgrounds, theme font
+  schemes, master text-style levels, header/footer policy, placeholder element
+  IDs, and slide-local links to their exact layout/master placeholder objects.
+- Inherited field placeholders are rendered through the selected layout and
+  slide-number fields use retained presentation order rather than the cached
+  number embedded in a template.
+- Ordinary text and shape text from the corporate fixture retain typed
+  paragraphs/runs and stable source IDs. Browser coverage verifies compiled
+  master/layout/local inheritance, theme font/color resolution, relative line
+  spacing, columns, and safe hyperlinks; core coverage verifies nested list
+  structure, script-specific fonts, field materialization, and edit detachment.
 
 This is a strong static-rendering result for the current corpus, not a claim
 that the entire ECMA-376 presentation specification is complete. The remaining
-high-value compatibility work is still explicit in the matrix: structured
-PowerPoint text and style inheritance, a full native chart-space/workbook
-model, opaque coverage for unsupported object families beyond graphic frames,
-headers/footers and fields beyond the current resolved placeholders,
+high-value compatibility work is still explicit in the matrix: deterministic
+PowerPoint text measurement/fitting and advanced text effects, a full native
+chart-space/workbook model, opaque coverage for unsupported object families
+beyond graphic frames, typed header/footer/date field content beyond the
+current resolved placeholders,
 notes/comments/timing semantics, advanced effects/3D, dependency-aware
 recalculation, and source-package patch export.

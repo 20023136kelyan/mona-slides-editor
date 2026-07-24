@@ -36,6 +36,10 @@ const privateOleFixture = new URL(
   '../../../../../tests/corpus/private/real-01-powerpoint-native-charts-stress.pptx',
   import.meta.url,
 )
+const privateCorporateFixture = new URL(
+  '../../../../../tests/corpus/private/real-03-nasa-sewp-corporate.pptx',
+  import.meta.url,
+)
 
 describe('Mona PowerPoint parser native identity', () => {
   it.each(fixtures)('carries an exact OOXML part and cNvPr id through %s', async fileName => {
@@ -183,6 +187,51 @@ describe('Mona PowerPoint parser native identity', () => {
         },
       })
       expect(preview?.type === 'image' ? preview.base64 : '').toMatch(/^data:image\//)
+    },
+  )
+
+  it.runIf(existsSync(privateCorporateFixture))(
+    'retains authored background layers, theme schemes, master text styles, and header/footer policy',
+    async () => {
+      const file = await readFile(privateCorporateFixture)
+      const source = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)
+      const [parsed, backing] = await Promise.all([
+        parse(source, { imageMode: 'base64' }),
+        createPowerPointPackageBacking(source, 'corporate.pptx'),
+      ])
+
+      expect(parsed.slides.some(slide => (
+        slide.backgrounds?.source && slide.backgrounds.source !== 'default'
+      ))).toBe(true)
+      expect(parsed.slides.some(slide => slide.backgrounds?.master)).toBe(true)
+      expect(backing.reference.hierarchy?.themes.some(theme => (
+        Boolean(theme.majorFont?.latin)
+        && Boolean(theme.minorFont?.latin)
+        && theme.colors.length >= 8
+      ))).toBe(true)
+      expect(backing.reference.hierarchy?.masters.some(master => (
+        Boolean(master.colorMap)
+        && Boolean(master.textStyles?.title.length)
+        && Boolean(master.textStyles?.body.length)
+      ))).toBe(true)
+      expect(backing.reference.hierarchy?.masters.some(master => Boolean(master.headerFooter))).toBe(true)
+      expect(backing.reference.hierarchy?.placeholders.some(placeholder => placeholder.layer === 'master')).toBe(true)
+      expect(backing.reference.hierarchy?.placeholders.some(placeholder => placeholder.layer === 'layout')).toBe(true)
+      const structuredText = parsed.slides.flatMap(slide => (
+        flattenElements([...(slide.masterElements ?? []), ...slide.layoutElements, ...slide.elements])
+      )).flatMap(element => (
+        element.type === 'text' || element.type === 'shape'
+          ? element.textBody ? [element.textBody] : []
+          : []
+      ))
+      expect(structuredText.length).toBeGreaterThan(0)
+      expect(structuredText.some(body => body.paragraphs.some(paragraph => paragraph.runs.length))).toBe(true)
+      expect(structuredText.some(body => body.paragraphs.some(paragraph => (
+        paragraph.runs.some(run => run.properties?.fontSize || run.properties?.fontFamily)
+      )))).toBe(true)
+      expect(backing.reference.hierarchy?.masters.some(master => (
+        master.textStyles?.body.some(level => Boolean(level.paragraph) && Boolean(level.run))
+      ))).toBe(true)
     },
   )
 })

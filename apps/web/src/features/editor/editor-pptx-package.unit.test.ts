@@ -33,7 +33,7 @@ const relationship = (id: string, type: string, target: string) => (
 const fixture = async (): Promise<ArrayBuffer> => {
   const zip = new JSZip()
   zip.file('[Content_Types].xml', contentTypes)
-  zip.file('ppt/presentation.xml', `<p:presentation xmlns:p="p" xmlns:r="r"><p:sldIdLst><p:sldId id="512" r:id="rId2"/><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>`)
+  zip.file('ppt/presentation.xml', `<p:presentation xmlns:p="p" xmlns:r="r" xmlns:a="a"><p:sldIdLst><p:sldId id="512" r:id="rId2"/><p:sldId id="256" r:id="rId1"/></p:sldIdLst><p:defaultTextStyle><a:lvl1pPr defTabSz="457200"><a:defRPr sz="1200" lang="en-US"><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl1pPr></p:defaultTextStyle></p:presentation>`)
   zip.file('ppt/_rels/presentation.xml.rels', relationships([
     relationship('rId1', 'slide', 'slides/slide1.xml'),
     relationship('rId2', 'slide', 'slides/slide2.xml'),
@@ -55,11 +55,21 @@ const fixture = async (): Promise<ArrayBuffer> => {
       relationship('rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml'),
     ))
   }
-  zip.file('ppt/slideLayouts/slideLayout1.xml', '<p:sldLayout xmlns:p="p" name="Title layout" type="title" showMasterSp="0"/>')
+  zip.file('ppt/slideLayouts/slideLayout1.xml', `<p:sldLayout xmlns:p="p" xmlns:a="a" name="Title layout" type="title" showMasterSp="0">
+    <p:clrMapOvr><a:overrideClrMapping accent1="accent2" tx1="dk1"/></p:clrMapOvr>
+  </p:sldLayout>`)
   zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels', relationships(
     relationship('rId1', 'slideMaster', '../slideMasters/slideMaster1.xml'),
   ))
-  zip.file('ppt/slideMasters/slideMaster1.xml', '<p:sldMaster xmlns:p="p"/>')
+  zip.file('ppt/slideMasters/slideMaster1.xml', `<p:sldMaster xmlns:p="p" xmlns:a="a">
+    <p:clrMap accent1="accent1" bg1="lt1" tx1="dk1"/>
+    <p:hf dt="0" ftr="1" hdr="0" sldNum="1"/>
+    <p:txStyles>
+      <p:titleStyle><a:lvl1pPr algn="ctr" marL="12700"><a:defRPr sz="3200" b="1" lang="en-US"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mj-lt"/></a:defRPr></a:lvl1pPr></p:titleStyle>
+      <p:bodyStyle><a:lvl1pPr marL="25400" indent="-12700"><a:buChar char="•"/><a:defRPr sz="1800"/></a:lvl1pPr></p:bodyStyle>
+      <p:otherStyle/>
+    </p:txStyles>
+  </p:sldMaster>`)
   zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', relationships([
     relationship('rId1', 'theme', '../theme/theme1.xml'),
     relationship('rId2', 'slideLayout', '../slideLayouts/slideLayout1.xml'),
@@ -67,9 +77,10 @@ const fixture = async (): Promise<ArrayBuffer> => {
   zip.file('ppt/theme/theme1.xml', `<a:theme xmlns:a="a" name="Fixture theme"><a:themeElements>
     <a:clrScheme name="Fixture colors"><a:dk1><a:srgbClr val="112233"/></a:dk1></a:clrScheme>
     <a:fontScheme name="Fixture fonts">
-      <a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont>
-      <a:minorFont><a:latin typeface="Aptos"/></a:minorFont>
+      <a:majorFont><a:latin typeface="Aptos Display"/><a:ea typeface="Yu Gothic"/><a:font script="Jpan" typeface="Yu Mincho"/></a:majorFont>
+      <a:minorFont><a:latin typeface="Aptos"/><a:cs typeface="Arial"/></a:minorFont>
     </a:fontScheme>
+    <a:fmtScheme name="Fixture format"/>
   </a:themeElements></a:theme>`)
   zip.file('ppt/customXml/item1.xml', '<custom:future-feature xmlns:custom="custom"/>')
   return zip.generateAsync({ type: 'arraybuffer' })
@@ -139,14 +150,83 @@ describe('PowerPoint package backing', () => {
     ])
     expect(slideObjects[0]?.stableId).toContain('/ppt/slides/slide1.xml#2')
     expect(backing.reference.hierarchy).toEqual({
+      defaultTextStyle: [expect.objectContaining({
+        level: 1,
+        paragraph: expect.objectContaining({
+          defaultRun: expect.objectContaining({
+            fontFamily: '+mn-lt',
+            fontSize: 12,
+            language: 'en-US',
+          }),
+          defaultTabSize: 36,
+        }),
+        run: expect.objectContaining({
+          fontFamily: '+mn-lt',
+          fontSize: 12,
+          language: 'en-US',
+        }),
+      })],
       layouts: [expect.objectContaining({
+        colorMapOverride: { accent1: 'accent2', tx1: 'dk1' },
         masterId: expect.stringContaining('/ppt/slideMasters/slideMaster1.xml'),
         name: 'Title layout',
         showMasterShapes: false,
         type: 'title',
       })],
       masters: [expect.objectContaining({
+        colorMap: { accent1: 'accent1', bg1: 'lt1', tx1: 'dk1' },
+        headerFooter: {
+          dateTime: false,
+          footer: true,
+          header: false,
+          slideNumber: true,
+        },
         layoutIds: [expect.stringContaining('/ppt/slideLayouts/slideLayout1.xml')],
+        textStyles: {
+          body: [expect.objectContaining({
+            bulletCharacter: '•',
+            fontSize: 18,
+            indent: -1,
+            level: 1,
+            marginLeft: 2,
+            paragraph: expect.objectContaining({
+              bullet: { character: '•', type: 'character' },
+              defaultRun: expect.objectContaining({ fontSize: 18 }),
+              indent: -1,
+              marginLeft: 2,
+            }),
+            run: expect.objectContaining({ fontSize: 18 }),
+          })],
+          other: [],
+          title: [expect.objectContaining({
+            alignment: 'ctr',
+            bold: true,
+            fontColor: { name: 'text', type: 'scheme', value: 'tx1' },
+            fontFamily: '+mj-lt',
+            fontSize: 32,
+            language: 'en-US',
+            level: 1,
+            marginLeft: 1,
+            paragraph: expect.objectContaining({
+              alignment: 'ctr',
+              defaultRun: expect.objectContaining({
+                bold: true,
+                color: { name: 'text', type: 'scheme', value: 'tx1' },
+                fontFamily: '+mj-lt',
+                fontSize: 32,
+                language: 'en-US',
+              }),
+              marginLeft: 1,
+            }),
+            run: expect.objectContaining({
+              bold: true,
+              color: { name: 'text', type: 'scheme', value: 'tx1' },
+              fontFamily: '+mj-lt',
+              fontSize: 32,
+              language: 'en-US',
+            }),
+          })],
+        },
         themeId: expect.stringContaining('/ppt/theme/theme1.xml'),
       })],
       placeholders: expect.arrayContaining([
@@ -159,7 +239,18 @@ describe('PowerPoint package backing', () => {
       themes: [expect.objectContaining({
         colorSchemeName: 'Fixture colors',
         colors: [{ name: 'dk1', type: 'srgb', value: '112233' }],
+        formatSchemeName: 'Fixture format',
+        majorFont: {
+          eastAsian: 'Yu Gothic',
+          latin: 'Aptos Display',
+          supplemental: [{ script: 'Jpan', typeface: 'Yu Mincho' }],
+        },
         majorLatinFont: 'Aptos Display',
+        minorFont: {
+          complexScript: 'Arial',
+          latin: 'Aptos',
+          supplemental: [],
+        },
         minorLatinFont: 'Aptos',
         name: 'Fixture theme',
       })],

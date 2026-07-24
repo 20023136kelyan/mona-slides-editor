@@ -452,37 +452,37 @@ export function EditorSearchPanel({ runtime }: { runtime: EditorRuntime }) {
     setSearchWordValue(value); reset(value) 
   }
   const renderSearchField = () => (
-    <InputGroup className="mona-search-input">
-      <InputGroupInput onChange={event => setSearchWord(event.target.value)} onKeyDown={event => {
+    <InputGroup className="mt-2.5 bg-background hover:border-ring focus-within:border-ring">
+      <InputGroupInput className="h-[30px] min-w-0 px-[5px] py-0 leading-[30px]" onChange={event => setSearchWord(event.target.value)} onKeyDown={event => {
         if (event.key === 'Enter') searchNext()
       }} placeholder={t('foundation.editor.search.findPlaceholder')} ref={searchInputRef} value={searchWord} />
-      <InputGroupAddon align="inline-end" className="mona-search-suffix">
-        <InputGroupText className="mona-search-count">{searchIndex + 1}/{results.length}</InputGroupText>
-        <Separator orientation="vertical" />
-        <InputGroupButton aria-pressed={modifiers === 'g'} className="mona-search-case" onClick={() => {
+      <InputGroupAddon align="inline-end" className="gap-0.5 pr-[3px]">
+        <InputGroupText className="mr-2 text-xs">{searchIndex + 1}/{results.length}</InputGroupText>
+        <Separator className="mx-1 my-auto h-[1em]" orientation="vertical" />
+        <InputGroupButton aria-pressed={modifiers === 'g'} className="text-xs aria-pressed:bg-muted aria-pressed:text-foreground" onClick={() => {
           setModifiers(value => value === 'g' ? 'gi' : 'g'); reset()
         }}>Aa</InputGroupButton>
-        <Separator orientation="vertical" />
-        <InputGroupButton aria-label={t('foundation.editor.search.previous')} className="mona-search-next" onClick={searchPrev} size="icon-xs"><LeftIcon /></InputGroupButton>
-        <InputGroupButton aria-label={t('foundation.editor.search.next')} className="mona-search-next" onClick={searchNext} size="icon-xs"><RightIcon /></InputGroupButton>
+        <Separator className="mx-1 my-auto h-[1em]" orientation="vertical" />
+        <InputGroupButton aria-label={t('foundation.editor.search.previous')} className="h-full w-[22px] hover:text-foreground" onClick={searchPrev} size="icon-xs"><LeftIcon /></InputGroupButton>
+        <InputGroupButton aria-label={t('foundation.editor.search.next')} className="h-full w-[22px] hover:text-foreground" onClick={searchNext} size="icon-xs"><RightIcon /></InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
   )
 
   return (
-    <div className="mona-search-panel is-embedded">
+    <div className="min-h-[180px] text-[13px]">
       <Tabs onValueChange={value => setMode(value as 'replace' | 'search')} value={mode}>
-        <TabsList className="mona-search-tabs">
+        <TabsList className="w-full justify-start border-b" variant="line">
           <TabsTrigger value="search">{t('foundation.editor.search.find')}</TabsTrigger>
           <TabsTrigger value="replace">{t('foundation.editor.search.replace')}</TabsTrigger>
         </TabsList>
-        <TabsContent className="mona-search-content is-search" onMouseDown={event => event.stopPropagation()} value="search">{renderSearchField()}</TabsContent>
-        <TabsContent className="mona-search-content is-replace" onMouseDown={event => event.stopPropagation()} value="replace">
+        <TabsContent className="flex flex-col justify-between" onMouseDown={event => event.stopPropagation()} value="search">{renderSearchField()}</TabsContent>
+        <TabsContent className="flex flex-col justify-between" onMouseDown={event => event.stopPropagation()} value="replace">
           {renderSearchField()}
-          <Input className="mona-search-replace-input" onChange={event => setReplaceWord(event.target.value)} onKeyDown={event => {
+          <Input className="mt-2.5" onChange={event => setReplaceWord(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter') replace()
           }} placeholder={t('foundation.editor.search.replacePlaceholder')} value={replaceWord} />
-          <div className="mona-search-footer"><Button disabled={!searchWord} onClick={replace} size="editor" variant="outline">{t('foundation.editor.action.replace')}</Button><Button disabled={!searchWord} onClick={replaceAll} size="editor">{t('foundation.editor.action.replaceAll')}</Button></div>
+          <div className="mt-2.5 flex items-center justify-end gap-[5px]"><Button disabled={!searchWord} onClick={replace} size="editor" variant="outline">{t('foundation.editor.action.replace')}</Button><Button disabled={!searchWord} onClick={replaceAll} size="editor">{t('foundation.editor.action.replaceAll')}</Button></div>
         </TabsContent>
       </Tabs>
     </div>

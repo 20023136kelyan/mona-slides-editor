@@ -1,7 +1,8 @@
 import { useMemo, type MouseEvent } from 'react'
 
 import {
-  resolveSlideRenderGraph,
+  compileSlideTheme,
+  resolveSlideRenderState,
   selectFormattedCurrentSlideAnimations,
   type PPTElementLink,
   type PresentationState,
@@ -40,10 +41,10 @@ export function ScreenSlideList({
   turnSlideToId,
 }: ScreenSlideListProps) {
   const slides = useMemo(() => resolveTurningModes(presentation.slides), [presentation.slides])
-  const renderGraphs = useMemo(
+  const renderStates = useMemo(
     () => new Map(slides.map(slide => [
       slide.id,
-      resolveSlideRenderGraph(slide, presentation.sourcePackages),
+      resolveSlideRenderState(slide, presentation.sourcePackages),
     ])),
     [presentation.sourcePackages, slides],
   )
@@ -74,6 +75,14 @@ export function ScreenSlideList({
           (Math.abs(distance) === 1 && slide.turningMode !== currentMode) ? 'is-hidden' : '',
         ].filter(Boolean).join(' ')
         const shouldRender = Math.abs(distance) < 2 || !!slide.animations?.length
+        const renderState = renderStates.get(slide.id)
+        const effectiveTheme = compileSlideTheme(
+          presentation.theme,
+          renderState?.theme,
+          renderState?.master,
+          renderState?.layout,
+          slide,
+        )
         return (
           <div className={classNames} data-slide-id={slide.id} key={slide.id}>
             {shouldRender ? (
@@ -86,8 +95,8 @@ export function ScreenSlideList({
                     width: presentation.viewportSize,
                   }}
                 >
-                  <div className="mona-screen-slide-background" style={getSlideBackgroundStyle(slide.background)} />
-                  {(renderGraphs.get(slide.id) ?? []).map(node => {
+                  <div className="mona-screen-slide-background" style={getSlideBackgroundStyle(renderState?.background)} />
+                  {(renderState?.nodes ?? []).map(node => {
                     const { element } = node
                     const renderer = (
                       <ElementRenderer
@@ -98,12 +107,12 @@ export function ScreenSlideList({
                           viewportRatio: presentation.viewportRatio,
                           viewportSize: presentation.viewportSize,
                         }}
-                        theme={presentation.theme}
+                        theme={effectiveTheme}
                       />
                     )
                     const style = {
-                      color: presentation.theme.fontColor,
-                      fontFamily: presentation.theme.fontName,
+                      color: effectiveTheme.fontColor,
+                      fontFamily: effectiveTheme.fontName,
                       visibility: needsEntryWait(presentation, element.id, animationIndex) ? 'hidden' as const : 'visible' as const,
                       zIndex: node.zIndex,
                     }

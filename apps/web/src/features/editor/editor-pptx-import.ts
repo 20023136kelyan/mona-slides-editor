@@ -1,15 +1,24 @@
 import tinycolor from 'tinycolor2'
 import { SVGPathData, SVGPathDataTransformer } from 'svg-pathdata'
-import type { ChartItem, Element as PptxElement, Shape as PptxShape, Slide as ParsedSlide } from '@mona/pptx-parser'
+import type {
+  ChartItem,
+  Element as PptxElement,
+  Fill as PptxFill,
+  Shape as PptxShape,
+  Slide as ParsedSlide,
+} from '@mona/pptx-parser'
 
 import {
   createPresentationId,
+  flattenElementTree,
   type PowerPointImportCapabilityReport,
   type PowerPointImportDisposition,
   type PowerPointImportDispositionCounts,
   type PowerPointImportIssue,
   type PowerPointImportReport,
+  type PowerPointElementSource,
   type PowerPointElementSourceLayer,
+  type PowerPointHierarchy,
   type PowerPointPackageManifest,
   type PowerPointPackageReference,
 } from '@mona/presentation-core'
@@ -29,6 +38,7 @@ import type {
   Slide,
   SlideBackground,
   SlideTheme,
+  StructuredTextBody,
   TableCell,
   TableCellStyle,
   TextAlignVertical,
@@ -46,6 +56,25 @@ export interface ParsedPptxPresentation {
 }
 
 const vAlignMap: Record<string, TextAlignVertical> = { down: 'bottom', mid: 'middle', up: 'top' }
+
+const retainStructuredText = (
+  body: StructuredTextBody | undefined,
+  sourceId: string,
+  scale: number,
+): StructuredTextBody | undefined => body
+  ? {
+      ...body,
+      paragraphs: body.paragraphs.map((paragraph, paragraphIndex) => ({
+        ...paragraph,
+        runs: paragraph.runs.map((run, runIndex) => ({
+          ...run,
+          sourceId: `${sourceId}/text/p${paragraphIndex}/r${runIndex}`,
+        })),
+        sourceId: `${sourceId}/text/p${paragraphIndex}`,
+      })),
+      scale,
+    }
+  : undefined
 
 const getTextNodeStyleSpan = (textNode: Text, styleProp: 'color' | 'fontSize') => {
   let parent = textNode.parentElement
@@ -326,8 +355,8 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
   return line
 }
 
-const slideBackground = (parsed: ParsedSlide): SlideBackground => {
-  const { type, value } = parsed.fill
+const slideBackground = (fill: PptxFill): SlideBackground => {
+  const { type, value } = fill
   if (type === 'image') return { image: { size: 'stretch', src: value.base64 }, type: 'image' }
   if (type === 'gradient') return { gradient: { colors: value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: value.rot, type: value.path === 'line' ? 'linear' : 'radial' }, type: 'gradient' }
   if (type === 'pattern') {
@@ -341,6 +370,31 @@ const slideBackground = (parsed: ParsedSlide): SlideBackground => {
     }
   }
   return { color: value || '#fff', type: 'solid' }
+}
+
+const normalizedPlaceholderType = (type: string | undefined): string | undefined => {
+  if (type === 'ctrTitle') return 'title'
+  return type
+}
+
+const findMatchingPlaceholder = (
+  elements: readonly PPTElement[],
+  source: PowerPointElementSource,
+): PPTElement | undefined => {
+  const placeholders = flattenElementTree(elements).filter(element => (
+    element.source?.placeholderIndex !== undefined
+    || element.source?.placeholderType !== undefined
+  ))
+  if (source.placeholderIndex !== undefined) {
+    const indexed = placeholders.find(element => (
+      element.source?.placeholderIndex === source.placeholderIndex
+    ))
+    if (indexed) return indexed
+  }
+  const type = normalizedPlaceholderType(source.placeholderType)
+  return type
+    ? placeholders.find(element => normalizedPlaceholderType(element.source?.placeholderType) === type)
+    : undefined
 }
 
 const emptyDispositionCounts = (): PowerPointImportDispositionCounts => ({
@@ -371,7 +425,9 @@ export const convertParsedPptxPresentation = ({
   const slideReports: PowerPointImportReport['slides'] = []
   const sourceOrder = new Map(sourcePackage?.slides.map((slide, index) => [slide.slidePart, index]) ?? [])
   const identitiesByPartAndNativeId = new Map<string, PowerPointPackageManifest['objects']>()
+  const layoutBackgroundsByPart = new Map<string, SlideBackground>()
   const layoutElementsByPart = new Map<string, PPTElement[]>()
+  const masterBackgroundsByPart = new Map<string, SlideBackground>()
   const masterElementsByPart = new Map<string, PPTElement[]>()
   for (const identity of sourceManifest?.objects ?? []) {
     const key = `${identity.partPath}\0${identity.nativeId}`
@@ -411,7 +467,7 @@ export const convertParsedPptxPresentation = ({
       zoom: 'scale',
     }
     const slide: Slide = {
-      background: slideBackground(item),
+      background: slideBackground(item.backgrounds?.effective ?? item.fill),
       ...(item.transition?.autoNextAfter && item.transition.autoNextAfter >= 1000
         ? { durationMs: item.transition.autoNextAfter }
         : {}),
@@ -462,6 +518,7 @@ export const convertParsedPptxPresentation = ({
     if (sourcePackage && sourceDependency) {
       slide.source = {
         ...sourceDependency,
+        ...(item.backgrounds ? { backgroundSource: item.backgrounds.source } : {}),
         kind: 'pptx',
         packageId: sourcePackage.packageId,
       }
@@ -530,13 +587,19 @@ export const convertParsedPptxPresentation = ({
           const fontScale = autoFitType === 'text' ? (element.autoFit!.fontScale || 100) / 100 : 1
           const textRatio = ratio * fontScale
           const metrics = getParagraphMetrics(element.content, textRatio)
+          const textId = createPresentationId(10)
+          const structuredText = retainStructuredText(
+            element.textBody,
+            sourceIdentity?.stableId ?? textId,
+            ratio,
+          )
           const text: PPTTextElement = {
             content: convertTextContent(element.content, textRatio),
             defaultColor: slideTheme.fontColor,
             defaultFontName: slideTheme.fontName,
             fill: element.fill?.type === 'color' ? element.fill.value : '',
             height: element.height,
-            id: createPresentationId(10),
+            id: textId,
             left: element.left,
             lineHeight: 1,
             outline: { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) },
@@ -545,13 +608,19 @@ export const convertParsedPptxPresentation = ({
             type: 'text',
             vertical: element.isVertical,
             width: element.width,
+            ...(structuredText ? { structuredText } : {}),
           }
           if (!adaptive) {
             text.fixedHeight = true; text.vAlign = vAlignMap[element.vAlign] || 'top' 
           }
           if (element.shadow) text.shadow = { blur: element.shadow.blur * ratio, color: element.shadow.color, h: element.shadow.h * ratio, v: element.shadow.v * ratio }
           if (element.link) text.link = { target: element.link, type: 'web' }
-          if (element.textInset) text.inset = [element.textInset.t, element.textInset.r, element.textInset.b, element.textInset.l]
+          if (element.textInset) text.inset = [
+            element.textInset.t * ratio,
+            element.textInset.r * ratio,
+            element.textInset.b * ratio,
+            element.textInset.l * ratio,
+          ]
           if (metrics.lineHeight) text.lineHeight = metrics.lineHeight
           if (metrics.margin) text.paragraphSpace = metrics.margin
           pushElement(text)
@@ -640,6 +709,12 @@ export const convertParsedPptxPresentation = ({
             const shape = shapeList.find(candidate => candidate.pptxShapeType === element.shapType)
             const gradient: Gradient | undefined = element.fill?.type === 'gradient' ? { colors: element.fill.value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: element.fill.value.rot, type: element.fill.value.path === 'line' ? 'linear' : 'radial' } : undefined
             const metrics = getParagraphMetrics(element.content, ratio)
+            const shapeId = createPresentationId(10)
+            const structuredText = retainStructuredText(
+              element.textBody,
+              sourceIdentity?.stableId ?? shapeId,
+              ratio,
+            )
             const destination: PPTShapeElement = {
               fill: !element.strokeOnly && element.fill?.type === 'color' ? element.fill.value : '',
               fixedRatio: false,
@@ -647,7 +722,7 @@ export const convertParsedPptxPresentation = ({
               flipV: element.isFlipV,
               gradient,
               height: element.height,
-              id: createPresentationId(10),
+              id: shapeId,
               left: element.left,
               outline: { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) },
               path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
@@ -660,14 +735,25 @@ export const convertParsedPptxPresentation = ({
                   }
                 : undefined,
               rotate: element.rotate,
-              text: { align: vAlignMap[element.vAlign] || 'middle', content: convertTextContent(element.content, ratio), defaultColor: slideTheme.fontColor, defaultFontName: slideTheme.fontName },
+              text: {
+                align: vAlignMap[element.vAlign] || 'middle',
+                content: convertTextContent(element.content, ratio),
+                defaultColor: slideTheme.fontColor,
+                defaultFontName: slideTheme.fontName,
+                ...(structuredText ? { structuredText } : {}),
+              },
               top: element.top,
               type: 'shape',
               viewBox: [200, 200],
               width: element.width,
             }
             if (element.link) destination.link = { target: element.link, type: 'web' }
-            if (element.textInset) destination.text!.inset = [element.textInset.t, element.textInset.r, element.textInset.b, element.textInset.l]
+            if (element.textInset) destination.text!.inset = [
+              element.textInset.t * ratio,
+              element.textInset.r * ratio,
+              element.textInset.b * ratio,
+              element.textInset.l * ratio,
+            ]
             if (metrics.lineHeight) destination.text!.lineHeight = metrics.lineHeight
             if (metrics.margin) destination.text!.paragraphSpace = metrics.margin
             if (element.shadow) destination.shadow = { blur: element.shadow.blur * ratio, color: element.shadow.color, h: element.shadow.h * ratio, v: element.shadow.v * ratio }
@@ -951,10 +1037,16 @@ export const convertParsedPptxPresentation = ({
       parseElements(item.masterElements ?? [], 'master', undefined, masterElements)
       masterElementsByPart.set(sourceDependency.masterPart, masterElements)
     }
+    if (sourceDependency?.masterPart && item.backgrounds?.master && !masterBackgroundsByPart.has(sourceDependency.masterPart)) {
+      masterBackgroundsByPart.set(sourceDependency.masterPart, slideBackground(item.backgrounds.master))
+    }
     if (sourceDependency?.layoutPart && !layoutElementsByPart.has(sourceDependency.layoutPart)) {
       const layoutElements: PPTElement[] = []
       parseElements(item.layoutElements, 'layout', undefined, layoutElements)
       layoutElementsByPart.set(sourceDependency.layoutPart, layoutElements)
+    }
+    if (sourceDependency?.layoutPart && item.backgrounds?.layout && !layoutBackgroundsByPart.has(sourceDependency.layoutPart)) {
+      layoutBackgroundsByPart.set(sourceDependency.layoutPart, slideBackground(item.backgrounds.layout))
     }
     parseElements(item.elements, 'slide')
     slides.push(slide)
@@ -969,6 +1061,33 @@ export const convertParsedPptxPresentation = ({
       slidePart: sourceDependency?.slidePart,
       sourceObjectCount,
     })
+  }
+  for (const slide of slides) {
+    const layoutElements = slide.source?.layoutPart
+      ? layoutElementsByPart.get(slide.source.layoutPart) ?? []
+      : []
+    const masterElements = slide.source?.masterPart
+      ? masterElementsByPart.get(slide.source.masterPart) ?? []
+      : []
+    for (const element of flattenElementTree(slide.elements)) {
+      const source = element.source
+      if (
+        !source
+        || source.sourceLayer !== 'slide'
+        || (source.placeholderIndex === undefined && source.placeholderType === undefined)
+      ) continue
+      const layoutPlaceholder = findMatchingPlaceholder(layoutElements, source)
+      const masterPlaceholder = findMatchingPlaceholder(
+        masterElements,
+        layoutPlaceholder?.source ?? source,
+      )
+      if (layoutPlaceholder?.source?.sourceObjectId) {
+        source.placeholderLayoutObjectId = layoutPlaceholder.source.sourceObjectId
+      }
+      if (masterPlaceholder?.source?.sourceObjectId) {
+        source.placeholderMasterObjectId = masterPlaceholder.source.sourceObjectId
+      }
+    }
   }
   const report: PowerPointImportReport = {
     counts: packageCounts,
@@ -988,7 +1107,7 @@ export const convertParsedPptxPresentation = ({
         ? 'complete-with-approximations'
         : 'complete',
   }
-  const baseHierarchy = sourcePackage
+  const baseHierarchy: PowerPointHierarchy | undefined = sourcePackage
     ? sourcePackage.hierarchy ?? {
         layouts: [...new Map(sourcePackage.slides.flatMap(dependency => dependency.layoutPart
           ? [[dependency.layoutPart, {
@@ -1026,12 +1145,28 @@ export const convertParsedPptxPresentation = ({
           ...baseHierarchy,
           layouts: baseHierarchy.layouts.map(layout => ({
             ...layout,
-            elements: layoutElementsByPart.get(layout.partPath) ?? [],
+            background: layoutBackgroundsByPart.get(layout.partPath) ?? layout.background,
+            elements: layoutElementsByPart.get(layout.partPath) ?? layout.elements ?? [],
           })),
           masters: baseHierarchy.masters.map(master => ({
             ...master,
-            elements: masterElementsByPart.get(master.partPath) ?? [],
+            background: masterBackgroundsByPart.get(master.partPath) ?? master.background,
+            elements: masterElementsByPart.get(master.partPath) ?? master.elements ?? [],
           })),
+          placeholders: baseHierarchy.placeholders.map(placeholder => {
+            const elements = placeholder.layer === 'layout'
+              ? layoutElementsByPart.get(placeholder.partPath)
+              : placeholder.layer === 'master'
+                ? masterElementsByPart.get(placeholder.partPath)
+                : slides.flatMap(slide => slide.elements)
+            const elementId = flattenElementTree(elements ?? []).find(element => (
+              element.source?.sourceObjectId === placeholder.objectId
+            ))?.id
+            return {
+              ...placeholder,
+              ...(elementId ? { elementId } : {}),
+            }
+          }),
         },
       }
     : sourcePackage

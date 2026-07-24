@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Blend, Bold, Italic, Layers3, Minus, Move, Plus, Sparkles, Strikethrough, SwatchBook, Type } from 'lucide-react'
+import { BetweenHorizontalEnd, Blend, Bold, Italic, Layers3, Minus, Move, Plus, Sparkles, Strikethrough, SwatchBook, Type } from 'lucide-react'
 
 import FlipHorizontalIcon from '~icons/icon-park-outline/flip-horizontally'
 import FlipVerticalIcon from '~icons/icon-park-outline/flip-vertically'
@@ -33,6 +33,13 @@ import { EditorMediaContextControls } from '@/features/editor/contextual/EditorM
 import { EditorShapeLineContextControls } from '@/features/editor/contextual/EditorShapeLineContextControls'
 import { EditorTableContextControls } from '@/features/editor/contextual/EditorTableContextControls'
 import { EditorTextContextControls } from '@/features/editor/contextual/EditorTextContextControls'
+import {
+  contextualControlIcon,
+  contextualControlLabeled,
+  contextualControlTextColor,
+  contextualGhostSelect,
+  contextualToggleFlat,
+} from '@/features/editor/contextual/contextual-control-styles'
 import type {
   ContextualSelectionKind,
   ElementCapabilityKind,
@@ -164,27 +171,39 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
         {capabilities.canFill ? (
           <InspectorPopoverButton
             ariaLabel={t('foundation.editor.contextual.fill', { state: capabilities.values.fill === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
-            className="mona-contextual-control is-labeled"
+            className={contextualControlLabeled}
             content={<EditorColorPicker onChange={updateFill} value={fill} />}
           >
-            <span className="mona-contextual-color-dot" data-mixed={capabilities.values.fill === 'mixed' || undefined} style={{ backgroundColor: fill }} />
+            <span
+              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              data-mixed={capabilities.values.fill === 'mixed' || undefined}
+              style={capabilities.values.fill === 'mixed'
+                ? { background: 'linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%)', border: '1px solid #737780' }
+                : { backgroundColor: fill, border: '1px solid rgb(16 18 25 / 35%)' }}
+            />
             <span>{t('foundation.editor.contextual.fillLabel')}</span>
           </InspectorPopoverButton>
         ) : null}
         {capabilities.canStroke ? (
           <InspectorPopoverButton
             ariaLabel={t('foundation.editor.contextual.stroke', { state: capabilities.values.stroke === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
-            className="mona-contextual-control is-labeled"
+            className={contextualControlLabeled}
             content={<EditorColorPicker onChange={updateStroke} value={stroke} />}
           >
-            <span className="mona-contextual-stroke-dot" data-mixed={capabilities.values.stroke === 'mixed' || undefined} style={{ borderColor: stroke }} />
+            <span
+              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              data-mixed={capabilities.values.stroke === 'mixed' || undefined}
+              style={capabilities.values.stroke === 'mixed'
+                ? { background: 'linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%)', border: '3px solid #737780' }
+                : { background: 'var(--background)', border: `3px solid ${stroke}` }}
+            />
             <span>{t('foundation.editor.contextual.strokeLabel')}</span>
           </InspectorPopoverButton>
         ) : null}
         {capabilities.canTransparency ? (
           <InspectorPopoverButton
             ariaLabel={t('foundation.editor.contextual.transparency', { state: capabilities.values.transparency === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
-            className="mona-contextual-control is-labeled"
+            className={contextualControlLabeled}
             content={(
               <div className="mona-contextual-transparency-popover">
                 <span>{capabilities.values.transparency === 'mixed' ? t('foundation.editor.contextual.mixed') : `${transparency}%`}</span>
@@ -199,14 +218,14 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
           <>
             <Toggle
               aria-label={t('foundation.editor.shape.horizontalFlip')}
-              className="mona-contextual-control"
+              className={`${contextualControlIcon} ${contextualToggleFlat}`}
               data-mixed={capabilities.values.flipH === 'mixed' || undefined}
               onPressedChange={() => updateFlip('flipH')}
               pressed={capabilities.values.flipH === true}
             ><FlipHorizontalIcon /></Toggle>
             <Toggle
               aria-label={t('foundation.editor.shape.verticalFlip')}
-              className="mona-contextual-control"
+              className={`${contextualControlIcon} ${contextualToggleFlat}`}
               data-mixed={capabilities.values.flipV === 'mixed' || undefined}
               onPressedChange={() => updateFlip('flipV')}
               pressed={capabilities.values.flipV === true}
@@ -218,7 +237,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             <div className="mona-contextual-divider" />
             <InspectorSelect
               ariaLabel={t('foundation.editor.text.fontFamily')}
-              className="mona-contextual-font-select"
+              className={`${contextualGhostSelect} w-[110px] mr-px`}
               onChange={value => updateText({ command: 'fontname', value })}
               options={[
                 ...(capabilities.values.fontFamily === 'mixed'
@@ -231,11 +250,11 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
               searchLabel={t('foundation.editor.text.fontSearch')}
               value={capabilities.values.fontFamily === 'mixed' ? '__mixed__' : capabilities.values.fontFamily ?? ''}
             />
-            <Button aria-label={t('foundation.editor.text.decreaseFont')} className="mona-contextual-control" onClick={() => updateText({ command: 'fontsize-reduce', value: '2' })} size="editor-icon" title={t('foundation.editor.text.decreaseFont')} type="button" variant="ghost"><Type /><Minus /></Button>
-            <Button aria-label={t('foundation.editor.text.increaseFont')} className="mona-contextual-control" onClick={() => updateText({ command: 'fontsize-add', value: '2' })} size="editor-icon" title={t('foundation.editor.text.increaseFont')} type="button" variant="ghost"><Type /><Plus /></Button>
+            <Button aria-label={t('foundation.editor.text.decreaseFont')} className={contextualControlIcon} onClick={() => updateText({ command: 'fontsize-reduce', value: '2' })} size="editor-icon" title={t('foundation.editor.text.decreaseFont')} type="button" variant="ghost"><Type /><Minus /></Button>
+            <Button aria-label={t('foundation.editor.text.increaseFont')} className={contextualControlIcon} onClick={() => updateText({ command: 'fontsize-add', value: '2' })} size="editor-icon" title={t('foundation.editor.text.increaseFont')} type="button" variant="ghost"><Type /><Plus /></Button>
             <InspectorPopoverButton
               ariaLabel={t('foundation.editor.contextual.textColor', { state: capabilities.values.textColor === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
-              className="mona-contextual-control is-text-color"
+              className={contextualControlTextColor}
               content={<EditorColorPicker onChange={value => updateText({ command: 'color', value })} value={capabilities.values.textColor === 'mixed' ? '#171717' : capabilities.values.textColor ?? '#171717'} />}
             >
               <Type />
@@ -250,7 +269,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             ] as const).map(([command, CommandIcon, label]) => (
               <Button
                 aria-label={t(`foundation.editor.text.${label}`)}
-                className="mona-contextual-control"
+                className={contextualControlIcon}
                 key={command}
                 onClick={() => updateText({ command })}
                 size="editor-icon"
@@ -266,27 +285,63 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
   )
 }
 
-function EditorPageContextControls({ currentSlide, runtime }: Pick<
+// Compact aspect-ratio labels for the pill trigger; the dropdown still shows the
+// full descriptive names. Keys are the exact ratio values listed in ratioOptions.
+const VIEWPORT_RATIO_SHORT = new Map<number | string, string>([
+  [0.5625, '16:9'],
+  [0.625, '16:10'],
+  [0.75, '4:3'],
+  [0.70710678, 'A4 ↔'],
+  [1.41421356, 'A4 ↕'],
+])
+
+function EditorPageContextControls({ currentSlide, onOpenInspector, presentation, runtime }: Pick<
   ContextualControlRegistryContext,
-  'currentSlide' | 'runtime'
+  'currentSlide' | 'onOpenInspector' | 'presentation' | 'runtime'
 >) {
   const { t } = useTranslation()
   const background = currentSlide.background?.color || '#ffffff'
+  // Mirrors SlideDesignPanel's ratio list; 'custom' routes to the Design panel
+  // where the custom-size dialog lives (it applies deck-wide).
+  const ratioOptions = [
+    { label: t('designPanel.wide169'), value: 0.5625 },
+    { label: t('designPanel.wide1610'), value: 0.625 },
+    { label: t('designPanel.standard43'), value: 0.75 },
+    { label: t('designPanel.paperLandscape'), value: 0.70710678 },
+    { label: t('designPanel.paperPortrait'), value: 1.41421356 },
+    { label: t('common.custom'), value: 'custom' as const },
+  ]
+  const activeRatio = ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'
   return (
     <div className="mona-contextual-controls mona-contextual-slide-controls">
       <div className="mona-contextual-control-row">
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.contextual.pageBackground')}
-          className="mona-contextual-control is-labeled"
+          className={contextualControlLabeled}
           content={<EditorColorPicker onChange={color => runtime.commit('Update page background', [{
             type: 'slide.update',
             slideId: currentSlide.id,
             props: { background: { type: 'solid', color } },
           }], { historyKey: `page-background-${currentSlide.id}` })} value={background} />}
         >
-          <span className="mona-contextual-color-dot" style={{ backgroundColor: background }} />
+          <span
+            className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+            style={{ backgroundColor: background, border: '1px solid rgb(16 18 25 / 35%)' }}
+          />
           <span>{t('foundation.editor.contextual.background')}</span>
         </InspectorPopoverButton>
+        <div className="mona-contextual-divider" />
+        <InspectorSelect
+          ariaLabel={t('designPanel.customCanvas')}
+          className={`${contextualGhostSelect} w-[88px]`}
+          onChange={value => {
+            if (value === 'custom') onOpenInspector('slideDesign')
+            else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { historyKey: 'slide-design-viewport' })
+          }}
+          options={ratioOptions}
+          renderLabel={option => (option && VIEWPORT_RATIO_SHORT.get(option.value)) || t('common.custom')}
+          value={activeRatio}
+        />
       </div>
     </div>
   )
@@ -294,7 +349,7 @@ function EditorPageContextControls({ currentSlide, runtime }: Pick<
 
 const controlRegistry: Record<ContextualSelectionKind, (context: ContextualControlRegistryContext) => ReactNode> = {
   empty: () => null,
-  page: context => <EditorPageContextControls currentSlide={context.currentSlide} runtime={context.runtime} />,
+  page: context => <EditorPageContextControls currentSlide={context.currentSlide} onOpenInspector={context.onOpenInspector} presentation={context.presentation} runtime={context.runtime} />,
   group: context => <EditorMultiContextControls capabilities={context.capabilities} presentation={context.presentation} runtime={context.runtime} />,
   mixed: context => <EditorMultiContextControls capabilities={context.capabilities} presentation={context.presentation} runtime={context.runtime} />,
   'group-child': context => <GroupChildControls context={context} />,
@@ -321,7 +376,7 @@ export function ContextualDeepActions({
         <ContextAction icon={<SwatchBook />} onClick={() => onOpenInspector(multiple ? 'multiStyle' : 'elStyle')}>{t('foundation.editor.text.style')}</ContextAction>
       )}
       {capabilities.canAnimate ? (
-        <ContextAction icon={<Sparkles />} onClick={() => onOpenInspector(page ? 'slideAnimation' : 'elAnimation')}>{t(page ? 'foundation.editor.toolbar.transition' : 'foundation.editor.text.animation')}</ContextAction>
+        <ContextAction icon={page ? <BetweenHorizontalEnd /> : <Sparkles />} onClick={() => onOpenInspector(page ? 'slideAnimation' : 'elAnimation')}>{t(page ? 'foundation.editor.toolbar.transition' : 'foundation.editor.text.animation')}</ContextAction>
       ) : null}
       {capabilities.canPosition && !page ? (
         <ContextAction icon={<Move />} onClick={() => onOpenInspector(multiple ? 'multiPosition' : 'elPosition')}>{t('foundation.editor.text.position')}</ContextAction>

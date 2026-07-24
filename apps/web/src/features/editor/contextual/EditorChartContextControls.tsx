@@ -6,6 +6,7 @@ import type { PPTChartElement } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { contextualControlLabeled } from '@/features/editor/contextual/contextual-control-styles'
 import { CHART_TYPES } from '@/features/editor/editor-chart'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
@@ -27,9 +28,9 @@ export function EditorChartContextControls({
   return (
     <div className="mona-contextual-controls mona-contextual-chart-controls">
       <div className="mona-contextual-control-row">
-        <Button className="mona-contextual-control is-labeled" onClick={onEditData} variant="ghost"><EditIcon /><span>{t('foundation.editor.chartStyle.editData')}</span></Button>
+        <Button className={contextualControlLabeled} onClick={onEditData} variant="ghost"><EditIcon /><span>{t('foundation.editor.chartStyle.editData')}</span></Button>
         <Popover>
-          <PopoverTrigger asChild><Button className="mona-contextual-control is-labeled" variant="ghost"><ChartIcon /><span>{t('foundation.editor.chartStyle.type')}</span></Button></PopoverTrigger>
+          <PopoverTrigger asChild><Button className={contextualControlLabeled} variant="ghost"><ChartIcon /><span>{t('foundation.editor.chartStyle.type')}</span></Button></PopoverTrigger>
           <PopoverContent aria-label={t('foundation.editor.chartStyle.type')} align="center" className="mona-chart-type-menu is-contextual" sideOffset={8}>
             {CHART_TYPES.map(type => <Button key={type} onClick={() => changeType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button>)}
           </PopoverContent>

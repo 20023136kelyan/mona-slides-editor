@@ -27,9 +27,9 @@ supported. Known limitations remain visible in each baseline's `parserGaps`:
 - `corpus-04-chart-table.pptx` now imports and renders its native bar, line,
   and pie charts. Its package-absolute relationship targets are a regression
   fixture for the OPC resolver;
-- two actionable three-element groups survive in the synthetic group fixture,
-  but its third nested group level cannot be represented by Mona's single
-  `groupId` membership field;
+- the synthetic group fixture retains its native recursive group tree,
+  including the third nested level, without relying on Mona's legacy
+  single-level `groupId` membership adapter;
 - the real corporate fixture now preserves all five source groups as
   actionable Mona groups;
 - SmartArt in the real design fixture is not editable SmartArt after import,

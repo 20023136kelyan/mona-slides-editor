@@ -1,6 +1,7 @@
 import { preload } from 'react-dom'
 
-import type { PresentationState } from '@mona/presentation-core'
+import { flattenElementTree, type PresentationState } from '@mona/presentation-core'
+import type { PPTElement, StructuredTextBody } from '@mona/presentation-core/model'
 
 // Vite resolves every bundled deck font to its hashed production URL.
 const fontUrls = import.meta.glob('/src/assets/fonts/*.woff2', {
@@ -30,12 +31,50 @@ const urlByFamily = new Map([
  */
 export const preloadDeckFonts = (presentation: PresentationState) => {
   const families = new Set<string>()
-  if (presentation.theme.fontName) families.add(presentation.theme.fontName)
-  for (const slide of presentation.slides) {
-    for (const element of slide.elements) {
-      if (element.type === 'text' && element.defaultFontName) families.add(element.defaultFontName)
-      else if (element.type === 'shape' && element.text?.defaultFontName) families.add(element.text.defaultFontName)
+  const addFamily = (family: string | undefined) => {
+    if (family && !family.startsWith('+')) families.add(family)
+  }
+  const addStructuredFonts = (body: StructuredTextBody | undefined) => {
+    if (!body) return
+    const runProperties = [
+      ...body.listStyle.flatMap(style => style.paragraph?.defaultRun ? [style.paragraph.defaultRun] : []),
+      ...body.paragraphs.flatMap(paragraph => [
+        ...(paragraph.properties?.defaultRun ? [paragraph.properties.defaultRun] : []),
+        ...(paragraph.endProperties ? [paragraph.endProperties] : []),
+        ...paragraph.runs.flatMap(run => run.properties ? [run.properties] : []),
+      ]),
+    ]
+    for (const properties of runProperties) {
+      addFamily(properties.fontFamily)
+      addFamily(properties.eastAsianFontFamily)
+      addFamily(properties.complexScriptFontFamily)
     }
+  }
+  const addElementFonts = (elements: readonly PPTElement[]) => {
+    for (const element of flattenElementTree(elements)) {
+      if (element.type === 'text') {
+        addFamily(element.defaultFontName)
+        addStructuredFonts(element.structuredText)
+      }
+      else if (element.type === 'shape') {
+        addFamily(element.text?.defaultFontName)
+        addStructuredFonts(element.text?.structuredText)
+      }
+    }
+  }
+  if (presentation.theme.fontName) families.add(presentation.theme.fontName)
+  for (const slide of presentation.slides) addElementFonts(slide.elements)
+  for (const sourcePackage of presentation.sourcePackages ?? []) {
+    for (const theme of sourcePackage.hierarchy?.themes ?? []) {
+      for (const scheme of [theme.majorFont, theme.minorFont]) {
+        addFamily(scheme?.latin)
+        addFamily(scheme?.eastAsian)
+        addFamily(scheme?.complexScript)
+        for (const supplemental of scheme?.supplemental ?? []) addFamily(supplemental.typeface)
+      }
+    }
+    for (const layout of sourcePackage.hierarchy?.layouts ?? []) addElementFonts(layout.elements ?? [])
+    for (const master of sourcePackage.hierarchy?.masters ?? []) addElementFonts(master.elements ?? [])
   }
   for (const family of families) {
     const url = urlByFamily.get(family)

@@ -1,6 +1,19 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitive renders a div; the navigation landmark is applied explicitly. */
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, LayoutTemplate, PencilLine, Shapes, Type, Upload } from 'lucide-react'
+import {
+  BarChart3,
+  Briefcase,
+  ChevronRight,
+  Folder,
+  Image,
+  LayoutGrid,
+  LayoutTemplate,
+  PencilLine,
+  Shapes,
+  Sparkles,
+  Type,
+  Upload,
+} from 'lucide-react'
 
 import type { ComponentType } from 'react'
 
@@ -13,15 +26,27 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from '@/components/ui/sidebar'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
 import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
 import type { EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 
-// Persistent creation rail built on shadcn SidebarMenu /
-// SidebarMenuItem / SidebarMenuButton composition, the same inner row and the
-// same chevron-that-rotates-open indicator — only the data is ours (the editor
-// tools instead of the demo nav). `hasPanel` items open the extension panel.
+type RailItem = {
+  active: boolean
+  hasPanel: boolean
+  icon: ComponentType<{ className?: string }>
+  key: string
+  label: string
+  onClick: (trigger: HTMLElement) => void
+  onFocus?: () => void
+  onPointerEnter?: () => void
+  stub?: boolean
+}
+
+// Persistent creation rail built on shadcn SidebarMenu composition.
+// Wired items open task panels / drawing; stub items reserve Canva-like
+// categories for upcoming reorganization without opening surfaces yet.
 export function EditorRail({
   activePanel,
   activeTool,
@@ -56,21 +81,58 @@ export function EditorRail({
     onPanelChange('text', trigger)
     onCreateToolChange({ type: 'text', key: 'text', vertical: false })
   }
+  const stubClick = () => {}
 
-  const railItems: Array<{
-    active: boolean
-    hasPanel: boolean
-    icon: ComponentType<{ className?: string }>
-    key: string
-    label: string
-    onClick: (trigger: HTMLElement) => void
-  }> = [
-    { key: 'design', hasPanel: true, icon: LayoutTemplate, label: t('foundation.editor.rail.design'), active: activePanel === 'design', onClick: trigger => togglePanel('design', trigger) },
+  const primaryItems: RailItem[] = [
+    { key: 'templates', hasPanel: true, icon: LayoutTemplate, label: t('foundation.editor.rail.templates'), active: activePanel === 'design', onClick: trigger => togglePanel('design', trigger) },
     { key: 'elements', hasPanel: true, icon: Shapes, label: t('foundation.editor.rail.elements'), active: activePanel === 'elements' || activeTool?.type === 'shape' || activeTool?.type === 'line', onClick: trigger => togglePanel('elements', trigger) },
     { key: 'text', hasPanel: true, icon: Type, label: t('foundation.editor.rail.text'), active: activePanel === 'text' || activeTool?.type === 'text', onClick: toggleTextPanel },
+    { key: 'brand', hasPanel: false, stub: true, icon: Briefcase, label: t('foundation.editor.rail.brand'), active: false, onClick: stubClick },
     { key: 'uploads', hasPanel: true, icon: Upload, label: t('foundation.editor.rail.uploads'), active: activePanel === 'uploads', onClick: trigger => togglePanel('uploads', trigger) },
-    { key: 'draw', hasPanel: false, icon: PencilLine, label: t('foundation.editor.rail.draw'), active: drawingActive || customShapeActive, onClick: onToggleDrawing },
+    { key: 'tools', hasPanel: false, icon: PencilLine, label: t('foundation.editor.rail.toolsItem'), active: drawingActive || customShapeActive, onClick: onToggleDrawing, onFocus: prefetchDrawingWorkspace, onPointerEnter: prefetchDrawingWorkspace },
+    { key: 'projects', hasPanel: false, stub: true, icon: Folder, label: t('foundation.editor.rail.projects'), active: false, onClick: stubClick },
+    { key: 'apps', hasPanel: false, stub: true, icon: LayoutGrid, label: t('foundation.editor.rail.apps'), active: false, onClick: stubClick },
   ]
+
+  const mediaItems: RailItem[] = [
+    { key: 'magic-media', hasPanel: false, stub: true, icon: Sparkles, label: t('foundation.editor.rail.magicMedia'), active: false, onClick: stubClick },
+    { key: 'photos', hasPanel: true, icon: Image, label: t('foundation.editor.rail.photos'), active: activePanel === 'photos', onClick: trigger => togglePanel('photos', trigger) },
+    { key: 'charts', hasPanel: true, icon: BarChart3, label: t('foundation.editor.rail.charts'), active: activePanel === 'charts', onClick: trigger => togglePanel('charts', trigger) },
+  ]
+
+  const renderItem = (item: RailItem) => {
+    const Icon = item.icon
+    return (
+      <SidebarMenuItem key={item.key}>
+        <SidebarMenuButton
+          aria-label={item.label}
+          aria-pressed={item.active}
+          className={cn(
+            'h-10 w-full px-3 max-[1100px]:justify-center max-[1100px]:px-0',
+            item.stub && 'text-muted-foreground',
+          )}
+          data-task-panel-route={item.hasPanel ? (item.key === 'templates' ? 'design' : item.key) : undefined}
+          isActive={item.active}
+          onClick={event => item.onClick(event.currentTarget)}
+          onFocus={item.onFocus}
+          onPointerEnter={item.onPointerEnter}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-3 max-[1100px]:flex-none">
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="truncate max-[1100px]:hidden">{item.label}</span>
+          </div>
+          {item.hasPanel ? (
+            <ChevronRight
+              className={cn(
+                'ml-auto h-4 w-4 shrink-0 transition-transform max-[1100px]:hidden',
+                item.active && 'rotate-90',
+              )}
+            />
+          ) : null}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    )
+  }
 
   return (
     <Sidebar
@@ -84,38 +146,15 @@ export function EditorRail({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {railItems.map(item => {
-                const Icon = item.icon
-                const isActive = item.active
-
-                return (
-                  <SidebarMenuItem key={item.key}>
-                    <SidebarMenuButton
-                      aria-label={item.label}
-                      aria-pressed={isActive}
-                      className="h-10 w-full px-3 max-[1100px]:justify-center max-[1100px]:px-0"
-                      data-task-panel-route={item.hasPanel ? item.key : undefined}
-                      isActive={isActive}
-                      onClick={event => item.onClick(event.currentTarget)}
-                      onFocus={item.key === 'draw' ? prefetchDrawingWorkspace : undefined}
-                      onPointerEnter={item.key === 'draw' ? prefetchDrawingWorkspace : undefined}
-                    >
-                      <div className="flex min-w-0 flex-1 items-center gap-3 max-[1100px]:flex-none">
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate max-[1100px]:hidden">{item.label}</span>
-                      </div>
-                      {item.hasPanel ? (
-                        <ChevronRight
-                          className={cn(
-                            'ml-auto h-4 w-4 shrink-0 transition-transform max-[1100px]:hidden',
-                            isActive && 'rotate-90'
-                          )}
-                        />
-                      ) : null}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
+              {primaryItems.map(renderItem)}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarSeparator className="mx-3" />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mediaItems.map(renderItem)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Check,
   ChevronDown,
   CircleAlert,
   Download,
@@ -12,6 +11,7 @@ import {
   FileType2,
   Image,
   Languages,
+  Laptop,
   LoaderCircle,
   MessageSquare,
   MonitorPlay,
@@ -38,7 +38,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { ButtonGroup } from '@/components/ui/button-group'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +51,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { EditorHotkeyDrawer } from '@/features/editor/EditorHotkeyDrawer'
 import { InspectorSelect } from '@/features/editor/EditorInspectorPrimitives'
 import type { ExportDialogType } from '@/features/editor/EditorExportDialog'
@@ -65,7 +65,7 @@ import { LOCALES, isSupportedLocale, setLocale, type SupportedLocale } from '@/i
 import { LEGACY_NATIVE_FILE_EXTENSION } from '@/lib/legacy-compatibility'
 import { cn } from '@/lib/utils'
 
-type OpenPopover = 'file' | 'view' | 'tools' | 'screen' | 'save' | 'settings' | null
+type OpenPopover = 'file' | 'view' | 'tools' | 'screen' | 'settings' | null
 
 const EMPTY_PERSISTENCE_SNAPSHOT: DeckPersistenceSnapshot = {
   dirty: false,
@@ -77,7 +77,7 @@ const EMPTY_PERSISTENCE_SNAPSHOT: DeckPersistenceSnapshot = {
 const subscribeToNothing = () => () => {}
 const getEmptyPersistenceSnapshot = () => EMPTY_PERSISTENCE_SNAPSHOT
 
-const headerMenuItemClass = 'flex w-full min-w-[120px] items-center gap-2.5 whitespace-nowrap rounded-[var(--radius-control)] px-2 py-2 text-[13px] min-h-10 [&_svg]:size-[17px] [&_svg]:text-muted-foreground'
+const headerMenuItemClass = 'flex w-full min-w-[120px] items-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] px-2 py-1.5 text-xs min-h-8 [&_svg]:size-3.5 [&_svg]:text-muted-foreground'
 
 function HeaderMenuItem({
   disabled = false,
@@ -127,13 +127,13 @@ function HeaderMenu({
     <DropdownMenu onOpenChange={value => onOpenChange(menu, value)} open={open === menu}>
       <DropdownMenuTrigger asChild>
         <Button
-          className="mona-header-menu-trigger h-10 min-h-10 min-w-10 rounded-[var(--radius-action)] px-2.5 text-[13px] text-foreground hover:bg-foreground/[0.06] data-[state=open]:bg-foreground/[0.08] max-[1160px]:px-1.5 max-[680px]:px-1"
+          className="mona-header-menu-trigger h-7 min-h-7 min-w-7 rounded-[var(--radius-action)] px-2 text-xs font-medium text-foreground/80 hover:bg-foreground/[0.06] hover:text-foreground data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground max-[1160px]:px-1.5 max-[680px]:px-1"
           ref={triggerRef}
           size="editor"
           variant="ghost"
         >{label}</Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-60 rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={6}>
+      <DropdownMenuContent align="start" className="min-w-56 rounded-[var(--radius-overlay)] p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={6}>
         {children}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -318,15 +318,15 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
       <header aria-label={t('header.editorHeader')} role="banner">
       <div
         aria-label={t('header.menuBar')}
-        className="mona-editor-header relative grid h-14 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center border-b border-border bg-background px-3 text-foreground leading-normal select-none max-[1160px]:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] max-[1160px]:px-2 max-[900px]:grid-cols-[max-content_minmax(0,1fr)_max-content] max-[680px]:px-1"
+        className="mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center border-b border-border bg-background px-2.5 text-foreground leading-normal select-none max-[1160px]:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] max-[1160px]:px-2 max-[900px]:grid-cols-[max-content_minmax(0,1fr)_max-content] max-[680px]:px-1"
         onKeyDown={moveMenuFocus}
         ref={menuBarRef}
         role="menubar"
         tabIndex={-1}
       >
-        <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left m-0 flex min-w-0 items-center gap-1.5 border-0 p-0 justify-self-start max-[900px]:gap-0">
-          <div aria-label="Mona" className="mr-2.5 flex flex-none items-center gap-2 text-lg font-bold tracking-tight text-foreground max-[1160px]:mr-1.5 max-[680px]:hidden">
-            <img alt="" aria-hidden="true" className="size-5 flex-none" src="/favicon.svg" />
+        <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left m-0 flex min-w-0 items-center gap-1 border-0 p-0 justify-self-start max-[900px]:gap-0">
+          <div aria-label="Mona" className="mr-1.5 flex flex-none items-center gap-1.5 text-sm font-semibold tracking-tight text-foreground max-[1160px]:mr-1 max-[680px]:hidden">
+            <img alt="" aria-hidden="true" className="size-4 flex-none" src="/favicon.svg" />
             <span>Mona</span>
           </div>
           <nav aria-label={t('header.menuBar')} className="flex min-w-0 items-center gap-px">
@@ -345,7 +345,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
                   <Download />
                   <span className="relative top-px flex-1">{t('header.exportFile')}</span>
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="min-w-[210px] rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]">
+                <DropdownMenuSubContent className="min-w-[210px] rounded-[var(--radius-overlay)] p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]">
                   <HeaderMenuItem icon={<FileSliders />} label={t('header.exportPptx')} onSelect={() => requestExport('pptx')} />
                   <HeaderMenuItem icon={<FileType2 />} label={t('header.exportPdf')} onSelect={() => requestExport('pdf')} />
                   <HeaderMenuItem icon={<Image />} label={t('header.exportImage')} onSelect={() => requestExport('image')} />
@@ -371,39 +371,41 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
               }} />
             </HeaderMenu>
           </nav>
-          <div aria-hidden="true" className="mx-1.5 h-5 w-px flex-none bg-border max-[900px]:mx-0.5" />
-          <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 className="text-foreground/80" /></Button>
-          <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 className="text-foreground/80" /></Button>
-          {persistence ? <Popover onOpenChange={open => setMenuOpen('save', open)} open={openPopover === 'save'}>
-            <PopoverTrigger asChild>
-              <Button
-                aria-label={saveLabel}
-                className={cn(
-                  'h-10 min-w-10 gap-1.5 px-2 text-xs font-medium text-muted-foreground max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden',
-                  persistenceSnapshot.status === 'error' && 'text-destructive',
-                )}
-                size="sm"
-                variant="ghost"
-              >
-                {persistenceSnapshot.status === 'saving' ? <LoaderCircle className="size-3.5 animate-spin" /> : persistenceSnapshot.status === 'error' ? <CircleAlert className="size-3.5" /> : <Check className="size-3.5" />}
-                <span aria-live="polite">{saveLabel}</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent aria-label={saveLabel} align="start" className="w-[280px] rounded-[var(--radius-overlay)] p-3.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
-              <div className="text-sm font-bold text-foreground">{saveLabel}</div>
-              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{persistenceSnapshot.status === 'error' ? persistenceSnapshot.error : t('header.localSaveDescription')}</p>
-              {savedAt ? <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{t('header.lastSavedAt', { time: savedAt })}</p> : null}
-              {persistenceSnapshot.status === 'error' ? (
-                <Button className="mt-3" onClick={() => void persistence.retry()} size="sm" variant="outline">{t('header.retrySave')}</Button>
-              ) : null}
-            </PopoverContent>
-          </Popover> : null}
+          <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border max-[900px]:mx-0.5" />
+          <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 /></Button>
+          <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 /></Button>
+          {persistence ? (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    aria-label={saveLabel}
+                    className={cn(
+                      'inline-flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-action)] text-foreground/70 [&_svg]:size-3.5',
+                      persistenceSnapshot.status === 'error' && 'text-destructive',
+                      persistenceSnapshot.status === 'error' && 'hover:bg-foreground/[0.04]',
+                    )}
+                    onClick={persistenceSnapshot.status === 'error' ? () => void persistence.retry() : undefined}
+                    type="button"
+                  >
+                    {persistenceSnapshot.status === 'saving' ? <LoaderCircle className="animate-spin" /> : persistenceSnapshot.status === 'error' ? <CircleAlert /> : <Laptop />}
+                    <span aria-live="polite" className="sr-only">{saveLabel}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  {saveLabel}
+                  {persistenceSnapshot.status === 'error' ? ` — ${t('header.retrySave')}` : null}
+                  {savedAt && persistenceSnapshot.status !== 'error' && persistenceSnapshot.status !== 'saving' ? ` · ${t('header.lastSavedAt', { time: savedAt })}` : null}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
         </fieldset>
 
-        <div className="mona-editor-header-center w-full min-w-0 px-4 max-[900px]:px-1">
+        <div className="mona-editor-header-center pointer-events-none w-full min-w-0 px-3 max-[900px]:px-1">
           <Input
             aria-label={t('header.presentationTitle')}
-            className="mona-editor-header-title-input h-10 w-full rounded-[var(--radius-control)] border border-transparent bg-transparent px-3 text-center text-sm font-semibold text-foreground text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text placeholder:font-medium placeholder:text-muted-foreground placeholder:opacity-100"
+            className="mona-editor-header-title-input pointer-events-auto h-7 w-full rounded-[var(--radius-control)] border border-transparent bg-transparent px-2.5 text-center text-[11px]! font-normal text-foreground/80 text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text md:text-[11px]! placeholder:font-normal placeholder:text-muted-foreground placeholder:opacity-100"
             onBlur={commitTitle}
             onChange={event => setTitleValue(event.target.value)}
             onFocus={beginTitleEdit}
@@ -426,7 +428,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
           />
         </div>
 
-        <fieldset aria-label={t('header.presentationControls')} className="mona-editor-header-right m-0 flex min-w-0 items-center gap-1.5 border-0 p-0 justify-self-end max-[900px]:gap-0">
+        <fieldset aria-label={t('header.presentationControls')} className="mona-editor-header-right m-0 flex min-w-0 items-center gap-1 border-0 p-0 justify-self-end max-[900px]:gap-0">
           <Button
             aria-label={t('header.comments')}
             aria-pressed={taskPanelRoute === 'comments'}
@@ -434,22 +436,22 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
             size="header-icon"
             title={t('header.comments')}
             variant="header-pill"
-          ><MessageSquare className={cn('text-foreground/80', taskPanelRoute === 'comments' && 'text-[var(--editor-selection)]')} /></Button>
+          ><MessageSquare className={cn(taskPanelRoute === 'comments' && 'text-[var(--editor-selection)]')} /></Button>
           <DropdownMenu onOpenChange={open => setMenuOpen('screen', open)} open={openPopover === 'screen'}>
-            <ButtonGroup className="h-10 overflow-hidden rounded-[var(--radius-action)] bg-background shadow-[inset_0_0_0_1px_var(--border)] max-[900px]:mx-0.5">
+            <div className="flex h-7 overflow-hidden rounded-[var(--radius-action)] border border-border bg-background max-[900px]:mx-0.5" role="group">
               <Button
                 aria-label={t('header.startSlideshow')}
-                className="h-full gap-1.5 rounded-none px-3 text-[13px] font-semibold text-foreground/80 hover:bg-foreground/5 hover:text-foreground max-[900px]:px-2 max-[680px]:w-10 max-[680px]:px-0 max-[680px]:[&>span]:hidden [&_svg]:size-[15px]"
+                className="h-full gap-1 rounded-none border-0 bg-transparent px-2 text-xs font-medium text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground max-[900px]:px-1.5 max-[680px]:w-7 max-[680px]:px-0 max-[680px]:[&>span]:hidden [&_svg]:size-3.5"
                 onClick={() => requestScreen(false)}
                 size="sm"
                 title={t('header.startSlideshow')}
                 variant="ghost"
               ><MonitorPlay /><span>{t('header.present')}</span></Button>
               <DropdownMenuTrigger asChild>
-                <Button aria-label={t('header.slideshowOptions')} className="h-full w-10 rounded-none border-l border-border p-0 text-foreground/70 hover:bg-foreground/5 hover:text-foreground data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground [&_svg]:size-[15px]" size="sm" variant="ghost"><ChevronDown /></Button>
+                <Button aria-label={t('header.slideshowOptions')} className="h-full w-7 shrink-0 rounded-none border-y-0 border-r-0 border-l border-border bg-transparent p-0 text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-foreground [&_svg]:size-3.5" size="sm" variant="ghost"><ChevronDown /></Button>
               </DropdownMenuTrigger>
-            </ButtonGroup>
-            <DropdownMenuContent align="center" className="w-max rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
+            </div>
+            <DropdownMenuContent align="center" className="w-max rounded-[var(--radius-overlay)] p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromBeginning')} onSelect={() => requestScreen(true)} shortcut="F5" />
               <HeaderMenuItem icon={<MonitorPlay />} label={t('header.fromCurrentSlide')} onSelect={() => requestScreen(false)} shortcut="⇧F5" />
               <HeaderMenuItem icon={<PanelsTopLeft />} label={t('screen.presenterView')} onSelect={() => requestScreen(false, { viewMode: 'presenter' })} />
@@ -460,7 +462,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
             aria-expanded={agentOpen}
             aria-label={t('header.generateWithAI')}
             aria-pressed={agentOpen}
-            className="max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden"
+            className="max-[1160px]:w-7 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden"
             onClick={() => {
               if (agentOpen) closeAgent()
               else openAgent()
@@ -469,26 +471,26 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
             size="header-pill"
             title={t('header.generateWithAI')}
             variant="header-pill"
-          ><Sparkles className={cn(agentOpen && 'text-[var(--editor-selection)]')} /><span className="text-[13px] font-medium">{t('header.ai')}</span></Button>
+          ><Sparkles className={cn(agentOpen && 'text-[var(--editor-selection)]')} /><span>{t('header.ai')}</span></Button>
           <Button
             aria-label={t('header.export')}
-            className="h-10 min-w-10 gap-1.75 rounded-[var(--radius-action)] px-3.5 max-[1160px]:w-10 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden [&_svg]:size-4"
+            className="max-[1160px]:w-7 max-[1160px]:px-0 max-[1160px]:[&>span]:hidden"
             onClick={() => requestExport('pptx')}
-            size="sm"
+            size="header-pill"
             title={t('header.export')}
-            variant="default"
+            variant="header-pill"
           ><Download /><span>{t('header.export')}</span></Button>
           <Popover onOpenChange={open => setMenuOpen('settings', open)} open={openPopover === 'settings'}>
             <PopoverTrigger asChild>
-              <Button aria-label={t('header.settings')} size="header-icon" title={t('header.settings')} variant="header-pill"><Settings className="text-foreground/80" /></Button>
+              <Button aria-label={t('header.settings')} size="header-icon" title={t('header.settings')} variant="header-pill"><Settings /></Button>
             </PopoverTrigger>
-            <PopoverContent aria-label={t('header.settings')} align="end" className="w-[272px] rounded-[var(--radius-overlay)] p-1.5 text-[13px] shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
-              <div className="flex items-center gap-2 border-b border-border px-0.5 pt-0.5 pb-2.5 text-sm font-bold"><Settings className="size-4" /><span>{t('header.settings')}</span></div>
-              <div className="flex items-center gap-4 pt-3">
+            <PopoverContent aria-label={t('header.settings')} align="end" className="w-[272px] rounded-[var(--radius-overlay)] p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
+              <div className="flex items-center gap-2 border-b border-border px-0.5 pt-0.5 pb-2 text-sm font-semibold"><Settings className="size-3.5" /><span>{t('header.settings')}</span></div>
+              <div className="flex items-center gap-4 pt-2.5">
                 <span className="flex-1 text-muted-foreground">{t('locale.language')}</span>
                 <InspectorSelect
                   ariaLabel={t('locale.language')}
-                  className="h-[30px] w-[140px] flex-none border-transparent hover:bg-muted"
+                  className="h-7 w-[140px] flex-none border-transparent hover:bg-muted"
                   icon={<Languages />}
                   onChange={locale => {
                     if (isSupportedLocale(locale)) void setLocale(locale)

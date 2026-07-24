@@ -272,10 +272,10 @@ export function FoundationPage() {
             >
               <EditorDeck
                 banner={restoredBanner ? (
-                  <output className="mona-restore-banner">
+                  <output className="absolute bottom-[148px] left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2.5 rounded-[var(--radius-overlay)] border bg-popover py-1.5 pr-2.5 pl-3.5 text-sm text-foreground shadow-lg">
                     <span>{t('foundation.restoredWorkingCopy')}</span>
-                    <Button className="mona-restore-banner-action" onClick={startFresh} size="sm" type="button" variant="ghost">{t('foundation.startFresh')}</Button>
-                    <Button aria-label={t('common.close')} className="mona-restore-banner-close" onClick={() => setRestoredBanner(false)} size="icon-sm" type="button" variant="ghost">×</Button>
+                    <Button className="border-foreground hover:bg-foreground hover:text-background" onClick={startFresh} size="sm" type="button" variant="outline">{t('foundation.startFresh')}</Button>
+                    <Button aria-label={t('common.close')} className="text-base text-muted-foreground" onClick={() => setRestoredBanner(false)} size="icon-sm" type="button" variant="ghost">×</Button>
                   </output>
                 ) : null}
                 presentation={presentation}

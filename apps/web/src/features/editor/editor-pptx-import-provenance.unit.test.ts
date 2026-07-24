@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { NativeObjectIdentity } from '@mona/pptx-parser'
+import type { NativeObjectIdentity, StructuredTextBody } from '@mona/pptx-parser'
 
 import type {
   PowerPointPackageManifest,
@@ -50,7 +50,12 @@ const image = (order: number, ref: string, identity?: NativeObjectIdentity) => (
   ...(identity ? { native: identity } : {}),
 })
 
-const shape = (order: number, name: string, identity?: NativeObjectIdentity) => ({
+const shape = (
+  order: number,
+  name: string,
+  identity?: NativeObjectIdentity,
+  textBody?: StructuredTextBody,
+) => ({
   borderColor: '#000000',
   borderStrokeDasharray: '0',
   borderType: 'solid' as const,
@@ -73,6 +78,7 @@ const shape = (order: number, name: string, identity?: NativeObjectIdentity) => 
   vAlign: 'mid',
   width: 200,
   ...(identity ? { native: identity } : {}),
+  ...(textBody ? { textBody } : {}),
 })
 
 const theme: SlideTheme = {
@@ -482,5 +488,200 @@ describe('PowerPoint import provenance', () => {
       counts: { approximated: 2, dropped: 0, modeled: 0, opaque: 1 },
       status: 'complete-with-approximations',
     })
+  })
+
+  it('retains authored hierarchy backgrounds and compiles placeholder ancestry', () => {
+    const masterPart = 'ppt/slideMasters/slideMaster1.xml'
+    const layoutPart = 'ppt/slideLayouts/slideLayout1.xml'
+    const slidePart = 'ppt/slides/slide1.xml'
+    const masterIdentity = {
+      kind: 'shape' as const,
+      nativeId: '2',
+      partPath: masterPart,
+      placeholderIndex: '1',
+      placeholderType: 'title',
+      sourceIndex: 0,
+      stableId: 'pptx:source/ppt/slideMasters/slideMaster1.xml#2',
+    }
+    const layoutIdentity = {
+      kind: 'shape' as const,
+      nativeId: '3',
+      partPath: layoutPart,
+      placeholderIndex: '1',
+      placeholderType: 'title',
+      sourceIndex: 0,
+      stableId: 'pptx:source/ppt/slideLayouts/slideLayout1.xml#3',
+    }
+    const slideIdentity = {
+      kind: 'shape' as const,
+      nativeId: '4',
+      partPath: slidePart,
+      placeholderIndex: '1',
+      placeholderType: 'title',
+      sourceIndex: 0,
+      stableId: 'pptx:source/ppt/slides/slide1.xml#4',
+    }
+    const placeholderNative = (
+      identity: typeof masterIdentity | typeof layoutIdentity | typeof slideIdentity,
+    ): NativeObjectIdentity => ({
+      ...native(identity.nativeId, identity.partPath, 'shape'),
+      placeholderIndex: identity.placeholderIndex,
+      placeholderType: identity.placeholderType,
+    })
+    const textBody = (
+      label: string,
+      properties: StructuredTextBody['paragraphs'][number]['properties'] = {},
+    ): StructuredTextBody => ({
+      bodyProperties: { autoFit: { fontScale: 85, type: 'normal' } },
+      listStyle: [],
+      paragraphs: [{
+        level: 0,
+        properties,
+        runs: [{
+          kind: 'text',
+          properties: { fontFamily: '+mj-lt', fontSize: 24 },
+          sourceId: 'p0.r0',
+          text: label,
+        }],
+        sourceId: 'p0',
+      }],
+      scale: 1,
+      schemaVersion: 1,
+    })
+    const hierarchyPackage: PowerPointPackageReference = {
+      ...sourcePackage,
+      hierarchy: {
+        layouts: [{
+          id: 'layout-1',
+          masterId: 'master-1',
+          objectIds: [layoutIdentity.stableId],
+          packageId: sourcePackage.packageId,
+          partPath: layoutPart,
+          preserve: false,
+          showMasterPlaceholderAnimations: true,
+          showMasterShapes: true,
+        }],
+        masters: [{
+          id: 'master-1',
+          layoutIds: ['layout-1'],
+          objectIds: [masterIdentity.stableId],
+          packageId: sourcePackage.packageId,
+          partPath: masterPart,
+          preserve: false,
+        }],
+        placeholders: [
+          {
+            index: '1',
+            layer: 'master',
+            objectId: masterIdentity.stableId,
+            partId: 'master-1',
+            partPath: masterPart,
+            textStyleKind: 'title',
+            type: 'title',
+          },
+          {
+            index: '1',
+            layer: 'layout',
+            objectId: layoutIdentity.stableId,
+            partId: 'layout-1',
+            partPath: layoutPart,
+            textStyleKind: 'title',
+            type: 'title',
+          },
+          {
+            index: '1',
+            layer: 'slide',
+            objectId: slideIdentity.stableId,
+            partId: 'slide-1',
+            partPath: slidePart,
+            textStyleKind: 'title',
+            type: 'title',
+          },
+        ],
+        themes: [],
+      },
+    }
+    const parsed: ParsedPptxPresentation = {
+      size: { height: 540, width: 960 },
+      slides: [{
+        backgrounds: {
+          effective: { type: 'color', value: '#223344' },
+          layout: { type: 'color', value: '#223344' },
+          master: { type: 'color', value: '#112233' },
+          source: 'layout',
+        },
+        elements: [shape(
+          1,
+          'Slide title',
+          placeholderNative(slideIdentity),
+          textBody('Slide title', { alignment: 'ctr' }),
+        )],
+        fill: { type: 'color', value: '#223344' },
+        layoutElements: [shape(
+          1,
+          'Layout title',
+          placeholderNative(layoutIdentity),
+          textBody('Layout title', { marginLeft: 12 }),
+        )],
+        masterElements: [shape(
+          1,
+          'Master title',
+          placeholderNative(masterIdentity),
+          textBody('Master title', { lineSpacing: { unit: 'percent', value: 110 } }),
+        )],
+        note: '',
+      }],
+      themeColors: [],
+      usedFonts: [],
+    }
+
+    const conversion = convertParsedPptxPresentation({
+      coordinateLabel: index => String(index),
+      parsed,
+      ratio: 1,
+      sourceManifest: {
+        ...sourceManifest,
+        objects: [masterIdentity, layoutIdentity, slideIdentity],
+      },
+      sourcePackage: hierarchyPackage,
+      theme,
+    })
+
+    expect(conversion.slides[0]?.source?.backgroundSource).toBe('layout')
+    expect(conversion.slides[0]?.elements[0]?.source).toMatchObject({
+      placeholderLayoutObjectId: layoutIdentity.stableId,
+      placeholderMasterObjectId: masterIdentity.stableId,
+    })
+    const slideShape = conversion.slides[0]?.elements[0]
+    expect(slideShape?.type === 'shape' ? slideShape.text?.structuredText : undefined).toMatchObject({
+      bodyProperties: { autoFit: { fontScale: 85, type: 'normal' } },
+      paragraphs: [{
+        runs: [{
+          sourceId: `${slideIdentity.stableId}/text/p0/r0`,
+          text: 'Slide title',
+        }],
+        sourceId: `${slideIdentity.stableId}/text/p0`,
+      }],
+      scale: 1,
+      schemaVersion: 1,
+    })
+    expect(conversion.sourcePackage?.hierarchy?.layouts[0]).toMatchObject({
+      background: { color: '#223344', type: 'solid' },
+      elements: [expect.objectContaining({ source: expect.objectContaining({ sourceObjectId: layoutIdentity.stableId }) })],
+    })
+    expect(conversion.sourcePackage?.hierarchy?.masters[0]).toMatchObject({
+      background: { color: '#112233', type: 'solid' },
+      elements: [expect.objectContaining({ source: expect.objectContaining({ sourceObjectId: masterIdentity.stableId }) })],
+    })
+    expect(conversion.sourcePackage?.hierarchy?.placeholders).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        elementId: expect.any(String),
+        objectId: layoutIdentity.stableId,
+      }),
+      expect.objectContaining({
+        elementId: expect.any(String),
+        objectId: masterIdentity.stableId,
+      }),
+    ]))
   })
 })

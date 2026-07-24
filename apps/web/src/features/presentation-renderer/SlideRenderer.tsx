@@ -1,6 +1,10 @@
 import { useMemo } from 'react'
 
-import { resolveSlideRenderGraph, type PowerPointPackageReference } from '@mona/presentation-core'
+import {
+  compileSlideTheme,
+  resolveSlideRenderState,
+  type PowerPointPackageReference,
+} from '@mona/presentation-core'
 import type { PPTElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
@@ -38,9 +42,13 @@ export function SlideRenderer({
   viewportRatio,
   viewportSize,
 }: SlideRendererProps) {
-  const renderGraph = useMemo(
-    () => resolveSlideRenderGraph(slide, sourcePackages),
+  const renderState = useMemo(
+    () => resolveSlideRenderState(slide, sourcePackages),
     [slide, sourcePackages],
+  )
+  const effectiveTheme = useMemo(
+    () => compileSlideTheme(theme, renderState.theme, renderState.master, renderState.layout, slide),
+    [renderState.layout, renderState.master, renderState.theme, slide, theme],
   )
   return (
     <div
@@ -48,12 +56,12 @@ export function SlideRenderer({
       className="mona-slide-renderer"
       data-slide-id={slide.id}
       style={{
-        ...getSlideBackgroundStyle(slide.background),
+        ...getSlideBackgroundStyle(renderState.background),
         width: viewportSize,
         height: viewportSize * viewportRatio,
       }}
     >
-      {renderGraph.map(node => {
+      {renderState.nodes.map(node => {
         const editable = node.layer === 'slide'
         return (
           <div
@@ -70,7 +78,7 @@ export function SlideRenderer({
               shapeEditor={editable ? shapeEditor : undefined}
               tableEditor={editable ? tableEditor : undefined}
               textEditor={editable ? textEditor : undefined}
-              theme={theme}
+              theme={effectiveTheme}
               thumbnail={thumbnail}
             />
           </div>

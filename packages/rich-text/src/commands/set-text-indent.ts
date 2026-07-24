@@ -16,7 +16,11 @@ const setNodeIndentMarkup = (
   if (!node) return tr
   const indent = Math.min(8, Math.max(0, (Number(node.attrs[indentKey]) || 0) + delta))
   if (indent === node.attrs[indentKey]) return tr
-  return tr.setNodeMarkup(pos, node.type, { ...node.attrs, [indentKey]: indent }, node.marks)
+  return tr.setNodeMarkup(pos, node.type, {
+    ...node.attrs,
+    [indentKey]: indent,
+    ...(indentKey === 'indent' ? { paddingLeft: '' } : { textIndentCss: '' }),
+  }, node.marks)
 }
 
 const setIndent = (

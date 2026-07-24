@@ -39,6 +39,8 @@ export function TextElement({ editor, element, thumbnail = false }: TextElementP
     letterSpacing: `${element.wordSpace || 0}px`,
     color: element.defaultColor,
     fontFamily: element.defaultFontName,
+    columnCount: element.columns,
+    columnGap: element.columnGap,
     writingMode: element.vertical ? 'vertical-rl' : 'horizontal-tb',
     padding: `${inset[0]}px ${inset[1]}px ${inset[2]}px ${inset[3]}px`,
     display: element.fixedHeight ? 'flex' : undefined,

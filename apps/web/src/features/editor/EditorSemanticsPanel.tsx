@@ -57,18 +57,18 @@ export function EditorSemanticsPanel({ runtime }: { runtime: EditorRuntime }) {
   ] : []
 
   return (
-    <div className="mona-markup-panel is-embedded">
-      <div className="mona-markup-container">
-        <div className="mona-markup-row">
-          <div>{t('foundation.editor.markup.currentSlide')}</div>
-          <InspectorSelect ariaLabel={t('foundation.editor.markup.currentSlide')} className="mona-markup-select" onChange={updateSlide} options={slideTypeOptions} value={slide.type ?? ''} />
+    <div className="min-h-[140px] h-full select-none text-xs">
+      <div className="flex h-full flex-col">
+        <div className="flex w-full items-center">
+          <div className="w-2/5">{t('foundation.editor.markup.currentSlide')}</div>
+          <InspectorSelect ariaLabel={t('foundation.editor.markup.currentSlide')} className="w-3/5" onChange={updateSlide} options={slideTypeOptions} value={slide.type ?? ''} />
         </div>
         {semanticKind ? (
-          <div className="mona-markup-row">
-            <div>{t(`foundation.editor.markup.${semanticKind === 'image' ? 'currentImage' : 'currentText'}`)}</div>
-            <InspectorSelect ariaLabel={t(`foundation.editor.markup.${semanticKind === 'image' ? 'currentImage' : 'currentText'}`)} className="mona-markup-select" onChange={updateElement} options={semanticOptions} value={semanticValue} />
+          <div className="mt-[5px] flex w-full items-center">
+            <div className="w-2/5">{t(`foundation.editor.markup.${semanticKind === 'image' ? 'currentImage' : 'currentText'}`)}</div>
+            <InspectorSelect ariaLabel={t(`foundation.editor.markup.${semanticKind === 'image' ? 'currentImage' : 'currentText'}`)} className="w-3/5" onChange={updateElement} options={semanticOptions} value={semanticValue} />
           </div>
-        ) : <div className="mona-markup-placeholder">{t('foundation.editor.markup.placeholder')}</div>}
+        ) : <div className="mt-[5px] h-[30px] rounded-[var(--radius-control)] border border-dashed border-input text-center italic leading-[30px] text-muted-foreground">{t('foundation.editor.markup.placeholder')}</div>}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 
-import type { PPTElement, Slide, TableCell } from '@mona/presentation-core/model'
+import type { PPTElement, Slide, StructuredTextBody, TableCell } from '@mona/presentation-core/model'
 import type { PowerPointPackageReference } from '@mona/presentation-core'
 
 // Deck content from outside this session (imported files, foreign clipboard
@@ -65,6 +65,26 @@ const sanitizeTableData = (data: TableCell[][]): Patch<TableCell[][]> => {
   return { changed, value: changed ? rows : data }
 }
 
+const sanitizeStructuredText = (
+  body: StructuredTextBody | undefined,
+): StructuredTextBody | undefined => {
+  if (!body) return body
+  let changed = false
+  const paragraphs = body.paragraphs.map(paragraph => {
+    let paragraphChanged = false
+    const runs = paragraph.runs.map(run => {
+      if (!run.hyperlink) return run
+      const hyperlink = sanitizeNavigationUrl(run.hyperlink)
+      if (hyperlink === run.hyperlink) return run
+      changed = true
+      paragraphChanged = true
+      return { ...run, hyperlink: hyperlink || undefined }
+    })
+    return paragraphChanged ? { ...paragraph, runs } : paragraph
+  })
+  return changed ? { ...body, paragraphs } : body
+}
+
 export const sanitizeElement = (element: PPTElement): PPTElement => {
   const diff: Record<string, unknown> = {}
 
@@ -79,10 +99,19 @@ export const sanitizeElement = (element: PPTElement): PPTElement => {
   if (element.type === 'text' && typeof element.content === 'string') {
     const content = patchString(element.content, sanitizeRichHtml)
     if (content.changed) diff.content = content.value
+    const structuredText = sanitizeStructuredText(element.structuredText)
+    if (structuredText !== element.structuredText) diff.structuredText = structuredText
   }
   if (element.type === 'shape' && typeof element.text?.content === 'string') {
     const content = patchString(element.text.content, sanitizeRichHtml)
-    if (content.changed) diff.text = { ...element.text, content: content.value }
+    const structuredText = sanitizeStructuredText(element.text.structuredText)
+    if (content.changed || structuredText !== element.text.structuredText) {
+      diff.text = {
+        ...element.text,
+        content: content.value,
+        structuredText,
+      }
+    }
   }
   if (element.type === 'table' && Array.isArray(element.data)) {
     const data = sanitizeTableData(element.data)
@@ -137,10 +166,22 @@ export const sanitizePowerPointPackageReference = (
   })
   const layouts = sanitizeLayers(hierarchy.layouts)
   const masters = sanitizeLayers(hierarchy.masters)
+  const placeholders = hierarchy.placeholders.map(placeholder => {
+    if (placeholder.layer) return placeholder
+    changed = true
+    return {
+      ...placeholder,
+      layer: placeholder.partPath.includes('/slideLayouts/')
+        ? 'layout' as const
+        : placeholder.partPath.includes('/slideMasters/')
+          ? 'master' as const
+          : 'slide' as const,
+    }
+  })
   if (!changed) return sourcePackage
   return {
     ...sourcePackage,
-    hierarchy: { ...hierarchy, layouts, masters },
+    hierarchy: { ...hierarchy, layouts, masters, placeholders },
   }
 }
 

@@ -61,15 +61,55 @@ for (const fixture of fixtures) {
         const source = slide.source
         const layout = hierarchy?.layouts.find(candidate => candidate.partPath === source?.layoutPart)
         const master = hierarchy?.masters.find(candidate => candidate.partPath === source?.masterPart)
+        const fieldTypes = new Set(['dt', 'ftr', 'hdr', 'sldNum'])
+        const key = (element: (typeof slide.elements)[number]) => {
+          if (element.source?.placeholderType && fieldTypes.has(element.source.placeholderType)) {
+            return `type:${element.source.placeholderType}`
+          }
+          if (element.source?.placeholderIndex !== undefined) return `index:${element.source.placeholderIndex}`
+          const type = element.source?.placeholderType === 'ctrTitle' ? 'title' : element.source?.placeholderType
+          return type ? `type:${type}` : undefined
+        }
+        const policy = master?.headerFooter ?? {
+          dateTime: true,
+          footer: true,
+          header: true,
+          slideNumber: true,
+        }
+        const enabledField = (element: (typeof slide.elements)[number]) => {
+          switch (element.source?.placeholderType) {
+            case 'dt': return policy.dateTime
+            case 'ftr': return policy.footer
+            case 'hdr': return policy.header
+            case 'sldNum': return policy.slideNumber
+            default: return false
+          }
+        }
+        const localKeys = new Set(slide.elements.map(key).filter(Boolean))
+        const layoutFields = (layout?.elements ?? []).filter(element => (
+          Boolean(element.source?.placeholderType && fieldTypes.has(element.source.placeholderType))
+          && enabledField(element)
+        ))
+        const layoutFieldKeys = new Set(layoutFields.map(key).filter(Boolean))
         const renderableMaster = source?.showMasterShapes === false || layout?.showMasterShapes === false
           ? []
           : (master?.elements ?? []).filter(element => (
-              element.source?.placeholderIndex === undefined
-              && element.source?.placeholderType === undefined
+              (element.source?.placeholderIndex === undefined && element.source?.placeholderType === undefined)
+              || (
+                !layout
+                && Boolean(element.source?.placeholderType && fieldTypes.has(element.source.placeholderType))
+                && enabledField(element)
+                && !localKeys.has(key(element))
+                && !layoutFieldKeys.has(key(element))
+              )
             ))
         const renderableLayout = (layout?.elements ?? []).filter(element => (
-          element.source?.placeholderIndex === undefined
-          && element.source?.placeholderType === undefined
+          (element.source?.placeholderIndex === undefined && element.source?.placeholderType === undefined)
+          || (
+            Boolean(element.source?.placeholderType && fieldTypes.has(element.source.placeholderType))
+            && enabledField(element)
+            && !localKeys.has(key(element))
+          )
         ))
         return { count: renderableMaster.length + renderableLayout.length, index }
       }).filter(item => item.count > 0)
@@ -79,16 +119,43 @@ for (const fixture of fixtures) {
         images: slide.elements.filter(element => element.type === 'image').length,
         index,
         local: slide.elements.length,
+        structuredRuns: slide.elements.reduce((count, element) => {
+          const body = element.type === 'text'
+            ? element.structuredText
+            : element.type === 'shape'
+              ? element.text?.structuredText
+              : undefined
+          return count + (body?.paragraphs.reduce((sum, paragraph) => sum + paragraph.runs.length, 0) ?? 0)
+        }, 0),
+        structuredText: slide.elements.filter(element => (
+          (element.type === 'text' && Boolean(element.structuredText?.paragraphs.length))
+          || (element.type === 'shape' && Boolean(element.text?.structuredText?.paragraphs.length))
+        )).length,
         tables: slide.elements.filter(element => element.type === 'table').length,
       }))
       return {
         capabilitySlides,
         counts: report?.counts,
         hierarchy: {
+          authoredBackgrounds: (hierarchy?.layouts.filter(layout => layout.background).length ?? 0)
+            + (hierarchy?.masters.filter(master => master.background).length ?? 0),
+          headerFooterPolicies: hierarchy?.masters.filter(master => master.headerFooter).length ?? 0,
           layouts: hierarchy?.layouts.length ?? 0,
           masters: hierarchy?.masters.length ?? 0,
+          placeholderElements: hierarchy?.placeholders.filter(placeholder => placeholder.elementId).length ?? 0,
+          styledMasters: hierarchy?.masters.filter(master => (
+            master.textStyles?.title.length
+            || master.textStyles?.body.length
+            || master.textStyles?.other.length
+          )).length ?? 0,
           themes: hierarchy?.themes.length ?? 0,
         },
+        linkedPlaceholders: presentation.slides.reduce((count, slide) => (
+          count + slide.elements.filter(element => (
+            element.source?.placeholderLayoutObjectId
+            || element.source?.placeholderMasterObjectId
+          )).length
+        ), 0),
         sharedArt,
       }
     })
@@ -97,6 +164,15 @@ for (const fixture of fixtures) {
     expect(fidelity.hierarchy.layouts).toBeGreaterThan(0)
     expect(fidelity.hierarchy.masters).toBeGreaterThan(0)
     expect(fidelity.hierarchy.themes).toBeGreaterThan(0)
+    if (fixture.file === 'real-03-nasa-sewp-corporate.pptx') {
+      expect(fidelity.hierarchy.authoredBackgrounds).toBeGreaterThan(0)
+      expect(fidelity.hierarchy.headerFooterPolicies).toBeGreaterThan(0)
+      expect(fidelity.hierarchy.placeholderElements).toBeGreaterThan(0)
+      expect(fidelity.hierarchy.styledMasters).toBeGreaterThan(0)
+      expect(fidelity.linkedPlaceholders).toBeGreaterThan(0)
+      expect(fidelity.capabilitySlides.some(slide => slide.structuredText > 0)).toBe(true)
+      expect(fidelity.capabilitySlides.some(slide => slide.structuredRuns > 0)).toBe(true)
+    }
 
     const showSlide = async (index: number) => {
       await page.getByRole('button', { name: `Show slide ${index + 1}`, exact: true }).click()
@@ -144,8 +220,68 @@ for (const fixture of fixtures) {
       )).toHaveCount(sharedArt.count)
     }
 
+    const structuredTextSlide = fidelity.capabilitySlides.find(item => item.structuredRuns > 0)
+    if (structuredTextSlide) {
+      await showSlide(structuredTextSlide.index)
+      const structuredRun = page.locator('.mona-editor-slide-canvas [data-ppt-run-id]').first()
+      await expect(page.locator('.mona-editor-slide-canvas [data-ppt-paragraph-id]').first()).toBeVisible()
+      await expect(structuredRun).toBeVisible()
+
+      if (fixture.file === 'real-03-nasa-sewp-corporate.pptx') {
+        const elementId = await structuredRun.evaluate(run => (
+          run.closest<HTMLElement>('[data-element-id]')?.dataset.elementId
+        ))
+        expect(elementId).toBeTruthy()
+        const original = await page.evaluate(id => {
+          const presentation = window.__MONA_TEST__!.getState().presentation
+          const element = presentation.slides[presentation.slideIndex]!.elements.find(candidate => candidate.id === id)!
+          return {
+            content: element.type === 'text' ? element.content : element.type === 'shape' ? element.text?.content : undefined,
+            structured: element.type === 'text'
+              ? Boolean(element.structuredText)
+              : element.type === 'shape'
+                ? Boolean(element.text?.structuredText)
+                : false,
+          }
+        }, elementId)
+        expect(original.structured).toBe(true)
+
+        const editor = page.locator(`[data-element-id="${elementId}"] .ProseMirror`)
+        await editor.click()
+        await editor.press('End')
+        await editor.type('MonaEditProbe')
+        await expect.poll(() => page.evaluate(id => {
+          const presentation = window.__MONA_TEST__!.getState().presentation
+          const element = presentation.slides[presentation.slideIndex]!.elements.find(candidate => candidate.id === id)!
+          return {
+            content: element.type === 'text' ? element.content : element.type === 'shape' ? element.text?.content : undefined,
+            structured: element.type === 'text'
+              ? Boolean(element.structuredText)
+              : element.type === 'shape'
+                ? Boolean(element.text?.structuredText)
+                : false,
+          }
+        }, elementId)).toMatchObject({ content: expect.stringContaining('MonaEditProbe'), structured: false })
+
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z')
+        await expect.poll(() => page.evaluate(id => {
+          const presentation = window.__MONA_TEST__!.getState().presentation
+          const element = presentation.slides[presentation.slideIndex]!.elements.find(candidate => candidate.id === id)!
+          return {
+            content: element.type === 'text' ? element.content : element.type === 'shape' ? element.text?.content : undefined,
+            structured: element.type === 'text'
+              ? Boolean(element.structuredText)
+              : element.type === 'shape'
+                ? Boolean(element.text?.structuredText)
+                : false,
+          }
+        }, elementId)).toEqual(original)
+      }
+    }
+
     const inspectionSlide = fidelity.capabilitySlides.find(item => item.charts > 0)
       ?? fidelity.capabilitySlides.find(item => item.grouped > 0)
+      ?? structuredTextSlide
       ?? fidelity.capabilitySlides[sharedArt?.index ?? 0]
     await showSlide(inspectionSlide!.index)
     await testInfo.attach(`${fixture.file}-representative-slide`, {

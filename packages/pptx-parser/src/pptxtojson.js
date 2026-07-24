@@ -1,12 +1,13 @@
 import JSZip from 'jszip'
 import { readXmlFile } from './readXmlFile'
 import { getBorder } from './border'
-import { getSlideBackgroundFill, getShapeFill, getSolidFill, getPicFill, getPicFillOpacity, getPicFilters, getImageData, getVideoData, getAudioData } from './fill'
+import { getSlideBackgroundFills, getShapeFill, getSolidFill, getPicFill, getPicFillOpacity, getPicFilters, getImageData, getVideoData, getAudioData } from './fill'
 import { getChartInfo, getChartMetadata } from './chart'
 import { getVerticalAlign, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
 import { getPosition, getSize } from './position'
 import { genTextBody, getTextNodeValue } from './text'
+import { getStructuredTextBody } from './structuredText'
 import { getCustomShapePath, identifyShape, isStrokeOnlyCustomGeometry } from './shape'
 import { extractFileExtension, getTextByPathList, angleToDegrees, isVideoLink, escapeHtml, hasValidText, numberToFixed, resolvePackageTarget } from './utils'
 import { getShadow } from './shadow'
@@ -398,7 +399,7 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
     },
   }
   const { layoutElements, masterElements } = await getHierarchyElements(warpObj)
-  const fill = await getSlideBackgroundFill(warpObj)
+  const backgrounds = await getSlideBackgroundFills(warpObj)
 
   const elements = []
   for (const nodeKey in nodes) {
@@ -416,7 +417,8 @@ async function processSingleSlide(zip, sldFileName, themeContent, defaultTextSty
   const transition = parseTransition(transitionNode)
 
   return {
-    fill,
+    backgrounds,
+    fill: backgrounds.effective,
     elements,
     hidden: getTextByPathList(slideContent, ['p:sld', 'attrs', 'show']) === '0',
     layoutElements,
@@ -935,7 +937,11 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   else txtRotate = rotate
 
   let content = ''
-  if (node['p:txBody']) content = genTextBody(node['p:txBody'], node, slideLayoutSpNode, slideMasterSpNode, type, warpObj)
+  let textBody
+  if (node['p:txBody']) {
+    content = genTextBody(node['p:txBody'], node, slideLayoutSpNode, slideMasterSpNode, type, warpObj)
+    textBody = getStructuredTextBody(node['p:txBody'], warpObj)
+  }
 
   const { borderColor, borderWidth, borderType, strokeDasharray, headEnd, tailEnd } = getBorder(node, type, warpObj)
   const fill = await getShapeFill(node, warpObj, source, {
@@ -974,6 +980,7 @@ async function genShape(node, slideLayoutSpNode, slideMasterSpNode, name, type, 
   }
 
   if (shadow) data.shadow = shadow
+  if (textBody) data.textBody = textBody
   if (autoFit) data.autoFit = autoFit
   if (link) data.link = link
   if (textInset) data.textInset = textInset

@@ -1,10 +1,12 @@
 import { createContext, useContext } from 'react'
 
 export type EditorTaskPanelRoute =
+  | 'charts'
   | 'comments'
   | 'design'
   | 'elements'
   | 'layers'
+  | 'photos'
   | 'properties'
   | 'search'
   | 'semantics'

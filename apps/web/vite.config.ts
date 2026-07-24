@@ -15,6 +15,8 @@ const excludeDevelopmentFixtures = () => ({
   },
 })
 
+import { monaImageSearchApi } from './src/features/editor/mona-image-search-api'
+
 // https://vite.dev/config/
 export default defineConfig({
   publicDir: fileURLToPath(new URL('../../public', import.meta.url)),
@@ -32,6 +34,7 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     excludeDevelopmentFixtures(),
+    monaImageSearchApi(),
   ],
   resolve: {
     alias: {

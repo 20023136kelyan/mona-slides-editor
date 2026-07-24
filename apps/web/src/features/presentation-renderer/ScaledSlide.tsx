@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { resolveSlideRenderGraph, type PowerPointPackageReference } from '@mona/presentation-core'
+import {
+  compileSlideTheme,
+  resolveSlideRenderState,
+  type PowerPointPackageReference,
+} from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { ElementRenderer } from '@/features/presentation-renderer/ElementRenderer'
@@ -49,9 +53,13 @@ export function ScaledSlide({
   }, [fixedScale, viewportRatio, viewportSize])
 
   const scale = fixedScale || responsiveScale
-  const renderGraph = useMemo(
-    () => resolveSlideRenderGraph(slide, sourcePackages),
+  const renderState = useMemo(
+    () => resolveSlideRenderState(slide, sourcePackages),
     [slide, sourcePackages],
+  )
+  const effectiveTheme = useMemo(
+    () => compileSlideTheme(theme, renderState.theme, renderState.master, renderState.layout, slide),
+    [renderState.layout, renderState.master, renderState.theme, slide, theme],
   )
   const frameStyle = fixedWidth
     ? { width: fixedWidth, height: fixedWidth * viewportRatio }
@@ -73,10 +81,10 @@ export function ScaledSlide({
         >
           {thumbnail ? (
             <>
-              <div className="mona-scaled-slide-background" style={getSlideBackgroundStyle(slide.background)} />
-              {renderGraph.map(node => (
+              <div className="mona-scaled-slide-background" style={getSlideBackgroundStyle(renderState.background)} />
+              {renderState.nodes.map(node => (
                 <div className="mona-rendered-element" data-pptx-layer={node.layer} key={node.element.id} style={{ zIndex: node.zIndex }}>
-                  <ElementRenderer element={node.element} theme={theme} thumbnail />
+                  <ElementRenderer element={node.element} theme={effectiveTheme} thumbnail />
                 </div>
               ))}
             </>

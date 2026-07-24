@@ -159,7 +159,7 @@ test('keeps the editor drawer closed until the user requests a task or contextua
 
   expect(document.querySelector('.mona-editor-drawer')).toBeNull()
 
-  await page.getByTestId('mona-editor-surface').getByRole('button', { name: 'Design' }).click()
+  await page.getByTestId('mona-editor-surface').getByRole('button', { name: 'Templates' }).click()
   expect(document.querySelector('.mona-editor-drawer')).not.toBeNull()
   await expect.element(page.getByText('Background fill')).toBeVisible()
 
@@ -170,7 +170,7 @@ test('keeps the editor drawer closed until the user requests a task or contextua
 
 test('toggles creation panels from the persistent rail', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
-  const design = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Design' })
+  const design = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Templates' })
 
   await design.click()
   expect(document.querySelector('.mona-editor-drawer')).not.toBeNull()
@@ -245,7 +245,7 @@ test('renames layers with F2 and restores focus on cancel and commit', async () 
 test('does not reopen a dismissed creation panel when the canvas selection later clears', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
 
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Design' }).click()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Templates' }).click()
   await page.getByRole('button', { name: 'Select shape shape-1' }).click()
   expect(document.querySelector('.mona-editor-drawer')).toBeNull()
 
@@ -347,7 +347,7 @@ test('records local comments in complete history and exposes undo immediately', 
 test('filters template catalogs in place instead of exposing a decorative search control', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={templatePresentation} /></div>)
 
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Design' }).click()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Templates' }).click()
   const search = page.getByRole('searchbox', { name: 'Describe your ideal design' })
   await expect.element(page.getByRole('button', { name: 'Crimson Landscape' })).toBeVisible()
   await expect.element(page.getByRole('button', { name: 'Urban Blue' })).toBeVisible()
@@ -360,56 +360,50 @@ test('filters template catalogs in place instead of exposing a decorative search
   await expect.element(page.getByText('No templates match your search.')).toBeVisible()
 })
 
-test('keeps online image search inside Uploads with nested back navigation', async () => {
+test('keeps the uploads record funnel inside the panel without modals', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
-  await page.getByRole('button', { name: 'Online images' }).click()
+  await expect.element(page.getByRole('button', { name: 'Upload files' })).toBeVisible()
+  await page.getByRole('button', { name: 'Record yourself' }).click()
 
-  await expect.element(page.getByRole('heading', { name: 'Image library (from pexels.com)' })).toBeVisible()
-  const imageLibrary = document.querySelector<HTMLElement>('.mona-image-library-panel')!
-  expect(imageLibrary.closest('.mona-editor-drawer')).not.toBeNull()
-  expect(getComputedStyle(imageLibrary).position).not.toBe('fixed')
+  await expect.element(page.getByRole('button', { name: 'Record a talking head' })).toBeVisible()
+  expect(document.querySelector('.mona-uploads-panel')?.closest('.mona-editor-drawer')).not.toBeNull()
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
 
   await page.getByRole('button', { name: 'Back to uploads' }).click()
-  expect(Array.from(document.querySelectorAll('.mona-drawer-action')).some(action => action.textContent?.includes('Upload image'))).toBe(true)
-  expect(document.querySelector('.mona-image-library-panel')).toBeNull()
+  await expect.element(page.getByRole('button', { name: 'Upload files' })).toBeVisible()
 })
 
-test('inserts URL media as an undoable native element from Uploads', async () => {
+test('inserts library media as an undoable native element from Uploads', async () => {
   const runtime = createEditorRuntime(presentation)
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} runtime={runtime} /></div>)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
-  await page.getByRole('textbox', { name: 'Enter a video URL, e.g. https://example.com/video.mp4' })
-    .fill('https://example.com/mona-proof.mp4')
-  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+  const input = document.querySelector<HTMLInputElement>('.mona-uploads-file-input')!
+  const pngBytes = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+    char => char.charCodeAt(0),
+  )
+  const file = new File([pngBytes], 'deck-hero.png', { type: 'image/png' })
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+  input.dispatchEvent(new Event('change', { bubbles: true }))
 
+  await expect.element(page.getByRole('button', { name: 'Insert deck-hero.png' })).toBeVisible()
+  await page.getByRole('button', { name: 'Insert deck-hero.png' }).click()
+
+  await expect.poll(() => runtime.store.getState().presentation.slides[0]!.elements.at(-1)?.type).toBe('image')
   expect(runtime.store.getState().presentation.slides[0]!.elements.at(-1)).toMatchObject({
-    type: 'video',
-    src: 'https://example.com/mona-proof.mp4',
-    autoplay: false,
+    type: 'image',
+    src: expect.stringMatching(/^data:image\/png;base64,/),
   })
   expect(runtime.undo()).toBe(true)
   expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
-
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
-  await page.getByRole('radio', { name: 'Audio' }).click()
-  await page.getByRole('textbox', { name: 'Enter an audio URL, e.g. https://example.com/audio.mp3' })
-    .fill('https://example.com/mona-proof.mp3')
-  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
-
-  expect(runtime.store.getState().presentation.slides[0]!.elements.at(-1)).toMatchObject({
-    type: 'audio',
-    src: 'https://example.com/mona-proof.mp3',
-    autoplay: false,
-    loop: false,
-  })
 })
 
 test('restores focus to the invoking control when a task panel closes', async () => {
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
-  const design = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Design' })
+  const design = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Templates' })
 
   await design.click()
   await page.getByRole('button', { name: 'Collapse panel' }).click()

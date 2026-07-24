@@ -22,7 +22,7 @@ const buttonVariants = cva(
         editor:
           'border-border bg-background text-foreground hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground',
         'header-pill':
-          'border-border bg-background text-foreground hover:bg-foreground/5 aria-pressed:bg-foreground/[0.08] aria-pressed:border-foreground/14 aria-expanded:bg-foreground/[0.08]',
+          'border-border bg-background text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground aria-pressed:bg-foreground/[0.06] aria-pressed:text-foreground aria-expanded:bg-foreground/[0.06] aria-expanded:text-foreground',
       },
       size: {
         default:
@@ -39,9 +39,9 @@ const buttonVariants = cva(
         editor: 'h-8 gap-1.5 rounded-[var(--radius-control)] px-2.5 text-[13px]',
         'editor-icon': 'size-8 rounded-[var(--radius-control)]',
         'header-pill':
-          'h-10 min-w-10 gap-1.5 rounded-[var(--radius-action)] px-2.5 text-[13px] font-medium [&_svg:not([class*=\'size-\'])]:size-[17px]',
+          'h-7 min-w-7 gap-1 rounded-[var(--radius-action)] px-2 text-xs font-medium [&_svg:not([class*=\'size-\'])]:size-3.5',
         'header-icon':
-          'size-10 rounded-[var(--radius-action)] [&_svg:not([class*=\'size-\'])]:size-[17px]',
+          'size-7 rounded-[var(--radius-action)] [&_svg:not([class*=\'size-\'])]:size-3.5',
       },
     },
     defaultVariants: {

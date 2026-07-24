@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { applyPresentationCommand } from './commands'
+import { resolveSlideRenderState } from './render-graph'
 import type { PresentationState } from './state'
 import type { PowerPointPackageReference } from './source'
 
@@ -123,5 +124,69 @@ describe('PowerPoint source package state', () => {
       revision: 1,
     })
     expect(result.state.sourcePackages?.[0]?.dirty?.parts).toHaveLength(2)
+  })
+
+  it('turns a background edit into a slide-local override instead of leaving inherited rendering active', () => {
+    const importedPackage: PowerPointPackageReference = {
+      ...sourcePackage,
+      hierarchy: {
+        layouts: [],
+        masters: [{
+          background: { color: '#112233', type: 'solid' },
+          id: 'master-1',
+          layoutIds: [],
+          objectIds: [],
+          packageId: sourcePackage.packageId,
+          partPath: sourcePackage.slides[0]!.masterPart!,
+          preserve: false,
+        }],
+        placeholders: [],
+        themes: [],
+      },
+    }
+    const initial: PresentationState = {
+      ...presentation(),
+      slides: [{
+        background: { color: '#112233', type: 'solid' },
+        elements: [],
+        id: 'slide-1',
+        source: {
+          ...sourcePackage.slides[0]!,
+          backgroundSource: 'master',
+          kind: 'pptx',
+          packageId: sourcePackage.packageId,
+        },
+      }],
+      sourcePackages: [importedPackage],
+    }
+
+    const result = applyPresentationCommand(initial, {
+      props: { background: { color: '#abcdef', type: 'solid' } },
+      type: 'slide.update',
+    })
+    const slide = result.state.slides[0]!
+
+    expect(slide.source?.backgroundSource).toBe('slide')
+    expect(result.state.sourcePackages?.[0]?.dirty?.parts).toContainEqual(expect.objectContaining({
+      partPath: 'ppt/slides/slide1.xml',
+      reasons: ['slide.update'],
+    }))
+    expect(resolveSlideRenderState(slide, result.state.sourcePackages).background).toEqual({
+      color: '#abcdef',
+      type: 'solid',
+    })
+
+    const replaced = applyPresentationCommand(initial, {
+      slides: [{
+        ...initial.slides[0]!,
+        background: { color: '#fedcba', type: 'solid' },
+      }],
+      type: 'presentation.slides.replace',
+    })
+    expect(replaced.state.slides[0]!.source?.backgroundSource).toBe('slide')
+    expect(replaced.state.sourcePackages?.[0]?.dirty?.parts).toContainEqual(expect.objectContaining({
+      partPath: 'ppt/slides/slide1.xml',
+      reasons: ['presentation.slides.replace'],
+    }))
   })
 })

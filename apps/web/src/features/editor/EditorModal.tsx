@@ -30,14 +30,13 @@ export function EditorModal({
     }} open={open}>
       <DialogContent
         aria-describedby={undefined}
-        className="mona-source-modal-content"
+        className="gap-0 overflow-hidden p-5 sm:max-w-none"
         onEscapeKeyDown={event => {
           if (!closeOnEsc) event.preventDefault()
         }}
         onPointerDownOutside={event => {
           if (!closeOnClickMask) event.preventDefault()
         }}
-        overlayClassName="mona-source-modal-mask"
         showCloseButton={false}
         style={{ width }}
       >

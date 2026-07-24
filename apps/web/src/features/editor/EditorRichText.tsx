@@ -29,6 +29,13 @@ const hostText = (element: RichTextHostElement, fallbackColor: string, fallbackF
     defaultFontName: element.text?.defaultFontName || fallbackFontName,
   }
 
+const withoutStructuredText = (text: PPTShapeElement['text']): PPTShapeElement['text'] => {
+  if (!text) return text
+  const detached = { ...text }
+  delete detached.structuredText
+  return detached
+}
+
 export function EditorRichText({
   element,
   fallbackColor,
@@ -77,7 +84,22 @@ export function EditorRichText({
   useLayoutEffect(() => {
     const mount = mountRef.current
     if (!mount) return undefined
+    const stateAtMount = readLatest().runtime.store.getState()
+    const slideAtMount = stateAtMount.presentation.slides[stateAtMount.presentation.slideIndex]
+    const liveElementAtMount = slideAtMount?.elements.find(candidate => candidate.id === readLatest().element.id)
+    const authoredBaseline = liveElementAtMount?.type === 'text' && liveElementAtMount.structuredText
+      ? {
+          content: liveElementAtMount.content,
+          structuredText: liveElementAtMount.structuredText,
+        }
+      : liveElementAtMount?.type === 'shape' && liveElementAtMount.text?.structuredText
+        ? {
+            content: liveElementAtMount.text.content,
+            structuredText: liveElementAtMount.text.structuredText,
+          }
+        : undefined
     let pendingInput: { historyKey?: string; ignoreHistory: boolean } | null = null
+    let structuredBaselineDom: string | null = null
     // Serialized-DOM baseline since mount/last commit. The keydown scheduler
     // also arms on no-op keys (a lone Shift before a multi-select click), and
     // ProseMirror re-serializes unchanged content differently from the stored
@@ -96,16 +118,32 @@ export function EditorRichText({
       if (!liveElement || (liveElement.type !== 'text' && liveElement.type !== 'shape')) return
       const value = view.dom.innerHTML
       const currentText = hostText(liveElement, current.fallbackColor, current.fallbackFontName)
-      if (normalizedEditorHtml(currentText.content) === normalizedEditorHtml(value)) return
+      const restoreAuthoredBaseline = Boolean(
+        authoredBaseline
+        && structuredBaselineDom !== null
+        && normalizedEditorHtml(value) === normalizedEditorHtml(structuredBaselineDom),
+      )
+      if (
+        normalizedEditorHtml(currentText.content) === normalizedEditorHtml(value)
+        && !restoreAuthoredBaseline
+      ) return
       const props = liveElement.type === 'text'
-        ? { content: value }
+        ? restoreAuthoredBaseline
+          ? {
+              content: authoredBaseline!.content,
+              structuredText: authoredBaseline!.structuredText,
+            }
+          : { content: value }
         : {
           text: {
             align: 'middle' as const,
             defaultFontName: current.fallbackFontName,
             defaultColor: current.fallbackColor,
-            ...liveElement.text,
-            content: value,
+            ...withoutStructuredText(liveElement.text),
+            content: restoreAuthoredBaseline ? authoredBaseline!.content : value,
+            ...(restoreAuthoredBaseline
+              ? { structuredText: authoredBaseline!.structuredText }
+              : {}),
           },
         }
       const changed = current.runtime.commit('Edit text', [{
@@ -205,6 +243,7 @@ export function EditorRichText({
       },
     })
     editorRef.current = view
+    structuredBaselineDom = view.dom.innerHTML
     const unregister = readLatest().runtime.richText.register(
       readLatest().element.id,
       {

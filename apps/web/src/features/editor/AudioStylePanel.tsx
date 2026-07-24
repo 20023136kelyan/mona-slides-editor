@@ -19,15 +19,15 @@ export function AudioStylePanel({ element, runtime }: { element: PPTAudioElement
           <InspectorColorButton ariaLabel={t('foundation.editor.media.iconColor')} color={element.color} onChange={color => update({ color })} />
         </div>
       </div>
-      <div className="mona-panel-row mona-media-switch-row">
+      <div className="flex h-8 w-full items-center">
         <div className="w-[48%] text-xs">{t('foundation.editor.media.autoplay')}</div>
-        <div className="mona-panel-row-control mona-panel-switch-wrapper">
+        <div className="w-[52%] text-right">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.autoplay')} checked={element.autoplay} onChange={autoplay => update({ autoplay })} />
         </div>
       </div>
-      <div className="mona-panel-row mona-media-switch-row">
+      <div className="flex h-8 w-full items-center">
         <div className="w-[48%] text-xs">{t('foundation.editor.media.loop')}</div>
-        <div className="mona-panel-row-control mona-panel-switch-wrapper">
+        <div className="w-[52%] text-right">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.loop')} checked={element.loop} onChange={loop => update({ loop })} />
         </div>
       </div>

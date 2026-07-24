@@ -3,7 +3,24 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import Sortable from 'sortablejs'
-import { Clock3, EyeOff, Sparkles } from 'lucide-react'
+import {
+  BetweenHorizontalEnd,
+  ClipboardPaste,
+  Clock3,
+  Copy,
+  CopyPlus,
+  EyeOff,
+  FilePlus2,
+  FolderMinus,
+  FolderPlus,
+  FolderX,
+  MonitorPlay,
+  Pencil,
+  Scissors,
+  SquareDashedMousePointer,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 
 import PlusIcon from '~icons/icon-park-outline/plus'
 import { editorActions } from '@mona/editor-state'
@@ -11,6 +28,14 @@ import type { PowerPointPackageReference } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -21,6 +46,7 @@ interface ThumbnailMenuItem {
   action?: string
   disabled?: boolean
   divider?: boolean
+  icon?: LucideIcon
   label?: string
   shortcut?: string
 }
@@ -37,78 +63,35 @@ function ThumbnailContextMenu({ menu, onAction, onDismiss }: {
   onAction: (action: string) => void
   onDismiss: () => void
 }) {
-  const menuRef = useRef<HTMLUListElement>(null)
-  const menuHeight = menu.items.filter(item => !item.divider).length * 30 + menu.items.filter(item => item.divider).length * 11 + 10
-  const left = document.body.clientWidth <= menu.x + 180 ? menu.x - 180 : menu.x
-  const top = document.body.clientHeight <= menu.y + menuHeight ? menu.y - menuHeight : menu.y
-  useEffect(() => {
-    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
-  }, [])
-  const handleMenuKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
-    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])
-    const current = items.indexOf(document.activeElement as HTMLButtonElement)
-    let target = current
-    if (event.key === 'ArrowDown') target = current < items.length - 1 ? current + 1 : 0
-    else if (event.key === 'ArrowUp') target = current > 0 ? current - 1 : items.length - 1
-    else if (event.key === 'Home') target = 0
-    else if (event.key === 'End') target = items.length - 1
-    else if (event.key === 'Escape') {
-      event.preventDefault()
-      onDismiss()
-      return
-    }
-    else return
-    event.preventDefault()
-    items[target]?.focus()
-  }
-  return createPortal((
-    <>
-      <div
-        className="mona-editor-context-menu-mask"
-        onContextMenu={event => {
-          event.preventDefault(); event.stopPropagation(); onDismiss()
-        }}
-        onMouseDown={event => {
-          if (event.button === 0) onDismiss()
-        }}
-        onPointerDown={event => event.stopPropagation()}
-      />
-      <div
-        className="mona-editor-context-menu mona-thumbnail-context-menu"
-        onContextMenu={event => {
-          event.preventDefault(); event.stopPropagation()
-        }}
-        onPointerDown={event => event.stopPropagation()}
-        style={{ left, top }}
-      >
-        <ul aria-label={menu.label} className="mona-context-menu-content" onKeyDown={handleMenuKeyDown} ref={menuRef} role="menu">
-          {menu.items.map((item, index) => item.divider ? (
-            <li className="mona-context-menu-entry is-divider" key={`divider-${index}`} role="separator" />
-          ) : (
-            <li key={item.action} role="none">
-              <Button
-                className={`mona-context-menu-entry${item.disabled ? ' is-disabled' : ''}`}
-                data-action={item.action}
-                disabled={item.disabled}
-                onClick={event => {
-                  event.stopPropagation()
-                  if (item.action) onAction(item.action)
-                }}
-                role="menuitem"
-                type="button"
-                variant="ghost"
-              >
-                <span className="mona-context-menu-item-content">
-                  <span className="mona-context-menu-label">{item.label}</span>
-                  {item.shortcut ? <span className="mona-context-menu-shortcut">{item.shortcut}</span> : null}
-                </span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
-  ), document.body)
+  // Portal to <body>: the filmstrip's frosted bottom bar uses backdrop-filter,
+  // which makes the fixed anchor span resolve against the bar instead of the
+  // viewport and flings the menu off-screen. Rendering at the document root
+  // restores viewport-relative fixed positioning at the cursor.
+  return createPortal(
+    <DropdownMenu onOpenChange={open => {
+      if (!open) onDismiss()
+    }} open>
+      <DropdownMenuTrigger asChild>
+        <span aria-hidden="true" className="pointer-events-none fixed" style={{ left: menu.x, top: menu.y }} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent aria-label={menu.label} align="start" className="w-auto min-w-52" onContextMenu={event => event.preventDefault()} side="bottom" sideOffset={0}>
+        {menu.items.map((item, index) => {
+          if (item.divider) return <DropdownMenuSeparator key={`divider-${index}`} />
+          const Icon = item.icon
+          return (
+            <DropdownMenuItem className="gap-2.5 py-1.5" disabled={item.disabled} key={item.action} onSelect={() => {
+              if (item.action) onAction(item.action)
+            }}>
+              {Icon ? <Icon className="size-5" /> : null}
+              {item.label}
+              {item.shortcut ? <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut> : null}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>,
+    document.body,
+  )
 }
 
 // Only the expensive miniature render trails canvas edits at background
@@ -361,32 +344,32 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
     }
     if (kind === 'section') {
       setMenu({ ...common, items: [
-        { action: `section-remove:${sectionId}`, label: t('foundation.editor.thumbnails.deleteSection') },
-        { action: `section-delete:${sectionId}`, label: t('foundation.editor.thumbnails.deleteSectionAndSlides') },
-        { action: 'section-remove-all', label: t('foundation.editor.thumbnails.deleteAllSections') },
-        { action: `section-rename:${sectionId}`, label: t('foundation.editor.thumbnails.renameSection') },
+        { action: `section-remove:${sectionId}`, icon: FolderMinus, label: t('foundation.editor.thumbnails.deleteSection') },
+        { action: `section-delete:${sectionId}`, icon: FolderX, label: t('foundation.editor.thumbnails.deleteSectionAndSlides') },
+        { action: 'section-remove-all', icon: Trash2, label: t('foundation.editor.thumbnails.deleteAllSections') },
+        { action: `section-rename:${sectionId}`, icon: Pencil, label: t('foundation.editor.thumbnails.renameSection') },
       ] })
       return
     }
     const base = [
-      { action: 'paste', label: t('foundation.editor.action.paste'), shortcut: 'Ctrl + V' },
-      { action: 'select-all', label: t('foundation.editor.action.selectAll'), shortcut: 'Ctrl + A' },
-      { action: 'new-slide', label: t('foundation.editor.thumbnails.newSlide'), shortcut: 'Enter' },
+      { action: 'paste', icon: ClipboardPaste, label: t('foundation.editor.action.paste'), shortcut: 'Ctrl + V' },
+      { action: 'select-all', icon: SquareDashedMousePointer, label: t('foundation.editor.action.selectAll'), shortcut: 'Ctrl + A' },
+      { action: 'new-slide', icon: FilePlus2, label: t('foundation.editor.thumbnails.newSlide'), shortcut: 'Enter' },
     ]
     setMenu({ ...common, items: kind === 'rail' ? [
       ...base,
-      { action: 'slideshow-start', label: t('foundation.editor.thumbnails.slideshow'), shortcut: 'F5' },
+      { action: 'slideshow-start', icon: MonitorPlay, label: t('foundation.editor.thumbnails.slideshow'), shortcut: 'F5' },
     ] : [
-      { action: 'cut', label: t('foundation.editor.action.cut'), shortcut: 'Ctrl + X' },
-      { action: 'copy', label: t('foundation.editor.action.copy'), shortcut: 'Ctrl + C' },
+      { action: 'cut', icon: Scissors, label: t('foundation.editor.action.cut'), shortcut: 'Ctrl + X' },
+      { action: 'copy', icon: Copy, label: t('foundation.editor.action.copy'), shortcut: 'Ctrl + C' },
       ...base.slice(0, 2),
       { divider: true },
       ...base.slice(2),
-      { action: 'duplicate', label: t('foundation.editor.thumbnails.duplicateSlide'), shortcut: 'Ctrl + D' },
-      { action: 'delete', label: t('foundation.editor.thumbnails.deleteSlide'), shortcut: 'Delete' },
-      { action: 'section-create', disabled: !!presentation.slides[presentation.slideIndex]?.sectionTag, label: t('foundation.editor.thumbnails.addSection') },
+      { action: 'duplicate', icon: CopyPlus, label: t('foundation.editor.thumbnails.duplicateSlide'), shortcut: 'Ctrl + D' },
+      { action: 'delete', icon: Trash2, label: t('foundation.editor.thumbnails.deleteSlide'), shortcut: 'Delete' },
+      { action: 'section-create', icon: FolderPlus, disabled: !!presentation.slides[presentation.slideIndex]?.sectionTag, label: t('foundation.editor.thumbnails.addSection') },
       { divider: true },
-      { action: 'slideshow-current', label: t('foundation.editor.thumbnails.fromCurrent'), shortcut: 'Shift + F5' },
+      { action: 'slideshow-current', icon: MonitorPlay, label: t('foundation.editor.thumbnails.fromCurrent'), shortcut: 'Shift + F5' },
     ] })
   }
 
@@ -645,8 +628,8 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                   >{slide.notes.length}</Button>
                 ) : null}
               </div>
-              <div className="mona-page-boundary-actions">
-                {index < presentation.slides.length - 1 ? (
+              {index < presentation.slides.length - 1 ? (
+                <div className="mona-page-boundary-actions" role="group">
                   <Button
                     aria-label={t('foundation.editor.statusBar.transitionBoundary', { from: index + 1, to: index + 2 })}
                     onClick={event => {
@@ -657,21 +640,21 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                     title={t('foundation.editor.statusBar.transition')}
                     type="button"
                     variant="ghost"
-                  ><Sparkles /></Button>
-                ) : null}
-                <Button
-                  aria-label={t('foundation.editor.statusBar.insertAfter', { number: index + 1 })}
-                  onClick={event => {
-                    event.stopPropagation()
-                    runtime.focusSlide(index)
-                    runtime.createSlide()
-                  }}
-                  size="icon-xs"
-                  title={t('foundation.editor.thumbnails.addSlide')}
-                  type="button"
-                  variant="ghost"
-                ><PlusIcon /></Button>
-              </div>
+                  ><BetweenHorizontalEnd /></Button>
+                  <Button
+                    aria-label={t('foundation.editor.statusBar.insertAfter', { number: index + 1 })}
+                    onClick={event => {
+                      event.stopPropagation()
+                      runtime.focusSlide(index)
+                      runtime.createSlide()
+                    }}
+                    size="icon-xs"
+                    title={t('foundation.editor.thumbnails.addSlide')}
+                    type="button"
+                    variant="ghost"
+                  ><PlusIcon /></Button>
+                </div>
+              ) : null}
             </div>
           )
         })}

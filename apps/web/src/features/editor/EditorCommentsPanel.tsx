@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { cn } from '@/lib/utils'
 
 export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
   const { t } = useTranslation()
@@ -33,7 +34,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
       setReplyNoteId('')
     })
     return () => {
-      active = false 
+      active = false
     }
   }, [presentation.slideIndex])
 
@@ -88,33 +89,33 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
   }
 
   return (
-    <div className="mona-notes-panel is-embedded">
-      <div className="mona-notes-container">
-        <div className="mona-notes-list" ref={notesRef}>
+    <div className="h-full min-h-[420px] text-xs select-none">
+      <div className="flex h-full flex-col">
+        <div className="mx-[-10px] flex-1 space-y-2.5 overflow-auto px-3 py-0.5" ref={notesRef}>
           {notes.map(note => (
             <div
-              className={`mona-note${activeNoteId === note.id ? ' is-active' : ''}`}
+              className={cn('group/note rounded-lg border p-2.5', activeNoteId === note.id && 'bg-muted')}
               data-note-id={note.id}
               key={note.id}
             >
-              <div className="mona-note-header">
+              <div className="mb-2 flex items-start justify-between">
                 <Button
                   aria-label={`${note.user}: ${note.content}`}
                   aria-pressed={activeNoteId === note.id}
-                  className="mona-note-select"
+                  className="h-auto justify-start p-0 font-normal hover:bg-transparent"
                   onClick={() => selectNote(note)}
                   type="button"
                   variant="ghost"
                 >
-                  <div className="mona-note-avatar"><UserIcon /></div>
-                  <div><div className="mona-note-username">{note.user}</div><div className="mona-note-time">{new Date(note.time).toLocaleString()}</div></div>
+                  <div className="mr-2.5 flex size-[30px] items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
+                  <div><div className="text-sm">{note.user}</div><div className="text-xs text-muted-foreground">{new Date(note.time).toLocaleString()}</div></div>
                 </Button>
-                <div className="mona-note-actions">
-                  <Button onClick={event => {
+                <div className="flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100">
+                  <Button className="h-7 px-1.5 text-xs hover:text-foreground hover:underline" onClick={event => {
                     event.stopPropagation()
                     setReplyNoteId(note.id)
                   }} size="xs" type="button" variant="ghost">{t('foundation.editor.notes.reply')}</Button>
-                  <Button onClick={event => {
+                  <Button className="h-7 px-1.5 text-xs hover:text-foreground hover:underline" onClick={event => {
                     event.stopPropagation()
                     setNotes(notes.filter(item => item.id !== note.id))
                   }} size="xs" type="button" variant="ghost">{t('foundation.editor.action.delete')}</Button>
@@ -123,38 +124,38 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
               <Button
                 aria-label={`${note.user}: ${note.content}`}
                 aria-pressed={activeNoteId === note.id}
-                className="mona-note-content mona-note-select-content"
+                className="block h-auto w-full justify-start p-0 text-left font-normal whitespace-normal hover:bg-transparent"
                 onClick={() => selectNote(note)}
                 type="button"
                 variant="ghost"
               >{note.content}</Button>
               {note.replies?.length ? (
-                <div className="mona-note-replies">
+                <div className="mt-[15px] ml-5">
                   {note.replies.map(reply => (
-                    <div className="mona-note-reply-item" key={reply.id}>
-                      <div className="mona-note-header">
-                        <div className="mona-note-user">
-                          <div className="mona-note-avatar"><UserIcon /></div>
-                          <div><div className="mona-note-username">{reply.user}</div><div className="mona-note-time">{new Date(reply.time).toLocaleString()}</div></div>
+                    <div className="mt-2.5" key={reply.id}>
+                      <div className="group/reply flex items-start justify-between">
+                        <div className="flex items-center">
+                          <div className="mr-2.5 flex size-[30px] items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
+                          <div><div className="text-sm">{reply.user}</div><div className="text-xs text-muted-foreground">{new Date(reply.time).toLocaleString()}</div></div>
                         </div>
-                        <div className="mona-note-actions"><Button onClick={event => {
+                        <div className="flex items-center opacity-0 group-hover/reply:opacity-100 group-focus-within/reply:opacity-100"><Button className="h-7 px-1.5 text-xs hover:text-foreground hover:underline" onClick={event => {
                           event.stopPropagation()
                           setNotes(notes.map(item => item.id === note.id ? { ...item, replies: item.replies?.filter(candidate => candidate.id !== reply.id) } : item))
                         }} size="xs" type="button" variant="ghost">{t('foundation.editor.action.delete')}</Button></div>
                       </div>
-                      <div className="mona-note-content">{reply.content}</div>
+                      <div className="mt-1.5">{reply.content}</div>
                     </div>
                   ))}
                 </div>
               ) : null}
               {replyNoteId === note.id ? (
-                <div className="mona-note-reply-editor">
-                  <Textarea onChange={event => setReplyContent(event.target.value)} onKeyDown={event => {
+                <div className="mt-[15px]">
+                  <Textarea className="resize-none" onChange={event => setReplyContent(event.target.value)} onKeyDown={event => {
                     if (event.key === 'Enter' && !event.shiftKey) {
-                      event.preventDefault(); createReply() 
-                    } 
+                      event.preventDefault(); createReply()
+                    }
                   }} placeholder={t('foundation.editor.notes.replyPlaceholder')} rows={1} value={replyContent} />
-                  <div className="mona-note-reply-buttons">
+                  <div className="mt-1.5 flex justify-end gap-2">
                     <Button onClick={() => setReplyNoteId('')} size="sm" variant="outline">{t('foundation.editor.action.cancel')}</Button>
                     <Button onClick={createReply} size="sm">{t('foundation.editor.notes.reply')}</Button>
                   </div>
@@ -162,27 +163,28 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
               ) : null}
             </div>
           ))}
-          {!notes.length ? <div className="mona-notes-empty">{t('foundation.editor.notes.empty')}</div> : null}
+          {!notes.length ? <div className="flex h-full w-full items-center justify-center text-muted-foreground italic">{t('foundation.editor.notes.empty')}</div> : null}
         </div>
-        <div className="mona-notes-send">
+        <div className="flex h-[120px] shrink-0 flex-col justify-end text-right">
           <Textarea
+            className="resize-none"
             onChange={event => setContent(event.target.value)}
             onFocus={() => {
-              setReplyNoteId(''); setActiveNoteId('') 
+              setReplyNoteId(''); setActiveNoteId('')
             }}
             onKeyDown={event => {
               if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault(); createNote() 
-              } 
+                event.preventDefault(); createNote()
+              }
             }}
             placeholder={t('foundation.editor.notes.commentPlaceholder', { target: t(session.handleElementId ? 'foundation.editor.notes.selectedElement' : 'foundation.editor.notes.currentSlide') })}
             ref={inputRef}
             rows={2}
             value={content}
           />
-          <div className="mona-notes-footer">
-            <Button aria-label={t('foundation.editor.notes.clearSlide')} className="mona-notes-clear" onClick={() => setNotes([])} size="editor-icon" variant="ghost"><DeleteIcon /></Button>
-            <Button className="mona-notes-add" onClick={createNote} size="sm"><PlusIcon /> {t('foundation.editor.notes.add')}</Button>
+          <div className="mt-2.5 flex items-center">
+            <Button aria-label={t('foundation.editor.notes.clearSlide')} className="flex-1 justify-start text-lg text-muted-foreground" onClick={() => setNotes([])} size="editor-icon" variant="ghost"><DeleteIcon /></Button>
+            <Button className="ml-2 flex-[12]" onClick={createNote} size="sm"><PlusIcon /> {t('foundation.editor.notes.add')}</Button>
           </div>
         </div>
       </div>

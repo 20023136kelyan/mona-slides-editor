@@ -47,7 +47,7 @@ const clearSketches = (page: Page) => page.evaluate(async () => {
 })
 
 const openDrawing = async (page: Page) => {
-  const draw = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Draw' })
+  const draw = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Tools' })
   await draw.click()
   await expect(draw).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('region', { name: 'Drawing layer' })).toBeVisible()
@@ -145,7 +145,7 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
   await page.getByRole('radio', { name: 'Reference slide elements' }).click()
   await page.getByRole('button', { name: /^Select shape / }).first().click()
   await expect(page.locator('.mona-editor-status')).toHaveText('1 selected element')
-  await expect(page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Draw' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Tools' })).toHaveAttribute('aria-pressed', 'true')
 
   await page.getByRole('button', { name: 'Exit drawing' }).click()
   await expect(page.getByRole('toolbar', { name: 'Drawing tools' })).toHaveCount(0)
@@ -160,9 +160,9 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
   await page.keyboard.up('Space')
   await expect.poll(async () => (await page.getByRole('region', { name: 'Drawing layer' }).boundingBox())?.x).toBeGreaterThan(drawingBeforePan!.x)
 
-  await page.getByRole('button', { name: 'Design', exact: true }).first().click()
+  await page.getByRole('button', { name: 'Templates', exact: true }).first().click()
   // Task panels name the drawer after themselves via aria-label.
-  await expect(page.getByRole('complementary', { name: 'Design' })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Templates' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Drawing layer' })).toBeVisible()
   expect((await readSketches(page))[0]!.scene.elements.map(element => ({
     height: element.height,

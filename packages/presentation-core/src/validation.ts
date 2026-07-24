@@ -1,4 +1,4 @@
-import type { PPTElement, Slide } from './model'
+import type { PPTElement, Slide, StructuredTextBody } from './model'
 import type { PresentationState } from './state'
 import { collectElementTreeIds } from './elements'
 
@@ -38,6 +38,83 @@ const finiteGeometryIssues = (
       })
     }
   }
+  return issues
+}
+
+const structuredTextIssues = (
+  body: StructuredTextBody | null | undefined,
+  path: string,
+): PresentationValidationIssue[] => {
+  if (body == null) return []
+  const issues: PresentationValidationIssue[] = []
+  if (body.schemaVersion !== 1 || !Number.isFinite(body.scale) || body.scale <= 0) {
+    issues.push({
+      code: 'element.structured-text.invalid',
+      message: 'Structured text must use schema version 1 and a positive finite scale',
+      path,
+      severity: 'error',
+    })
+  }
+  if (!Array.isArray(body.paragraphs) || !Array.isArray(body.listStyle)) {
+    issues.push({
+      code: 'element.structured-text.collections',
+      message: 'Structured text paragraphs and list styles must be arrays',
+      path,
+      severity: 'error',
+    })
+    return issues
+  }
+  const sourceIds = new Set<string>()
+  body.paragraphs.forEach((paragraph, paragraphIndex) => {
+    const paragraphPath = `${path}.paragraphs[${paragraphIndex}]`
+    if (
+      !paragraph.sourceId
+      || !Number.isInteger(paragraph.level)
+      || paragraph.level < 0
+      || paragraph.level > 8
+      || !Array.isArray(paragraph.runs)
+    ) {
+      issues.push({
+        code: 'element.structured-text.paragraph',
+        message: 'Structured paragraphs require a source ID, level 0–8, and run array',
+        path: paragraphPath,
+        severity: 'error',
+      })
+    }
+    if (sourceIds.has(paragraph.sourceId)) {
+      issues.push({
+        code: 'element.structured-text.source-id',
+        message: `Duplicate structured text source ID: ${paragraph.sourceId}`,
+        path: `${paragraphPath}.sourceId`,
+        severity: 'error',
+      })
+    }
+    sourceIds.add(paragraph.sourceId)
+    paragraph.runs.forEach((run, runIndex) => {
+      const runPath = `${paragraphPath}.runs[${runIndex}]`
+      if (
+        !run.sourceId
+        || !['break', 'field', 'tab', 'text'].includes(run.kind)
+        || (run.text !== undefined && typeof run.text !== 'string')
+      ) {
+        issues.push({
+          code: 'element.structured-text.run',
+          message: 'Structured runs require a source ID, supported kind, and optional string text',
+          path: runPath,
+          severity: 'error',
+        })
+      }
+      if (sourceIds.has(run.sourceId)) {
+        issues.push({
+          code: 'element.structured-text.source-id',
+          message: `Duplicate structured text source ID: ${run.sourceId}`,
+          path: `${runPath}.sourceId`,
+          severity: 'error',
+        })
+      }
+      sourceIds.add(run.sourceId)
+    })
+  })
   return issues
 }
 
@@ -103,6 +180,12 @@ const validateSlide = (
     }
     seenElementIds.add(element.id)
     issues.push(...finiteGeometryIssues(element, elementPath))
+    if (element.type === 'text') {
+      issues.push(...structuredTextIssues(element.structuredText, `${elementPath}.structuredText`))
+    }
+    else if (element.type === 'shape') {
+      issues.push(...structuredTextIssues(element.text?.structuredText, `${elementPath}.text.structuredText`))
+    }
 
     if (element.link?.type === 'slide' && !slideIds.has(element.link.target)) {
       issues.push({
@@ -169,6 +252,18 @@ const validateHierarchyElements = (
       return
     }
     issues.push(...finiteGeometryIssues(candidate as PPTElement, elementPath))
+    if (candidate.type === 'text') {
+      issues.push(...structuredTextIssues(
+        (candidate as Extract<PPTElement, { type: 'text' }>).structuredText,
+        `${elementPath}.structuredText`,
+      ))
+    }
+    else if (candidate.type === 'shape') {
+      issues.push(...structuredTextIssues(
+        (candidate as Extract<PPTElement, { type: 'shape' }>).text?.structuredText,
+        `${elementPath}.text.structuredText`,
+      ))
+    }
     if (candidate.type === 'group') {
       issues.push(...validateHierarchyElements(candidate.elements, `${elementPath}.elements`, seenElementIds))
     }
@@ -206,6 +301,18 @@ export const validateImportedSlides = (value: unknown): PresentationValidationRe
         if (typeof geometryValue !== 'number' || !Number.isFinite(geometryValue)) {
           issues.push(importIssue('import.element.geometry', `${key} must be a finite number`, `${elementPath}.${key}`))
         }
+      }
+      if (record.type === 'text') {
+        issues.push(...structuredTextIssues(
+          (record as Extract<PPTElement, { type: 'text' }>).structuredText,
+          `${elementPath}.structuredText`,
+        ))
+      }
+      else if (record.type === 'shape') {
+        issues.push(...structuredTextIssues(
+          (record as Extract<PPTElement, { type: 'shape' }>).text?.structuredText,
+          `${elementPath}.text.structuredText`,
+        ))
       }
       if (record.type === 'group') {
         if (!Array.isArray(record.elements)) {
@@ -386,8 +493,9 @@ export const validatePresentationState = (
           })
         }
         else {
+          const hierarchyRecord = hierarchy as Record<string, unknown>
           for (const layerName of ['masters', 'layouts'] as const) {
-            const layers = (hierarchy as Record<string, unknown>)[layerName]
+            const layers = hierarchyRecord[layerName]
             if (!Array.isArray(layers)) {
               issues.push({
                 code: 'presentation.source-hierarchy.layers',
@@ -412,6 +520,44 @@ export const validatePresentationState = (
                 `${path}.hierarchy.${layerName}[${layerIndex}].elements`,
                 seenElementIds,
               ))
+            })
+          }
+          const placeholders = hierarchyRecord.placeholders
+          if (!Array.isArray(placeholders) || placeholders.some(placeholder => {
+            if (!placeholder || typeof placeholder !== 'object' || Array.isArray(placeholder)) return true
+            const record = placeholder as Record<string, unknown>
+            return !['layout', 'master', 'slide'].includes(String(record.layer))
+              || typeof record.objectId !== 'string'
+              || !record.objectId
+              || typeof record.partPath !== 'string'
+              || !record.partPath
+          })) {
+            issues.push({
+              code: 'presentation.source-hierarchy.placeholders',
+              message: 'PowerPoint hierarchy placeholders must contain valid layered object references',
+              path: `${path}.hierarchy.placeholders`,
+              severity: 'error',
+            })
+          }
+          const themes = hierarchyRecord.themes
+          if (!Array.isArray(themes) || themes.some(theme => {
+            if (!theme || typeof theme !== 'object' || Array.isArray(theme)) return true
+            const record = theme as Record<string, unknown>
+            return typeof record.id !== 'string'
+              || !record.id
+              || !Array.isArray(record.colors)
+              || record.colors.some(color => {
+                if (!color || typeof color !== 'object' || Array.isArray(color)) return true
+                const colorRecord = color as Record<string, unknown>
+                return typeof colorRecord.name !== 'string'
+                  || typeof colorRecord.value !== 'string'
+              })
+          })) {
+            issues.push({
+              code: 'presentation.source-hierarchy.themes',
+              message: 'PowerPoint hierarchy themes must contain typed colors and stable identities',
+              path: `${path}.hierarchy.themes`,
+              severity: 'error',
             })
           }
         }

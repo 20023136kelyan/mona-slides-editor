@@ -51,26 +51,26 @@ export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement
     video.src = element.src
   }
   return (
-    <div className="mona-video-style-panel">
-      <div className="mona-video-style-title">{t('foundation.editor.media.videoPoster')}</div>
-      <div className="mona-video-poster-wrapper">
-        <input accept="image/*" aria-label={t('foundation.editor.media.videoPoster')} className="mona-media-file-input" onChange={event => void setPoster(event)} ref={inputRef} type="file" />
-        <Button className="mona-video-poster" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
-          <span className="mona-video-poster-content" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
+    <div className="text-[13px] text-foreground select-none">
+      <div className="mb-2.5">{t('foundation.editor.media.videoPoster')}</div>
+      <div className="mb-2.5">
+        <input accept="image/*" aria-label={t('foundation.editor.media.videoPoster')} hidden onChange={event => void setPoster(event)} ref={inputRef} type="file" />
+        <Button className="relative block h-0 w-full rounded-[var(--radius-control)] border border-dashed p-0 pb-[56.25%] transition-all hover:border-foreground hover:text-foreground" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
+          <span className="absolute inset-0 flex items-center justify-center bg-contain bg-center bg-no-repeat" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
         </Button>
       </div>
       <div className="flex w-full items-center mb-2.5">
-        <Button className="mona-panel-button mona-media-full-button" onClick={setPosterFromFirstFrame} size="editor" type="button" variant="editor"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</Button>
+        <Button className="w-full flex-1" onClick={setPosterFromFirstFrame} size="editor" type="button" variant="editor"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</Button>
       </div>
       {element.poster ? (
         <div className="flex w-full items-center mb-2.5">
-          <Button className="mona-panel-button mona-media-full-button" onClick={() => update({ poster: '' })} size="editor" type="button" variant="editor"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</Button>
+          <Button className="w-full flex-1" onClick={() => update({ poster: '' })} size="editor" type="button" variant="editor"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</Button>
         </div>
       ) : null}
       <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mona-panel-row mona-media-switch-row">
+      <div className="flex h-8 w-full items-center">
         <div className="w-[48%] text-xs">{t('foundation.editor.media.autoplay')}</div>
-        <div className="mona-panel-row-control mona-panel-switch-wrapper">
+        <div className="w-[52%] text-right">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.autoplay')} checked={element.autoplay} onChange={autoplay => update({ autoplay })} />
         </div>
       </div>

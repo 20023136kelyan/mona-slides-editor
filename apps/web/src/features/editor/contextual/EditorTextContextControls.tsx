@@ -24,6 +24,12 @@ import {
   InspectorPopoverButton,
   InspectorSelect,
 } from '@/features/editor/EditorInspectorPrimitives'
+import {
+  contextualControlIcon,
+  contextualControlTextColor,
+  contextualGhostSelect,
+  contextualToggleActive,
+} from '@/features/editor/contextual/contextual-control-styles'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { editorFontOptions, editorFontSizeOptions } from '@/features/editor/editor-text-options'
 
@@ -52,7 +58,7 @@ export function EditorRichTextContextControls({
     <>
       <InspectorSelect
         ariaLabel={t('foundation.editor.text.fontFamily')}
-        className="mona-contextual-font-select"
+        className={`${contextualGhostSelect} w-[110px] mr-px`}
         onChange={value => execute({ command: 'fontname', value })}
         options={[{ label: t('common.defaultFont'), value: '' }, ...editorFontOptions]}
         search
@@ -61,7 +67,7 @@ export function EditorRichTextContextControls({
       />
       <InspectorSelect
         ariaLabel={t('foundation.editor.text.fontSize')}
-        className="mona-contextual-fontsize-select"
+        className={`${contextualGhostSelect} w-[80px]`}
         onChange={value => execute({ command: 'fontsize', value })}
         options={editorFontSizeOptions}
         search
@@ -71,7 +77,7 @@ export function EditorRichTextContextControls({
       <div className="mona-contextual-divider" />
       <InspectorPopoverButton
         ariaLabel={t('foundation.editor.text.textColor')}
-        className="mona-contextual-control is-text-color"
+        className={contextualControlTextColor}
         content={<EditorColorPicker onChange={value => execute({ command: 'color', value })} value={attrs.color} />}
       >
         <TextIcon />
@@ -87,7 +93,7 @@ export function EditorRichTextContextControls({
       ] as const).map(([command, CommandIcon, label]) => (
         <Toggle
           aria-label={t(`foundation.editor.text.${label}`)}
-          className={`mona-contextual-control${attrs[command] ? ' is-active' : ''}`}
+          className={`${contextualControlIcon} ${contextualToggleActive}`}
           key={command}
           onPressedChange={() => execute({ command })}
           pressed={Boolean(attrs[command])}
@@ -102,7 +108,7 @@ export function EditorRichTextContextControls({
       ] as const).map(([value, AlignmentIcon, label]) => (
         <Toggle
           aria-label={t(`foundation.editor.text.${label}`)}
-          className={`mona-contextual-control${attrs.align === value ? ' is-active' : ''}`}
+          className={`${contextualControlIcon} ${contextualToggleActive}`}
           key={value}
           onPressedChange={() => execute({ command: 'align', value })}
           pressed={attrs.align === value}
@@ -111,19 +117,19 @@ export function EditorRichTextContextControls({
       <div className="mona-contextual-divider" />
       <Toggle
         aria-label={t('foundation.editor.text.bullets')}
-        className={`mona-contextual-control${attrs.bulletList ? ' is-active' : ''}`}
+        className={`${contextualControlIcon} ${contextualToggleActive}`}
         onPressedChange={() => execute({ command: 'bulletList' })}
         pressed={attrs.bulletList}
       ><ListIcon /></Toggle>
       <Toggle
         aria-label={t('foundation.editor.text.numbering')}
-        className={`mona-contextual-control${attrs.orderedList ? ' is-active' : ''}`}
+        className={`${contextualControlIcon} ${contextualToggleActive}`}
         onPressedChange={() => execute({ command: 'orderedList' })}
         pressed={attrs.orderedList}
       ><OrderedListIcon /></Toggle>
       <Button
         aria-label={t('foundation.editor.text.clear')}
-        className="mona-contextual-control"
+        className={contextualControlIcon}
         onClick={() => execute({ command: 'clear' })}
         size="editor-icon"
         type="button"

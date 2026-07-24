@@ -1,4 +1,4 @@
-import type { ChartData, ChartType, PPTChartElement, SlideTheme } from '@mona/presentation-core/model'
+import type { ChartData, ChartOptions, ChartType, PPTChartElement, SlideTheme } from '@mona/presentation-core/model'
 import { createPresentationId } from '@mona/presentation-core'
 
 export const CHART_TYPES: readonly ChartType[] = ['bar', 'column', 'line', 'area', 'scatter', 'pie', 'ring', 'radar']
@@ -25,26 +25,50 @@ export interface ChartDataTranslations {
   value: string
 }
 
-export function getChartDefaultData(type: ChartType, translations: ChartDataTranslations): ChartData {
+export interface CreateChartElementOptions {
+  chartType: ChartType
+  options?: ChartOptions
+  seriesCount?: 1 | 2 | 3
+}
+
+export function getChartDefaultData(
+  type: ChartType,
+  translations: ChartDataTranslations,
+  seriesCount?: 1 | 2 | 3,
+): ChartData {
   const label = type === 'scatter' ? translations.coordinate : translations.category
   const labels = Array.from({ length: 5 }, (_, index) => label(index + 1))
   const singleSeries = type === 'pie' || type === 'ring'
+  const count = singleSeries ? 1 : (seriesCount ?? (type === 'scatter' ? 2 : 2))
+  if (singleSeries || count <= 1) {
+    return {
+      labels,
+      legends: [translations.value],
+      series: [[12, 19, 5, 2, 18]],
+    }
+  }
+  const seriesPool = [
+    [12, 19, 5, 2, 18],
+    [7, 11, 13, 21, 9],
+    [4, 15, 8, 16, 12],
+  ]
   return {
     labels,
-    legends: singleSeries
-      ? [translations.value]
-      : [translations.series(1), translations.series(2)],
-    series: singleSeries
-      ? [[12, 19, 5, 2, 18]]
-      : [[12, 19, 5, 2, 18], [7, 11, 13, 21, 9]],
+    legends: Array.from({ length: count }, (_, index) => translations.series(index + 1)),
+    series: seriesPool.slice(0, count),
   }
 }
 
-export function createChartElement(type: ChartType, theme: SlideTheme, translations: ChartDataTranslations): PPTChartElement {
+export function createChartElement(
+  input: ChartType | CreateChartElementOptions,
+  theme: SlideTheme,
+  translations: ChartDataTranslations,
+): PPTChartElement {
+  const spec = typeof input === 'string' ? { chartType: input } : input
   return {
     type: 'chart',
     id: createPresentationId(10),
-    chartType: type,
+    chartType: spec.chartType,
     left: 300,
     top: 81.25,
     width: 400,
@@ -52,6 +76,7 @@ export function createChartElement(type: ChartType, theme: SlideTheme, translati
     rotate: 0,
     themeColors: [...theme.themeColors],
     textColor: theme.fontColor,
-    data: getChartDefaultData(type, translations),
+    data: getChartDefaultData(spec.chartType, translations, spec.seriesCount),
+    ...(spec.options ? { options: spec.options } : {}),
   }
 }

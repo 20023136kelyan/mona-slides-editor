@@ -702,6 +702,55 @@ export async function getSlideBackgroundFill(warpObj) {
   }
 }
 
+function hasBackground(content, rootName) {
+  return Boolean(
+    getTextByPathList(content, [rootName, 'p:cSld', 'p:bg', 'p:bgPr'])
+    || getTextByPathList(content, [rootName, 'p:cSld', 'p:bg', 'p:bgRef']),
+  )
+}
+
+/**
+ * Retains the authored background at each PowerPoint hierarchy layer while
+ * preserving the existing effective-fill result for compatibility.
+ *
+ * getSlideBackgroundFill already implements the complete slide -> layout ->
+ * master fallback and resolves theme fill references. Reusing it with only
+ * the lower layers visible avoids maintaining a second color/fill resolver.
+ */
+export async function getSlideBackgroundFills(warpObj) {
+  const slideAuthored = hasBackground(warpObj.slideContent, 'p:sld')
+  const layoutAuthored = hasBackground(warpObj.slideLayoutContent, 'p:sldLayout')
+  const masterAuthored = hasBackground(warpObj.slideMasterContent, 'p:sldMaster')
+  const effective = await getSlideBackgroundFill(warpObj)
+  const master = masterAuthored
+    ? await getSlideBackgroundFill({
+        ...warpObj,
+        slideContent: {},
+        slideLayoutContent: {},
+      })
+    : undefined
+  const layout = layoutAuthored
+    ? await getSlideBackgroundFill({
+        ...warpObj,
+        slideContent: {},
+      })
+    : undefined
+
+  return {
+    effective,
+    ...(slideAuthored ? { slide: effective } : {}),
+    ...(layout ? { layout } : {}),
+    ...(master ? { master } : {}),
+    source: slideAuthored
+      ? 'slide'
+      : layoutAuthored
+        ? 'layout'
+        : masterAuthored
+          ? 'master'
+          : 'default',
+  }
+}
+
 function getShapeFillCandidates(node, source, slideLayoutSpNode, slideMasterSpNode) {
   const candidates = [{ node, source }]
 

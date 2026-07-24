@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { renderLatex, renderLatexSymbol, type LatexRenderResult } from '@/features/editor/editor-latex'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { cn } from '@/lib/utils'
 
 type FormulaToolbarState = 'formula' | 'symbol'
 
@@ -19,7 +20,7 @@ function FormulaContent({ height, latex, width }: { height: number; latex: strin
     ? result.w / result.h > width / height ? width / result.w : height / result.h
     : 1
   return (
-    <svg className="mona-latex-formula-content" fill="none" height={result.h} overflow="visible" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" width={result.w}>
+    <svg className="overflow-hidden" fill="none" height={result.h} overflow="visible" stroke="#000" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" width={result.w}>
       <g style={{ transformOrigin: '0 50%' }} transform={'scale(' + scale + ', ' + scale + ') translate(0,0) matrix(1,0,0,1,0,0)'}><path d={result.path} /></g>
     </svg>
   )
@@ -27,7 +28,7 @@ function FormulaContent({ height, latex, width }: { height: number; latex: strin
 
 function FormulaSymbol({ latex }: { latex: string }) {
   const svg = useMemo(() => renderLatexSymbol(latex), [latex])
-  return <div className="mona-latex-symbol-content" dangerouslySetInnerHTML={{ __html: svg }} />
+  return <div className="[&_svg]:inline [&_svg]:align-baseline" dangerouslySetInnerHTML={{ __html: svg }} />
 }
 
 function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }: {
@@ -39,14 +40,32 @@ function LatexTabs({ card = false, onChange, spaceBetween = false, tabs, value }
 }) {
   return (
     <ToggleGroup
-      className={'mona-latex-tabs' + (card ? ' is-card' : '') + (spaceBetween ? ' is-space-between' : '')}
+      className={cn(
+        'w-full flex-wrap items-center justify-start gap-0 rounded-none',
+        !card && 'border-b',
+        spaceBetween && 'justify-between',
+        card && 'h-10 shrink-0 items-stretch',
+      )}
       onValueChange={next => {
         if (next) onChange(next)
       }}
       type="single"
       value={value}
     >
-      {tabs.map(tab => <ToggleGroupItem className={tab.key === value ? 'is-active' : ''} key={tab.key} value={tab.key}>{tab.label}</ToggleGroupItem>)}
+      {tabs.map(tab => (
+        <ToggleGroupItem
+          className={cn(
+            'min-w-0 rounded-none font-normal data-[state=on]:bg-transparent',
+            card
+              ? 'h-auto flex-1 border-b bg-muted px-0 py-0 text-xs hover:bg-muted data-[state=on]:border-b-transparent [&:not(:first-child)]:border-l'
+              : 'h-auto border-b-2 border-transparent px-2.5 py-2 hover:bg-transparent data-[state=on]:border-b-foreground',
+          )}
+          key={tab.key}
+          value={tab.key}
+        >
+          {tab.label}
+        </ToggleGroupItem>
+      ))}
     </ToggleGroup>
   )
 }
@@ -96,43 +115,42 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
       if (!open) onClose()
     }} open>
       <DialogContent
-        className="mona-latex-modal-content"
+        className="w-[880px] max-w-none gap-0 overflow-hidden p-5 sm:max-w-none"
         onOpenAutoFocus={event => {
           event.preventDefault()
           textAreaRef.current?.focus()
         }}
-        overlayClassName="mona-latex-modal-mask"
         showCloseButton={false}
       >
         <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.latex.edit')}</DialogTitle></DialogHeader>
-        <div className="mona-latex-editor">
-          <div className="mona-latex-editor-container">
-            <div className="mona-latex-editor-left">
-              <div className="mona-latex-input-area">
-                <Textarea onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
+        <div className="h-[560px]">
+          <div className="flex h-[calc(100%-50px)]">
+            <div className="flex h-full w-[540px] shrink-0 flex-col">
+              <div className="flex-1">
+                <Textarea className="h-full resize-none p-2.5 font-mono leading-relaxed" onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
               </div>
-              <div className="mona-latex-preview">
-                {!latex ? <div className="mona-latex-preview-placeholder">{t('foundation.editor.latex.preview')}</div> : (
-                  <div className="mona-latex-preview-content"><FormulaContent height={138} latex={latex} width={518} /></div>
+              <div className="mt-5 flex h-40 items-center justify-center rounded-lg border text-center select-none">
+                {!latex ? <div className="text-sm text-muted-foreground">{t('foundation.editor.latex.preview')}</div> : (
+                  <div className="flex h-full w-full items-center justify-center p-2.5"><FormulaContent height={138} latex={latex} width={518} /></div>
                 )}
               </div>
             </div>
-            <div className="mona-latex-editor-right">
+            <div className="ml-5 flex h-full w-[280px] flex-col overflow-hidden rounded-lg border bg-background select-none">
               <LatexTabs card onChange={value => setToolbarState(value as FormulaToolbarState)} tabs={formulaTabs} value={toolbarState} />
-              <div className="mona-latex-editor-content">
+              <div className="h-[calc(100%-40px)] text-sm">
                 {toolbarState === 'symbol' ? (
-                  <div className="mona-latex-symbol-pane">
-                    <div className="mona-latex-symbol-tabs"><LatexTabs onChange={setSelectedSymbolKey} spaceBetween tabs={symbolTabs} value={selectedSymbolKey} /></div>
-                    <div className="mona-latex-symbol-pool">
-                      {selectedSymbol.children.map(item => <div className="mona-latex-symbol-item" key={item.latex} onClick={() => insertSymbol(item.latex)}><FormulaSymbol latex={item.latex} /></div>)}
+                  <div className="flex h-full flex-col">
+                    <div className="mx-2.5 mt-2.5"><LatexTabs onChange={setSelectedSymbolKey} spaceBetween tabs={symbolTabs} value={selectedSymbolKey} /></div>
+                    <div className="flex flex-1 flex-wrap overflow-auto p-3">
+                      {selectedSymbol.children.map(item => <div className="flex cursor-pointer items-center justify-center rounded-[var(--radius-control)] hover:bg-muted" key={item.latex} onClick={() => insertSymbol(item.latex)}><FormulaSymbol latex={item.latex} /></div>)}
                     </div>
                   </div>
                 ) : (
-                  <div className="mona-latex-formula-pane">
+                  <div className="h-full space-y-2.5 overflow-auto p-3">
                     {FORMULA_LIST.map((item, index) => (
-                      <div className="mona-latex-formula-item" key={item.latex}>
-                        <div className="mona-latex-formula-title">{t('foundation.editor.latex.formulaPresets.' + index)}</div>
-                        <div className="mona-latex-formula-item-content" onClick={() => setLatex(item.latex)}><FormulaContent height={60} latex={item.latex} width={236} /></div>
+                      <div key={item.latex}>
+                        <div className="mb-1.5">{t('foundation.editor.latex.formulaPresets.' + index)}</div>
+                        <div className="flex h-[60px] cursor-pointer items-center rounded-[var(--radius-control)] bg-muted p-[5px]" onClick={() => setLatex(item.latex)}><FormulaContent height={60} latex={item.latex} width={236} /></div>
                       </div>
                     ))}
                   </div>
@@ -140,9 +158,9 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
               </div>
             </div>
           </div>
-          <div className="mona-latex-editor-footer">
-            <Button className="mona-latex-editor-button" onClick={onClose} size="editor" variant="outline">{t('foundation.editor.latex.cancel')}</Button>
-            <Button className="mona-latex-editor-button" onClick={confirm} size="editor">{t('foundation.editor.latex.confirm')}</Button>
+          <div className="flex h-[50px] items-end justify-end gap-2.5">
+            <Button onClick={onClose} size="editor" variant="outline">{t('foundation.editor.latex.cancel')}</Button>
+            <Button onClick={confirm} size="editor">{t('foundation.editor.latex.confirm')}</Button>
           </div>
         </div>
       </DialogContent>

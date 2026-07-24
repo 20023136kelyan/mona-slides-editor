@@ -115,6 +115,32 @@ const mark: MarkSpec = {
   toDOM: node => ['mark', { 'data-index': node.attrs.index }, 0],
 }
 
+const powerPointSource: MarkSpec = {
+  attrs: {
+    fieldId: { default: '' },
+    fieldType: { default: '' },
+    runId: {},
+  },
+  excludes: '',
+  inclusive: false,
+  parseDOM: [{
+    tag: 'span[data-ppt-run-id]:not([data-ppt-run-kind="tab"])',
+    getAttrs: dom => {
+      const element = dom as HTMLElement
+      return {
+        fieldId: element.dataset.pptFieldId || '',
+        fieldType: element.dataset.pptFieldType || '',
+        runId: element.dataset.pptRunId,
+      }
+    },
+  }],
+  toDOM: node => ['span', {
+    ...(node.attrs.fieldId ? { 'data-ppt-field-id': node.attrs.fieldId } : {}),
+    ...(node.attrs.fieldType ? { 'data-ppt-field-type': node.attrs.fieldType } : {}),
+    'data-ppt-run-id': node.attrs.runId,
+  }, 0],
+}
+
 const { em, strong, code } = marks
 
 export default {
@@ -132,4 +158,5 @@ export default {
   underline,
   link,
   mark,
+  pptSource: powerPointSource,
 }

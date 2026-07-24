@@ -8,7 +8,11 @@ import type {
   PowerPointPackagePartKind,
   PowerPointPackageReference,
   PowerPointRelationship,
+  PowerPointColorMap,
+  PowerPointHeaderFooterPolicy,
   PowerPointHierarchy,
+  PowerPointMasterTextStyles,
+  PowerPointTextStyleLevel,
   PowerPointSlideLayout,
   PowerPointSlideMaster,
   PowerPointSourceObjectIdentity,
@@ -16,6 +20,9 @@ import type {
   PowerPointSlideDependency,
   PowerPointTheme,
   PowerPointThemeColor,
+  PowerPointThemeFont,
+  StructuredTextParagraphProperties,
+  StructuredTextRunProperties,
 } from '@mona/presentation-core'
 
 import type { PowerPointPackageBacking } from '@/features/editor/editor-pptx-backing-store'
@@ -282,6 +289,16 @@ const findFirstAttributes = (
   return node ? nodeAttributes(node) : {}
 }
 
+const childNodes = (
+  node: OrderedXmlNode | undefined,
+  expectedTag?: string,
+): OrderedXmlNode[] => {
+  if (!node) return []
+  return nodeEntries(node).flatMap(([tag, children]) => (
+    expectedTag === undefined || localName(tag) === expectedTag ? children : []
+  ))
+}
+
 const collectSourceObjects = (
   xml: string,
   partPath: string,
@@ -350,6 +367,61 @@ const collectSourceObjects = (
 
 const stablePartId = (packageId: string, partPath: string): string => `${packageId}/${partPath}`
 
+const parseThemeColorNode = (
+  node: OrderedXmlNode,
+  name: string,
+): PowerPointThemeColor | undefined => {
+  const children = childNodes(node)
+  for (const [sourceTag, type] of [
+    ['srgbClr', 'srgb'],
+    ['sysClr', 'system'],
+    ['schemeClr', 'scheme'],
+    ['prstClr', 'preset'],
+  ] as const) {
+    const source = findFirstNode(children, sourceTag)
+    if (!source) continue
+    const values = nodeAttributes(source)
+    const value = type === 'system' ? values.lastClr ?? values.val : values.val ?? values.lastClr
+    if (value) return { name, type, value }
+  }
+  return undefined
+}
+
+const parseColorScheme = (node: OrderedXmlNode | undefined): PowerPointThemeColor[] => {
+  const colors: PowerPointThemeColor[] = []
+  for (const colorNode of childNodes(node, 'clrScheme')) {
+    for (const [tag] of nodeEntries(colorNode)) {
+      const color = parseThemeColorNode(colorNode, localName(tag))
+      if (color) colors.push(color)
+    }
+  }
+  return colors
+}
+
+const parseThemeFont = (node: OrderedXmlNode | undefined): PowerPointThemeFont | undefined => {
+  if (!node) return undefined
+  const children = childNodes(node)
+  const latin = findFirstAttributes(children, 'latin').typeface
+  const eastAsian = findFirstAttributes(children, 'ea').typeface
+  const complexScript = findFirstAttributes(children, 'cs').typeface
+  const supplemental: PowerPointThemeFont['supplemental'] = []
+  walkXml(children, (tag, fontNode) => {
+    if (tag !== 'font') return
+    const values = nodeAttributes(fontNode)
+    if (values.script && values.typeface) supplemental.push({
+      script: values.script,
+      typeface: values.typeface,
+    })
+  })
+  if (!latin && !eastAsian && !complexScript && !supplemental.length) return undefined
+  return {
+    ...(complexScript ? { complexScript } : {}),
+    ...(eastAsian ? { eastAsian } : {}),
+    ...(latin ? { latin } : {}),
+    supplemental,
+  }
+}
+
 const parseTheme = (
   xml: string,
   partPath: string,
@@ -358,40 +430,20 @@ const parseTheme = (
   const nodes = parseXml(xml, partPath)
   const root = findFirstAttributes(nodes, 'theme')
   const colorSchemeNode = findFirstNode(nodes, 'clrScheme')
-  const colorSchemeChildren = colorSchemeNode
-    ? nodeEntries(colorSchemeNode).flatMap(([, children]) => children)
-    : []
-  const colors: PowerPointThemeColor[] = []
-  for (const colorNode of colorSchemeChildren) {
-    for (const [tag, children] of nodeEntries(colorNode)) {
-      const colorName = localName(tag)
-      for (const [sourceTag, type] of [
-        ['srgbClr', 'srgb'],
-        ['sysClr', 'system'],
-        ['schemeClr', 'scheme'],
-        ['prstClr', 'preset'],
-      ] as const) {
-        const source = findFirstNode(children, sourceTag)
-        if (!source) continue
-        const values = nodeAttributes(source)
-        const value = type === 'system' ? values.lastClr ?? values.val : values.val ?? values.lastClr
-        if (value) colors.push({ name: colorName, type, value })
-        break
-      }
-    }
-  }
+  const colors = parseColorScheme(colorSchemeNode)
   const majorFontNode = findFirstNode(nodes, 'majorFont')
   const minorFontNode = findFirstNode(nodes, 'minorFont')
+  const majorFont = parseThemeFont(majorFontNode)
+  const minorFont = parseThemeFont(minorFontNode)
   return {
     colorSchemeName: findFirstAttributes(nodes, 'clrScheme').name,
     colors,
+    formatSchemeName: findFirstAttributes(nodes, 'fmtScheme').name,
     id: stablePartId(packageId, partPath),
-    majorLatinFont: majorFontNode
-      ? findFirstAttributes(nodeEntries(majorFontNode).flatMap(([, children]) => children), 'latin').typeface
-      : undefined,
-    minorLatinFont: minorFontNode
-      ? findFirstAttributes(nodeEntries(minorFontNode).flatMap(([, children]) => children), 'latin').typeface
-      : undefined,
+    ...(majorFont ? { majorFont } : {}),
+    majorLatinFont: majorFont?.latin,
+    ...(minorFont ? { minorFont } : {}),
+    minorLatinFont: minorFont?.latin,
     name: root.name,
     packageId,
     partPath,
@@ -401,6 +453,231 @@ const parseTheme = (
 const parseBooleanAttribute = (value: string | undefined, fallback: boolean): boolean => (
   value === undefined ? fallback : value !== '0' && value.toLowerCase() !== 'false'
 )
+
+const parseColorMap = (
+  nodes: OrderedXmlNode[],
+  tag: 'clrMap' | 'overrideClrMapping',
+): PowerPointColorMap | undefined => {
+  const values = findFirstAttributes(nodes, tag)
+  return Object.keys(values).length ? values : undefined
+}
+
+const parseHeaderFooter = (nodes: OrderedXmlNode[]): PowerPointHeaderFooterPolicy | undefined => {
+  const node = findFirstNode(nodes, 'hf')
+  const values = node ? nodeAttributes(node) : {}
+  return {
+    dateTime: parseBooleanAttribute(values.dt, true),
+    footer: parseBooleanAttribute(values.ftr, true),
+    header: parseBooleanAttribute(values.hdr, true),
+    slideNumber: parseBooleanAttribute(values.sldNum, true),
+  }
+}
+
+const textPoints = (value: string | undefined) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed / 12_700 : undefined
+}
+
+const parseTextSpacing = (node: OrderedXmlNode | undefined) => {
+  if (!node) return undefined
+  const percent = Number(findFirstAttributes(childNodes(node), 'spcPct').val)
+  if (Number.isFinite(percent)) return { unit: 'percent' as const, value: percent / 1000 }
+  const points = Number(findFirstAttributes(childNodes(node), 'spcPts').val)
+  if (Number.isFinite(points)) return { unit: 'points' as const, value: points / 100 }
+  return undefined
+}
+
+const parseTextRunProperties = (
+  runNode: OrderedXmlNode | undefined,
+): StructuredTextRunProperties | undefined => {
+  if (!runNode) return undefined
+  const values = nodeAttributes(runNode)
+  const children = childNodes(runNode)
+  const colorNode = findFirstNode(children, 'solidFill')
+  const color = colorNode ? parseThemeColorNode(colorNode, 'text') : undefined
+  const fontSize = Number(values.sz)
+  const spacing = Number(values.spc)
+  const baseline = Number(values.baseline)
+  const properties: StructuredTextRunProperties = {
+    ...(values.altLang ? { alternativeLanguage: values.altLang } : {}),
+    ...(Number.isFinite(baseline) ? { baseline: baseline / 1000 } : {}),
+    ...(values.b !== undefined ? { bold: parseBooleanAttribute(values.b, false) } : {}),
+    ...(values.cap ? { capitalization: values.cap } : {}),
+    ...(color ? { color } : {}),
+    ...(findFirstAttributes(children, 'cs').typeface
+      ? { complexScriptFontFamily: findFirstAttributes(children, 'cs').typeface }
+      : {}),
+    ...(findFirstAttributes(children, 'ea').typeface
+      ? { eastAsianFontFamily: findFirstAttributes(children, 'ea').typeface }
+      : {}),
+    ...(findFirstAttributes(children, 'latin').typeface
+      ? { fontFamily: findFirstAttributes(children, 'latin').typeface }
+      : {}),
+    ...(Number.isFinite(fontSize) ? { fontSize: fontSize / 100 } : {}),
+    ...(values.i !== undefined ? { italic: parseBooleanAttribute(values.i, false) } : {}),
+    ...(values.lang ? { language: values.lang } : {}),
+    ...(values.normalizeH !== undefined
+      ? { normalizeHeight: parseBooleanAttribute(values.normalizeH, false) }
+      : {}),
+    ...(Number.isFinite(spacing) ? { spacing: spacing / 100 } : {}),
+    ...(values.strike ? { strike: values.strike } : {}),
+    ...(values.u ? { underline: values.u } : {}),
+  }
+  return Object.keys(properties).length ? properties : undefined
+}
+
+const parseTextBullet = (children: OrderedXmlNode[]) => {
+  if (findFirstNode(children, 'buNone')) return { type: 'none' as const }
+  const character = findFirstAttributes(children, 'buChar').char
+  const autoNumber = findFirstNode(children, 'buAutoNum')
+  const picture = findFirstNode(children, 'buBlip')
+  if (!character && !autoNumber && !picture) return undefined
+  const autoValues = autoNumber ? nodeAttributes(autoNumber) : {}
+  const startAt = Number(autoValues.startAt)
+  const percent = Number(findFirstAttributes(children, 'buSzPct').val)
+  const points = Number(findFirstAttributes(children, 'buSzPts').val)
+  return {
+    ...(character ? { character } : {}),
+    ...(findFirstAttributes(children, 'buFont').typeface
+      ? { fontFamily: findFirstAttributes(children, 'buFont').typeface }
+      : {}),
+    ...(autoValues.type ? { numberingScheme: autoValues.type } : {}),
+    ...(Number.isFinite(percent)
+      ? { size: { unit: 'percent' as const, value: percent / 1000 } }
+      : Number.isFinite(points)
+        ? { size: { unit: 'points' as const, value: points / 100 } }
+        : {}),
+    ...(Number.isFinite(startAt) ? { startAt } : {}),
+    type: autoNumber ? 'auto-number' as const : picture ? 'picture' as const : 'character' as const,
+  }
+}
+
+const parseTextParagraphProperties = (
+  styleNode: OrderedXmlNode,
+): StructuredTextParagraphProperties | undefined => {
+  const values = nodeAttributes(styleNode)
+  const children = childNodes(styleNode)
+  const bullet = parseTextBullet(children)
+  const defaultRun = parseTextRunProperties(findFirstNode(children, 'defRPr'))
+  const marginLeft = textPoints(values.marL)
+  const indent = textPoints(values.indent)
+  const defaultTabSize = textPoints(values.defTabSz)
+  const tabsNode = findFirstNode(children, 'tabLst')
+  const tabs = childNodes(tabsNode, 'tabLst').flatMap(tabNode => {
+    const tabValues = nodeAttributes(tabNode)
+    const position = textPoints(tabValues.pos)
+    return position === undefined
+      ? []
+      : [{ ...(tabValues.algn ? { alignment: tabValues.algn } : {}), position }]
+  })
+  const lineSpacing = parseTextSpacing(findFirstNode(children, 'lnSpc'))
+  const spaceBefore = parseTextSpacing(findFirstNode(children, 'spcBef'))
+  const spaceAfter = parseTextSpacing(findFirstNode(children, 'spcAft'))
+  const properties: StructuredTextParagraphProperties = {
+    ...(values.algn ? { alignment: values.algn } : {}),
+    ...(bullet ? { bullet } : {}),
+    ...(defaultRun ? { defaultRun } : {}),
+    ...(defaultTabSize !== undefined ? { defaultTabSize } : {}),
+    ...(values.eaLnBrk !== undefined
+      ? { eastAsianLineBreak: parseBooleanAttribute(values.eaLnBrk, false) }
+      : {}),
+    ...(values.fontAlgn ? { fontAlignment: values.fontAlgn } : {}),
+    ...(values.hangingPunct !== undefined
+      ? { hangingPunctuation: parseBooleanAttribute(values.hangingPunct, false) }
+      : {}),
+    ...(indent !== undefined ? { indent } : {}),
+    ...(values.latinLnBrk !== undefined
+      ? { latinLineBreak: parseBooleanAttribute(values.latinLnBrk, false) }
+      : {}),
+    ...(lineSpacing ? { lineSpacing } : {}),
+    ...(marginLeft !== undefined ? { marginLeft } : {}),
+    ...(values.rtl !== undefined
+      ? { rightToLeft: parseBooleanAttribute(values.rtl, false) }
+      : {}),
+    ...(spaceAfter ? { spaceAfter } : {}),
+    ...(spaceBefore ? { spaceBefore } : {}),
+    ...(tabs.length ? { tabs } : {}),
+  }
+  return Object.keys(properties).length ? properties : undefined
+}
+
+const parseTextStyleLevel = (
+  styleNode: OrderedXmlNode,
+  level: number,
+) => {
+  const values = nodeAttributes(styleNode)
+  const children = childNodes(styleNode)
+  const runNode = findFirstNode(children, 'defRPr')
+  const runValues = runNode ? nodeAttributes(runNode) : {}
+  const runChildren = childNodes(runNode)
+  const colorNode = findFirstNode(runChildren, 'solidFill')
+  const fontColor = colorNode ? parseThemeColorNode(colorNode, 'text') : undefined
+  const fontFamily = findFirstAttributes(runChildren, 'latin').typeface
+  const bulletCharacter = findFirstAttributes(children, 'buChar').char
+  const paragraph = parseTextParagraphProperties(styleNode)
+  const run = parseTextRunProperties(runNode)
+  const fontSize = Number(runValues.sz)
+  return {
+    ...(values.algn ? { alignment: values.algn } : {}),
+    ...(runValues.b !== undefined ? { bold: parseBooleanAttribute(runValues.b, false) } : {}),
+    ...(bulletCharacter ? { bulletCharacter } : {}),
+    ...(fontColor ? { fontColor } : {}),
+    ...(fontFamily ? { fontFamily } : {}),
+    ...(Number.isFinite(fontSize) ? { fontSize: fontSize / 100 } : {}),
+    ...(textPoints(values.indent) !== undefined ? { indent: textPoints(values.indent) } : {}),
+    ...(runValues.i !== undefined ? { italic: parseBooleanAttribute(runValues.i, false) } : {}),
+    ...(runValues.lang ? { language: runValues.lang } : {}),
+    level,
+    ...(textPoints(values.marL) !== undefined ? { marginLeft: textPoints(values.marL) } : {}),
+    ...(paragraph ? { paragraph } : {}),
+    ...(values.rtl !== undefined ? { rightToLeft: parseBooleanAttribute(values.rtl, false) } : {}),
+    ...(run ? { run } : {}),
+    ...(runValues.u ? { underline: runValues.u } : {}),
+  }
+}
+
+const parseTextStyleLevels = (styleChildren: OrderedXmlNode[]) => {
+  const levels: PowerPointTextStyleLevel[] = []
+  for (let level = 1; level <= 9; level += 1) {
+    const levelNode = findFirstNode(styleChildren, `lvl${level}pPr`)
+    if (levelNode) levels.push(parseTextStyleLevel(levelNode, level))
+  }
+  return levels
+}
+
+const parseTextStyle = (
+  nodes: OrderedXmlNode[],
+  styleTag: 'bodyStyle' | 'otherStyle' | 'titleStyle',
+) => {
+  const styleNode = findFirstNode(nodes, styleTag)
+  const styleChildren = childNodes(styleNode, styleTag)
+  return parseTextStyleLevels(styleChildren)
+}
+
+const parseMasterTextStyles = (nodes: OrderedXmlNode[]): PowerPointMasterTextStyles | undefined => {
+  const stylesNode = findFirstNode(nodes, 'txStyles')
+  const styles = childNodes(stylesNode, 'txStyles')
+  if (!styles.length) return undefined
+  return {
+    body: parseTextStyle(styles, 'bodyStyle'),
+    other: parseTextStyle(styles, 'otherStyle'),
+    title: parseTextStyle(styles, 'titleStyle'),
+  }
+}
+
+const placeholderLayer = (partPath: string): 'layout' | 'master' | 'slide' => {
+  if (partPath.includes('/slideLayouts/')) return 'layout'
+  if (partPath.includes('/slideMasters/')) return 'master'
+  return 'slide'
+}
+
+const placeholderTextStyleKind = (
+  type: string | undefined,
+): 'body' | 'other' | 'title' => {
+  if (type === 'title' || type === 'ctrTitle') return 'title'
+  if (type === 'body' || type === 'obj' || type === 'subTitle') return 'body'
+  return 'other'
+}
 
 const buildHierarchy = async ({
   objects,
@@ -415,15 +692,24 @@ const buildHierarchy = async ({
   readXmlPart: (path: string) => Promise<string>
   relationships: PowerPointRelationship[]
 }): Promise<PowerPointHierarchy> => {
+  const presentationPart = parts.find(part => part.kind === 'presentation' && /\/presentation\.xml$/i.test(part.path))
+  const presentationNodes = presentationPart ? parseXml(await readXmlPart(presentationPart.path), presentationPart.path) : []
+  const defaultTextStyleNode = findFirstNode(presentationNodes, 'defaultTextStyle')
+  const defaultTextStyle = defaultTextStyleNode
+    ? parseTextStyleLevels(childNodes(defaultTextStyleNode, 'defaultTextStyle'))
+    : []
   const themeParts = parts.filter(part => part.kind === 'theme')
   const themes = await Promise.all(themeParts.map(async part => (
     parseTheme(await readXmlPart(part.path), part.path, packageId)
   )))
   const layouts: PowerPointSlideLayout[] = await Promise.all(
     parts.filter(part => part.kind === 'layout').map(async part => {
-      const root = findFirstAttributes(parseXml(await readXmlPart(part.path), part.path), 'sldLayout')
+      const nodes = parseXml(await readXmlPart(part.path), part.path)
+      const root = findFirstAttributes(nodes, 'sldLayout')
       const masterPart = findInternalTarget(relationships, part.path, 'slideMaster')
+      const colorMapOverride = parseColorMap(nodes, 'overrideClrMapping')
       return {
+        ...(colorMapOverride ? { colorMapOverride } : {}),
         id: stablePartId(packageId, part.path),
         matchingName: root.matchingName,
         masterId: masterPart ? stablePartId(packageId, masterPart) : undefined,
@@ -440,20 +726,27 @@ const buildHierarchy = async ({
   )
   const masters: PowerPointSlideMaster[] = await Promise.all(
     parts.filter(part => part.kind === 'master').map(async part => {
-      const root = findFirstAttributes(parseXml(await readXmlPart(part.path), part.path), 'sldMaster')
+      const nodes = parseXml(await readXmlPart(part.path), part.path)
+      const root = findFirstAttributes(nodes, 'sldMaster')
       const themePart = findInternalTarget(relationships, part.path, 'theme')
+      const colorMap = parseColorMap(nodes, 'clrMap')
+      const headerFooter = parseHeaderFooter(nodes)
+      const textStyles = parseMasterTextStyles(nodes)
       const layoutParts = relationships.filter(relationship => (
         !relationship.external
         && relationship.sourcePart === part.path
         && relationshipKind(relationship) === 'slideLayout'
       )).map(relationship => relationship.target)
       return {
+        ...(colorMap ? { colorMap } : {}),
+        ...(headerFooter ? { headerFooter } : {}),
         id: stablePartId(packageId, part.path),
         layoutIds: layoutParts.map(layoutPart => stablePartId(packageId, layoutPart)),
         objectIds: objects.filter(object => object.partPath === part.path).map(object => object.stableId),
         packageId,
         partPath: part.path,
         preserve: parseBooleanAttribute(root.preserve, false),
+        ...(textStyles ? { textStyles } : {}),
         themeId: themePart ? stablePartId(packageId, themePart) : undefined,
       }
     }),
@@ -463,13 +756,21 @@ const buildHierarchy = async ({
       ? []
       : [{
           ...(object.placeholderIndex !== undefined ? { index: object.placeholderIndex } : {}),
+          layer: placeholderLayer(object.partPath),
           objectId: object.stableId,
           partId: stablePartId(packageId, object.partPath),
           partPath: object.partPath,
+          textStyleKind: placeholderTextStyleKind(object.placeholderType),
           ...(object.placeholderType !== undefined ? { type: object.placeholderType } : {}),
         }]
   ))
-  return { layouts, masters, placeholders, themes }
+  return {
+    ...(defaultTextStyle.length ? { defaultTextStyle } : {}),
+    layouts,
+    masters,
+    placeholders,
+    themes,
+  }
 }
 
 const buildSlideDependencies = async (
@@ -486,9 +787,12 @@ const buildSlideDependencies = async (
     const layoutPart = findInternalTarget(relationships, slide.slidePart, 'slideLayout')
     const masterPart = findInternalTarget(relationships, layoutPart, 'slideMaster')
     const themePart = findInternalTarget(relationships, masterPart, 'theme')
-    const root = findFirstAttributes(parseXml(await readXmlPart(slide.slidePart), slide.slidePart), 'sld')
+    const nodes = parseXml(await readXmlPart(slide.slidePart), slide.slidePart)
+    const root = findFirstAttributes(nodes, 'sld')
+    const colorMapOverride = parseColorMap(nodes, 'overrideClrMapping')
     return {
       ...slide,
+      ...(colorMapOverride ? { colorMapOverride } : {}),
       layoutPart,
       masterPart,
       showMasterPlaceholderAnimations: parseBooleanAttribute(root.showMasterPhAnim, true),

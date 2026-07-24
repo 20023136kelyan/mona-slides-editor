@@ -178,11 +178,33 @@ export const applyPresentationCommand = (
       return changed({ ...state, viewportRatio: command.ratio }, command)
     }
     case 'presentation.slides.replace': {
-      return changed({
+      const previousById = new Map(state.slides.map(slide => [slide.id, slide]))
+      const backgroundChanges: Slide[] = []
+      const slides = command.slides.map(slide => {
+        const previous = previousById.get(slide.id)
+        if (
+          !previous?.source
+          || !slide.source
+          || JSON.stringify(previous.background) === JSON.stringify(slide.background)
+        ) return slide
+        backgroundChanges.push(previous)
+        return {
+          ...slide,
+          source: {
+            ...slide.source,
+            backgroundSource: 'slide' as const,
+          },
+        }
+      })
+      let nextState: PresentationState = {
         ...state,
-        slides: command.slides,
+        slides,
         theme: command.theme ? { ...state.theme, ...command.theme } : state.theme,
-      }, command, command.slides.map(slide => slide.id))
+      }
+      for (const previous of backgroundChanges) {
+        nextState = markPowerPointSlideDirty(nextState, previous, command.type)
+      }
+      return changed(nextState, command, slides.map(slide => slide.id))
     }
     case 'presentation.source-packages.replace': {
       if (command.sourcePackages === state.sourcePackages) return unchanged(state, command)
@@ -213,7 +235,18 @@ export const applyPresentationCommand = (
       const slideIndex = findSlideIndex(state, command.slideId)
       const previousSlide = state.slides[slideIndex]
       if (!previousSlide) throw new PresentationCommandError('Slide not found')
-      const slide = { ...previousSlide, ...command.props }
+      const slide = {
+        ...previousSlide,
+        ...command.props,
+        ...(command.props.background !== undefined && (command.props.source ?? previousSlide.source)
+          ? {
+              source: {
+                ...(command.props.source ?? previousSlide.source)!,
+                backgroundSource: 'slide' as const,
+              },
+            }
+          : {}),
+      }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(markPowerPointSlideDirty({ ...state, slides }, previousSlide, command.type), command, [slide.id])
@@ -320,7 +353,34 @@ export const applyPresentationCommand = (
       const elements = updateElementTreeByIds(
         currentSlide.elements,
         targetIds,
-        element => ({ ...element, ...command.payload.props }) as PPTElement,
+        element => {
+          const props = command.payload.props
+          const updated = { ...element, ...props } as PPTElement
+          // Imported structured text remains the inheritance source until a
+          // direct HTML edit occurs. At that point Mona's editor markup is the
+          // new authored source and must not be overwritten on the next render.
+          if (
+            element.type === 'text'
+            && 'content' in props
+            && !('structuredText' in props)
+            && updated.type === 'text'
+          ) {
+            delete updated.structuredText
+          }
+          if (
+            element.type === 'shape'
+            && updated.type === 'shape'
+            && 'text' in props
+            && props.text
+            && typeof props.text === 'object'
+            && 'content' in props.text
+            && !('structuredText' in props.text)
+            && updated.text
+          ) {
+            delete updated.text.structuredText
+          }
+          return updated
+        },
       )
       const slide = { ...currentSlide, elements }
       const slides = state.slides.slice()

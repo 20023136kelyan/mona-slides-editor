@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { orderElement } from '@/features/editor/editor-geometry'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { cn } from '@/lib/utils'
 
 interface GroupItem { elements: PPTElement[]; id: string; type: 'group' }
 type SelectionItem = GroupItem | PPTElement
@@ -112,13 +113,23 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
     const name = element.name || typeName(element.type)
     return (
       <div
-        className={`mona-selection-item${active ? ' is-active' : ''}${groupActive ? ' is-group-active' : ''}${element.lock ? ' is-locked' : ''}`}
+        className={cn(
+          'mona-selection-item flex items-center rounded-[var(--radius-control)] p-[5px] text-xs',
+          // is-locked retained so the lingering `.mona-selection-item:not(.is-locked):hover`
+          // CSS rule keeps excluding locked rows until that rule is deleted centrally.
+          element.lock && 'is-locked',
+          group && 'ml-[15px]',
+          !element.lock && 'transition-colors duration-200 hover:bg-[var(--editor-selection-medium)]',
+          active && 'bg-[var(--editor-selection-soft)]',
+          groupActive && 'bg-[var(--editor-selection-medium)]',
+        )}
         data-element-id={element.id}
         key={element.id}
       >
         {editingId === element.id ? (
           <Input
             aria-label={t('foundation.editor.selection.renameElement', { name })}
+            className="h-4 flex-1 rounded-none border-0 bg-transparent p-0 text-xs md:text-xs focus-visible:ring-0"
             defaultValue={name}
             onBlur={event => saveName(element.id, event.currentTarget.value)}
             onKeyDown={event => {
@@ -138,7 +149,7 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
             aria-label={t('foundation.editor.selection.selectElement', { name })}
             aria-disabled={element.lock || hidden}
             aria-pressed={active}
-            className="mona-selection-name mona-selection-select"
+            className="mona-selection-select h-[18px] flex-1 justify-start overflow-hidden rounded-none p-0 text-left text-xs font-normal leading-[18px] text-ellipsis whitespace-nowrap text-inherit"
             onClick={() => group ? selectGroupElement(group, element) : selectElement(element)}
             onDoubleClick={() => setEditingId(element.id)}
             onKeyDown={event => {
@@ -159,18 +170,20 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
             variant="ghost"
           >{name}</Button>
         )}
-        <div className="mona-selection-icons">
+        <div className="ml-2.5 flex items-center justify-end gap-0.5">
           {element.lock ? (
             <Button
               aria-label={t('foundation.editor.selection.unlockElement', { name })}
+              className="size-5 p-0.5"
               onClick={() => unlock(element)}
               size="editor-icon"
               type="button"
               variant="ghost"
             ><LockIcon /></Button>
-          ) : <span aria-hidden="true" />}
+          ) : <span aria-hidden="true" className="size-5" />}
           <Button
             aria-label={t(`foundation.editor.selection.${hidden ? 'showElement' : 'hideElement'}`, { name })}
+            className="size-5 p-0.5"
             onClick={() => toggleHidden(element.id)}
             size="editor-icon"
             type="button"
@@ -185,27 +198,27 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
     <>
       {elements.length ? (
         <>
-          <div className="mona-selection-handler">
-            <div><Button onClick={showAll} size="xs" variant="ghost">{t('foundation.editor.selection.showAll')}</Button><Button onClick={hideAll} size="xs" variant="ghost">{t('foundation.editor.selection.hideAll')}</Button></div>
+          <div className="mb-2 flex h-6 items-center justify-between">
+            <div className="flex items-center gap-1"><Button onClick={showAll} size="xs" variant="ghost">{t('foundation.editor.selection.showAll')}</Button><Button onClick={hideAll} size="xs" variant="ghost">{t('foundation.editor.selection.hideAll')}</Button></div>
             {handleElement ? (
-              <div className="mona-selection-order">
-                <Button aria-label={t('common.moveUp')} onClick={() => order('up')} size="editor-icon" type="button" variant="ghost"><DownIcon /></Button>
-                <Button aria-label={t('common.moveDown')} onClick={() => order('down')} size="editor-icon" type="button" variant="ghost"><UpIcon /></Button>
+              <div className="flex h-full flex-1 items-center justify-end gap-1">
+                <Button aria-label={t('common.moveUp')} className="h-6 w-5 p-0" onClick={() => order('up')} size="editor-icon" type="button" variant="ghost"><DownIcon /></Button>
+                <Button aria-label={t('common.moveDown')} className="h-6 w-5 p-0" onClick={() => order('down')} size="editor-icon" type="button" variant="ghost"><UpIcon /></Button>
               </div>
             ) : null}
           </div>
-          <div className="mona-selection-list">
+          <div className="-mr-2.5 h-[calc(100%-32px)] overflow-auto pr-2.5">
             {elements.map(item => item.type === 'group' ? (
-              <div className="mona-selection-group" key={item.id}>
-                <div className="mona-selection-group-title">{t('foundation.editor.selection.group')}</div>
+              <div className="py-[5px]" key={item.id}>
+                <div className="mb-[5px] px-[5px]">{t('foundation.editor.selection.group')}</div>
                 {item.elements.map(element => renderItem(element, item))}
               </div>
             ) : renderItem(item))}
           </div>
         </>
-      ) : <div className="mona-selection-empty">{t('foundation.editor.selection.empty')}</div>}
+      ) : <div className="flex h-full w-full items-center justify-center italic text-muted-foreground">{t('foundation.editor.selection.empty')}</div>}
     </>
   )
 
-  return <div className="mona-selection-panel is-embedded">{content}</div>
+  return <div className="h-[calc(100vh-170px)] min-h-[260px] select-none text-xs">{content}</div>
 }

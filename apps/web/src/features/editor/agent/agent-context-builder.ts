@@ -1,4 +1,10 @@
-import { findElementById, flattenElementTree, type PresentationState } from '@mona/presentation-core'
+import {
+  compileSlideTheme,
+  findElementById,
+  flattenElementTree,
+  resolveSlideRenderState,
+  type PresentationState,
+} from '@mona/presentation-core'
 import type { PPTElement } from '@mona/presentation-core/model'
 
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
@@ -47,14 +53,19 @@ export const buildAgentDocumentContext = async ({
 }: BuildAgentContextInput): Promise<AgentDocumentContext> => {
   const currentSlide = presentation.slides[presentation.slideIndex]
   if (!currentSlide) throw new Error('The presentation has no active slide')
-  const slides: AgentSlideContext[] = presentation.slides.map((slide, index) => ({
+  const resolvedSlides = presentation.slides.map(slide => ({
+    renderState: resolveSlideRenderState(slide, presentation.sourcePackages),
+    slide,
+  }))
+  const slides: AgentSlideContext[] = resolvedSlides.map(({ renderState, slide }, index) => ({
     id: slide.id,
     index,
     elements: slide.elements.map(compactElement),
-    ...(slide.background ? { background: structuredClone(slide.background) } : {}),
+    ...(renderState.background ? { background: structuredClone(renderState.background) } : {}),
     ...(slide.notes?.length ? { notes: structuredClone(slide.notes) } : {}),
     ...(slide.sectionTag ? { sectionTag: structuredClone(slide.sectionTag) } : {}),
   }))
+  const currentRenderState = resolvedSlides[presentation.slideIndex]!.renderState
 
   return {
     currentSlideId: currentSlide.id,
@@ -76,7 +87,13 @@ export const buildAgentDocumentContext = async ({
       viewportHeight: presentation.viewportSize * presentation.viewportRatio,
       viewportWidth: presentation.viewportSize,
     },
-    theme: structuredClone(presentation.theme),
+    theme: structuredClone(compileSlideTheme(
+      presentation.theme,
+      currentRenderState.theme,
+      currentRenderState.master,
+      currentRenderState.layout,
+      currentSlide,
+    )),
     ...(currentSlidePreview ? { currentSlidePreviewDataUrl: await blobToDataUrl(currentSlidePreview) } : {}),
     ...(sketch ? {
       sketch: {

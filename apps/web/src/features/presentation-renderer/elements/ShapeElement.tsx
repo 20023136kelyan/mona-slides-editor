@@ -119,6 +119,8 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
       : element.fill || 'none'
   const textStyle: SlideCSSProperties = {
     lineHeight: text.lineHeight,
+    columnCount: text.columns,
+    columnGap: text.columnGap,
     letterSpacing: `${text.wordSpace || 0}px`,
     padding: `${inset[0]}px ${inset[1]}px ${inset[2]}px ${inset[3]}px`,
     '--paragraphSpace': `${text.paragraphSpace === undefined ? 5 : text.paragraphSpace}px`,

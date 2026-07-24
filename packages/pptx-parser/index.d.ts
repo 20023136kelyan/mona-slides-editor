@@ -43,6 +43,14 @@ export interface PatternFill {
 
 export type Fill = ColorFill | ImageFill | GradientFill | PatternFill
 
+export interface BackgroundFills {
+  effective: Fill
+  layout?: Fill
+  master?: Fill
+  slide?: Fill
+  source: 'default' | 'layout' | 'master' | 'slide'
+}
+
 export interface Border {
   borderColor: string
   borderWidth: number
@@ -52,6 +60,99 @@ export interface Border {
 export interface AutoFit {
   type: 'shape' | 'text'
   fontScale?: number
+}
+
+export interface StructuredTextColor {
+  alpha?: number
+  type: 'preset' | 'scheme' | 'srgb' | 'system'
+  value: string
+}
+
+export interface StructuredTextSpacing {
+  unit: 'percent' | 'points'
+  value: number
+}
+
+export interface StructuredTextRunProperties {
+  alternativeLanguage?: string
+  baseline?: number
+  bold?: boolean
+  capitalization?: string
+  color?: StructuredTextColor
+  complexScriptFontFamily?: string
+  eastAsianFontFamily?: string
+  fontFamily?: string
+  fontSize?: number
+  italic?: boolean
+  language?: string
+  normalizeHeight?: boolean
+  spacing?: number
+  strike?: string
+  underline?: string
+}
+
+export interface StructuredTextParagraphProperties {
+  alignment?: string
+  bullet?: {
+    character?: string
+    color?: StructuredTextColor
+    fontFamily?: string
+    numberingScheme?: string
+    size?: StructuredTextSpacing
+    startAt?: number
+    type: 'auto-number' | 'character' | 'none' | 'picture'
+  }
+  defaultRun?: StructuredTextRunProperties
+  defaultTabSize?: number
+  eastAsianLineBreak?: boolean
+  fontAlignment?: string
+  hangingPunctuation?: boolean
+  indent?: number
+  latinLineBreak?: boolean
+  lineSpacing?: StructuredTextSpacing
+  marginLeft?: number
+  rightToLeft?: boolean
+  spaceAfter?: StructuredTextSpacing
+  spaceBefore?: StructuredTextSpacing
+  tabs?: Array<{ alignment?: string; position: number }>
+}
+
+export interface StructuredTextBody {
+  bodyProperties?: {
+    anchor?: string
+    anchorCenter?: boolean
+    autoFit?: {
+      fontScale?: number
+      lineSpacingReduction?: number
+      type: 'none' | 'normal' | 'shape'
+    }
+    columnCount?: number
+    columnSpacing?: number
+    insets?: [number, number, number, number]
+    rightToLeftColumns?: boolean
+    rotation?: number
+    verticalMode?: string
+    wrap?: string
+  }
+  defaultParagraph?: StructuredTextParagraphProperties
+  listStyle: Array<{ level: number; paragraph?: StructuredTextParagraphProperties }>
+  paragraphs: Array<{
+    endProperties?: StructuredTextRunProperties
+    level: number
+    properties?: StructuredTextParagraphProperties
+    runs: Array<{
+      fieldId?: string
+      fieldType?: string
+      hyperlink?: string
+      kind: 'break' | 'field' | 'tab' | 'text'
+      properties?: StructuredTextRunProperties
+      sourceId: string
+      text?: string
+    }>
+    sourceId: string
+  }>
+  scale: number
+  schemaVersion: 1
 }
 
 export interface TextInset {
@@ -109,6 +210,7 @@ export interface Shape extends NativeObjectCarrier {
   shadow?: Shadow
   fill: Fill
   content: string
+  textBody?: StructuredTextBody
   isFlipV: boolean
   isFlipH: boolean
   rotate: number
@@ -144,6 +246,7 @@ export interface Text extends NativeObjectCarrier {
   isVertical: boolean
   rotate: number
   content: string
+  textBody?: StructuredTextBody
   vAlign: string
   name: string
   order: number
@@ -392,6 +495,7 @@ export interface SlideTransition {
 }
 
 export interface Slide {
+  backgrounds?: BackgroundFills
   fill: Fill
   elements: Element[]
   layoutElements: Element[]
