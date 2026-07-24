@@ -7,10 +7,12 @@ import {
   getShadowStyle,
   type SlideCSSProperties,
 } from '@/features/presentation-renderer/render-utils'
+import { autofitEnabled, useTextAutofit } from '@/features/presentation-renderer/use-text-autofit'
 
 export interface TextElementEditor {
   content: ReactNode
   onContextMenu: MouseEventHandler<HTMLDivElement>
+  onDoubleClick?: MouseEventHandler<HTMLDivElement>
   onPointerDown: PointerEventHandler<HTMLDivElement>
 }
 
@@ -29,6 +31,11 @@ const verticalAlignment: Record<NonNullable<PPTTextElement['vAlign']>, CSSProper
 export function TextElement({ editor, element, thumbnail = false }: TextElementProps) {
   const inset = element.inset || [10, 10, 10, 10]
   const shadow = getShadowStyle(element.shadow)
+  const fitEnabled = autofitEnabled(element.structuredText?.bodyProperties?.autoFit)
+  const { attachContent, attachFrame, scale: fitScale } = useTextAutofit(
+    fitEnabled,
+    `${element.width}|${element.height}|${element.lineHeight}|${element.content}`,
+  )
   const contentStyle: SlideCSSProperties = {
     width: element.vertical && !element.fixedHeight ? 'auto' : `${element.width}px`,
     height: !element.vertical && !element.fixedHeight ? 'auto' : `${element.height}px`,
@@ -66,11 +73,22 @@ export function TextElement({ editor, element, thumbnail = false }: TextElementP
         <div
           className={`mona-text-content${element.lock ? ' is-locked' : ''}`}
           onContextMenu={editor?.onContextMenu}
+          onDoubleClick={editor?.onDoubleClick}
           onPointerDown={editor?.onPointerDown}
+          ref={attachFrame}
           style={contentStyle}
         >
           <ElementOutline height={element.height} outline={element.outline} width={element.width} />
-          {editor?.content ?? (
+          {fitEnabled ? (
+            <div className="mona-text-autofit" ref={attachContent} style={{ zoom: fitScale }}>
+              {editor?.content ?? (
+                <div
+                  className={`mona-rich-text ProseMirror-static${thumbnail ? ' is-thumbnail' : ''}`}
+                  dangerouslySetInnerHTML={markup}
+                />
+              )}
+            </div>
+          ) : editor?.content ?? (
             <div
               className={`mona-rich-text ProseMirror-static${thumbnail ? ' is-thumbnail' : ''}`}
               dangerouslySetInnerHTML={markup}

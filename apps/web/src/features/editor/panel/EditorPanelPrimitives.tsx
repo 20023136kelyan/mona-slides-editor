@@ -56,11 +56,11 @@ export function PanelSearchField({
   value: string
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center gap-0.5 rounded-[var(--radius-action)] border border-input bg-background pl-2.5 pr-1">
+    <div className="flex h-9 shrink-0 items-center gap-0.5 rounded-action border border-input bg-background pl-2.5 pr-1">
       <Search className="size-3.5 shrink-0 text-muted-foreground" />
       <Input
         aria-label={label}
-        className="h-8 min-w-0 flex-1 rounded-[var(--radius-action)] border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0 [&::-webkit-search-cancel-button]:hidden"
+        className="h-8 min-w-0 flex-1 rounded-action border-0 bg-transparent px-1.5 shadow-none focus-visible:ring-0 [&::-webkit-search-cancel-button]:hidden"
         onChange={event => onChange(event.target.value)}
         onKeyDown={onSubmit
           ? event => {

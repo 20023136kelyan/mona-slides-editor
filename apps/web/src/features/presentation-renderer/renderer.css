@@ -163,6 +163,13 @@
   position: relative;
 }
 
+/* Wraps a shrink-to-fit body. `zoom` is set inline by the measured autofit
+   step; the box itself must stay full width so the reflow happens against the
+   real text area. */
+.mona-text-autofit {
+  width: 100%;
+}
+
 .mona-prosemirror-editor {
   cursor: text;
 }
@@ -206,6 +213,15 @@
 
 .ProseMirror > * { white-space: normal; }
 
+/* Compiled PowerPoint paragraphs carry their authored spacing verbatim, so
+   leading indentation and repeated spaces must survive HTML collapsing while
+   spaces stay valid wrap opportunities. Scoped to the compiler's own output so
+   legacy imported markup, which contains formatting whitespace between tags,
+   keeps normal collapsing. */
+:is(.ProseMirror, .ProseMirror-static) p[data-ppt-paragraph-id] {
+  white-space: pre-wrap;
+}
+
 .ProseMirror ::selection,
 .ProseMirror-static ::selection {
   background-color: var(--editor-selection-medium);
@@ -231,8 +247,20 @@
   padding-inline-start: 1.25em;
 }
 
+/* A compiled PowerPoint list declares its authored indent inline, which wins
+   over the default padding above. A list with no authored indent keeps that
+   default rather than collapsing its marker onto the text. */
+
 :is(.ProseMirror, .ProseMirror-static) ul { list-style-type: disc; }
 :is(.ProseMirror, .ProseMirror-static) ol { list-style-type: decimal; }
+/* A PowerPoint bullet has its own face, colour, and size, set per list item by
+   the structured-text compiler. Without the authored face a Wingdings marker
+   renders as whatever letter the body font maps that codepoint to. */
+:is(.ProseMirror, .ProseMirror-static) li::marker {
+  color: var(--mona-bullet-color, currentcolor);
+  font-family: var(--mona-bullet-font, inherit);
+  font-size: var(--mona-bullet-size, inherit);
+}
 /* the source editor serializes custom markers as inline list-style-type on ul/ol; li must inherit it. */
 :is(.ProseMirror, .ProseMirror-static) ul li { list-style-type: inherit; }
 :is(.ProseMirror, .ProseMirror-static) ol li { list-style-type: inherit; }
@@ -559,38 +587,7 @@
   transition: all .3s ease-in-out;
 }
 .mona-player-bar-wrap:hover .mona-player-played > span { transform: scale(1); }
-.mona-player-icons {
-  position: absolute;
-  bottom: 0;
-  left: 14px;
-  display: flex;
-  height: 38px;
-  align-items: center;
-}
-.mona-video-controller .mona-player-icons.is-left { left: 20px; }
-.mona-video-controller .mona-player-icons.is-right { right: 15px; left: auto; }
-.mona-player-icon {
-  position: relative;
-  display: flex;
-  width: 36px;
-  height: 100%;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #fff;
-  font-family: inherit;
-  font-size: 20px;
-  text-align: start;
-  cursor: pointer;
-}
-.mona-video-controller .mona-player-icon { width: 40px; }
-.mona-player-icon.is-play { font-size: 26px; }
-.mona-player-icon > span { color: #fff; opacity: .8; transition: all .2s ease-in-out; }
-.mona-player-icon:hover > span,
-.mona-player-icon.is-active > span { opacity: 1; }
-.mona-player-icon svg { display: block; width: 1em; height: 1em; }
-.mona-player-volume { position: relative; display: flex; height: 100%; align-items: center; cursor: pointer; }
+
 .mona-player-volume-wrap { display: inline-block; height: 100%; margin: 0 15px 0 -5px; vertical-align: middle; }
 .mona-player-volume-bar { position: relative; top: 17px; width: 0; height: 3px; background: #aaa; transition: all .3s ease-in-out; }
 .mona-player-volume:hover .mona-player-volume-bar { width: 45px; }
@@ -637,14 +634,7 @@
   transition: all .3s ease;
 }
 .mona-video-time { color: #eee; font-size: 13px; line-height: 38px; text-shadow: 0 0 2px rgba(0, 0, 0, .5); cursor: default; }
-.mona-player-icon.is-speed,
-.mona-player-icon.is-loop { font-size: 12px; }
-.mona-player-icon.is-loop > span { opacity: .5; }
-.mona-video-speed { position: relative; height: 12px; }
-.mona-video-speed-menu { position: absolute; bottom: 30px; left: -23px; width: 70px; background: #22211b; padding: 5px 0; color: #ddd; font-size: 12px; line-height: 12px; }
-.mona-video-speed-menu > button { width: 100%; border: 0; background: transparent; padding: 8px 0; color: inherit; font: inherit; text-align: center; cursor: pointer; }
-.mona-video-speed-menu > button:hover { background: #393833; color: #fff; }
-.mona-video-speed-menu > button.is-active { color: #fff; font-weight: 700; }
+
 .mona-video-bezel { position: absolute; z-index: 3; inset: 0; color: #fff; font-size: 22px; pointer-events: none; }
 .mona-video-bezel > span { position: absolute; top: 50%; left: 50%; display: flex; width: 52px; height: 52px; align-items: center; justify-content: center; margin: -26px 0 0 -26px; border-radius: var(--radius-pill); background: rgba(0, 0, 0, .5); padding: 12px; font-size: 40px; opacity: 0; }
 .mona-video-bezel > span.is-active { animation: mona-video-bezel-hide .5s linear; }

@@ -8,7 +8,7 @@ import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
 
 import { decryptNativePresentation } from '@/features/editor/editor-file-format'
-import { loadGoogleFonts } from '@/features/editor/editor-fonts'
+import { loadPresentationFonts } from '@/features/editor/editor-fonts'
 import { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
 import type { PowerPointImportStage } from '@/features/editor/editor-pptx-worker-client'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -119,6 +119,7 @@ const importPptx = async (
   options: NonNullable<ImportRequestDetail['options']>,
   signal: AbortSignal,
   onProgress: (stage: PowerPointImportStage) => void,
+  notify: EditorNotificationService['notify'],
 ) => {
   const [{ convertParsedPptxPresentation }, { parsePowerPointPackage }] = await Promise.all([
     import('@/features/editor/editor-pptx-import'),
@@ -127,7 +128,19 @@ const importPptx = async (
   const bytes = await readArrayBuffer(file)
   if (signal.aborted) throw Object.assign(new Error('PowerPoint import was cancelled'), { name: 'AbortError' })
   const { backing, parsed } = await parsePowerPointPackage(bytes, file.name, { onProgress, signal })
-  if (parsed.usedFonts.length) loadGoogleFonts(parsed.usedFonts)
+  // Font resolution runs alongside conversion rather than gating it: slides
+  // paint immediately and reflow as faces arrive. Only families with no
+  // deterministic stand-in are worth telling the user about.
+  void loadPresentationFonts({
+    embeddedFonts: parsed.embeddedFonts,
+    usedFonts: parsed.usedFonts,
+  }).then(report => {
+    if (!report.missing.length) return
+    notify({
+      text: t('runtime.fontsUnavailable', { fonts: report.missing.join(', ') }),
+      type: 'warning',
+    })
+  }, () => { /* Font resolution never fails an import. */ })
   const presentation = runtime.store.getState().presentation
   const width = parsed.size.width
   const height = parsed.size.height
@@ -225,7 +238,7 @@ export function useEditorImport(
         await importPptx(runtime, file, t, {
           cover,
           fixedViewport: request.options?.fixedViewport ?? false,
-        }, controller.signal, setImportStage)
+        }, controller.signal, setImportStage, notify)
       }
       else {
         if (controller.signal.aborted) throw Object.assign(new Error('Import was cancelled'), { name: 'AbortError' })

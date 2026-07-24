@@ -115,14 +115,14 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
     return (
       <div
         className={cn(
-          'mona-selection-item flex items-center rounded-[var(--radius-control)] p-[5px] text-xs',
+          'mona-selection-item flex items-center rounded-control p-1.25 text-xs',
           // is-locked retained so the lingering `.mona-selection-item:not(.is-locked):hover`
           // CSS rule keeps excluding locked rows until that rule is deleted centrally.
           element.lock && 'is-locked',
-          group && 'ml-[15px]',
-          !element.lock && 'transition-colors duration-200 hover:bg-[var(--editor-selection-medium)]',
-          active && 'bg-[var(--editor-selection-soft)]',
-          groupActive && 'bg-[var(--editor-selection-medium)]',
+          group && 'ml-3.75',
+          !element.lock && 'transition-colors duration-200 hover:bg-editor-selection-medium',
+          active && 'bg-editor-selection-soft',
+          groupActive && 'bg-editor-selection-medium',
         )}
         data-element-id={element.id}
         key={element.id}
@@ -150,7 +150,7 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
             aria-label={t('foundation.editor.selection.selectElement', { name })}
             aria-disabled={element.lock || hidden}
             aria-pressed={active}
-            className="mona-selection-select h-[18px] flex-1 justify-start overflow-hidden rounded-none p-0 text-left text-xs font-normal leading-[18px] text-ellipsis whitespace-nowrap text-inherit"
+            className="mona-selection-select h-4.5 flex-1 justify-start overflow-hidden rounded-none p-0 text-left text-xs font-normal leading-[18px] text-ellipsis whitespace-nowrap text-inherit"
             onClick={() => group ? selectGroupElement(group, element) : selectElement(element)}
             onDoubleClick={() => setEditingId(element.id)}
             onKeyDown={event => {
@@ -210,8 +210,8 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
           </div>
           <div className="-mr-2.5 h-[calc(100%-32px)] overflow-auto pr-2.5">
             {elements.map(item => item.type === 'group' ? (
-              <div className="py-[5px]" key={item.id}>
-                <div className="mb-[5px] px-[5px]">{t('foundation.editor.selection.group')}</div>
+              <div className="py-1.25" key={item.id}>
+                <div className="mb-1.25 px-1.25">{t('foundation.editor.selection.group')}</div>
                 {item.elements.map(element => renderItem(element, item))}
               </div>
             ) : renderItem(item))}
@@ -221,5 +221,5 @@ export function EditorLayersPanel({ runtime }: { runtime: EditorRuntime }) {
     </>
   )
 
-  return <div className="h-[calc(100vh-170px)] min-h-[260px] select-none text-xs">{content}</div>
+  return <div className="h-[calc(100vh-170px)] min-h-65 select-none text-xs">{content}</div>
 }

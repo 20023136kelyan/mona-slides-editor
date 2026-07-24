@@ -108,7 +108,7 @@ export function EditorRail({
           aria-label={item.label}
           aria-pressed={item.active}
           className={cn(
-            'h-10 w-full px-3 max-[1100px]:justify-center max-[1100px]:px-0',
+            'h-10 w-full px-3 max-snug:justify-center max-snug:px-0',
             item.stub && 'text-muted-foreground',
           )}
           data-task-panel-route={item.hasPanel ? (item.key === 'templates' ? 'design' : item.key) : undefined}
@@ -117,14 +117,14 @@ export function EditorRail({
           onFocus={item.onFocus}
           onPointerEnter={item.onPointerEnter}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-3 max-[1100px]:flex-none">
+          <div className="flex min-w-0 flex-1 items-center gap-3 max-snug:flex-none">
             <Icon className="h-4 w-4 shrink-0" />
-            <span className="truncate max-[1100px]:hidden">{item.label}</span>
+            <span className="truncate max-snug:hidden">{item.label}</span>
           </div>
           {item.hasPanel ? (
             <ChevronRight
               className={cn(
-                'ml-auto h-4 w-4 shrink-0 transition-transform max-[1100px]:hidden',
+                'ml-auto h-4 w-4 shrink-0 transition-transform max-snug:hidden',
                 item.active && 'rotate-90',
               )}
             />
@@ -137,7 +137,7 @@ export function EditorRail({
   return (
     <Sidebar
       aria-label={t('foundation.editor.rail.tools')}
-      className="mona-editor-rail w-56 shrink-0 border-r border-sidebar-border max-[1100px]:w-[3.25rem]"
+      className="mona-editor-rail w-56 shrink-0 border-r border-sidebar-border max-snug:w-[3.25rem]"
       collapsible="none"
       role="navigation"
       side="left"

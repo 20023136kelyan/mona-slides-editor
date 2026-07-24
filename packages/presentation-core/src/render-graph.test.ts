@@ -41,7 +41,7 @@ const image = (id: string, sourceLayer?: PowerPointElementSourceLayer): PPTImage
 const field = (
   id: string,
   placeholderType: 'dt' | 'ftr' | 'sldNum',
-  sourceLayer: 'layout' | 'master',
+  sourceLayer: 'layout' | 'master' | 'slide',
 ): PPTTextElement => ({
   content: `<p><span>${placeholderType === 'sldNum' ? '‹#›' : id}</span></p>`,
   defaultColor: '#111111',
@@ -475,7 +475,7 @@ describe('PowerPoint render graph', () => {
     })
   })
 
-  it('renders enabled header/footer fields once and materializes the current slide number', () => {
+  const fieldFixture = (slideElements: PPTTextElement[]) => {
     const masterSlideNumber = field('master-number', 'sldNum', 'master')
     const layoutSlideNumber = field('layout-number', 'sldNum', 'layout')
     const footer = field('master-footer', 'ftr', 'master')
@@ -526,7 +526,7 @@ describe('PowerPoint render graph', () => {
       ],
     }
     const slide: Slide = {
-      elements: [],
+      elements: slideElements,
       id: 'slide-2',
       source: {
         ...sourcePackage.slides[1]!,
@@ -534,10 +534,116 @@ describe('PowerPoint render graph', () => {
         packageId: sourcePackage.packageId,
       },
     }
+    return { slide, sourcePackage }
+  }
+
+  it('renders the slide\'s own fields once and materializes the current slide number', () => {
+    const { sourcePackage, slide } = fieldFixture([
+      field('slide-footer', 'ftr', 'slide'),
+      field('slide-number', 'sldNum', 'slide'),
+    ])
 
     const graph = resolveSlideRenderGraph(slide, [sourcePackage])
-    expect(graph.map(node => node.element.id)).toEqual(['layout-footer', 'layout-number'])
+
+    // Enabling a field writes the placeholder onto the slide, so the slide's
+    // own copy renders and the layout and master prompts stay unpainted. A
+    // deck that never enabled them shows nothing, which is what every Canva
+    // export looks like.
+    expect(graph.map(node => node.element.id)).toEqual(['slide-footer', 'slide-number'])
     expect((graph[1]!.element as PPTTextElement).content).toContain('2')
     expect((graph[1]!.element as PPTTextElement).content).not.toContain('‹#›')
+  })
+
+  it('paints no field when the slide never declared one', () => {
+    const { sourcePackage, slide } = fieldFixture([])
+
+    expect(resolveSlideRenderGraph(slide, [sourcePackage]).map(node => node.element.id)).toEqual([])
+  })
+
+  it('lets the master switch a family off for a slide that declares it', () => {
+    // dateTime is disabled on the master below.
+    const { sourcePackage, slide } = fieldFixture([field('slide-date', 'dt', 'slide')])
+
+    expect(resolveSlideRenderGraph(slide, [sourcePackage]).map(node => node.element.id)).toEqual([])
+  })
+
+  it('compiles table cell bodies against the deck theme instead of the first span', () => {
+    const table = {
+      cellMinHeight: 36,
+      colWidths: [0.5, 0.5],
+      data: [[
+        {
+          colspan: 1,
+          id: 'cell-0',
+          rowspan: 1,
+          structuredText: {
+            listStyle: [],
+            paragraphs: [{
+              level: 0,
+              runs: [
+                { kind: 'text' as const, properties: { bold: true, fontFamily: '+mn-lt' }, sourceId: 'c0.r0', text: 'Metric' },
+                { kind: 'text' as const, properties: { color: { type: 'scheme' as const, value: 'accent1' } }, sourceId: 'c0.r1', text: ' 2025' },
+              ],
+              sourceId: 'c0.p0',
+            }],
+            scale: 1,
+            schemaVersion: 1 as const,
+          },
+          text: '<p><span>Metric 2025</span></p>',
+        },
+        { colspan: 1, id: 'cell-1', rowspan: 1, text: '<p>plain</p>' },
+      ]],
+      height: 80,
+      id: 'table-1',
+      left: 0,
+      outline: { color: '#cccccc', style: 'solid' as const, width: 1 },
+      rotate: 0,
+      rowHeights: [40],
+      top: 0,
+      type: 'table' as const,
+      width: 400,
+    }
+    const sourcePackage: PowerPointPackageReference = {
+      byteLength: 10,
+      fileName: 'table.pptx',
+      kind: 'pptx',
+      hierarchy: {
+        layouts: [],
+        masters: [],
+        placeholders: [],
+        themes: [{
+          colors: [{ name: 'accent1', type: 'srgb', value: 'E2534D' }],
+          id: 'theme-1',
+          minorFont: { latin: 'Aptos', supplemental: [] },
+          packageId: 'pptx:source',
+          partPath: 'ppt/theme/theme1.xml',
+        }],
+      },
+      packageId: 'pptx:source',
+      slides: [{ slidePart: 'ppt/slides/slide1.xml', themeId: 'theme-1' }],
+    }
+    const slide: Slide = {
+      elements: [table],
+      id: 'slide-1',
+      source: {
+        kind: 'pptx',
+        packageId: 'pptx:source',
+        slidePart: 'ppt/slides/slide1.xml',
+        themeId: 'theme-1',
+      },
+    }
+
+    const nodes = resolveSlideRenderGraph(slide, [sourcePackage])
+    const rendered = nodes[0]?.element
+    expect(rendered?.type).toBe('table')
+    const compiled = rendered?.type === 'table' ? rendered.data[0]![0]!.text : ''
+
+    // Each run keeps its own properties rather than the whole cell inheriting
+    // whatever the first span declared.
+    expect(compiled).toContain('font-weight:700')
+    expect(compiled).toContain('font-family:&quot;Aptos&quot;')
+    expect(compiled).toContain('color:#E2534D')
+    // A cell with no retained body is left exactly as authored.
+    expect(rendered?.type === 'table' ? rendered.data[0]![1]!.text : '').toBe('<p>plain</p>')
   })
 })

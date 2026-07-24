@@ -10,6 +10,20 @@ export interface ColorFill {
   value: string
 }
 
+export interface PictureFillFit {
+  /** Tile alignment, tile mode only. */
+  alignment?: string
+  mode: 'stretch' | 'tile'
+  /**
+   * Destination rectangle for a stretch, as fractions of the shape inset from
+   * each edge. Negative values push the edge outward so the picture overflows
+   * and is cropped by the shape.
+   */
+  rect?: { b: number; l: number; r: number; t: number }
+  scaleX?: number
+  scaleY?: number
+}
+
 export interface ImageFill {
   type: 'image'
   value: {
@@ -17,6 +31,7 @@ export interface ImageFill {
     base64: string
     blob: string
     opacity: number
+    fit?: PictureFillFit
   }
 }
 
@@ -293,6 +308,8 @@ export interface Image extends NativeObjectCarrier {
 
 export interface TableCell {
   text: string
+  /** Retained paragraph/run model for the cell, parallel to `text`. */
+  textBody?: StructuredTextBody
   rowSpan?: number
   colSpan?: number
   vMerge?: number
@@ -514,8 +531,18 @@ export interface Options {
   audioMode?: 'blob' | 'none'
 }
 
+export interface EmbeddedFont {
+  /** Base64 payload of the font part, exactly as stored in the package. */
+  data: string
+  italic: boolean
+  partPath: string
+  typeface: string
+  weight: number
+}
+
 export const parse: (file: ArrayBuffer, options?: Options) => Promise<{
   slides: Slide[]
+  embeddedFonts: EmbeddedFont[]
   themeColors: string[]
   usedFonts: string[]
   size: {

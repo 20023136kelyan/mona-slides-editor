@@ -20,49 +20,12 @@ import type { PresentationState } from '@mona/presentation-core'
 import type { RichTextAction } from '@mona/rich-text'
 
 import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorSelect, inspectorDividerClass, inspectorSelectGroupClass } from '@/features/editor/EditorInspectorPrimitives'
+import { LinePreview, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
-
-const fontOptions = [
-  { label: '思源黑体', value: 'SourceHanSans' },
-  { label: '思源宋体', value: 'SourceHanSerif' },
-  { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
-  { label: '文鼎PL宋体', value: 'WenDingPLSongTi' },
-  { label: '朱雀仿宋', value: 'ZhuQueFangSong' },
-  { label: '霞鹜文楷', value: 'LXGWWenKai' },
-  { label: '霞鹜新致宋', value: 'LXGWNeoZhiSong' },
-  { label: '霞鹜新晰黑', value: 'LXGWNeoXiHei' },
-  { label: '阿里巴巴普惠体', value: 'AlibabaPuHuiTi' },
-  { label: '得意黑', value: 'DeYiHei' },
-  { label: 'MiSans', value: 'MiSans' },
-  { label: 'Source Serif 4', value: 'SourceSerif4' },
-  { label: 'JetBrains Mono', value: 'JetBrainsMono' },
-  { label: 'Literata', value: 'Literata' },
-  { label: 'Inter', value: 'Inter' },
-  { label: 'Roboto', value: 'Roboto' },
-  { label: 'Open Sans', value: 'OpenSans' },
-  { label: 'Montserrat', value: 'Montserrat' },
-  { label: 'Source Sans Pro', value: 'SourceSansPro' },
-  { label: 'Merriweather', value: 'Merriweather' },
-  { label: 'Lato', value: 'Lato' },
-] as const
-
-const fontSizeOptions = [
-  '12px', '14px', '16px', '18px', '20px', '22px', '24px', '28px', '32px',
-  '36px', '40px', '44px', '48px', '54px', '60px', '66px', '72px', '76px',
-  '80px', '88px', '96px', '104px', '112px', '120px',
-].map(value => ({ label: value, value }))
+import { editorFontOptions, editorFontSizeOptions } from '@/features/editor/editor-text-options'
 
 type MultiFontCommand = 'align' | 'backcolor' | 'color' | 'fontname' | 'fontsize' | 'fontsize-add' | 'fontsize-reduce'
-
-function LinePreview({ type }: { type: LineStyleType }) {
-  const dashArray = type === 'dashed' ? '10 5' : type === 'dotted' ? '3.6 3.2' : '0 0'
-  return (
-    <svg aria-hidden="true" className="mona-line-style-preview" height="100%" viewBox="0 0 100 10" width="100%">
-      <line stroke="#333" strokeDasharray={dashArray} strokeWidth="2" x1="0" x2="100" y1="5" y2="5" />
-    </svg>
-  )
-}
 
 const cloneTableData = (data: readonly (readonly TableCell[])[]): TableCell[][] => (
   JSON.parse(JSON.stringify(data)) as TableCell[][]
@@ -155,34 +118,28 @@ export function MultiStylePanel({
 
   return (
     <div className="mona-multi-style-panel">
-      <div className="flex w-full items-center mb-2.5">
-        <div className="w-[48%] text-xs">{t('foundation.editor.multi.fillColor')}</div>
-        <div className="w-[52%] [&>*]:w-full"><InspectorColorButton ariaLabel={t('foundation.editor.multi.fillColor')} color={fill} onChange={updateFill} /></div>
-      </div>
+      <PropertyRow label={t('foundation.editor.multi.fillColor')}>
+        <InspectorColorButton ariaLabel={t('foundation.editor.multi.fillColor')} color={fill} onChange={updateFill} />
+      </PropertyRow>
 
       <div className={inspectorDividerClass} />
 
-      <div className="flex w-full items-center mb-2.5">
-        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderStyle')}</div>
-        <div className="w-[52%] [&>*]:w-full">
-          <InspectorSelect<LineStyleType>
-            ariaLabel={t('foundation.editor.multi.borderStyle')}
-            onChange={style => updateOutline({ style })}
-            options={lineStyleOptions}
-            renderLabel={option => <LinePreview type={option?.value || 'solid'} />}
-            renderOption={option => <LinePreview type={option.value} />}
-            value={outline.style || 'solid'}
-          />
-        </div>
-      </div>
-      <div className="flex w-full items-center mb-2.5">
-        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderColor')}</div>
-        <div className="w-[52%] [&>*]:w-full"><InspectorColorButton ariaLabel={t('foundation.editor.multi.borderColor')} color={outline.color || '#000'} onChange={color => updateOutline({ color })} /></div>
-      </div>
-      <div className="flex w-full items-center mb-2.5">
-        <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderWidth')}</div>
-        <div className="w-[52%] [&>*]:w-full"><InspectorNumberInput ariaLabel={t('foundation.editor.multi.borderWidth')} min={0} onChange={width => updateOutline({ width })} value={outline.width || 0} /></div>
-      </div>
+      <PropertyRow label={t('foundation.editor.multi.borderStyle')}>
+        <InspectorSelect<LineStyleType>
+          ariaLabel={t('foundation.editor.multi.borderStyle')}
+          onChange={style => updateOutline({ style })}
+          options={lineStyleOptions}
+          renderLabel={option => <LinePreview type={option?.value || 'solid'} />}
+          renderOption={option => <LinePreview type={option.value} />}
+          value={outline.style || 'solid'}
+        />
+      </PropertyRow>
+      <PropertyRow label={t('foundation.editor.multi.borderColor')}>
+        <InspectorColorButton ariaLabel={t('foundation.editor.multi.borderColor')} color={outline.color || '#000'} onChange={color => updateOutline({ color })} />
+      </PropertyRow>
+      <PropertyRow label={t('foundation.editor.multi.borderWidth')}>
+        <InspectorNumberInput ariaLabel={t('foundation.editor.multi.borderWidth')} min={0} onChange={width => updateOutline({ width })} value={outline.width || 0} />
+      </PropertyRow>
 
       <div className={inspectorDividerClass} />
 
@@ -191,7 +148,7 @@ export function MultiStylePanel({
           ariaLabel={t('foundation.editor.text.fontFamily')}
           icon={<FontSizeIcon />}
           onChange={value => updateFontStyle('fontname', value)}
-          options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]}
+          options={[{ label: t('common.defaultFont'), value: '' }, ...editorFontOptions]}
           search
           searchLabel={t('foundation.editor.text.fontSearch')}
           style={{ width: '60%' }}
@@ -201,7 +158,7 @@ export function MultiStylePanel({
           ariaLabel={t('foundation.editor.text.fontSize')}
           icon={<AddTextIcon />}
           onChange={value => updateFontStyle('fontsize', value)}
-          options={fontSizeOptions}
+          options={editorFontSizeOptions}
           search
           searchLabel={t('foundation.editor.text.fontSizeSearch')}
           style={{ width: '40%' }}

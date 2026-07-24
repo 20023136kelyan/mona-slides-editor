@@ -36,53 +36,12 @@ export interface InspectorOption<T extends number | string> {
 
 /** Shared inspector layout recipes (Tailwind-first). */
 export const inspectorRowClass = 'flex w-full items-center mb-2.5'
-export const inspectorRowFullClass = 'flex w-full items-center mb-2.5'
 export const inspectorSplitRowClass = 'grid w-full grid-cols-2 items-center gap-2.5 mb-2.5'
-export const inspectorRowLabelClass = 'w-[48%] text-xs'
-export const inspectorRowControlClass = 'w-[52%] [&>*]:w-full'
 export const inspectorDividerClass = 'my-6 w-full border-t border-black/[0.06]'
-export const inspectorButtonGroupClass = 'flex items-center [&_.mona-panel-button]:rounded-none [&_.mona-panel-button]:border-r-0 [&_:first-child]:rounded-l-[var(--radius-control)] [&_:last-child]:rounded-r-[var(--radius-control)] [&_:last-child]:border-r'
+export const inspectorButtonGroupClass = 'flex items-center [&_.mona-panel-button]:rounded-none [&_.mona-panel-button]:border-r-0 [&_:first-child]:rounded-l-control [&_:last-child]:rounded-r-control [&_:last-child]:border-r'
 export const inspectorSelectGroupClass = 'flex items-center'
-export const inspectorSwitchWrapperClass = 'w-full text-right'
-export const inspectorPopoverMenuItemClass = 'min-w-20 rounded-[var(--radius-control)] border-0 bg-transparent px-2.5 py-1.5 text-[#333] hover:bg-[#f1f1f1]'
+export const inspectorPopoverMenuItemClass = 'min-w-20 rounded-control border-0 bg-transparent px-2.5 py-1.5 text-[#333] hover:bg-[#f1f1f1]'
 export const inspectorPopoverMenuItemCenteredClass = `${inspectorPopoverMenuItemClass} text-center`
-
-export function InspectorRow({
-  children,
-  className,
-  label,
-}: {
-  children: ReactNode
-  className?: string
-  label?: ReactNode
-}) {
-  if (label == null) {
-    return <div className={cn(inspectorRowFullClass, className)}>{children}</div>
-  }
-  return (
-    <div className={cn(inspectorRowClass, className)}>
-      <div className={inspectorRowLabelClass}>{label}</div>
-      <div className={inspectorRowControlClass}>{children}</div>
-    </div>
-  )
-}
-
-export function InspectorSection({
-  children,
-  className,
-  title,
-}: {
-  children: ReactNode
-  className?: string
-  title?: ReactNode
-}) {
-  return (
-    <div className={cn('w-full', className)}>
-      {title ? <div className="mb-2 text-xs font-semibold text-foreground">{title}</div> : null}
-      {children}
-    </div>
-  )
-}
 
 export function InspectorCheckbox({
   checked,
@@ -98,7 +57,7 @@ export function InspectorCheckbox({
   style?: CSSProperties
 }) {
   return (
-    <label className={cn('flex h-5 cursor-pointer items-center text-[13px] leading-5 select-none [&>span:last-child]:ml-1.5', className)} style={style}>
+    <label className={cn('flex h-5 cursor-pointer items-center text-control leading-5 select-none [&>span:last-child]:ml-1.5', className)} style={style}>
       <Checkbox checked={checked} onCheckedChange={value => onChange(value === true)} />
       <span>{children}</span>
     </label>
@@ -189,7 +148,7 @@ export function InspectorPopoverButton({
       <PopoverContent
         aria-label={ariaLabel}
         align="center"
-        className="z-[9999] w-max max-w-[300px] rounded-[var(--radius-overlay)] border border-border bg-popover p-0 text-[13px] text-popover-foreground shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
+        className="z-[9999] w-max max-w-75 rounded-overlay border border-border bg-popover p-0 text-control text-popover-foreground shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
         collisionPadding={5}
         onCloseAutoFocus={event => event.preventDefault()}
         onFocusOutside={event => event.preventDefault()}
@@ -236,7 +195,7 @@ export function InspectorSelect<T extends number | string>({
   const [open, setOpen] = useState(false)
   const triggerLabel = renderLabel ? renderLabel(selectedOption) : label
   const triggerClass = cn(
-    'mona-panel-select relative h-8 w-full justify-between rounded-[var(--radius-control)] text-start text-[13px]',
+    'mona-panel-select relative h-8 w-full justify-between rounded-control text-start text-control',
     className,
   )
 
@@ -259,14 +218,14 @@ export function InspectorSelect<T extends number | string>({
         </SelectTrigger>
         <SelectContent
           align="start"
-          className="z-[9999] w-max min-w-[var(--radix-select-trigger-width)] max-w-[300px] rounded-[var(--radius-overlay)] border border-border bg-popover p-0 text-[13px] shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
+          className="z-[9999] w-max min-w-[var(--radix-select-trigger-width)] max-w-75 rounded-overlay border border-border bg-popover p-0 text-control shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
           collisionPadding={8}
           position="popper"
           sideOffset={8}
         >
           {options.map(option => (
             <SelectItem
-              className="flex h-8 w-full items-center overflow-hidden rounded-[var(--radius-control)] px-1.5 text-left text-ellipsis whitespace-nowrap data-[state=checked]:font-bold"
+              className="flex h-8 w-full items-center overflow-hidden rounded-control px-1.5 text-left text-ellipsis whitespace-nowrap data-[state=checked]:font-bold"
               disabled={option.disabled}
               key={String(option.value)}
               value={String(option.value)}
@@ -296,21 +255,21 @@ export function InspectorSelect<T extends number | string>({
       <PopoverContent
         aria-label={ariaLabel}
         align="start"
-        className="z-[9999] w-max min-w-[var(--radix-popover-trigger-width)] max-w-[300px] rounded-[var(--radius-overlay)] border border-border bg-popover p-0 text-[13px] shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
+        className="z-[9999] w-max min-w-[var(--radix-popover-trigger-width)] max-w-75 rounded-overlay border border-border bg-popover p-0 text-control shadow-[0_6px_16px_rgb(0_0_0_/_8%)]"
         collisionPadding={8}
         side="bottom"
         sideOffset={8}
       >
         <Command>
           <CommandInput aria-label={searchLabel} placeholder={searchLabel} />
-          <CommandList className="max-h-[260px] overflow-auto p-1.5 text-left text-[13px] select-none">
+          <CommandList className="max-h-65 overflow-auto p-1.5 text-left text-control select-none">
             <CommandEmpty>{searchLabel}</CommandEmpty>
             <CommandGroup>
               {options.map(option => (
                 <CommandItem
                   aria-selected={option.value === value}
                   className={cn(
-                    'flex h-8 w-full items-center overflow-hidden rounded-[var(--radius-control)] px-1.5 text-left text-ellipsis whitespace-nowrap',
+                    'flex h-8 w-full items-center overflow-hidden rounded-control px-1.5 text-left text-ellipsis whitespace-nowrap',
                     option.value === value && 'font-bold',
                   )}
                   data-checked={option.value === value}
@@ -384,7 +343,7 @@ export function InspectorNumberInput({
   return (
     <div
       className={cn(
-        'mona-panel-number inline-flex h-8 min-w-0 items-center rounded-[var(--radius-control)] border border-input bg-background pl-1.5 text-[13px] transition-[border-color]',
+        'mona-panel-number inline-flex h-8 min-w-0 items-center rounded-control border border-input bg-background pl-1.5 text-control transition-[border-color]',
         focused && 'border-ring',
         !disabled && !focused && 'hover:border-ring',
         disabled && 'opacity-50',
@@ -392,7 +351,7 @@ export function InspectorNumberInput({
       style={style}
     >
       {label ? <span className="mona-panel-number-prefix min-w-0 flex-[0_1_auto] overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-[30px]">{label}</span> : null}
-      <span className="mona-panel-number-input-wrap relative min-w-9 flex-1 pl-1.5 text-[#41464b]">
+      <span className="mona-panel-number-input-wrap relative min-w-9 flex-1 pl-1.5 text-foreground">
         <Input
           aria-label={ariaLabel}
           className="h-full min-w-0 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
@@ -499,7 +458,7 @@ export function InspectorColorButton({
     <InspectorPopoverButton
       ariaLabel={ariaLabel}
       className={cn(
-        'relative flex h-8 items-center justify-center border border-[#d9d9d9] bg-white p-0 text-[#41464b] hover:border-[var(--editor-selection)] hover:text-[var(--editor-selection)]',
+        'relative flex h-8 items-center justify-center border border-[#d9d9d9] bg-white p-0 text-foreground hover:border-editor-selection hover:text-editor-selection',
         icon ? 'flex-col' : 'flex-row',
       )}
       content={<EditorColorPicker onChange={onChange} value={color || '#000000'} />}
@@ -510,7 +469,7 @@ export function InspectorColorButton({
       {icon ? (
         <>
           {icon}
-          <span className="mt-px h-1 w-[17px]" style={{ backgroundImage: stripBg }}>
+          <span className="mt-px h-1 w-4.25" style={{ backgroundImage: stripBg }}>
             <span className="block size-full" style={{ backgroundColor: color }} />
           </span>
         </>
@@ -522,7 +481,7 @@ export function InspectorColorButton({
           >
             <span className="block size-full" style={{ backgroundColor: color }} />
           </span>
-          <span className="flex w-8 items-center justify-center text-[13px] text-[#bfbfbf] [&_svg]:w-8">
+          <span className="flex w-8 items-center justify-center text-control text-[#bfbfbf] [&_svg]:w-8">
             <PaletteIcon />
           </span>
         </>

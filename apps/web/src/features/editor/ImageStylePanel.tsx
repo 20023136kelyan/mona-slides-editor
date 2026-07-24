@@ -23,7 +23,7 @@ import {
   ElementShadowControls,
   PropertyRow,
 } from '@/features/editor/ElementStyleCommons'
-import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorPopoverButton, InspectorSlider, InspectorSwitch, inspectorDividerClass, inspectorRowFullClass } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorPopoverButton, InspectorSlider, InspectorSwitch, inspectorDividerClass, inspectorRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import { getImageBeforeCrop, getPresetImageCrop, getReplacementImageCommands } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { CLIP_PATHS, getImageFilter } from '@/features/presentation-renderer/render-utils'
@@ -139,7 +139,7 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       <div className="mona-image-origin-preview" style={{ backgroundImage: `url(${element.src})` }} />
       <ElementFlipControls element={element} runtime={runtime} />
 
-      <InspectorButtonGroup className={`mona-image-crop-group ${inspectorRowFullClass}`}>
+      <InspectorButtonGroup className={`mona-image-crop-group ${inspectorRowClass}`}>
         <InspectorButton ariaLabel={t('foundation.editor.image.cropImage')} onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} style={{ width: 'calc(100% - 32px)' }}><TailoringIcon /> {t('foundation.editor.image.cropImage')}</InspectorButton>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.image.cropOptions')}

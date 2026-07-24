@@ -1,4 +1,7 @@
 import { useTranslation } from 'react-i18next'
+import { RotateCw } from 'lucide-react'
+
+import { cn } from '@/lib/utils'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 
 import { boundsToRect, type ResizeHandle } from '@mona/editor-interactions/geometry'
@@ -22,14 +25,35 @@ const allResizeHandles: readonly ResizeHandle[] = [
   'bottom-right', 'bottom', 'bottom-left', 'left',
 ]
 
-const getResizeHandles = (elements: readonly PPTElement[], interactionProfile: 'desktop' | 'mobile'): readonly ResizeHandle[] => {
+// Selection chrome geometry, duplicated inline at three call sites where it
+// silently beat the stylesheet. One source of truth: solid hairline outline
+// with round handles, the idiom modern design tools use.
+// Space the rotate button needs above the frame: its offset plus its own
+// size, which is also roughly the contextual toolbar's footprint.
+const ROTATE_CLEARANCE = 64
+
+const SELECTION_CHROME = {
+  '--mona-handle-size': '10px',
+  '--mona-outline-width': '2px',
+  '--mona-handle-stroke': '1px',
+  '--mona-border-radius': '9999px',
+  // Canva's shape system: circular corners, elongated pills on the edges.
+  '--mona-handle-long': '20px',
+  '--mona-handle-thin': '6px',
+  '--mona-rotate-size': '22px',
+  // Neutral hairline: Canva colours the outline, not the handles.
+  '--mona-handle-border': 'rgb(16 18 25 / 28%)',
+  // Re-points the inherited token for everything inside the frame only.
+  '--editor-selection': 'var(--selection-accent)',
+} as CSSProperties
+
+const getResizeHandles = (elements: readonly PPTElement[]): readonly ResizeHandle[] => {
   if (elements.length !== 1) return canResizeSelection(elements) ? allResizeHandles : []
   const element = elements[0]!
   if (!canResizeSelection(elements)) return []
   if (element.type === 'text' && !element.fixedHeight) {
     return element.vertical ? ['top', 'bottom'] : ['left', 'right']
   }
-  if (interactionProfile === 'mobile' && element.type === 'table') return ['left', 'right']
   return allResizeHandles
 }
 
@@ -46,15 +70,15 @@ const getResizeRotationClass = (rotate = 0) => {
 
 function TransformHandles({
   elements,
-  interactionProfile,
   onResizePointerDown,
   onRotatePointerDown,
+  rotateBelow = false,
   showRotate = true,
 }: {
   elements: PPTElement[]
-  interactionProfile: 'desktop' | 'mobile'
   onResizePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
+  rotateBelow?: boolean
   showRotate?: boolean
 }) {
   const { t } = useTranslation()
@@ -62,7 +86,7 @@ function TransformHandles({
   const rotateClass = getResizeRotationClass(single && single.type !== 'line' ? single.rotate : 0)
   return (
     <>
-      {getResizeHandles(elements, interactionProfile).map(handle => (
+      {getResizeHandles(elements).map(handle => (
         <button
           aria-label={t('foundation.editor.resizeHandle', { handle: t(`foundation.editor.handle.${handle}`) })}
           className={`mona-transform-handle is-${handle} ${rotateClass}`}
@@ -75,10 +99,10 @@ function TransformHandles({
       {showRotate && canRotateSelection(elements) ? (
         <button
           aria-label={t('foundation.editor.rotateSelection')}
-          className="mona-rotate-handle"
+          className={cn('mona-rotate-handle', rotateBelow && 'is-below')}
           onPointerDown={onRotatePointerDown}
           type="button"
-        />
+        ><RotateCw /></button>
       ) : null}
     </>
   )
@@ -88,7 +112,6 @@ function RectSelection({
   children,
   className = '',
   elements,
-  interactionProfile,
   onResizePointerDown,
   onRotatePointerDown,
   scale,
@@ -98,7 +121,6 @@ function RectSelection({
   children?: ReactNode
   className?: string
   elements: PPTElement[]
-  interactionProfile: 'desktop' | 'mobile'
   onResizePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
   scale: number
@@ -110,6 +132,9 @@ function RectSelection({
   const rect = boundsToRect(bounds)
   const single = elements.length === 1 ? elements[0] : undefined
   const rotate = single && single.type !== 'line' ? single.rotate : 0
+  // Not enough room above (stage edge or the contextual toolbar that lives
+  // there) — put the rotate affordance under the element instead.
+  const rotateBelow = rect.top * scale < ROTATE_CLEARANCE
   const secondary = className.includes('is-secondary')
   return (
     <div
@@ -123,10 +148,8 @@ function RectSelection({
         width: rect.width * scale,
         height: rect.height * scale,
         transform: `rotate(${rotate}deg)`,
-        '--mona-handle-size': '10px',
-        '--mona-outline-width': '1px',
-        '--mona-border-radius': '1px',
-        '--mona-rotate-offset': '25px',
+        ...SELECTION_CHROME,
+        '--mona-rotate-offset': '38px',
         '--mona-keypoint-color': '#ffe873',
       } as CSSProperties}
     >
@@ -137,9 +160,9 @@ function RectSelection({
       {showHandles ? (
         <TransformHandles
           elements={elements}
-          interactionProfile={interactionProfile}
           onResizePointerDown={onResizePointerDown}
           onRotatePointerDown={onRotatePointerDown}
+          rotateBelow={rotateBelow}
           showRotate={showRotate}
         />
       ) : null}
@@ -169,9 +192,7 @@ function LineSelection({
       style={{
         left: element.left * scale,
         top: element.top * scale,
-        '--mona-handle-size': '10px',
-        '--mona-outline-width': '1px',
-        '--mona-border-radius': '1px',
+        ...SELECTION_CHROME,
       } as CSSProperties}
     >
       {showHandles && (element.curve || element.cubic) ? (
@@ -230,9 +251,7 @@ function ShapeKeypointControls({
       style={{
         left: (point.x - element.left) * scale,
         top: (point.y - element.top) * scale,
-        '--mona-handle-size': '10px',
-        '--mona-outline-width': '1px',
-        '--mona-border-radius': '1px',
+        ...SELECTION_CHROME,
       } as CSSProperties}
       type="button"
     />
@@ -369,7 +388,6 @@ export function EditorSelectionOverlay({
   cropElementId,
   elements,
   handleElementId,
-  interactionProfile = 'desktop',
   onLinePointerDown,
   onResizePointerDown,
   onRotatePointerDown,
@@ -380,7 +398,6 @@ export function EditorSelectionOverlay({
   cropElementId: string | null
   elements: PPTElement[]
   handleElementId: string | null
-  interactionProfile?: 'desktop' | 'mobile'
   onLinePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: LineControlHandle) => void
   onResizePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: ResizeHandle) => void
   onRotatePointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
@@ -403,8 +420,7 @@ export function EditorSelectionOverlay({
           <RectSelection
             className={` is-secondary${element.id === handleElementId ? ' is-handle-element' : ''}`}
             elements={[element]}
-            interactionProfile={interactionProfile}
-            key={element.id}
+              key={element.id}
             onResizePointerDown={onResizePointerDown}
             onRotatePointerDown={onRotatePointerDown}
             scale={scale}
@@ -414,7 +430,6 @@ export function EditorSelectionOverlay({
         <RectSelection
           className=" is-multi-selection"
           elements={elements}
-          interactionProfile={interactionProfile}
           onResizePointerDown={onResizePointerDown}
           onRotatePointerDown={onRotatePointerDown}
           scale={scale}
@@ -430,8 +445,7 @@ export function EditorSelectionOverlay({
             <RectSelection
               className=" is-active-group-member"
               elements={[activeMember]}
-              interactionProfile={interactionProfile}
-              onResizePointerDown={onResizePointerDown}
+                  onResizePointerDown={onResizePointerDown}
               onRotatePointerDown={onRotatePointerDown}
               scale={scale}
               showHandles
@@ -452,7 +466,6 @@ export function EditorSelectionOverlay({
     <>
       <RectSelection
         elements={elements}
-        interactionProfile={interactionProfile}
         onResizePointerDown={onResizePointerDown}
         onRotatePointerDown={onRotatePointerDown}
         scale={scale}

@@ -175,6 +175,45 @@ export async function getPicFill(type, node, warpObj) {
   return await getImageData(imgPath, warpObj)
 }
 
+const fillRectPercent = value => {
+  const parsed = Number(value)
+  // The rect is stored in thousandths of a percent, and negative values are
+  // normal: they push an edge outward so the picture overflows the shape and
+  // is cropped by it, which is how a crop survives a round trip.
+  return Number.isFinite(parsed) ? parsed / 100000 : 0
+}
+
+const readFillRect = node => {
+  const attrs = getTextByPathList(node, ['a:fillRect', 'attrs']) || {}
+  return {
+    b: fillRectPercent(attrs.b),
+    l: fillRectPercent(attrs.l),
+    r: fillRectPercent(attrs.r),
+    t: fillRectPercent(attrs.t),
+  }
+}
+
+/**
+ * Reads how a picture fill is laid into its shape.
+ *
+ * `a:stretch` fits the picture to the shape's bounds, distorting it if the
+ * aspect ratios differ — it is not a cover-crop. `a:tile` repeats it instead.
+ * When neither is present the default is a plain stretch.
+ */
+export function getPicFillMode(node) {
+  if (!node) return undefined
+  if (node['a:tile']) {
+    const attrs = getTextByPathList(node, ['a:tile', 'attrs']) || {}
+    return {
+      alignment: attrs.algn || 'tl',
+      mode: 'tile',
+      scaleX: Number(attrs.sx) / 100000 || 1,
+      scaleY: Number(attrs.sy) / 100000 || 1,
+    }
+  }
+  return { mode: 'stretch', rect: readFillRect(node['a:stretch']) }
+}
+
 export function getPicFillOpacity(node) {
   const aBlipNode = node['a:blip']
 
@@ -799,6 +838,7 @@ async function resolveShapeFillFromNode(node, warpObj, source, groupHierarchy) {
       base64: picFill.base64,
       blob: picFill.blob,
       opacity,
+      fit: getPicFillMode(shpFill),
     }
     type = 'image'
   }
@@ -886,6 +926,7 @@ async function findFillInGroupHierarchy(groupHierarchy, warpObj, source) {
             base64: picFill.base64,
             blob: picFill.blob,
             opacity,
+            fit: getPicFillMode(shpFill),
           },
         }
       }

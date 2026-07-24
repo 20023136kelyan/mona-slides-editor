@@ -113,7 +113,7 @@ export function EditorContextToolbar({
       tabIndex={-1}
     >
       <div className="mona-contextual-command-lane flex min-w-0 flex-1 items-center justify-start overflow-visible">
-        <div className="mona-contextual-toolbar-group pointer-events-auto mx-auto flex h-10 w-max max-w-full flex-none items-center overflow-x-auto rounded-[var(--radius-overlay)] bg-white px-1.5 shadow-[0_0_0_0.5px_rgb(64_79_109/7%),0_2px_5px_0_rgb(21_30_130/12%),0_6px_12px_0_rgb(21_30_130/6%)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mona-contextual-toolbar-group pointer-events-auto mx-auto flex h-10 w-max max-w-full flex-none items-center overflow-x-auto rounded-overlay bg-white px-1.5 shadow-[0_0_0_0.5px_rgb(64_79_109/7%),0_2px_5px_0_rgb(21_30_130/12%),0_6px_12px_0_rgb(21_30_130/6%)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ContextualPrimaryControls context={context} />
           <ContextualDeepActions capabilities={capabilities} onOpenInspector={onOpenInspector} />
           {capabilities.selectionKind === 'page' ? (

@@ -85,14 +85,6 @@ const createPoint = (type: SegmentType, position: PointPosition, previous: PathP
   return { ...position, type: 'L' }
 }
 
-function PathCheckbox({ checked, children, onChange }: {
-  checked: boolean
-  children: React.ReactNode
-  onChange: (checked: boolean) => void
-}) {
-  return <InspectorCheckbox checked={checked} className="mona-path-checkbox" onChange={onChange}>{children}</InspectorCheckbox>
-}
-
 function PathButton({ children, disabled = false, onClick, primary = false }: {
   children: React.ReactNode
   disabled?: boolean
@@ -414,8 +406,8 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
                       <InspectorNumberInput ariaLabel={t('foundation.editor.pathEditor.rotation')} label={t('foundation.editor.pathEditor.rotation')} max={360} min={0} onChange={value => updateArcParam('rot', value)} value={activePoint.a.rot} />
                     </div>
                     <div className="mona-svg-path-checkbox-row">
-                      <PathCheckbox checked={activePoint.a.laf === 1} onChange={value => updateArcParam('laf', value ? 1 : 0)}>{t('foundation.editor.pathEditor.largeArc')}</PathCheckbox>
-                      <PathCheckbox checked={activePoint.a.sf === 1} onChange={value => updateArcParam('sf', value ? 1 : 0)}>{t('foundation.editor.pathEditor.clockwise')}</PathCheckbox>
+                      <InspectorCheckbox checked={activePoint.a.laf === 1} onChange={value => updateArcParam('laf', value ? 1 : 0)}>{t('foundation.editor.pathEditor.largeArc')}</InspectorCheckbox>
+                      <InspectorCheckbox checked={activePoint.a.sf === 1} onChange={value => updateArcParam('sf', value ? 1 : 0)}>{t('foundation.editor.pathEditor.clockwise')}</InspectorCheckbox>
                     </div>
                   </section>
                 </>
@@ -423,7 +415,7 @@ export function EditorSvgPathEditor({ onClose, onInsert }: {
 
               <div className="mona-svg-path-divider" />
               <section className="mona-svg-path-section">
-                <PathCheckbox checked={closePath} onChange={setClosePath}>{t('foundation.editor.pathEditor.closePath')}</PathCheckbox>
+                <InspectorCheckbox checked={closePath} onChange={setClosePath}>{t('foundation.editor.pathEditor.closePath')}</InspectorCheckbox>
               </section>
               <div className="mona-svg-path-divider" />
               <section className="mona-svg-path-section"><div className="mona-svg-path-content">{path}</div></section>

@@ -419,7 +419,17 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
                               }}
                               style={getTableTextStyle(element.cellMinHeight, cell.style)}
                             />
-                          ) : <div className="mona-table-cell-text" dangerouslySetInnerHTML={markup} style={getTableTextStyle(element.cellMinHeight, cell.style)} />}
+                          ) : (
+                            // A compiled cell body carries the same paragraph
+                            // markup as a text element, so it needs the same
+                            // paragraph, list, and spacing rules rather than
+                            // the browser's default block margins.
+                            <div
+                              className={`mona-table-cell-text${cell.structuredText ? ' ProseMirror-static' : ''}`}
+                              dangerouslySetInnerHTML={markup}
+                              style={getTableTextStyle(element.cellMinHeight, cell.style)}
+                            />
+                          )}
                         </td>
                       )
                     })}

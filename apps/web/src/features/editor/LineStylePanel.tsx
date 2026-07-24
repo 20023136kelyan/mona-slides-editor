@@ -42,7 +42,7 @@ const lineTypeOptions: LineTypeOption[] = [
 function LineTypeThumbnail({ element, item, onSelect }: { element: PPTLineElement; item: LineTypeOption; onSelect: () => void }) {
   const id = `mona-replace-line-${item.key}`
   return (
-    <Button aria-label={`Replace with ${item.key} line`} className="mona-line-type-item" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
+    <Button aria-label={`Replace with ${item.key} line`} className="relative flex aspect-square size-full cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-neutral-400 hover:text-editor-selection [&_svg]:absolute [&_svg]:top-1/2 [&_svg]:left-1/2 [&_svg]:-translate-x-1/2 [&_svg]:-translate-y-1/2 [&_svg]:overflow-visible" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
       <svg height="24" overflow="visible" width="24">
         <defs>
           {element.points[0] ? <LinePointMarker baseSize={2} color="currentColor" id={id} position="start" preview type={element.points[0]} /> : null}
@@ -99,7 +99,7 @@ export function LineStylePanel({
   return (
     <div className="mona-line-style-panel">
       <div className="mona-shape-panel-title"><span>{t('foundation.editor.line.replace')}</span><DownIcon /></div>
-      <div className="mona-line-type-pool">
+      <div className="mb-5 box-border grid w-58.75 grid-cols-6 gap-[3.2%] border p-1.25">
         {lineTypeOptions.map(item => <LineTypeThumbnail element={element} item={item} key={item.key} onSelect={() => changeLineType(item)} />)}
       </div>
       <PropertyRow label={t('foundation.editor.line.style')}>

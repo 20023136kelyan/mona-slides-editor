@@ -56,9 +56,7 @@ const nativeButtonAllowlist = new Set([
   'apps/web/src/features/editor/EditorCanvas.tsx',
   'apps/web/src/features/editor/EditorGradientBar.tsx',
   'apps/web/src/features/editor/EditorSelectionOverlay.tsx',
-  'apps/web/src/features/mobile/MobileThumbnails.tsx',
   'apps/web/src/features/presentation-renderer/ReadOnlyDeck.tsx',
-  'apps/web/src/features/presentation-renderer/elements/MediaElements.tsx',
 ])
 for (const file of featureFiles) {
   const source = read(file)
@@ -99,7 +97,6 @@ if (/\.mona-statusbar[^{\s]*\s*\{[^}]*background/.test(editorCss)) {
 
 for (const file of [
   'apps/web/src/features/editor/editor.css',
-  'apps/web/src/features/mobile/mobile.css',
   'apps/web/src/features/presentation-renderer/renderer.css',
   'apps/web/src/features/screen/screen.css',
 ]) {

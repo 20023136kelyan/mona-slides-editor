@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { ExportDialogType } from '@/features/editor/EditorExportDialog'
+import type { ExportType } from '@/features/editor/EditorExportPopover'
 import type { DeckPersistence } from '@/features/editor/editor-persistence'
 import type { ImportRequestDetail } from '@/features/editor/editor-import'
 import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
@@ -16,12 +16,13 @@ export interface EditorApplication {
   closeAgent: () => void
   closeExport: () => void
   exitPresentation: () => void
-  exportType: ExportDialogType | null
+  /** Selected file type in the header export dropdown, or null while closed. */
+  exportType: ExportType | null
   importFiles: (request: ImportRequestDetail) => Promise<void>
   importing: boolean
   notifications: EditorNotificationService
   openAgent: () => void
-  openExport: (type?: ExportDialogType) => void
+  openExport: (type?: ExportType) => void
   persistence: DeckPersistence | null
   presenting: boolean
   startPresentation: (options: StartPresentationOptions) => void

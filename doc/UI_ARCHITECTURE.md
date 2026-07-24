@@ -21,7 +21,6 @@ See also:
 App-level overlays on the foundation page (not inside `EditorDeck`):
 
 - Import fullscreen spin (`EditorFullscreenSpin`) while `importing`
-- Lazy export stack (`EditorExportFeature` → `EditorExportDialog`) when `exportType` is set
 - `EditorNotificationViewport` for toasts
 - Dev-only `window.__MONA_TEST__` bridge for store/history/rich-text in tests
 
@@ -32,6 +31,7 @@ FoundationPage
   └─ EditorApplicationProvider
        ├─ EditorDeck (+ EditorShellProvider)
        │    ├─ EditorHeader
+       │    │    └─ [share] EditorExportFeature (lazy Share popover: invite / public / export / embed)
        │    └─ SidebarProvider (.mona-editor-workspace)
        │         ├─ EditorRail (creation rail)
        │         ├─ CollapsiblePanelRegion (.mona-drawer-region)
@@ -44,7 +44,6 @@ FoundationPage
        │         └─ CollapsiblePanelRegion (.mona-dock-region)
        │              └─ EditorAgentDock
        ├─ [importing] EditorFullscreenSpin
-       ├─ [export] EditorExportFeature
        └─ [presenting] ScreenView
 ```
 
@@ -104,7 +103,7 @@ Do not collapse these casually. Each owns a different UI concern.
 | Owns | UI effect |
 | --- | --- |
 | `agentOpen` / `openAgent` / `closeAgent` | Right dock mount + focus restore |
-| `exportType` / `openExport` / `closeExport` | Lazy export modal at page level |
+| `exportType` / `openExport` / `closeExport` | Header Share dropdown (selected export file type); file menu and Ctrl+P preselect a type |
 | `presenting` / `startPresentation` / `exitPresentation` | Hide editor `Activity`, mount `ScreenView`, fullscreen, close agent/export |
 | `importFiles` / `importing` | Fullscreen import spin |
 | `persistence` | Header save / restore plumbing |
@@ -306,7 +305,7 @@ icon buttons use `Button size="header-icon"`.
 Settled in the export / pools pass:
 
 - Hotkey drawer is `Sheet` + Tailwind (`EditorHotkeyDrawer`)
-- Export dialog chrome is Tailwind + shadcn (`EditorExportDialog`); no `.mona-export-*` skin
+- Export UI is a header `Popover` (`EditorExportPopover`): one panel with a file-type list, inline options for the selection, and a Download action; no `.mona-export-*` skin
 - Creation pools (element category tiles, shape/line grids) and templates/symbols compose Tailwind in `EditorRail` / panel kit — charts already use `EditorChartsPanel`
 
 Settled in the contextual-controls pass:
@@ -320,13 +319,31 @@ Settled in the filmstrip / inspector / animation-pool pass:
 
 - Filmstrip tile chrome (rings, labels, flags, add tile, boundary actions) is Tailwind;
   CSS keeps scroll/fade masks, `content-visibility`, and Sortable drop markers
-- Layout recipes (`inspectorRowFullClass`, dividers, select groups, popover menu items)
-  replace residual `mona-panel-*` layout classes in style panels
+- Layout recipes (`inspectorRowClass`, `inspectorSplitRowClass`, dividers, select groups,
+  popover menu items) replace residual `mona-panel-*` layout classes in style panels
 - Chart custom theme colors use `EditorModal` (same shell as design-panel theme modals)
 - Animation pool skin is Tailwind in `ElementAnimationPanel`
 
+Settled in the dedupe pass (single source per concept, no visual change):
+
+- Option lists live once: fonts / font sizes / line-height / paragraph / word spacing in
+  [`editor-text-options.ts`](../apps/web/src/features/editor/editor-text-options.ts)
+  (`editor-fonts.ts` re-uses the same list), line styles in `editor-style-options.ts`
+- One labelled row primitive: `PropertyRow` (`ElementStyleCommons.tsx`); the unused
+  `InspectorRow` / `InspectorSection` duplicates were deleted
+- One line preview (`LinePreview`) and one gradient bar (`EditorGradientBar`) shared by
+  shape / multi / design panels; the private `GradientBar` copy is gone
+- Text panel composes `RichTextBaseControls` + `ElementOutline/Shadow/OpacityControls`
+  instead of inlining duplicates of both
+- Pointer drag-to-reorder for inspector lists is one helper:
+  [`editor-list-reorder.ts`](../apps/web/src/features/editor/editor-list-reorder.ts)
+  (theme colors, animation sequence)
+- Chart theme-color rows use `InspectorColorButton` like the design panel; the
+  `ChartCheckbox` / `PathCheckbox` pass-through wrappers were inlined
+
 Remaining chrome (lower urgency): dense `mona-panel-button` / `select` / `number` control
-hooks inside inspector primitives; heavy Dialogs (SvgPath / Latex / ChartData) can stay
-raw until a shared dense-editor Dialog recipe exists.
+hooks inside inspector primitives; heavy Dialogs (SvgPath / Latex / ChartData) and the
+canvas `LinkEditor` (needs focus + pointer isolation) stay raw until a shared dense-editor
+Dialog recipe exists.
 
 Geometry that must stay in CSS: stage/viewport, selection and transform/crop handles, filmstrip drag markers and edge masks, `CollapsiblePanelRegion` width animation, color-picker pointers, rich-text document surface.

@@ -36,13 +36,13 @@ const buttonVariants = cva(
         'icon-sm':
           'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
         'icon-lg': 'size-9',
-        editor: 'h-8 gap-1.5 rounded-[var(--radius-control)] px-2.5 text-[13px]',
-        'editor-icon': 'size-8 rounded-[var(--radius-control)]',
+        editor: 'h-8 gap-1.5 rounded-control px-2.5 text-control',
+        'editor-icon': 'size-8 rounded-control',
         'header-pill':
-          'h-7 min-w-7 gap-1 rounded-[var(--radius-action)] px-2 text-xs font-medium [&_svg:not([class*=\'size-\'])]:size-3.5',
+          'h-7 min-w-7 gap-1 rounded-action px-2 text-xs font-medium [&_svg:not([class*=\'size-\'])]:size-3.5',
         'header-icon':
-          'size-7 rounded-[var(--radius-action)] [&_svg:not([class*=\'size-\'])]:size-3.5',
-        chip: 'h-7 gap-1 rounded-[var(--radius-pill)] px-3 text-xs [&_svg:not([class*=\'size-\'])]:size-3.5',
+          'size-7 rounded-action [&_svg:not([class*=\'size-\'])]:size-3.5',
+        chip: 'h-7 gap-1 rounded-pill px-3 text-xs [&_svg:not([class*=\'size-\'])]:size-3.5',
       },
     },
     defaultVariants: {

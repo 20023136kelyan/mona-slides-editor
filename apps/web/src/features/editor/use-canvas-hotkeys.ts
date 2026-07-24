@@ -88,6 +88,28 @@ export function useCanvasHotkeys({
       finishCropEditing(true)
       return
     }
+    // Escape is the universal "get me out of here": abandon a crop, step out of
+    // a group, then clear the selection back to the page. It runs before the
+    // text-input guard so it also works while a shape's editor holds focus.
+    if (event.key === 'Escape') {
+      if (isCropping()) {
+        event.preventDefault()
+        finishCropEditing(false)
+        return
+      }
+      if (liveSession.activeGroupElementId) {
+        event.preventDefault()
+        runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
+        return
+      }
+      if (liveActiveElementIds.length) {
+        event.preventDefault()
+        runtime.store.dispatch(editorActions.selectionChanged([]))
+        runtime.store.dispatch(editorActions.pageSelectionChanged(true))
+        return
+      }
+      return
+    }
     // A shape's embedded ProseMirror can retain DOM focus after Shift-click
     // creates a multi-selection. the source editor still handles canvas shortcuts in
     // that state; text-input suppression applies only to an editing selection.

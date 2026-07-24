@@ -185,7 +185,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             content={<EditorColorPicker onChange={updateFill} value={fill} />}
           >
             <span
-              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              className="inline-block box-border size-4 flex-none rounded-control"
               data-mixed={capabilities.values.fill === 'mixed' || undefined}
               style={capabilities.values.fill === 'mixed'
                 ? { background: 'linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%)', border: '1px solid #737780' }
@@ -201,7 +201,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             content={<EditorColorPicker onChange={updateStroke} value={stroke} />}
           >
             <span
-              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              className="inline-block box-border size-4 flex-none rounded-control"
               data-mixed={capabilities.values.stroke === 'mixed' || undefined}
               style={capabilities.values.stroke === 'mixed'
                 ? { background: 'linear-gradient(135deg, #fff 0 42%, #737780 42% 58%, #fff 58% 100%)', border: '3px solid #737780' }
@@ -247,7 +247,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             <div className={contextualDivider} />
             <InspectorSelect
               ariaLabel={t('foundation.editor.text.fontFamily')}
-              className={`${contextualGhostSelect} w-[110px] mr-px`}
+              className={`${contextualGhostSelect} w-27.5 mr-px`}
               onChange={value => updateText({ command: 'fontname', value })}
               options={[
                 ...(capabilities.values.fontFamily === 'mixed'
@@ -335,7 +335,7 @@ function EditorPageContextControls({ currentSlide, onOpenInspector, presentation
           }], { historyKey: `page-background-${currentSlide.id}` })} value={background} />}
         >
           <span
-            className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+            className="inline-block box-border size-4 flex-none rounded-control"
             style={{ backgroundColor: background, border: '1px solid rgb(16 18 25 / 35%)' }}
           />
           <span>{t('foundation.editor.contextual.background')}</span>
@@ -343,7 +343,7 @@ function EditorPageContextControls({ currentSlide, onOpenInspector, presentation
         <div className={contextualDivider} />
         <InspectorSelect
           ariaLabel={t('designPanel.customCanvas')}
-          className={`${contextualGhostSelect} w-[88px]`}
+          className={`${contextualGhostSelect} w-22`}
           onChange={value => {
             if (value === 'custom') onOpenInspector('slideDesign')
             else if (typeof value === 'number') runtime.commit('Set viewport ratio', [{ type: 'presentation.viewport-ratio.set', ratio: value }], { historyKey: 'slide-design-viewport' })

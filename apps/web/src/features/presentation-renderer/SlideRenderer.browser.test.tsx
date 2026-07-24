@@ -23,7 +23,7 @@ const theme: SlideTheme = {
 const field = (
   id: string,
   type: 'ftr' | 'sldNum',
-  layer: 'layout' | 'master',
+  layer: 'layout' | 'master' | 'slide',
 ): PPTTextElement => ({
   content: `<p>${type === 'sldNum' ? '‹#›' : 'Corporate footer'}</p>`,
   defaultColor: '#111111',
@@ -46,10 +46,14 @@ const field = (
   width: 200,
 })
 
-test('renders the resolved hierarchy background and enabled inherited fields', async () => {
+test('renders the resolved hierarchy background and the slide\'s own fields', async () => {
   const footer = field('master-footer', 'ftr', 'master')
   const layoutFooter = field('layout-footer', 'ftr', 'layout')
   const slideNumber = field('layout-number', 'sldNum', 'layout')
+  // Enabling a field writes the placeholder onto the slide; the layout and
+  // master copies stay prompts.
+  const slideFooter = field('slide-footer', 'ftr', 'slide')
+  const slideNumberOnSlide = field('slide-number', 'sldNum', 'slide')
   const sourcePackage: PowerPointPackageReference = {
     byteLength: 100,
     fileName: 'hierarchy.pptx',
@@ -98,7 +102,7 @@ test('renders the resolved hierarchy background and enabled inherited fields', a
   }
   const slide: Slide = {
     background: { color: '#ffffff', type: 'solid' },
-    elements: [],
+    elements: [slideFooter, slideNumberOnSlide],
     id: 'slide-2',
     source: {
       ...sourcePackage.slides[1]!,
@@ -120,7 +124,8 @@ test('renders the resolved hierarchy background and enabled inherited fields', a
   await expect.element(page.getByText('Corporate footer')).toBeVisible()
   await expect.element(page.getByText('2')).toBeVisible()
   expect(document.querySelectorAll('[data-pptx-layer="master"]')).toHaveLength(0)
-  expect(document.querySelectorAll('[data-pptx-layer="layout"]')).toHaveLength(2)
+  expect(document.querySelectorAll('[data-pptx-layer="layout"]')).toHaveLength(0)
+  expect(document.querySelectorAll('[data-pptx-layer="slide"]')).toHaveLength(2)
   expect(getComputedStyle(document.querySelector('.mona-slide-renderer')!).backgroundColor).toBe('rgb(34, 68, 102)')
 })
 

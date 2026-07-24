@@ -90,12 +90,12 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
   }
 
   return (
-    <div className="h-full min-h-[420px] text-xs select-none">
+    <div className="h-full min-h-105 text-xs select-none">
       <div className="flex h-full flex-col">
         <div className="mx-[-10px] flex-1 space-y-2.5 overflow-auto px-3 py-0.5" ref={notesRef}>
           {notes.map(note => (
             <div
-              className={cn('group/note rounded-[var(--radius-surface)] border p-2.5', activeNoteId === note.id && 'bg-muted')}
+              className={cn('group/note rounded-surface border p-2.5', activeNoteId === note.id && 'bg-muted')}
               data-note-id={note.id}
               key={note.id}
             >
@@ -108,7 +108,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
                   type="button"
                   variant="ghost"
                 >
-                  <div className="mr-2.5 flex size-[30px] items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
+                  <div className="mr-2.5 flex size-7.5 items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
                   <div><div className="text-sm">{note.user}</div><div className="text-xs text-muted-foreground">{new Date(note.time).toLocaleString()}</div></div>
                 </Button>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100">
@@ -131,12 +131,12 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
                 variant="ghost"
               >{note.content}</Button>
               {note.replies?.length ? (
-                <div className="mt-[15px] ml-5">
+                <div className="mt-3.75 ml-5">
                   {note.replies.map(reply => (
                     <div className="mt-2.5" key={reply.id}>
                       <div className="group/reply flex items-start justify-between">
                         <div className="flex items-center">
-                          <div className="mr-2.5 flex size-[30px] items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
+                          <div className="mr-2.5 flex size-7.5 items-center justify-center rounded-full bg-[#42ba97] text-lg text-white"><UserIcon /></div>
                           <div><div className="text-sm">{reply.user}</div><div className="text-xs text-muted-foreground">{new Date(reply.time).toLocaleString()}</div></div>
                         </div>
                         <div className="flex items-center opacity-0 group-hover/reply:opacity-100 group-focus-within/reply:opacity-100"><Button className="h-7 px-1.5 text-xs hover:text-foreground hover:underline" onClick={event => {
@@ -150,7 +150,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
                 </div>
               ) : null}
               {replyNoteId === note.id ? (
-                <div className="mt-[15px]">
+                <div className="mt-3.75">
                   <Textarea className="resize-none" onChange={event => setReplyContent(event.target.value)} onKeyDown={event => {
                     if (event.key === 'Enter' && !event.shiftKey) {
                       event.preventDefault(); createReply()
@@ -166,7 +166,7 @@ export function EditorCommentsPanel({ runtime }: { runtime: EditorRuntime }) {
           ))}
           {!notes.length ? <PanelEmptyState message={t('foundation.editor.notes.empty')} /> : null}
         </div>
-        <div className="flex h-[120px] shrink-0 flex-col justify-end text-right">
+        <div className="flex h-30 shrink-0 flex-col justify-end text-right">
           <Textarea
             className="resize-none"
             onChange={event => setContent(event.target.value)}

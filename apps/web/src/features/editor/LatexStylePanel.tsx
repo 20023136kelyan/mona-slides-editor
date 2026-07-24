@@ -4,7 +4,7 @@ import EditIcon from '~icons/icon-park-outline/edit'
 import type { PPTLatexElement } from '@mona/presentation-core/model'
 
 import { PropertyRow } from '@/features/editor/ElementStyleCommons'
-import { InspectorButton, InspectorColorButton, InspectorNumberInput } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorColorButton, InspectorNumberInput, inspectorDividerClass, inspectorRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 export function LatexStylePanel({ element, onEdit, runtime }: {
@@ -19,8 +19,8 @@ export function LatexStylePanel({ element, onEdit, runtime }: {
   }])
   return (
     <div className="mona-latex-style-panel">
-      <div className="flex w-full items-center mb-2.5"><InspectorButton ariaLabel={t('foundation.editor.latex.edit')} className="mona-latex-edit-button" onClick={onEdit}><EditIcon /> {t('foundation.editor.latex.edit')}</InspectorButton></div>
-      <div className="my-6 w-full border-t border-black/[0.06]" />
+      <div className={inspectorRowClass}><InspectorButton ariaLabel={t('foundation.editor.latex.edit')} className="mona-latex-edit-button" onClick={onEdit}><EditIcon /> {t('foundation.editor.latex.edit')}</InspectorButton></div>
+      <div className={inspectorDividerClass} />
       <PropertyRow label={t('foundation.editor.latex.color')}>
         <InspectorColorButton ariaLabel={t('foundation.editor.latex.color')} color={element.color} onChange={color => commit({ color }, 'Update equation color')} />
       </PropertyRow>

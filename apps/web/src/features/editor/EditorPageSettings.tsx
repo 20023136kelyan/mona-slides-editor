@@ -69,15 +69,15 @@ export function EditorPageSettings({
           <SlidersHorizontal /><span>{t('foundation.editor.statusBar.pageSettings')}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent aria-label={t('foundation.editor.statusBar.pageSettings')} align="start" className="mona-page-settings" side="top" sideOffset={10}>
-        <div className="mona-page-settings-heading">
+      <PopoverContent aria-label={t('foundation.editor.statusBar.pageSettings')} align="start" className="flex w-80 flex-col gap-3.5" side="top" sideOffset={10}>
+        <div className="flex items-center justify-between [&>span]:text-tiny [&>span]:text-muted-foreground">
           <strong>{t('foundation.editor.statusBar.pageSettings')}</strong>
           <span>{t('foundation.editor.thumbnails.slideCount', {
             current: runtime.store.getState().presentation.slides.findIndex(candidate => candidate.id === slide.id) + 1,
             total: runtime.store.getState().presentation.slides.length,
           })}</span>
         </div>
-        <div className="mona-page-settings-field">
+        <div className="grid gap-1.5 [&_label]:text-xs [&_label]:font-semibold">
           <Label htmlFor={`page-title-${slide.id}`}>{t('foundation.editor.statusBar.pageTitle')}</Label>
           <Input
             id={`page-title-${slide.id}`}
@@ -94,7 +94,7 @@ export function EditorPageSettings({
             value={title}
           />
         </div>
-        <div className="mona-page-settings-row">
+        <div className="flex items-center justify-between gap-5 [&_label]:text-xs [&_label]:font-semibold [&_p]:mt-0.75 [&_p]:text-mini [&_p]:text-muted-foreground">
           <div>
             <Label htmlFor={`page-hidden-${slide.id}`}>{t('foundation.editor.statusBar.hidePage')}</Label>
             <p>{t('foundation.editor.statusBar.hidePageDescription')}</p>
@@ -105,9 +105,9 @@ export function EditorPageSettings({
             onCheckedChange={hidden => update({ hidden }, hidden ? 'Hide page' : 'Show page', `page-hidden-${slide.id}`)}
           />
         </div>
-        <div className="mona-page-settings-field">
+        <div className="grid gap-1.5 [&_label]:text-xs [&_label]:font-semibold">
           <Label htmlFor={`page-duration-${slide.id}`}>{t('foundation.editor.statusBar.duration')}</Label>
-          <div className="mona-page-duration-input">
+          <div className="relative flex items-center gap-1.75 [&>svg]:absolute [&>svg]:left-2.25 [&>svg]:size-3.75 [&>svg]:text-muted-foreground [&_input]:pl-7.5 [&>span]:text-tiny [&>span]:text-muted-foreground">
             <Clock3 />
             <Input
               id={`page-duration-${slide.id}`}
@@ -131,7 +131,7 @@ export function EditorPageSettings({
             <span>{t('foundation.editor.statusBar.seconds')}</span>
           </div>
         </div>
-        <div className="mona-page-settings-field">
+        <div className="grid gap-1.5 [&_label]:text-xs [&_label]:font-semibold">
           <Label>{t('foundation.editor.statusBar.transition')}</Label>
           <Select
             onValueChange={value => update({ turningMode: value as TurningMode }, 'Update page transition', `page-transition-${slide.id}`)}

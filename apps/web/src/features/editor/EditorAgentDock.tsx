@@ -111,7 +111,7 @@ const MODEL_PROVIDER_ORDER: readonly AgentProviderId[] = [
   ...(referenceAgentEnabled ? ['reference' as const] : []),
 ]
 
-const modelBadgeClass = 'inline-flex items-center rounded-[var(--radius-detail)] border border-border bg-[linear-gradient(90deg,rgb(129_161_193),rgb(125_124_155))] bg-clip-text px-1 text-[8.5px] font-extrabold tracking-[0.04em] text-transparent'
+const modelBadgeClass = 'inline-flex items-center rounded-detail border border-border bg-[linear-gradient(90deg,rgb(129_161_193),rgb(125_124_155))] bg-clip-text px-1 text-[8.5px] font-extrabold tracking-[0.04em] text-transparent'
 
 const useObjectUrl = (blob: Blob | null | undefined) => {
   const url = useMemo(() => blob ? URL.createObjectURL(blob) : null, [blob])
@@ -136,17 +136,17 @@ function AgentAuthPromptForm({
 
   return (
     <form
-      className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-[9px]"
+      className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-2.25"
       onSubmit={event => {
         event.preventDefault()
         if (!answer.trim()) return
         void answerAgentAuthPrompt(providerId, prompt.id, answer).catch(() => undefined)
       }}
     >
-      <Label className="text-[10px] leading-[1.35] text-muted-foreground" htmlFor={answerId}>{prompt.message}</Label>
+      <Label className="text-mini leading-[1.35] text-muted-foreground" htmlFor={answerId}>{prompt.message}</Label>
       {prompt.type === 'select' ? (
         <Select onValueChange={setAnswer} value={answer}>
-          <SelectTrigger aria-label={prompt.message} className="w-full bg-background text-[11px]" id={answerId}>
+          <SelectTrigger aria-label={prompt.message} className="w-full bg-background text-tiny" id={answerId}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper">
@@ -184,34 +184,34 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
 
   if (status.connected) {
     return (
-      <div className="grid gap-[9px] [&_button]:w-full [&_button_svg]:size-[13px]">
+      <div className="grid gap-2.25 [&_button]:w-full [&_button_svg]:size-3.25">
         <div className="flex items-center gap-2">
-          <span className="size-[7px] shrink-0 rounded-[var(--radius-pill)] bg-[var(--success,#16a34a)] opacity-100" />
+          <span className="size-1.75 shrink-0 rounded-pill bg-[var(--success,#16a34a)] opacity-100" />
           <span className="grid gap-px">
-            <strong className="text-[11px]">{status.accountLabel || t('foundation.editor.agent.connected')}</strong>
-            <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{status.planLabel || t('foundation.editor.agent.subscriptionReady')}</small>
+            <strong className="text-tiny">{status.accountLabel || t('foundation.editor.agent.connected')}</strong>
+            <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{status.planLabel || t('foundation.editor.agent.subscriptionReady')}</small>
           </span>
         </div>
         <Button disabled={status.loading} onClick={() => void disconnectAgentProvider(providerId)} size="sm" type="button" variant="outline">
           <Unplug />{t('foundation.editor.agent.disconnect')}
         </Button>
-        <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
+        <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
       </div>
     )
   }
   return (
-    <div className="grid gap-[9px] [&_button]:w-full [&_button_svg]:size-[13px]">
-      <p className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t(`foundation.editor.agent.providers.${providerId}.signInDescription`)}</p>
+    <div className="grid gap-2.25 [&_button]:w-full [&_button_svg]:size-3.25">
+      <p className="m-0 text-mini leading-[1.4] text-muted-foreground">{t(`foundation.editor.agent.providers.${providerId}.signInDescription`)}</p>
       <Button disabled={status.loading} onClick={() => void connectAgentProvider(providerId).catch(() => undefined)} size="sm" type="button">
         <LogIn />{status.loading
           ? t('foundation.editor.agent.connecting')
           : t(`foundation.editor.agent.providers.${providerId}.signIn`)}
       </Button>
       {status.flow?.deviceCode ? (
-        <div className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-[9px]">
-          <span className="text-[10px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.deviceCodeLabel')}</span>
+        <div className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-2.25">
+          <span className="text-mini leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.deviceCodeLabel')}</span>
           <div className="flex items-center gap-1.5">
-            <code className="flex-1 rounded-[var(--radius-sm)] bg-background px-2 py-[7px] text-center text-[13px] font-bold tracking-[0.12em]">{status.flow.deviceCode.userCode}</code>
+            <code className="flex-1 rounded-[var(--radius-sm)] bg-background px-2 py-1.75 text-center text-control font-bold tracking-[0.12em]">{status.flow.deviceCode.userCode}</code>
             <Button
               aria-label={t('foundation.editor.agent.copyDeviceCode')}
               className="size-7 min-w-7"
@@ -224,7 +224,7 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
             </Button>
           </div>
           <a
-            className="inline-flex items-center justify-center gap-[5px] text-[10px] font-semibold text-foreground no-underline hover:underline [&_svg]:size-3"
+            className="inline-flex items-center justify-center gap-1.25 text-mini font-semibold text-foreground no-underline hover:underline [&_svg]:size-3"
             href={status.flow.deviceCode.verificationUri}
             rel="noreferrer"
             target="_blank"
@@ -236,14 +236,14 @@ function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
       {status.flow?.prompt ? (
         <AgentAuthPromptForm key={status.flow.prompt.id} prompt={status.flow.prompt} providerId={providerId} />
       ) : null}
-      {status.flow?.message ? <p className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{status.flow.message}</p> : null}
+      {status.flow?.message ? <p className="m-0 text-mini leading-[1.4] text-muted-foreground">{status.flow.message}</p> : null}
       {status.flow?.status === 'pending' ? (
         <Button onClick={() => void cancelAgentAuthFlow(providerId)} size="sm" type="button" variant="ghost">
           <CircleStop />{t('common.cancel')}
         </Button>
       ) : null}
-      {status.error ? <p className="m-0 text-[10px] leading-[1.4] text-destructive">{status.error}</p> : null}
-      <small className="m-0 text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
+      {status.error ? <p className="m-0 text-mini leading-[1.4] text-destructive">{status.error}</p> : null}
+      <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
     </div>
   )
 }
@@ -262,7 +262,7 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
 
   return (
     <form
-      className="grid gap-2.5 [&_>div]:grid [&_>div]:gap-[5px] [&_label]:text-[11px]"
+      className="grid gap-2.5 [&_>div]:grid [&_>div]:gap-1.25 [&_label]:text-tiny"
       onSubmit={event => {
         event.preventDefault()
         if (apiKey.trim()) onConnect(apiKey.trim(), modelId)
@@ -271,10 +271,10 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
       <div>
         <Label htmlFor={apiKeyId}>{t('foundation.editor.agent.apiKey')}</Label>
         <div className="relative">
-          <KeyRound className="pointer-events-none absolute top-1/2 left-2 z-[1] size-[13px] -translate-y-1/2 text-muted-foreground" />
+          <KeyRound className="pointer-events-none absolute top-1/2 left-2 z-[1] size-3.25 -translate-y-1/2 text-muted-foreground" />
           <Input
             autoComplete="off"
-            className="pl-[27px]"
+            className="pl-6.75"
             id={apiKeyId}
             onChange={event => setApiKey(event.target.value)}
             placeholder={t('foundation.editor.agent.apiKeyPlaceholder')}
@@ -295,7 +295,7 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
         </Select>
       </div>
       <Button disabled={!apiKey.trim()} size="sm" type="submit"><LogIn />{t('foundation.editor.agent.connectModel')}</Button>
-      <p className="mt-[-2px] mr-px mb-0 ml-px text-[10px] leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.keyMemoryNotice')}</p>
+      <p className="mt-[-2px] mr-px mb-0 ml-px text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.keyMemoryNotice')}</p>
     </form>
   )
 }
@@ -467,14 +467,14 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         open={providerOpen}
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
-      <SidebarHeader className="flex min-h-[46px] flex-row items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
-        <h2 className="m-0 min-w-0 truncate text-[13px] font-medium" id="mona-agent-dock-title" title={slideTitle || t('foundation.editor.statusBar.untitledPage')}>{slideTitle || t('foundation.editor.statusBar.untitledPage')}</h2>
+      <SidebarHeader className="flex min-h-11.5 flex-row items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
+        <h2 className="m-0 min-w-0 truncate text-control font-medium" id="mona-agent-dock-title" title={slideTitle || t('foundation.editor.statusBar.untitledPage')}>{slideTitle || t('foundation.editor.statusBar.untitledPage')}</h2>
         <Button aria-label={t('common.close')} onClick={closeAgent} size="editor-icon" type="button" variant="ghost"><X /></Button>
       </SidebarHeader>
           <PopoverContent
             aria-label={t('foundation.editor.agent.chooseProvider')}
             align="start"
-            className="w-[min(248px,calc(100vw-24px))] max-h-[min(70vh,460px)] gap-0 overflow-y-auto p-[5px]"
+            className="w-[min(248px,calc(100vw-24px))] max-h-[min(70vh,460px)] gap-0 overflow-y-auto p-1.25"
             data-editor-interactive-overlay
             side="top"
             sideOffset={8}
@@ -484,13 +484,13 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 <div className="flex items-center gap-1.5">
                   <Button
                     aria-label={t('foundation.editor.agent.back')}
-                    className="size-[26px] [&_svg]:size-[15px]"
+                    className="size-6.5 [&_svg]:size-3.75"
                     onClick={() => setAuthView(null)}
                     size="editor-icon"
                     type="button"
                     variant="ghost"
                   ><ChevronLeft /></Button>
-                  <strong className="text-[13px] font-bold">{t(`foundation.editor.agent.providers.${authView}.name`)}</strong>
+                  <strong className="text-control font-bold">{t(`foundation.editor.agent.providers.${authView}.name`)}</strong>
                 </div>
                 {authView === 'openai-chatgpt' || authView === 'anthropic-claude' ? (
                   <OAuthAuthPanel providerId={authView} />
@@ -499,13 +499,13 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                   <GeminiAuthPanel defaultModelId="gemini-3.6-flash" onConnect={connectGemini} />
                 ) : null}
                 {authView === 'mona-managed' ? (
-                  <p className="m-0 text-[11px] leading-[1.45] text-muted-foreground">{t('foundation.editor.agent.managedUnavailable')}</p>
+                  <p className="m-0 text-tiny leading-[1.45] text-muted-foreground">{t('foundation.editor.agent.managedUnavailable')}</p>
                 ) : null}
               </div>
             ) : (
               <>
-                <div className="-mx-[5px] -mt-[5px] mb-1 flex items-center gap-1.5 border-b border-border px-[11px] py-[3px]">
-                  <Search className="size-[13px] shrink-0 text-muted-foreground" />
+                <div className="-mx-1.25 -mt-1.25 mb-1 flex items-center gap-1.5 border-b border-border px-2.75 py-0.75">
+                  <Search className="size-3.25 shrink-0 text-muted-foreground" />
                   <input
                     aria-label={t('foundation.editor.agent.searchModels')}
                     className="h-7 w-full border-0 bg-transparent p-0 text-[12.5px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus-visible:shadow-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
@@ -524,13 +524,13 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                     if (!models.length) return null
                     const ready = providerReadiness[providerId]
                     return (
-                      <div className="grid gap-px not-first:mt-[3px]" key={providerId}>
-                        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-px text-[10px] font-semibold tracking-[0.02em] text-muted-foreground uppercase">
+                      <div className="grid gap-px not-first:mt-0.75" key={providerId}>
+                        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-px text-mini font-semibold tracking-[0.02em] text-muted-foreground uppercase">
                           <span>{t(`foundation.editor.agent.providers.${providerId}.name`)}</span>
                           {ready ? null : (
                             <Button
                               aria-label={t('foundation.editor.agent.signInToProvider', { provider: t(`foundation.editor.agent.providers.${providerId}.name`) })}
-                              className="h-auto min-h-0 rounded-[var(--radius-control)] px-1.5 py-px text-[10.5px] font-semibold tracking-normal text-foreground normal-case hover:bg-[rgb(15_16_21/6%)]"
+                              className="h-auto min-h-0 rounded-control px-1.5 py-px text-[10.5px] font-semibold tracking-normal text-foreground normal-case hover:bg-ink-deep/6"
                               onClick={() => setAuthView(providerId)}
                               size="sm"
                               type="button"
@@ -544,8 +544,8 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                             <Button
                               aria-label={ready ? model.name : t('foundation.editor.agent.modelLockedHint', { model: model.name })}
                               className={cn(
-                                'h-[30px] w-full justify-between gap-[9px] rounded-[var(--radius-control)] px-2 text-left text-[12.5px] text-foreground hover:bg-[rgb(15_16_21/6%)] [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
-                                active && 'bg-[rgb(15_16_21/8%)] font-semibold [&_svg]:text-foreground',
+                                'h-7.5 w-full justify-between gap-2.25 rounded-control px-2 text-left text-[12.5px] text-foreground hover:bg-ink-deep/6 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+                                active && 'bg-ink-deep/8 font-semibold [&_svg]:text-foreground',
                                 !ready && 'text-muted-foreground',
                               )}
                               key={model.id}
@@ -554,7 +554,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                               type="button"
                               variant="ghost"
                             >
-                              <span className="inline-flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap">
+                              <span className="inline-flex min-w-0 items-center gap-1.75 overflow-hidden text-ellipsis whitespace-nowrap">
                                 {model.name}
                                 {model.badge === 'max' ? <span className={modelBadgeClass}>MAX</span> : null}
                               </span>
@@ -577,24 +577,24 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         <div aria-live="polite" className="flex min-h-full flex-1 flex-col gap-2.5 p-3">
           {!entries.length && !candidate && !handoff ? (
             <div className="flex min-h-full flex-1 flex-col items-center justify-center px-2.5 py-7 text-center">
-              <span className="mb-3.5 flex size-11 items-center justify-center rounded-[var(--radius-action)] bg-[rgb(15_16_21/6%)] text-[rgb(16_18_25/70%)] [&_svg]:size-[22px]"><Bot /></span>
-              <h3 className="m-0 text-[15px] font-[750]">{t('foundation.editor.agent.emptyTitle')}</h3>
-              <p className="mt-[7px] mb-0 max-w-[290px] text-xs leading-normal text-muted-foreground">{t('foundation.editor.agent.emptyDescription')}</p>
+              <span className="mb-3.5 flex size-11 items-center justify-center rounded-action bg-ink-deep/6 text-ink/70 [&_svg]:size-5.5"><Bot /></span>
+              <h3 className="m-0 text-field font-[750]">{t('foundation.editor.agent.emptyTitle')}</h3>
+              <p className="mt-1.75 mb-0 max-w-72.5 text-xs leading-normal text-muted-foreground">{t('foundation.editor.agent.emptyDescription')}</p>
             </div>
           ) : null}
 
           {handoff && attachmentVisible && handoffUrl ? (
-            <div className="m-0 grid gap-2.5 rounded-[var(--radius-overlay)] border border-border bg-muted p-2.5">
+            <div className="m-0 grid gap-2.5 rounded-overlay border border-border bg-muted p-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="grid gap-0.5">
                   <strong className="text-xs">{t('foundation.editor.agent.sketchAttached')}</strong>
-                  <span className="text-[10px] text-muted-foreground">{t('foundation.editor.agent.sketchElements', {
+                  <span className="text-mini text-muted-foreground">{t('foundation.editor.agent.sketchElements', {
                     count: handoff.scene.elements.filter(element => element.isDeleted !== true).length,
                   })}</span>
                 </div>
                 <Button aria-label={t('foundation.editor.agent.removeSketch')} onClick={() => setAttachmentVisible(false)} size="editor-icon" type="button" variant="ghost"><X /></Button>
               </div>
-              <img alt={t('foundation.editor.agent.sketchPreview')} className="w-full rounded-[var(--radius-surface)] border border-border bg-white object-contain" src={handoffUrl} />
+              <img alt={t('foundation.editor.agent.sketchPreview')} className="w-full rounded-surface border border-border bg-white object-contain" src={handoffUrl} />
             </div>
           ) : null}
 
@@ -608,16 +608,16 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             >
               <p className={cn(
                 'm-0 text-[12.5px] leading-[1.55] whitespace-pre-wrap',
-                entry.role === 'user' && 'rounded-[var(--radius-overlay)] bg-[rgb(15_16_21/6%)] px-3 py-2',
-                entry.role === 'agent' && 'text-[rgb(16_18_25/88%)]',
-                entry.role === 'error' && 'rounded-[var(--radius-overlay)] bg-[color-mix(in_oklab,var(--destructive)_7%,var(--background))] px-3 py-2 text-destructive',
+                entry.role === 'user' && 'rounded-overlay bg-ink-deep/6 px-3 py-2',
+                entry.role === 'agent' && 'text-ink/88',
+                entry.role === 'error' && 'rounded-overlay bg-[color-mix(in_oklab,var(--destructive)_7%,var(--background))] px-3 py-2 text-destructive',
               )}>{entry.text}</p>
             </div>
           ))}
 
           {progress ? (
-            <output className="flex items-center gap-2.5 rounded-[var(--radius-overlay)] bg-[rgb(15_16_21/4%)] px-3 py-2.5">
-              <span className="size-[15px] shrink-0 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none motion-reduce:border-muted-foreground" />
+            <output className="flex items-center gap-2.5 rounded-overlay bg-ink-deep/4 px-3 py-2.5">
+              <span className="size-3.75 shrink-0 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none motion-reduce:border-muted-foreground" />
               <div className="grid gap-0.5">
                 <strong className="text-[11.5px]">{t(`foundation.editor.agent.progress.${progress}`)}</strong>
                 <small className="text-[9.5px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.progress.detail')}</small>
@@ -626,12 +626,12 @@ export function EditorAgentDock({ handoff = null, runtime }: {
           ) : null}
 
           {candidate && candidate.preview.ok ? (
-            <article className="overflow-hidden rounded-[var(--radius-overlay)] border border-border bg-background shadow-[0_8px_26px_rgb(15_23_42/7%)]">
-              <header className="flex items-start gap-[9px] border-b border-border p-[11px]">
-                <span className="grid size-[25px] shrink-0 place-items-center rounded-[var(--radius-action)] bg-muted text-foreground [&_svg]:size-3.5"><Sparkles /></span>
+            <article className="overflow-hidden rounded-overlay border border-border bg-background shadow-[0_8px_26px_rgb(15_23_42/7%)]">
+              <header className="flex items-start gap-2.25 border-b border-border p-2.75">
+                <span className="grid size-6.25 shrink-0 place-items-center rounded-action bg-muted text-foreground [&_svg]:size-3.5"><Sparkles /></span>
                 <div className="grid min-w-0 gap-0.5">
                   <strong className="text-xs leading-[1.4]">{candidate.explanation}</strong>
-                  <small className="text-[10px] text-muted-foreground">{candidate.providerLabel}</small>
+                  <small className="text-mini text-muted-foreground">{candidate.providerLabel}</small>
                 </div>
               </header>
               {beforeUrl || afterUrl ? (
@@ -639,27 +639,27 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                   {beforeUrl ? (
                     <figure className="relative m-0 min-w-0 bg-muted">
                       <img alt={t('foundation.editor.agent.beforePreview')} className="block aspect-video w-full bg-white object-contain" src={beforeUrl} />
-                      <figcaption className="absolute right-[5px] bottom-[5px] rounded-[var(--radius-pill)] bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.before')}</figcaption>
+                      <figcaption className="absolute right-1.25 bottom-1.25 rounded-pill bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.before')}</figcaption>
                     </figure>
                   ) : null}
                   {afterUrl ? (
                     <figure className="relative m-0 min-w-0 bg-muted">
                       <img alt={t('foundation.editor.agent.afterPreview')} className="block aspect-video w-full bg-white object-contain" src={afterUrl} />
-                      <figcaption className="absolute right-[5px] bottom-[5px] rounded-[var(--radius-pill)] bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.after')}</figcaption>
+                      <figcaption className="absolute right-1.25 bottom-1.25 rounded-pill bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.after')}</figcaption>
                     </figure>
                   ) : null}
                 </div>
               ) : null}
-              <div className="flex flex-wrap gap-[5px] px-2.5 pt-[9px] pb-1">
-                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.created', { count: candidate.summary.createdElements })}</span>
-                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.updated', { count: candidate.summary.updatedElements })}</span>
-                <span className="rounded-[var(--radius-pill)] bg-muted px-[7px] py-[3px] text-[9px] text-muted-foreground">{t('foundation.editor.agent.summary.removed', { count: candidate.summary.deletedElements })}</span>
+              <div className="flex flex-wrap gap-1.25 px-2.5 pt-2.25 pb-1">
+                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.created', { count: candidate.summary.createdElements })}</span>
+                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.updated', { count: candidate.summary.updatedElements })}</span>
+                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.removed', { count: candidate.summary.deletedElements })}</span>
               </div>
-              <details className="mx-2.5 mt-[5px] mb-2.5 rounded-[var(--radius-control)] border border-border">
-                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-[7px] text-[10px] text-muted-foreground [&::-webkit-details-marker]:hidden [&_svg]:size-3"><Code2 />{t('foundation.editor.agent.viewProgram')}</summary>
-                <pre className="m-0 max-h-[200px] overflow-auto border-t border-border bg-muted p-[9px] text-[9px] leading-[1.45] whitespace-pre-wrap"><code>{candidate.code}</code></pre>
+              <details className="mx-2.5 mt-1.25 mb-2.5 rounded-control border border-border">
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.75 text-mini text-muted-foreground [&::-webkit-details-marker]:hidden [&_svg]:size-3"><Code2 />{t('foundation.editor.agent.viewProgram')}</summary>
+                <pre className="m-0 max-h-50 overflow-auto border-t border-border bg-muted p-2.25 text-micro leading-[1.45] whitespace-pre-wrap"><code>{candidate.code}</code></pre>
               </details>
-              <footer className="flex justify-end gap-[7px] border-t border-border px-2.5 py-[9px] [&_svg]:size-[13px]">
+              <footer className="flex justify-end gap-1.75 border-t border-border px-2.5 py-2.25 [&_svg]:size-3.25">
                 <Button onClick={() => setCandidate(null)} size="sm" type="button" variant="outline">
                   {t('foundation.editor.agent.discard')}
                 </Button>
@@ -671,7 +671,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
           ) : null}
 
           {appliedCandidate ? (
-            <div className="flex items-center gap-[7px] rounded-[var(--radius-overlay)] border border-border px-[9px] py-2 text-[10.5px]">
+            <div className="flex items-center gap-1.75 rounded-overlay border border-border px-2.25 py-2 text-[10.5px]">
               <Check className="size-3.5 text-[var(--success,#16a34a)]" />
               <span className="min-w-0 flex-1">{t('foundation.editor.agent.appliedSummary')}</span>
               <Button className="[&_svg]:size-3" onClick={undoApplied} size="sm" type="button" variant="outline"><RotateCcw />{t('foundation.editor.agent.undo')}</Button>
@@ -691,7 +691,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         >
           <Textarea
             aria-label={t('foundation.editor.agent.composerLabel')}
-            className="max-h-[220px] min-h-[50px] field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-[13px] leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0"
+            className="max-h-55 min-h-12.5 field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-control leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0"
             disabled={busy}
             onChange={event => setDraft(event.target.value)}
             onKeyDown={event => {
@@ -705,11 +705,11 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             rows={2}
             value={draft}
           />
-          <div className="flex min-h-10 items-center gap-1.5 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-[15px]">
+          <div className="flex min-h-10 items-center gap-1.5 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-3.75">
             <PopoverTrigger asChild>
               <Button
                 aria-label={t('foundation.editor.agent.chooseProvider')}
-                className="h-[26px] min-w-0 gap-[5px] rounded-[var(--radius-control)] px-1 text-[12.5px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
+                className="h-6.5 min-w-0 gap-1.25 rounded-control px-1 text-[12.5px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
                 size="sm"
                 type="button"
                 variant="ghost"
@@ -733,7 +733,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               {busy ? (
                 <Button
                   aria-label={t('foundation.editor.agent.cancel')}
-                  className="size-[30px] shrink-0 rounded-[var(--radius-pill)] border-[rgb(16_18_25/20%)] p-0 [&_svg]:stroke-[2.4]"
+                  className="size-7.5 shrink-0 rounded-pill border-ink/20 p-0 [&_svg]:stroke-[2.4]"
                   onClick={() => abortRef.current?.abort()}
                   size="editor-icon"
                   type="button"
@@ -742,7 +742,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               ) : (
                 <Button
                   aria-label={t('foundation.editor.agent.send')}
-                  className="size-[30px] shrink-0 rounded-[var(--radius-pill)] p-0 disabled:bg-muted disabled:opacity-100 disabled:[&_svg]:text-muted-foreground [&_svg]:stroke-[2.4]"
+                  className="size-7.5 shrink-0 rounded-pill p-0 disabled:bg-muted disabled:opacity-100 disabled:[&_svg]:text-muted-foreground [&_svg]:stroke-[2.4]"
                   disabled={!draft.trim() || !providerReady}
                   size="editor-icon"
                   type="submit"
@@ -759,7 +759,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               const SuggestionIcon = SUGGESTION_ICONS[suggestion]
               return (
                 <Button
-                  className="h-7 shrink-0 gap-1.5 rounded-[var(--radius-control)] border-0 bg-transparent px-2 text-xs font-medium whitespace-nowrap text-muted-foreground hover:bg-[rgb(15_16_21/5%)] hover:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground"
+                  className="h-7 shrink-0 gap-1.5 rounded-control border-0 bg-transparent px-2 text-xs font-medium whitespace-nowrap text-muted-foreground hover:bg-ink-deep/5 hover:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground"
                   key={suggestion}
                   onClick={() => {
                     setDraft(t(`foundation.editor.agent.suggestions.${suggestion}`))
@@ -776,7 +776,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             })}
           </div>
         ) : (
-          <p className="mt-[7px] mr-0.5 mb-0 ml-0.5 text-center text-[10px] leading-[1.4] text-muted-foreground">{providerReady
+          <p className="mt-1.75 mr-0.5 mb-0 ml-0.5 text-center text-mini leading-[1.4] text-muted-foreground">{providerReady
             ? t('foundation.editor.agent.reviewNotice')
             : t('foundation.editor.agent.connectionRequired')}</p>
         )}

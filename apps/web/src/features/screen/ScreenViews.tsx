@@ -43,6 +43,15 @@ import { ScreenWritingBoard } from '@/features/screen/ScreenWritingBoard'
 import type { ScreenPresentationController } from '@/features/screen/screen-types'
 import type { ScreenPlayback } from '@/features/screen/use-screen-playback'
 import { useScreenSlideSize } from '@/features/screen/use-screen-slide-size'
+import { cn } from '@/lib/utils'
+
+// Slideshow chrome recipes. The edge arrows sit almost invisible over the
+// slide until pointed at; the right-hand tools share one ghost skin.
+const SCREEN_EDGE_BUTTON = 'border-0 bg-transparent p-0 text-inherit opacity-10 transition-opacity hover:opacity-100 focus-visible:opacity-100 disabled:cursor-default disabled:opacity-5'
+const SCREEN_TOOL_BUTTON = 'border-0 bg-transparent p-0 text-inherit hover:text-editor-selection'
+// Presenter-view rail: stacked icon-over-label buttons.
+const PRESENTER_TOOL = 'flex w-full flex-col items-center justify-center border-0 bg-transparent p-0 text-inherit hover:text-editor-selection [&>svg]:mb-2 [&>svg]:text-[22px]'
+const REMARK_SCALE_BUTTON = 'flex size-10 items-center justify-center border-0 bg-transparent text-inherit select-none disabled:cursor-not-allowed disabled:text-neutral-500 not-disabled:hover:bg-neutral-700 not-disabled:focus-visible:bg-neutral-700'
 
 interface CommonViewProps {
   controller: ScreenPresentationController
@@ -106,7 +115,7 @@ export function ScreenBaseView({
       <Button
         aria-label={label}
         aria-pressed={active || undefined}
-        className={`mona-screen-tool-button${active ? ' is-active' : ''}`}
+        className={cn(SCREEN_TOOL_BUTTON, active && 'text-editor-selection')}
         onClick={onClick}
         ref={buttonRef}
         size={null}
@@ -194,13 +203,23 @@ export function ScreenBaseView({
       {allSlidesVisible ? <ScreenAllSlides onClose={closeAllSlides} presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} /> : null}
       {writingVisible ? <ScreenWritingBoard onClose={closeWriting} slideHeight={slideHeight} slideId={currentSlide.id} slideWidth={slideWidth} /> : null}
       {timerVisible ? <ScreenCountdownTimer onClose={closeTimer} /> : null}
-      <div className="mona-screen-tools-left">
-        <Button aria-label={t('screen.previousSlide')} disabled={presentation.slideIndex <= 0} onClick={() => playback.execPrev()} ref={previousButtonRef} size={null} type="button" variant={null}><LeftIcon /></Button>
-        <Button aria-label={t('screen.nextSlide')} disabled={presentation.slideIndex >= presentation.slides.length - 1} onClick={playback.execNext} ref={nextButtonRef} size={null} type="button" variant={null}><RightIcon /></Button>
+      <div className="fixed bottom-2 left-2 z-10 flex gap-2 text-[25px] text-neutral-500">
+        <Button aria-label={t('screen.previousSlide')} className={SCREEN_EDGE_BUTTON} disabled={presentation.slideIndex <= 0} onClick={() => playback.execPrev()} ref={previousButtonRef} size={null} type="button" variant={null}><LeftIcon /></Button>
+        <Button aria-label={t('screen.nextSlide')} className={SCREEN_EDGE_BUTTON} disabled={presentation.slideIndex >= presentation.slides.length - 1} onClick={playback.execNext} ref={nextButtonRef} size={null} type="button" variant={null}><RightIcon /></Button>
       </div>
-      <div className={`mona-screen-tools-right${rightToolsVisible ? ' is-visible' : ''}`} onMouseEnter={() => setRightToolsVisible(true)} onMouseLeave={() => setRightToolsVisible(false)}>
-        <div className="mona-screen-tools-right-content">
-          <Button aria-label={t('screen.allSlides')} className="mona-screen-tool-button mona-screen-page-number" onClick={() => setAllSlidesVisible(true)} ref={allSlidesButtonRef} size={null} type="button" variant={null}>{t('screen.slideNumber', { current: presentation.slideIndex + 1, total: presentation.slides.length })}</Button>
+      <div
+        className={cn(
+          // Sits off-screen and slides up on hover/focus; the ::after strip
+          // above it keeps the pointer target alive during the transition.
+          'fixed right-0 z-[5] h-16.5 p-2 transition-[bottom] duration-200 focus-within:bottom-0',
+          'after:absolute after:top-[-66px] after:left-0 after:h-16.5 after:w-full after:content-[""]',
+          rightToolsVisible ? 'bottom-0' : 'bottom-[-66px]',
+        )}
+        onMouseEnter={() => setRightToolsVisible(true)}
+        onMouseLeave={() => setRightToolsVisible(false)}
+      >
+        <div className="flex size-full items-center justify-center gap-3.75 rounded-control border bg-background px-2.5 py-2 text-[25px] text-foreground shadow-[0_2px_12px_0_rgb(56_56_56/20%)]">
+          <Button aria-label={t('screen.allSlides')} className={cn(SCREEN_TOOL_BUTTON, 'h-3.75 px-3 text-xs leading-none')} onClick={() => setAllSlidesVisible(true)} ref={allSlidesButtonRef} size={null} type="button" variant={null}>{t('screen.slideNumber', { current: presentation.slideIndex + 1, total: presentation.slides.length })}</Button>
           {toolbarButton(t('screen.penTools'), <PenIcon />, () => setWritingVisible(true), writingVisible, penButtonRef)}
           {toolbarButton(t('screen.laserPointer'), <LaserIcon />, () => playback.setLaserPen(!playback.laserPen), playback.laserPen)}
           {toolbarButton(t('screen.timer'), <StopwatchIcon />, () => setTimerVisible(current => !current), timerVisible, timerButtonRef)}
@@ -266,7 +285,7 @@ export function ScreenPresenterView({
   const tool = (active: boolean, icon: React.ReactNode, label: string, onClick: () => void, buttonRef?: React.Ref<HTMLButtonElement>) => (
     <Button
       aria-pressed={active || undefined}
-      className={`mona-screen-presenter-tool${active ? ' is-active' : ''}`}
+      className={cn(PRESENTER_TOOL, active && 'text-editor-selection')}
       onClick={onClick}
       ref={buttonRef}
       size={null}
@@ -288,21 +307,21 @@ export function ScreenPresenterView({
     setContextMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
   }
   return (
-    <div className="mona-screen-presenter">
-      <div className="mona-screen-presenter-toolbar">
+    <div className="flex size-full">
+      <div className="my-5 h-full w-17.5 border-r bg-background text-xs [&>button+button]:mt-5.5">
         {tool(false, <ListIcon />, t('screen.normalView'), () => setViewMode('base'), normalViewButtonRef)}
         {tool(false, <PeopleIcon />, t('screen.audienceView'), openAudience)}
         {tool(writingVisible, <PenIcon />, t('screen.pen'), () => setWritingVisible(current => !current), penButtonRef)}
         {tool(playback.laserPen, <LaserIcon />, t('screen.laserPointer'), () => playback.setLaserPen(!playback.laserPen))}
         {tool(timerVisible, <StopwatchIcon />, t('screen.timer'), () => setTimerVisible(current => !current), timerButtonRef)}
         {tool(false, fullscreen ? <OffscreenIcon /> : <FullscreenIcon />, t(fullscreen ? 'screen.exitFullscreen' : 'screen.enterFullscreen'), fullscreen ? manualExitFullscreen : enterFullscreen)}
-        <div className="mona-screen-presenter-divider" />
+        <div className="mx-[15%] my-6 w-[70%] border-t border-black/[0.06]" />
         {tool(false, <PowerIcon />, t('screen.endSlideshow'), exit)}
       </div>
-      <div className="mona-screen-presenter-content">
+      <div className="h-full w-[calc(100%-430px)] bg-screen-surface">
         <div
           aria-label={t('screen.slideshowCanvas')}
-          className={`mona-screen-presenter-slide-wrap${playback.laserPen ? ' is-laser-pen' : ''}`}
+          className="relative m-5 h-[calc(100%-190px)] overflow-hidden focus-visible:-outline-offset-[3px] focus-visible:outline-[3px] focus-visible:outline-editor-selection"
           onContextMenu={event => {
             event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY }) 
           }}
@@ -321,12 +340,12 @@ export function ScreenPresenterView({
         </div>
         <ScreenPresenterThumbnails presentation={presentation} turnSlideToIndex={playback.turnSlideToIndex} />
       </div>
-      <div className="mona-screen-presenter-remark">
-        <div className="mona-screen-presenter-remark-header"><span>{t('screen.speakerNotes')}</span><span>P {presentation.slideIndex + 1} / {presentation.slides.length}</span></div>
-        <div className={`mona-screen-presenter-remark-content ProseMirror-static${remark ? '' : ' is-empty'}`} dangerouslySetInnerHTML={{ __html: remark || t('screen.noNotes') }} style={{ fontSize: remarkFontSize }} />
-        <div className="mona-screen-presenter-remark-scale">
-          <Button aria-label={t('common.decrease')} disabled={remarkFontSize === 12} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))} size={null} type="button" variant={null}><MinusIcon /></Button>
-          <Button aria-label={t('common.increase')} disabled={remarkFontSize === 40} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))} size={null} type="button" variant={null}><PlusIcon /></Button>
+      <div className="relative h-full w-90 border-l border-screen-panel-border bg-screen-panel text-white">
+        <div className="flex h-15 items-center justify-between border-b border-screen-panel-border px-5 text-lg"><span>{t('screen.speakerNotes')}</span><span>P {presentation.slideIndex + 1} / {presentation.slides.length}</span></div>
+        <div className={cn('ProseMirror-static h-[calc(100%-60px)] overflow-auto p-5 leading-normal', !remark && 'text-neutral-400 italic')} dangerouslySetInnerHTML={{ __html: remark || t('screen.noNotes') }} style={{ fontSize: remarkFontSize }} />
+        <div className="absolute right-1.25 bottom-1.25 flex text-[22px]">
+          <Button aria-label={t('common.decrease')} className={REMARK_SCALE_BUTTON} disabled={remarkFontSize === 12} onClick={() => setRemarkFontSize(value => Math.max(12, value - 2))} size={null} type="button" variant={null}><MinusIcon /></Button>
+          <Button aria-label={t('common.increase')} className={REMARK_SCALE_BUTTON} disabled={remarkFontSize === 40} onClick={() => setRemarkFontSize(value => Math.min(40, value + 2))} size={null} type="button" variant={null}><PlusIcon /></Button>
         </div>
       </div>
       {contextMenu ? <ScreenContextMenu items={menu} onDismiss={() => setContextMenu(null)} position={contextMenu} /> : null}

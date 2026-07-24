@@ -732,3 +732,90 @@ describe('editor geometry contracts', () => {
     expect(rotated).toMatchObject({ left: 50, top: 50, width: 160, height: 120 })
   })
 })
+
+describe('ungrouping a native PowerPoint group', () => {
+  const child = (id: string, left: number, top: number): PPTShapeElement => ({
+    fill: '#ff0000',
+    fixedRatio: false,
+    height: 50,
+    id,
+    left,
+    path: 'M 0 0 L 100 0 L 100 50 L 0 50 Z',
+    rotate: 0,
+    top,
+    type: 'shape',
+    viewBox: [100, 50],
+    width: 100,
+  })
+
+  const group = (overrides: Partial<Extract<PPTElement, { type: 'group' }>> = {}) => ({
+    coordinateHeight: 100,
+    coordinateWidth: 200,
+    elements: [child('child-a', 0, 0), child('child-b', 100, 50)],
+    height: 200,
+    id: 'group-1',
+    left: 1000,
+    rotate: 0,
+    top: 500,
+    type: 'group' as const,
+    width: 400,
+    ...overrides,
+  })
+
+  it('lifts children into slide coordinates through the group scale', () => {
+    // The group is twice its coordinate box, so every child doubles.
+    const elements = ungroupElements([group()], new Set(['group-1']))!
+
+    expect(elements.map(element => element.id)).toEqual(['child-a', 'child-b'])
+    expect(elements[0]).toMatchObject({ height: 100, left: 1000, top: 500, width: 200 })
+    expect(elements[1]).toMatchObject({ height: 100, left: 1200, top: 600, width: 200 })
+  })
+
+  it('carries the group rotation onto each child and about the group centre', () => {
+    const elements = ungroupElements([group({ rotate: 90 })], new Set(['group-1']))!
+
+    // Rotating the box 90° about its centre (1200, 600) moves the first
+    // child's centre from (1100, 550) to (1250, 500).
+    expect(elements[0]).toMatchObject({ rotate: 90 })
+    expect((elements[0] as PPTShapeElement).left).toBeCloseTo(1150)
+    expect((elements[0] as PPTShapeElement).top).toBeCloseTo(450)
+  })
+
+  it('mirrors children and their own flip when the group is flipped', () => {
+    const elements = ungroupElements([group({ flipH: true })], new Set(['group-1']))!
+
+    // The first child sat on the left, so it lands on the right.
+    expect((elements[0] as PPTShapeElement).left).toBeCloseTo(1200)
+    expect((elements[0] as PPTShapeElement).flipH).toBe(true)
+  })
+
+  it('transforms a line by its origin and point vectors', () => {
+    const line: PPTLineElement = {
+      color: '#000000',
+      end: [50, 25],
+      id: 'line-1',
+      left: 10,
+      points: ['', ''],
+      start: [0, 0],
+      style: 'solid',
+      top: 20,
+      type: 'line',
+      width: 2,
+    }
+    const elements = ungroupElements(
+      [group({ elements: [line] })],
+      new Set(['group-1']),
+    )! as PPTLineElement[]
+
+    // A line has no box, so the origin moves and the vectors scale.
+    expect(elements[0]!.left).toBeCloseTo(1020)
+    expect(elements[0]!.top).toBeCloseTo(540)
+    expect(elements[0]!.end).toEqual([100, 50])
+    // The stroke width is not a dimension and must not be scaled.
+    expect(elements[0]!.width).toBe(2)
+  })
+
+  it('leaves the slide alone when nothing selected is grouped', () => {
+    expect(ungroupElements([child('loose', 0, 0)], new Set(['loose']))).toBeUndefined()
+  })
+})

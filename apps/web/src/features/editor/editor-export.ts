@@ -17,7 +17,7 @@ import type {
   Slide,
 } from '@mona/presentation-core/model'
 
-import type { EditorExportActions } from '@/features/editor/EditorExportDialog'
+import type { EditorExportActions } from '@/features/editor/EditorExportPopover'
 import { getExportFileStem } from '@/features/editor/editor-export-filename'
 import { encryptNativePresentation } from '@/features/editor/editor-file-format'
 import { applyPptxSlideMetadata } from '@/features/editor/editor-pptx-slide-metadata'

@@ -53,18 +53,18 @@ function MediaThumb({ item }: { item: MediaLibraryItem }) {
   useEffect(() => () => URL.revokeObjectURL(url), [url])
 
   if (item.kind === 'image') {
-    return <img alt="" className="block w-full rounded-[var(--radius-control)] bg-muted object-cover" src={url} />
+    return <img alt="" className="block w-full rounded-control bg-muted object-cover" src={url} />
   }
   if (item.kind === 'video') {
     return (
-      <div className="relative overflow-hidden rounded-[var(--radius-control)] bg-muted">
+      <div className="relative overflow-hidden rounded-control bg-muted">
         <video className="block w-full" muted preload="metadata" src={url} />
         <FileVideo className="pointer-events-none absolute right-1.5 bottom-1.5 size-3.5 text-white drop-shadow" />
       </div>
     )
   }
   return (
-    <div className="flex aspect-square items-center justify-center rounded-[var(--radius-control)] bg-muted text-muted-foreground">
+    <div className="flex aspect-square items-center justify-center rounded-control bg-muted text-muted-foreground">
       <FileAudio className="size-6" />
     </div>
   )
@@ -172,13 +172,13 @@ export function EditorUploadsPanel({
               const Icon = option.icon
               return (
                 <Button
-                  className="h-auto justify-start gap-3 rounded-[var(--radius-control)] border px-3 py-3 text-left font-medium whitespace-normal"
+                  className="h-auto justify-start gap-3 rounded-control border px-3 py-3 text-left font-medium whitespace-normal"
                   key={option.key}
                   onClick={() => setRecordNotice(t('foundation.editor.uploads.recordComingSoon'))}
                   type="button"
                   variant="ghost"
                 >
-                  <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-muted text-foreground">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-control bg-muted text-foreground">
                     <Icon className="size-5" />
                   </span>
                   <span className="text-sm">{option.label}</span>
@@ -187,7 +187,7 @@ export function EditorUploadsPanel({
             })}
           </div>
           {recordNotice ? (
-            <output className="mt-4 block rounded-[var(--radius-control)] bg-muted px-3 py-2 text-xs text-muted-foreground">
+            <output className="mt-4 block rounded-control bg-muted px-3 py-2 text-xs text-muted-foreground">
               {recordNotice}
             </output>
           ) : null}
@@ -274,7 +274,7 @@ export function EditorUploadsPanel({
             renderItem={item => (
               <button
                 aria-label={t('foundation.editor.uploads.insertItem', { name: item.name })}
-                className="block w-full overflow-hidden rounded-[var(--radius-control)] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="block w-full overflow-hidden rounded-control text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => insertItem(item)}
                 type="button"
               >

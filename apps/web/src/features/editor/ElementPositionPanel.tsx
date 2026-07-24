@@ -203,8 +203,8 @@ export function ElementPositionPanel({
           <div className="mona-position-row">
             <InspectorNumberInput ariaLabel={t('foundation.editor.position.rotation')} label={t('foundation.editor.position.rotation')} max={180} min={-180} onChange={value => update({ rotate: value } as Partial<PPTElement>)} step={5} style={{ width: '45%' }} value={rotate} />
             <div style={{ width: '7%' }} />
-            <Button aria-label={t('foundation.editor.position.rotateMinus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.max(-180, Math.floor(rotate / 45) * 45 - 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon /> -45°</Button>
-            <Button aria-label={t('foundation.editor.position.rotatePlus')} className="mona-position-text-button" onClick={() => update({ rotate: Math.min(180, Math.floor(rotate / 45) * 45 + 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon style={{ transform: 'rotateY(180deg)' }} /> +45°</Button>
+            <Button aria-label={t('foundation.editor.position.rotateMinus')} className="block h-7.5 rounded-none border-0 bg-transparent p-0 leading-[30px] text-foreground hover:rounded-control hover:bg-[#efefef]" onClick={() => update({ rotate: Math.max(-180, Math.floor(rotate / 45) * 45 - 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon /> -45°</Button>
+            <Button aria-label={t('foundation.editor.position.rotatePlus')} className="block h-7.5 rounded-none border-0 bg-transparent p-0 leading-[30px] text-foreground hover:rounded-control hover:bg-[#efefef]" onClick={() => update({ rotate: Math.min(180, Math.floor(rotate / 45) * 45 + 45) } as Partial<PPTElement>)} size="editor" style={{ width: '24%' }} type="button" variant="outline"><RotateIcon style={{ transform: 'rotateY(180deg)' }} /> +45°</Button>
           </div>
         </>
       ) : null}

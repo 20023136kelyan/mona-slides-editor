@@ -272,7 +272,9 @@ test('exposes the real rich-text controls in the top toolbar', async () => {
   const runtime = createEditorRuntime(textPresentation)
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={textPresentation} runtime={runtime} /></div>)
 
-  await page.getByText('Contextual editing').first().click()
+  // The rich-text surface is inert until a double-click promotes it (so the
+  // first click can select and drag), so target the element, not its text.
+  await page.getByText('Contextual editing').first().click({ force: true })
   await expect.element(page.getByRole('button', { exact: true, name: 'Font' })).toBeVisible()
   await expect.element(page.getByRole('button', { exact: true, name: 'Font size' })).toBeVisible()
   const bold = page.getByRole('button', { name: 'Bold' })

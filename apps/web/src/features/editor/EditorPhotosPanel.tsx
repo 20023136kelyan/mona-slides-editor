@@ -39,7 +39,7 @@ function PhotoThumb({ item }: { item: PhotoSearchItem }) {
   return (
     <img
       alt=""
-      className="block h-auto w-full rounded-[var(--radius-control)] bg-muted object-cover"
+      className="block h-auto w-full rounded-control bg-muted object-cover"
       decoding="async"
       loading="lazy"
       src={item.src}
@@ -61,7 +61,7 @@ function HorizontalStrip({
       {items.map(item => (
         <button
           aria-label={t('foundation.editor.photos.insertPhoto')}
-          className="w-28 shrink-0 overflow-hidden rounded-[var(--radius-control)] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-28 shrink-0 overflow-hidden rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
           key={item.id}
           onClick={() => onInsert(item)}
           type="button"
@@ -95,7 +95,7 @@ function PhotoMasonry({
       renderItem={item => (
         <button
           aria-label={t('foundation.editor.photos.insertPhoto')}
-          className="block w-full overflow-hidden rounded-[var(--radius-control)] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="block w-full overflow-hidden rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={() => onInsert(item)}
           type="button"
         >

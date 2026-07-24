@@ -86,7 +86,7 @@ export function EditorTableGenerator({
           </tbody>
         </table>
       ) : (
-        <div className="w-[230px]">
+        <div className="w-57.5">
           <div className="flex items-center">
             <div className="w-1/4">{t('foundation.editor.table.rows')}</div>
             <InspectorNumberInput ariaLabel={t('foundation.editor.table.rows')} max={20} min={1} onChange={setRows} style={{ width: '75%' }} value={rows} />

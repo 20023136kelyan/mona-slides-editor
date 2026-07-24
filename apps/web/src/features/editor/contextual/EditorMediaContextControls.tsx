@@ -62,7 +62,7 @@ export function EditorMediaContextControls({ element, runtime }: {
             content={<EditorColorPicker onChange={color => update({ color }, 'Update audio icon color')} value={element.color} />}
           >
             <span
-              className="inline-block box-border size-4 flex-none rounded-[var(--radius-control)]"
+              className="inline-block box-border size-4 flex-none rounded-control"
               style={{ backgroundColor: element.color, border: '1px solid rgb(16 18 25 / 35%)' }}
             />
             <span>{t('foundation.editor.media.iconColor')}</span>

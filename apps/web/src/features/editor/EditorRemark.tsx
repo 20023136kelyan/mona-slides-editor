@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import BoldIcon from '~icons/icon-park-outline/text-bold'
@@ -15,6 +14,7 @@ import { createDocument, executeRichTextActions, getTextAttrs, initProsemirrorEd
 import { editorActions, selectCurrentSlide, selectPresentation } from '@mona/editor-state'
 
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Toggle } from '@/components/ui/toggle'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -26,7 +26,6 @@ export function EditorRemark({ runtime }: { runtime: EditorRuntime }) {
   const mountRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<ReturnType<typeof initProsemirrorEditor> | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
   const [attrs, setAttrs] = useState<RichTextAttrs | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const latestSlideRef = useRef(currentSlide)
@@ -114,15 +113,6 @@ export function EditorRemark({ runtime }: { runtime: EditorRuntime }) {
     setMenuPosition(null)
   }, [currentSlide.id, runtime])
 
-  useEffect(() => {
-    const dismiss = (event: globalThis.MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return
-      setMenuPosition(null)
-    }
-    document.addEventListener('mousedown', dismiss)
-    return () => document.removeEventListener('mousedown', dismiss)
-  }, [])
-
   const execute = (action: RichTextAction) => {
     const editor = editorRef.current
     if (!editor) return
@@ -130,19 +120,34 @@ export function EditorRemark({ runtime }: { runtime: EditorRuntime }) {
     setAttrs(getTextAttrs(editor))
     scheduleUpdate()
   }
-  const menu = menuPosition ? createPortal((
-    <div className="mona-remark-menu" ref={menuRef} style={menuPosition}>
+  const menu = (
+    <Popover onOpenChange={open => {
+      if (!open) setMenuPosition(null)
+    }} open={Boolean(menuPosition)}>
+      <PopoverTrigger asChild>
+        <span aria-hidden="true" className="pointer-events-none fixed" style={menuPosition ?? undefined} />
+      </PopoverTrigger>
+      {/* Keeping focus in the notes editor is what makes the selection survive
+          while formatting; Radix would otherwise pull focus into the toolbar. */}
+      <PopoverContent
+        align="start"
+        className="mona-remark-menu w-auto flex-row gap-0.5 p-1"
+        onOpenAutoFocus={event => event.preventDefault()}
+        side="bottom"
+        sideOffset={0}
+      >
       <Toggle aria-label={t('common.bold')} onPressedChange={() => execute({ command: 'bold' })} pressed={attrs?.bold}><BoldIcon /></Toggle>
       <Toggle aria-label={t('common.italic')} onPressedChange={() => execute({ command: 'em' })} pressed={attrs?.em}><ItalicIcon /></Toggle>
       <Toggle aria-label={t('common.underline')} onPressedChange={() => execute({ command: 'underline' })} pressed={attrs?.underline}><UnderlineIcon /></Toggle>
       <Toggle aria-label={t('common.strikethrough')} onPressedChange={() => execute({ command: 'strikethrough' })} pressed={attrs?.strikethrough}><StrikethroughIcon /></Toggle>
-      <label><TextIcon /><input onChange={event => execute({ command: 'color', value: event.target.value })} type="color" value={attrs?.color || '#000000'} /></label>
-      <label><HighlightIcon /><input onChange={event => execute({ command: 'backcolor', value: event.target.value })} type="color" value={attrs?.backcolor || '#ffffff'} /></label>
+      <label className="relative flex size-8 cursor-pointer items-center justify-center rounded-control p-0.75 text-base hover:bg-editor-selection hover:text-primary-foreground [&_input]:absolute [&_input]:size-px [&_input]:opacity-0"><TextIcon /><input onChange={event => execute({ command: 'color', value: event.target.value })} type="color" value={attrs?.color || '#000000'} /></label>
+      <label className="relative flex size-8 cursor-pointer items-center justify-center rounded-control p-0.75 text-base hover:bg-editor-selection hover:text-primary-foreground [&_input]:absolute [&_input]:size-px [&_input]:opacity-0"><HighlightIcon /><input onChange={event => execute({ command: 'backcolor', value: event.target.value })} type="color" value={attrs?.backcolor || '#ffffff'} /></label>
       <Toggle aria-label={t('common.bullets')} onPressedChange={() => execute({ command: 'bulletList' })} pressed={attrs?.bulletList}><ListIcon /></Toggle>
       <Toggle aria-label={t('common.numbering')} onPressedChange={() => execute({ command: 'orderedList' })} pressed={attrs?.orderedList}><OrderedListIcon /></Toggle>
       <Button aria-label={t('common.clearFormatting')} onClick={() => execute({ command: 'clear' })} size="icon" type="button" variant="ghost"><FormatIcon /></Button>
-    </div>
-  ), document.body) : null
+      </PopoverContent>
+    </Popover>
+  )
 
   return (
     <div aria-label="Speaker notes" className="mona-editor-remark">

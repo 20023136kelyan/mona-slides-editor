@@ -1,4 +1,4 @@
-import type { PPTElement, PPTShapeElement, PPTTextElement, Slide, SlideBackground, SlideTheme } from './model'
+import type { PPTElement, PPTShapeElement, PPTTableElement, PPTTextElement, Slide, SlideBackground, SlideTheme } from './model'
 import { flattenElementTree } from './elements'
 import type {
   PowerPointElementSourceLayer,
@@ -108,16 +108,15 @@ const placeholderKey = (element: PPTElement): string | undefined => {
 const createLayerNodes = (
   elements: readonly PPTElement[],
   layer: PowerPointElementSourceLayer,
-  headerFooterPolicy: PowerPointHeaderFooterPolicy,
 ): SlideRenderNode[] => elements
   // Placeholder shapes in a layout or master define inheritance defaults;
   // PowerPoint does not paint their editing prompts in normal slide view.
-  // Header/footer fields are the exception: they are visible inherited
-  // objects when the master's header/footer policy enables them.
-  .filter(element => (
-    !isInheritedPlaceholder(element)
-    || (isHeaderFooterPlaceholder(element) && headerFooterVisible(element, headerFooterPolicy))
-  ))
+  // That includes the date, footer, header, and slide-number prompts: turning
+  // one of those on writes the placeholder onto each slide it applies to, so
+  // the slide's own copy is what renders. A deck that never enabled them —
+  // every Canva export, for one — carries the prompts on its layouts and must
+  // show nothing.
+  .filter(element => !isInheritedPlaceholder(element))
   .map((element, sourceIndex) => ({
     element,
     layer,
@@ -214,12 +213,47 @@ const bodyAnchor = (
   anchor === 'b' ? 'bottom' : anchor === 'ctr' || anchor === 'dist' || anchor === 'just' ? 'middle' : 'top'
 )
 
+/**
+ * Table cells inherit from the presentation and theme like any other body, but
+ * they are not placeholders and have no layout or master counterpart to
+ * inherit a prompt from, so they compile against the deck defaults alone.
+ */
+const materializeTableText = (
+  element: PPTTableElement,
+  hierarchy: PowerPointSlideRenderHierarchy,
+  slide: Slide,
+): PPTTableElement => {
+  const { layout, master, sourcePackage, theme } = hierarchy
+  const colorMap = slide.source?.colorMapOverride ?? layout?.colorMapOverride ?? master?.colorMap
+  let compiledAny = false
+  const data = element.data.map(row => row.map(cell => {
+    if (!cell.structuredText) return cell
+    compiledAny = true
+    const compiled = compileStructuredText(cell.structuredText, {
+      colorMap,
+      defaultTextStyle: sourcePackage?.hierarchy?.defaultTextStyle,
+      fallbackColor: cell.style?.color ?? '#000000',
+      fallbackFontName: cell.style?.fontname ?? '',
+      slideNumber: 1,
+      textStyleKind: 'other',
+      theme,
+    })
+    return {
+      ...cell,
+      structuredText: compiled.body,
+      text: compiled.html,
+    }
+  }))
+  return compiledAny ? { ...element, data } : element
+}
+
 const materializeStructuredText = (
   element: PPTElement,
   hierarchy: PowerPointSlideRenderHierarchy,
   slide: Slide,
   slideNumber: number,
 ): PPTElement => {
+  if (element.type === 'table') return materializeTableText(element, hierarchy, slide)
   const structuredText = elementStructuredText(element)
   if (!structuredText) return materializeSlideNumber(element, slideNumber)
   const { layout, master, sourcePackage, theme } = hierarchy
@@ -377,25 +411,10 @@ export const resolveSlideRenderState = (
   const headerFooterPolicy = master?.headerFooter ?? defaultHeaderFooterPolicy
   const masterNodes = slide.source?.showMasterShapes === false || layout?.showMasterShapes === false
     ? []
-    : createLayerNodes(master?.elements ?? [], 'master', headerFooterPolicy)
-  const layoutNodes = createLayerNodes(layout?.elements ?? [], 'layout', headerFooterPolicy)
+    : createLayerNodes(master?.elements ?? [], 'master')
+  const layoutNodes = createLayerNodes(layout?.elements ?? [], 'layout')
   const localElements = flattenElementTree(slide.elements)
-  const localPlaceholderKeys = new Set(localElements.map(placeholderKey).filter(Boolean))
-  const layoutFieldKeys = new Set(layoutNodes
-    .filter(node => isHeaderFooterPlaceholder(node.element))
-    .map(node => placeholderKey(node.element))
-    .filter(Boolean))
-  const inherited = [
-    ...masterNodes.filter(node => {
-      const key = placeholderKey(node.element)
-      if (layout && isHeaderFooterPlaceholder(node.element)) return false
-      return !key || (!localPlaceholderKeys.has(key) && !layoutFieldKeys.has(key))
-    }),
-    ...layoutNodes.filter(node => {
-      const key = placeholderKey(node.element)
-      return !key || !localPlaceholderKeys.has(key)
-    }),
-  ]
+  const inherited = [...masterNodes, ...layoutNodes]
   const slideNumber = sourcePackage && slide.source
     ? Math.max(1, sourcePackage.slides.findIndex(candidate => candidate.slidePart === slide.source!.slidePart) + 1)
     : 1
@@ -406,6 +425,11 @@ export const resolveSlideRenderState = (
   const inheritedStableIds = new Set(materializedInherited.map(node => node.element.source?.stableId).filter(Boolean))
   const local = slide.elements
     .filter(element => !element.source?.stableId || !inheritedStableIds.has(element.source.stableId))
+    // The slide declaring a field is what turns it on, but the master can
+    // still switch the whole family off for every slide that uses it.
+    .filter(element => (
+      !isHeaderFooterPlaceholder(element) || headerFooterVisible(element, headerFooterPolicy)
+    ))
     .map((element, sourceIndex) => ({
       element: materializeStructuredText(element, hierarchy, slide, slideNumber),
       layer: element.source?.sourceLayer ?? 'slide',

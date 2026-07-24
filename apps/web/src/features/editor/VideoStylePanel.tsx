@@ -7,7 +7,8 @@ import UndoIcon from '~icons/icon-park-outline/undo'
 import type { PPTVideoElement } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import { InspectorSwitch } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorSwitch, inspectorDividerClass, inspectorRowClass } from '@/features/editor/EditorInspectorPrimitives'
+import { PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 const fileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
@@ -51,29 +52,28 @@ export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement
     video.src = element.src
   }
   return (
-    <div className="text-[13px] text-foreground select-none">
+    <div className="text-control text-foreground select-none">
       <div className="mb-2.5">{t('foundation.editor.media.videoPoster')}</div>
       <div className="mb-2.5">
         <input accept="image/*" aria-label={t('foundation.editor.media.videoPoster')} hidden onChange={event => void setPoster(event)} ref={inputRef} type="file" />
-        <Button className="relative block h-0 w-full rounded-[var(--radius-control)] border border-dashed p-0 pb-[56.25%] transition-all hover:border-foreground hover:text-foreground" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
+        <Button className="relative block h-0 w-full rounded-control border border-dashed p-0 pb-[56.25%] transition-all hover:border-foreground hover:text-foreground" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
           <span className="absolute inset-0 flex items-center justify-center bg-contain bg-center bg-no-repeat" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
         </Button>
       </div>
-      <div className="flex w-full items-center mb-2.5">
+      <div className={inspectorRowClass}>
         <Button className="w-full flex-1" onClick={setPosterFromFirstFrame} size="editor" type="button" variant="editor"><ScreenshotIcon /> {t('foundation.editor.media.firstFramePoster')}</Button>
       </div>
       {element.poster ? (
-        <div className="flex w-full items-center mb-2.5">
+        <div className={inspectorRowClass}>
           <Button className="w-full flex-1" onClick={() => update({ poster: '' })} size="editor" type="button" variant="editor"><UndoIcon /> {t('foundation.editor.media.resetPoster')}</Button>
         </div>
       ) : null}
-      <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="flex h-8 w-full items-center">
-        <div className="w-[48%] text-xs">{t('foundation.editor.media.autoplay')}</div>
-        <div className="w-[52%] text-right">
+      <div className={inspectorDividerClass} />
+      <PropertyRow label={t('foundation.editor.media.autoplay')}>
+        <div className="w-full text-right">
           <InspectorSwitch ariaLabel={t('foundation.editor.media.autoplay')} checked={element.autoplay} onChange={autoplay => update({ autoplay })} />
         </div>
-      </div>
+      </PropertyRow>
     </div>
   )
 }

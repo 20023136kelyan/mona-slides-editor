@@ -7,7 +7,7 @@ import type { PresentationState } from '@mona/presentation-core'
 
 import { Button } from '@/components/ui/button'
 import { EditorDeck } from '@/features/editor/EditorDeck'
-import type { ExportDialogType } from '@/features/editor/EditorExportDialog'
+import type { ExportType } from '@/features/editor/EditorExportPopover'
 import {
   consumeRestoredDeckFlag,
   discardWorkingDeck,
@@ -27,19 +27,12 @@ import { EditorNotificationViewport } from '@/features/editor/services/EditorNot
 import type { EditorApplication, StartPresentationOptions } from '@/features/editor/services/editor-application'
 import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
-import { isMobileUserAgent } from '@/features/mobile/mobile-device'
+import { isMobileUserAgent } from '@/features/foundation/mobile-device'
+import { MobileComingSoon } from '@/features/foundation/MobileComingSoon'
 
-// The export stack (pptxgenjs, html-to-image) loads on first use, keeping it
-// out of the editor's critical path.
-const EditorExportFeature = lazy(async () => ({
-  default: (await import('@/features/editor/EditorExportFeature')).EditorExportFeature,
-}))
-// Mobile and slideshow surfaces are mutually exclusive with the desktop
-// editor. Keeping them out of the editor route avoids parsing two complete
-// interaction systems that the current session cannot use.
-const MobileView = lazy(async () => ({
-  default: (await import('@/features/mobile/MobileView')).MobileView,
-}))
+// The slideshow surface is mutually exclusive with the desktop editor.
+// Keeping it out of the editor route avoids parsing an interaction system
+// the current session cannot use.
 const ScreenView = lazy(async () => ({
   default: (await import('@/features/screen/ScreenView')).ScreenView,
 }))
@@ -88,14 +81,13 @@ export function FoundationPage() {
   const [notifications] = useState(createEditorNotificationService)
   preloadDeckFonts(presentation)
   const { importFiles, importing } = useEditorImport(runtime, t, notifications.notify)
-  const [exportType, setExportType] = useState<ExportDialogType | null>(null)
+  const [exportType, setExportType] = useState<ExportType | null>(null)
   const [agentDockOpen, setAgentDockOpen] = useState(false)
   const audienceMode = new URLSearchParams(window.location.search).get('mode') === 'audience'
   const [screening, setScreening] = useState(audienceMode)
   const [presentationLaunch, setPresentationLaunch] = useState<Pick<StartPresentationOptions, 'autoPlay' | 'viewMode'>>({})
   const presentationStartListenersRef = useRef(new Set<() => void>())
   const agentReturnFocusRef = useRef<HTMLElement | null>(null)
-  const exportReturnFocusRef = useRef<HTMLElement | null>(null)
   const presentationReturnFocusRef = useRef<HTMLElement | null>(null)
   const closeAgent = useCallback(() => {
     const activeElement = document.activeElement
@@ -111,32 +103,16 @@ export function FoundationPage() {
       })
     }
   }, [])
-  const closeExport = useCallback(() => {
-    const activeElement = document.activeElement
-    const meaningfulOutsideFocus = activeElement instanceof HTMLElement
-      && activeElement !== document.body
-      && !activeElement.closest('[role="dialog"]')
-    const shouldRestoreFocus = !meaningfulOutsideFocus
-    setExportType(null)
-    if (shouldRestoreFocus) {
-      requestAnimationFrame(() => {
-        const returnTarget = exportReturnFocusRef.current
-        if (returnTarget?.isConnected) returnTarget.focus()
-      })
-    }
-  }, [])
+  // The export dropdown is a header popover; Radix returns focus to its
+  // trigger on close, so no bespoke focus bookkeeping is needed here.
+  const closeExport = useCallback(() => setExportType(null), [])
   const openAgent = useCallback(() => {
     if (document.activeElement instanceof HTMLElement) {
       agentReturnFocusRef.current = document.activeElement
     }
     setAgentDockOpen(true)
   }, [])
-  const openExport = useCallback((type: ExportDialogType = 'pptx') => {
-    if (document.activeElement instanceof HTMLElement) {
-      exportReturnFocusRef.current = document.activeElement
-    }
-    setExportType(type)
-  }, [])
+  const openExport = useCallback((type: ExportType = 'pptx') => setExportType(type), [])
   const subscribeToPresentationStart = useCallback((listener: () => void) => {
     presentationStartListenersRef.current.add(listener)
     return () => presentationStartListenersRef.current.delete(listener)
@@ -256,9 +232,7 @@ export function FoundationPage() {
           <EditorErrorBoundary><ScreenView initialAutoPlay={presentationLaunch.autoPlay} initialViewMode={presentationLaunch.viewMode} onExit={exitPresentation} runtime={runtime} /></EditorErrorBoundary>
         </Suspense>
       ) : isMobileUserAgent() ? (
-        <Suspense fallback={<EditorFullscreenSpin loading tip={t('common.loading')} />}>
-          <MobileView runtime={runtime} />
-        </Suspense>
+        <MobileComingSoon />
       ) : (
         <>
           {/* Quirk-retirement decision (doc/QUIRK_RETIREMENT.md): the editor
@@ -272,7 +246,7 @@ export function FoundationPage() {
             >
               <EditorDeck
                 banner={restoredBanner ? (
-                  <output className="absolute bottom-[148px] left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2.5 rounded-[var(--radius-overlay)] border bg-popover py-1.5 pr-2.5 pl-3.5 text-sm text-foreground shadow-lg">
+                  <output className="absolute bottom-37 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2.5 rounded-overlay border bg-popover py-1.5 pr-2.5 pl-3.5 text-sm text-foreground shadow-lg">
                     <span>{t('foundation.restoredWorkingCopy')}</span>
                     <Button className="border-foreground hover:bg-foreground hover:text-background" onClick={startFresh} size="sm" type="button" variant="outline">{t('foundation.startFresh')}</Button>
                     <Button aria-label={t('common.close')} className="text-base text-muted-foreground" onClick={() => setRestoredBanner(false)} size="icon-sm" type="button" variant="ghost">×</Button>
@@ -282,7 +256,6 @@ export function FoundationPage() {
                 runtime={runtime}
               />
               <EditorFullscreenSpin loading={importing} tip={t('common.importing')} />
-              {exportType ? <Suspense fallback={null}><EditorExportFeature onClose={closeExport} openType={exportType} runtime={runtime} /></Suspense> : null}
             </div>
           </Activity>
           {screening ? (

@@ -379,6 +379,17 @@ export const applyPresentationCommand = (
           ) {
             delete updated.text.structuredText
           }
+          // A table update carries the whole cell matrix, so the edited cells
+          // are the ones whose text actually changed. Only those detach; the
+          // rest keep inheriting.
+          if (element.type === 'table' && updated.type === 'table' && 'data' in props) {
+            updated.data = updated.data.map((row, rowIndex) => row.map((cell, columnIndex) => {
+              const previous = element.data[rowIndex]?.[columnIndex]
+              if (!cell.structuredText || !previous || previous.text === cell.text) return cell
+              const { structuredText: _detached, ...rest } = cell
+              return rest
+            }))
+          }
           return updated
         },
       )

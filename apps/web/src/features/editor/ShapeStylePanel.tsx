@@ -1,5 +1,4 @@
-/* oxlint-disable jsx-a11y/no-static-element-interactions -- Gradient stops preserve the established editor's pointer and context-menu interaction contract. */
-import { useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import AlignBottomIcon from '~icons/icon-park-outline/align-text-bottom-one'
@@ -13,10 +12,11 @@ import RowHeightIcon from '~icons/icon-park-outline/row-height'
 import VerticalSpacingIcon from '~icons/icon-park-outline/vertical-spacing-between-items'
 import type { PresentationState, ShapePoolItem } from '@mona/presentation-core'
 import { SHAPE_LIST, SHAPE_PATH_FORMULAS } from '@mona/presentation-core/shape-presets'
-import type { Gradient, GradientColor, GradientType, PPTShapeElement, ShapeText, TextInset } from '@mona/presentation-core/model'
+import type { Gradient, GradientType, PPTShapeElement, ShapeText, TextInset } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorSelect, InspectorSlider, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
+import { EditorGradientBar } from '@/features/editor/EditorGradientBar'
+import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorSelect, InspectorSlider, inspectorDividerClass, inspectorRowClass, inspectorSplitRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import {
   ElementFlipControls,
   ElementOpacityControl,
@@ -25,17 +25,14 @@ import {
   PropertyRow,
 } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { editorLineHeightOptions, editorParagraphSpaceOptions, editorWordSpaceOptions } from '@/features/editor/editor-text-options'
 import { RichTextBaseControls } from '@/features/editor/TextStylePanel'
 
 type FillType = 'fill' | 'gradient' | 'pattern'
 
-const lineHeightOptions = [0.9, 1, 1.15, 1.2, 1.4, 1.5, 1.8, 2, 2.5, 3].map(value => ({ label: `${value}×`, value }))
-const paragraphSpaceOptions = [0, 5, 10, 15, 20, 25, 30, 40, 50, 80].map(value => ({ label: `${value}px`, value }))
-const wordSpaceOptions = [0, 1, 2, 3, 4, 5, 6, 8, 10].map(value => ({ label: `${value}px`, value }))
-
 function ShapeThumbnail({ onSelect, shape }: { onSelect: () => void; shape: ShapePoolItem }) {
   return (
-    <Button aria-label={shape.title || 'Shape preset'} className="mona-shape-thumbnail" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
+    <Button aria-label={shape.title || 'Shape preset'} className="relative aspect-square size-full cursor-pointer border-0 bg-transparent p-0 text-neutral-400 [&_svg]:absolute [&_svg]:top-1/2 [&_svg]:left-1/2 [&_svg]:-translate-x-1/2 [&_svg]:-translate-y-1/2 [&_svg]:overflow-visible hover:[&_path:not(.is-outlined)]:stroke-editor-selection hover:[&_path.is-outlined]:fill-editor-selection" onClick={onSelect} size="editor-icon" type="button" variant="ghost">
       <svg height="18" overflow="visible" width="18">
         <g transform={`scale(${18 / shape.viewBox[0]}, ${18 / shape.viewBox[1]}) translate(0,0) matrix(1,0,0,1,0,0)`}>
           <path
@@ -51,87 +48,6 @@ function ShapeThumbnail({ onSelect, shape }: { onSelect: () => void; shape: Shap
         </g>
       </svg>
     </Button>
-  )
-}
-
-function GradientBar({
-  index,
-  onChange,
-  onIndexChange,
-  value,
-}: {
-  index: number
-  onChange: (value: GradientColor[]) => void
-  onIndexChange: (index: number) => void
-  value: GradientColor[]
-}) {
-  const barRef = useRef<HTMLDivElement>(null)
-  const [draft, setDraft] = useState<GradientColor[] | null>(null)
-  const points = draft || value
-  const activeIndex = Math.min(index, value.length - 1)
-  const positionAt = (clientX: number) => {
-    const bar = barRef.current
-    if (!bar) return 0
-    return Math.min(100, Math.max(0, Math.round((clientX - bar.getBoundingClientRect().left) / bar.clientWidth * 100)))
-  }
-  const addPoint = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.target !== barRef.current || value.length >= 6) return
-    const pos = positionAt(event.clientX)
-    let targetIndex = 0
-    value.forEach((point, pointIndex) => {
-      if (pos > point.pos) targetIndex = pointIndex + 1 
-    })
-    const color = value[targetIndex - 1]?.color || value[targetIndex]!.color
-    const next = [...value]
-    next.splice(targetIndex, 0, { pos, color })
-    onIndexChange(targetIndex)
-    onChange(next)
-  }
-  const movePoint = (event: ReactPointerEvent<HTMLDivElement>, movingIndex: number) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    const update = (pointer: PointerEvent) => setDraft(value.map((point, pointIndex) => pointIndex === movingIndex ? { ...point, pos: positionAt(pointer.clientX) } : point))
-    const stop = (pointer: PointerEvent) => {
-      const moving = { ...value[movingIndex]!, pos: positionAt(pointer.clientX) }
-      const next = value.filter((_, pointIndex) => pointIndex !== movingIndex)
-      let targetIndex = 0
-      next.forEach((point, pointIndex) => {
-        if (moving.pos > point.pos) targetIndex = pointIndex + 1 
-      })
-      next.splice(targetIndex, 0, moving)
-      setDraft(null)
-      onIndexChange(targetIndex)
-      onChange(next)
-      document.removeEventListener('pointermove', update)
-      document.removeEventListener('pointerup', stop)
-      document.removeEventListener('pointercancel', stop)
-    }
-    document.addEventListener('pointermove', update)
-    document.addEventListener('pointerup', stop)
-    document.addEventListener('pointercancel', stop)
-  }
-  const removePoint = (event: ReactPointerEvent<HTMLDivElement>, removingIndex: number) => {
-    if (event.button !== 2 || value.length <= 2) return
-    event.preventDefault()
-    let targetIndex = 0
-    if (removingIndex === activeIndex) targetIndex = Math.max(0, removingIndex - 1)
-    else if (activeIndex === value.length - 1) targetIndex = value.length - 2
-    onIndexChange(targetIndex)
-    onChange(value.filter((_, pointIndex) => pointIndex !== removingIndex))
-  }
-  return (
-    <div className="mona-gradient-bar" onPointerDown={addPoint}>
-      <div className="mona-gradient-bar-track" ref={barRef} style={{ backgroundImage: `linear-gradient(to right, ${points.map(point => `${point.color} ${point.pos}%`).join(',')})` }} />
-      {points.map((point, pointIndex) => (
-        <div
-          className={`mona-gradient-stop${activeIndex === pointIndex ? ' is-active' : ''}`}
-          key={`${point.pos}-${pointIndex}`}
-          onContextMenu={event => event.preventDefault()}
-          onPointerDown={event => event.button === 2 ? removePoint(event, pointIndex) : movePoint(event, pointIndex)}
-          style={{ backgroundColor: point.color, left: `calc(${point.pos}% - 5px)` }}
-        />
-      ))}
-    </div>
   )
 }
 
@@ -227,7 +143,7 @@ export function ShapeStylePanel({
       <div className="mona-shape-panel-title"><span>{t('foundation.editor.shape.replace')}</span><DownIcon /></div>
       <div className="mona-shape-replace-pool">
         {SHAPE_LIST.map(category => (
-          <div className="mona-shape-replace-list" key={category.type}>
+          <div className="grid grid-cols-6 gap-[3.2%]" key={category.type}>
             {category.children.map((shape, index) => <ShapeThumbnail key={`${category.type}-${index}`} onSelect={() => changeShape(shape)} shape={shape} />)}
           </div>
         ))}
@@ -248,7 +164,7 @@ export function ShapeStylePanel({
       </div>
       {fillType === 'gradient' ? (
         <>
-          <div className="flex w-full items-center mb-2.5"><GradientBar index={gradientIndex} onChange={colors => updateGradient({ colors })} onIndexChange={setGradientIndex} value={gradient.colors} /></div>
+          <div className={inspectorRowClass}><EditorGradientBar index={Math.min(gradientIndex, gradient.colors.length - 1)} onChange={colors => updateGradient({ colors })} onIndexChange={setGradientIndex} value={gradient.colors} /></div>
           <PropertyRow label={t('foundation.editor.shape.currentStop')}><InspectorColorButton ariaLabel={t('foundation.editor.shape.currentStop')} color={gradient.colors[gradientIndex]?.color || gradient.colors[0]!.color} onChange={color => updateGradient({ colors: gradient.colors.map((stop, index) => index === gradientIndex ? { ...stop, color } : stop) })} /></PropertyRow>
           {gradient.type === 'linear' ? <PropertyRow label={t('foundation.editor.shape.gradientAngle')}><InspectorSlider ariaLabel={t('foundation.editor.shape.gradientAngle')} max={360} min={0} onChange={rotate => updateGradient({ rotate })} step={15} value={gradient.rotate} /></PropertyRow> : null}
         </>
@@ -275,12 +191,12 @@ export function ShapeStylePanel({
         <>
           <RichTextBaseControls element={element} runtime={runtime} />
           <div className={inspectorDividerClass} />
-          <PropertyRow label={t('foundation.editor.text.lineSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.lineSpacing')} icon={<RowHeightIcon />} onChange={value => updateText({ lineHeight: value })} options={lineHeightOptions} value={element.text.lineHeight || 1.5} /></PropertyRow>
-          <PropertyRow label={t('foundation.editor.text.paragraphSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.paragraphSpacing')} icon={<VerticalSpacingIcon />} onChange={value => updateText({ paragraphSpace: value })} options={paragraphSpaceOptions} value={element.text.paragraphSpace === undefined ? 5 : element.text.paragraphSpace} /></PropertyRow>
-          <PropertyRow label={t('foundation.editor.text.letterSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.letterSpacing')} icon={<FullwidthIcon />} onChange={value => updateText({ wordSpace: value })} options={wordSpaceOptions} value={element.text.wordSpace || 0} /></PropertyRow>
+          <PropertyRow label={t('foundation.editor.text.lineSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.lineSpacing')} icon={<RowHeightIcon />} onChange={value => updateText({ lineHeight: value })} options={editorLineHeightOptions} value={element.text.lineHeight || 1.5} /></PropertyRow>
+          <PropertyRow label={t('foundation.editor.text.paragraphSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.paragraphSpacing')} icon={<VerticalSpacingIcon />} onChange={value => updateText({ paragraphSpace: value })} options={editorParagraphSpaceOptions} value={element.text.paragraphSpace === undefined ? 5 : element.text.paragraphSpace} /></PropertyRow>
+          <PropertyRow label={t('foundation.editor.text.letterSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.letterSpacing')} icon={<FullwidthIcon />} onChange={value => updateText({ wordSpace: value })} options={editorWordSpaceOptions} value={element.text.wordSpace || 0} /></PropertyRow>
           <div className={inspectorDividerClass} />
-          <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets"><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginTop')} label={t('foundation.editor.text.marginTop')} max={50} min={0} onChange={value => updateInset(0, value)} value={inset[0]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginBottom')} label={t('foundation.editor.text.marginBottom')} max={50} min={0} onChange={value => updateInset(2, value)} value={inset[2]} /></div>
-          <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets"><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginLeft')} label={t('foundation.editor.text.marginLeft')} max={50} min={0} onChange={value => updateInset(3, value)} value={inset[3]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginRight')} label={t('foundation.editor.text.marginRight')} max={50} min={0} onChange={value => updateInset(1, value)} value={inset[1]} /></div>
+          <div className={`${inspectorSplitRowClass} is-insets`}><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginTop')} label={t('foundation.editor.text.marginTop')} max={50} min={0} onChange={value => updateInset(0, value)} value={inset[0]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginBottom')} label={t('foundation.editor.text.marginBottom')} max={50} min={0} onChange={value => updateInset(2, value)} value={inset[2]} /></div>
+          <div className={`${inspectorSplitRowClass} is-insets`}><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginLeft')} label={t('foundation.editor.text.marginLeft')} max={50} min={0} onChange={value => updateInset(3, value)} value={inset[3]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginRight')} label={t('foundation.editor.text.marginRight')} max={50} min={0} onChange={value => updateInset(1, value)} value={inset[1]} /></div>
           <div className={inspectorDividerClass} />
           <InspectorButtonGroup className="flex w-full items-center mb-2.5">
             <InspectorButton active={(element.text.align || 'middle') === 'top'} ariaLabel={t('foundation.editor.text.alignTop')} onClick={() => updateText({ align: 'top' })} style={{ flex: 1 }}><AlignTopIcon /></InspectorButton>

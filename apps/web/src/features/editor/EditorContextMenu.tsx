@@ -229,6 +229,10 @@ export function EditorContextMenu({
         onContextMenu={event => {
           event.preventDefault(); event.stopPropagation()
         }}
+        // Radix portals this to <body>, but React events still bubble up the
+        // React tree — straight into the stage's onPointerDown, which clears
+        // the menu state and unmounted this before Radix could fire onSelect.
+        onPointerDown={event => event.stopPropagation()}
         side="bottom"
         sideOffset={0}
       >
@@ -359,7 +363,7 @@ export function LinkEditor({
               {selectedSlide ? (
                 <div className="mt-3">
                   <div className="text-muted-foreground">{t('foundation.editor.link.preview')}</div>
-                  <div className="mt-1.5 w-fit overflow-hidden rounded-[var(--radius-surface)] border">
+                  <div className="mt-1.5 w-fit overflow-hidden rounded-surface border">
                     <ScaledSlide
                       fixedWidth={500}
                       slide={selectedSlide}

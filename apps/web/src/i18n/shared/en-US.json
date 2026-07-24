@@ -113,10 +113,10 @@
     "testingOnly": "For testing only",
     "nativeFormat": "Native format",
     "exportFile": "Export",
-    "exportPptx": "PowerPoint (.pptx)",
-    "exportPdf": "PDF document",
+    "exportPptx": "PowerPoint",
+    "exportPdf": "PDF",
     "exportImage": "Images",
-    "exportNative": "Mona presentation",
+    "exportNative": "Mona",
     "exportJson": "JSON",
     "newPresentation": "New presentation",
     "newPresentationConfirmTitle": "Create a new presentation?",
@@ -134,6 +134,7 @@
     "fromCurrentSlide": "From current slide",
     "generateWithAI": "Generate presentation with AI",
     "ai": "AI",
+    "share": "Share",
     "export": "Export",
     "untitledPresentation": "Untitled presentation",
     "presentationTitle": "Presentation title",
@@ -254,7 +255,23 @@
       "template_8": "Fresh Sky Blue"
     }
   },
+  "share": {
+    "title": "Share",
+    "invite": "Invite others",
+    "public": "Share publicly",
+    "export": "Export",
+    "embed": "Embed",
+    "inviteSoon": "Invite teammates",
+    "inviteDescription": "Send an invite so people can view or edit this presentation with you. Coming soon.",
+    "publicSoon": "Share a public link",
+    "publicDescription": "Create a link anyone can open — no account required. Coming soon.",
+    "embedSoon": "Embed this deck",
+    "embedDescription": "Get a snippet to place this presentation on your site. Coming soon."
+  },
   "export": {
+    "tip": "Download a static copy of your deck to share with others.",
+    "fileType": "File type",
+    "download": "Download",
     "range": "Export range:",
     "format": "Export format:",
     "mode": "Export mode:",
@@ -271,6 +288,7 @@
     "pageMargin": "Page margin:",
     "printTip": "In the print dialog, enable background graphics and use the default margins.",
     "nativeFileTip": ".mona is this application's native file format and can be imported back into the editor.",
+    "jsonTip": "Download the presentation as a JSON file.",
     "exportNative": "Export Mona file",
     "exportPptx": "Export PPTX",
     "exportImage": "Export images",
@@ -754,17 +772,8 @@
     "countdown": "Countdown"
   },
   "mobile": {
-    "edit": "Edit",
-    "play": "Play",
-    "exitEdit": "Exit editing",
-    "exitPlay": "Exit playback",
-    "layout": "Layout",
-    "noProperties": "No settings available",
-    "newSlide": "New slide",
-    "text": "Text",
-    "rectangle": "Rectangle",
-    "circle": "Circle",
-    "newText": "New text"
+    "comingSoonTitle": "Mona is desktop-only for now",
+    "comingSoonBody": "The mobile editor is coming soon. Open Mona on a desktop browser to build and edit your presentation."
   },
   "player": {
     "loadFailed": "Video failed to load",
@@ -807,6 +816,7 @@
     "invalidLink": "Enter a valid web address",
     "selectLinkTarget": "Choose a link target first",
     "fileParseFailed": "This file could not be read or parsed",
+    "fontsUnavailable": "These fonts are unavailable and were replaced by a fallback: {{fonts}}",
     "clipboardEmpty": "The clipboard is empty or does not contain text",
     "clipboardDenied": "Clipboard access is unavailable or blocked. Use Ctrl+V instead."
   },

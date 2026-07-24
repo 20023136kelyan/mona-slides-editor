@@ -36,7 +36,7 @@ export function EditorChartContextControls({
         <Button className={contextualControlLabeled} onClick={onEditData} variant="ghost"><EditIcon /><span>{t('foundation.editor.chartStyle.editData')}</span></Button>
         <Popover>
           <PopoverTrigger asChild><Button className={contextualControlLabeled} variant="ghost"><ChartIcon /><span>{t('foundation.editor.chartStyle.type')}</span></Button></PopoverTrigger>
-          <PopoverContent aria-label={t('foundation.editor.chartStyle.type')} align="center" className="mona-chart-type-menu is-contextual" sideOffset={8}>
+          <PopoverContent aria-label={t('foundation.editor.chartStyle.type')} align="center" className="grid w-35.5 gap-0.5 [&>button]:w-full [&>button]:justify-center" sideOffset={8}>
             {CHART_TYPES.map(type => <Button key={type} onClick={() => changeType(type)} size="sm" variant="ghost">{t(`foundation.editor.chartTypes.${type}`)}</Button>)}
           </PopoverContent>
         </Popover>

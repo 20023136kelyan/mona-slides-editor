@@ -38,12 +38,29 @@ function extractChartData(serNode) {
       || index
 
     const rowNames = {}
-    if (getTextByPathList(innerNode, ['c:cat', 'c:strRef', 'c:strCache', 'c:pt'])) {
+    if (getTextByPathList(innerNode, ['c:cat', 'c:multiLvlStrRef', 'c:multiLvlStrCache', 'c:lvl'])) {
+      // A grouped category axis stores one c:lvl per tier, innermost first.
+      // PowerPoint stacks the tiers under the axis, so joining them by line
+      // keeps every tier's label instead of dropping all but one.
+      const levelNode = innerNode['c:cat']['c:multiLvlStrRef']['c:multiLvlStrCache']['c:lvl']
+      const levels = levelNode.constructor === Array ? levelNode : [levelNode]
+      for (const level of levels) {
+        if (!level || !level['c:pt']) continue
+        eachElement(level['c:pt'], pointNode => {
+          const index = pointNode['attrs']['idx']
+          const value = pointNode['c:v']
+          if (value === undefined || value === null) return ''
+          rowNames[index] = rowNames[index] === undefined ? value : `${rowNames[index]}\n${value}`
+          return ''
+        })
+      }
+    }
+    else if (getTextByPathList(innerNode, ['c:cat', 'c:strRef', 'c:strCache', 'c:pt'])) {
       eachElement(innerNode['c:cat']['c:strRef']['c:strCache']['c:pt'], innerNode => {
         rowNames[innerNode['attrs']['idx']] = innerNode['c:v']
         return ''
       })
-    } 
+    }
     else if (getTextByPathList(innerNode, ['c:cat', 'c:numRef', 'c:numCache', 'c:pt'])) {
       eachElement(innerNode['c:cat']['c:numRef']['c:numCache']['c:pt'], innerNode => {
         rowNames[innerNode['attrs']['idx']] = innerNode['c:v']

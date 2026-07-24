@@ -53,12 +53,7 @@
 }
 .mona-drawing-palette [data-slot="toggle-group"] { gap: 1px; }
 .mona-drawing-palette svg { width: 16px; height: 16px; }
-.mona-drawing-palette-divider {
-  width: 1px;
-  height: 24px;
-  background: rgb(16 18 25 / 10%);
-  margin-inline: 2px;
-}
+
 .mona-drawing-reference-count {
   position: absolute;
   top: -2px;
@@ -71,37 +66,6 @@
   font-size: 9px;
   line-height: 14px;
 }
-.mona-drawing-stroke-popover,
-.mona-drawing-export-popover {
-  width: 220px;
-}
-.mona-drawing-stroke-popover {
-  display: grid;
-  gap: 10px;
-}
-.mona-drawing-stroke-popover strong { font-size: 12px; }
-.mona-drawing-colors {
-  display: flex;
-  gap: 6px;
-}
-.mona-drawing-colors button::before {
-  width: 18px;
-  height: 18px;
-  border: 2px solid #fff;
-  border-radius: var(--radius-pill);
-  background: var(--drawing-color);
-  box-shadow: 0 0 0 1px rgb(16 18 25 / 16%);
-  content: "";
-}
-.mona-drawing-colors button.is-active::before {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #171717;
-}
-.mona-drawing-export-popover {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.mona-drawing-export-popover button { justify-content: flex-start; }
 @media (prefers-reduced-motion: reduce) {
   .mona-drawing-workspace *,
   .mona-drawing-workspace *::before,

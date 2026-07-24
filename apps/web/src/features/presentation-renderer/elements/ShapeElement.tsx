@@ -8,6 +8,7 @@ import {
   getShadowStyle,
   type SlideCSSProperties,
 } from '@/features/presentation-renderer/render-utils'
+import { autofitEnabled, useTextAutofit } from '@/features/presentation-renderer/use-text-autofit'
 
 interface ShapeElementProps {
   editor?: ShapeElementEditor
@@ -55,6 +56,35 @@ function PowerPointPattern({ pattern }: { pattern: PatternFill }) {
 
 function ShapeGradient({ element, svgId }: { element: PPTShapeElement; svgId: string }) {
   if (element.pattern) {
+    // An imported picture fill declares how it meets its shape. `stretch` fits
+    // the picture to the shape and distorts it when the aspect ratios differ —
+    // it is not a cover-crop — and the destination rect can reach outside the
+    // shape, which is how a crop is expressed. Both are laid out in the path's
+    // own coordinate space, so the pattern uses that space rather than the
+    // bounding box, whose units are anisotropic.
+    if (element.patternFit && element.patternFit.mode === 'stretch') {
+      const [viewWidth, viewHeight] = element.viewBox
+      const rect = element.patternFit.rect ?? { b: 0, l: 0, r: 0, t: 0 }
+      return (
+        <pattern
+          height={viewHeight}
+          id={`${svgId}-pattern`}
+          patternUnits="userSpaceOnUse"
+          width={viewWidth}
+          x={0}
+          y={0}
+        >
+          <image
+            height={viewHeight * (1 - rect.t - rect.b)}
+            href={element.pattern}
+            preserveAspectRatio="none"
+            width={viewWidth * (1 - rect.l - rect.r)}
+            x={viewWidth * rect.l}
+            y={viewHeight * rect.t}
+          />
+        </pattern>
+      )
+    }
     return (
       <pattern
         height="1"
@@ -126,6 +156,11 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
     '--paragraphSpace': `${text.paragraphSpace === undefined ? 5 : text.paragraphSpace}px`,
   }
   const markup = { __html: text.content }
+  const fitEnabled = autofitEnabled(text.structuredText?.bodyProperties?.autoFit)
+  const { attachContent, attachFrame, scale: fitScale } = useTextAutofit(
+    fitEnabled,
+    `${element.width}|${element.height}|${text.lineHeight}|${text.content}`,
+  )
 
   return (
     <div
@@ -167,8 +202,16 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
               />
             </g>
           </svg>
-          <div className={`mona-shape-text is-${text.align}${editor?.content || text.content ? ' is-editable' : ''}`} style={textStyle}>
-            {editor?.content ?? <div className="ProseMirror-static" dangerouslySetInnerHTML={markup} />}
+          <div
+            className={`mona-shape-text is-${text.align}${editor?.content || text.content ? ' is-editable' : ''}`}
+            ref={attachFrame}
+            style={textStyle}
+          >
+            {fitEnabled ? (
+              <div className="mona-text-autofit" ref={attachContent} style={{ zoom: fitScale }}>
+                {editor?.content ?? <div className="ProseMirror-static" dangerouslySetInnerHTML={markup} />}
+              </div>
+            ) : editor?.content ?? <div className="ProseMirror-static" dangerouslySetInnerHTML={markup} />}
           </div>
         </div>
       </div>

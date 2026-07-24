@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import tinycolor from 'tinycolor2'
 
@@ -9,7 +9,6 @@ import PlusIcon from '~icons/icon-park-outline/plus'
 import RightIcon from '~icons/icon-park-outline/right'
 import type {
   Gradient,
-  LineStyleType,
   SlideBackground,
   SlideBackgroundImage,
   SlideBackgroundType,
@@ -29,9 +28,13 @@ import {
   InspectorSlider,
 } from '@/features/editor/EditorInspectorPrimitives'
 import { EditorModal } from '@/features/editor/EditorModal'
+import { LinePreview } from '@/features/editor/ElementStyleCommons'
 import { useEditorModalClose } from '@/features/editor/editor-modal-context'
+import { startListReorder } from '@/features/editor/editor-list-reorder'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { fileToDataUrl } from '@/features/editor/editor-image'
+import { lineStyleOptions } from '@/features/editor/editor-style-options'
+import { editorFontOptions } from '@/features/editor/editor-text-options'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import {
   applyFontToSlides,
@@ -43,41 +46,6 @@ import {
   type PresetTheme,
 } from '@/features/editor/editor-slide-theme'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
-
-const fontOptions = [
-  { label: '思源黑体', value: 'SourceHanSans' },
-  { label: '思源宋体', value: 'SourceHanSerif' },
-  { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
-  { label: '文鼎PL宋体', value: 'WenDingPLSongTi' },
-  { label: '朱雀仿宋', value: 'ZhuQueFangSong' },
-  { label: '霞鹜文楷', value: 'LXGWWenKai' },
-  { label: '霞鹜新致宋', value: 'LXGWNeoZhiSong' },
-  { label: '霞鹜新晰黑', value: 'LXGWNeoXiHei' },
-  { label: '阿里巴巴普惠体', value: 'AlibabaPuHuiTi' },
-  { label: '得意黑', value: 'DeYiHei' },
-  { label: 'MiSans', value: 'MiSans' },
-  { label: 'Source Serif 4', value: 'SourceSerif4' },
-  { label: 'JetBrains Mono', value: 'JetBrainsMono' },
-  { label: 'Literata', value: 'Literata' },
-  { label: 'Inter', value: 'Inter' },
-  { label: 'Roboto', value: 'Roboto' },
-  { label: 'Open Sans', value: 'OpenSans' },
-  { label: 'Montserrat', value: 'Montserrat' },
-  { label: 'Source Sans Pro', value: 'SourceSansPro' },
-  { label: 'Merriweather', value: 'Merriweather' },
-  { label: 'Lato', value: 'Lato' },
-] as const
-
-const lineStyleOptions: Array<{ label: string; value: LineStyleType }> = [
-  { label: 'Solid', value: 'solid' },
-  { label: 'Dashed', value: 'dashed' },
-  { label: 'Dotted', value: 'dotted' },
-]
-
-function LineStylePreview({ type }: { type: LineStyleType }) {
-  const dashArray = type === 'dashed' ? '10 5' : type === 'dotted' ? '3.6 3.2' : '0 0'
-  return <svg aria-hidden="true" height="100%" viewBox="0 0 100 10" width="100%"><line stroke="#333" strokeDasharray={dashArray} strokeWidth="2" x1="0" x2="100" y1="5" y2="5" /></svg>
-}
 
 function DesignRow({ children, label, style }: { children: React.ReactNode; label: string; style?: React.CSSProperties }) {
   return <div className="mb-2.5 flex w-full items-center" style={style}><div className="w-2/5">{label}</div><div className="w-3/5 [&>*]:w-full">{children}</div></div>
@@ -116,10 +84,10 @@ function ViewportSizeSetting({ runtime }: { runtime: EditorRuntime }) {
   }
   return (
     <div>
-      <div className="mb-[15px] text-[17px] font-bold">{t('designPanel.customCanvas')}</div>
-      <div className="mb-2.5 flex w-full items-center text-[13px] [&>div:first-child]:w-[50px] [&>*:last-child]:flex-1"><div>{t('toolbar.width')}</div><InspectorNumberInput ariaLabel={t('toolbar.width')} max={max} min={min} onChange={setWidth} onEnter={value => apply(value, height)} value={width} /></div>
-      <div className="mb-2.5 flex w-full items-center text-[13px] [&>div:first-child]:w-[50px] [&>*:last-child]:flex-1"><div>{t('toolbar.height')}</div><InspectorNumberInput ariaLabel={t('toolbar.height')} max={max} min={min} onChange={setHeight} onEnter={value => apply(width, value)} value={height} /></div>
-      <div className="mb-[18px] text-xs text-muted-foreground">{t('designPanel.sizeRange', { min, max })}</div>
+      <div className="mb-3.75 text-[17px] font-bold">{t('designPanel.customCanvas')}</div>
+      <div className="mb-2.5 flex w-full items-center text-control [&>div:first-child]:w-12.5 [&>*:last-child]:flex-1"><div>{t('toolbar.width')}</div><InspectorNumberInput ariaLabel={t('toolbar.width')} max={max} min={min} onChange={setWidth} onEnter={value => apply(value, height)} value={width} /></div>
+      <div className="mb-2.5 flex w-full items-center text-control [&>div:first-child]:w-12.5 [&>*:last-child]:flex-1"><div>{t('toolbar.height')}</div><InspectorNumberInput ariaLabel={t('toolbar.height')} max={max} min={min} onChange={setHeight} onEnter={value => apply(width, value)} value={height} /></div>
+      <div className="mb-4.5 text-xs text-muted-foreground">{t('designPanel.sizeRange', { min, max })}</div>
       <div className="flex justify-end gap-2.5">
         <InspectorButton active ariaLabel={t('common.confirm')} onClick={apply}>{t('common.confirm')}</InspectorButton>
         <InspectorButton ariaLabel={t('common.cancel')} onClick={close}>{t('common.cancel')}</InspectorButton>
@@ -137,39 +105,15 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
     while (next.length < 6) next.push('#00000000')
     return next
   })
-  const dragCleanupRef = useRef<(() => void) | null>(null)
-  const startReorder = (event: ReactPointerEvent<HTMLDivElement>, oldIndex: number) => {
-    if (event.button !== 0) return
-    const startY = event.clientY
-    let moved = false
-    let nextIndex = oldIndex
-    const move = (pointer: PointerEvent) => {
-      if (!moved && Math.abs(pointer.clientY - startY) < 4) return
-      moved = true
-      const rows = [...document.querySelectorAll<HTMLElement>('.mona-theme-colors-row')]
-      const target = rows.findIndex(row => pointer.clientY < row.getBoundingClientRect().top + (row.offsetHeight / 2))
-      nextIndex = target < 0 ? rows.length - 1 : target
-    }
-    const stop = () => {
-      cleanup()
-      if (!moved || nextIndex === oldIndex) return
-      setColors(current => {
-        const next = [...current]
-        const item = next.splice(oldIndex, 1)[0]!
-        next.splice(nextIndex, 0, item)
-        return next
-      })
-    }
-    const cleanup = () => {
-      document.removeEventListener('pointermove', move)
-      document.removeEventListener('pointerup', stop)
-      dragCleanupRef.current = null
-    }
-    dragCleanupRef.current?.()
-    document.addEventListener('pointermove', move)
-    document.addEventListener('pointerup', stop, { once: true })
-    dragCleanupRef.current = cleanup
-  }
+  const startReorder = (event: ReactPointerEvent<HTMLDivElement>, oldIndex: number) => startListReorder(event, oldIndex, {
+    getRows: () => document.querySelectorAll<HTMLElement>('.mona-theme-colors-row'),
+    onReorder: (from, to) => setColors(current => {
+      const next = [...current]
+      const item = next.splice(from, 1)[0]!
+      next.splice(to, 0, item)
+      return next
+    }),
+  })
   const confirm = () => {
     let next = colors.filter(color => color !== '#00000000')
     if (!next.length) next = ['#00000000']
@@ -181,10 +125,10 @@ function ThemeColorsSetting({ runtime }: { runtime: EditorRuntime }) {
   }
   return (
     <div className="flex flex-col">
-      <div className="mb-[15px] text-[17px] font-bold">{t('designPanel.editThemeColors')}</div>
+      <div className="mb-3.75 text-[17px] font-bold">{t('designPanel.editThemeColors')}</div>
       {colors.map((color, index) => (
         <div className="mona-theme-colors-row mb-2.5 flex w-full items-center [&>*:last-child]:w-3/5" key={index}>
-          <div className="w-2/5 cursor-move text-[13px]" onPointerDown={event => startReorder(event, index)}>{t('designPanel.slideThemeColor', { number: index + 1 })}</div>
+          <div className="w-2/5 cursor-move text-control" onPointerDown={event => startReorder(event, index)}>{t('designPanel.slideThemeColor', { number: index + 1 })}</div>
           <InspectorColorButton ariaLabel={t('designPanel.slideThemeColor', { number: index + 1 })} color={color} onChange={value => setColors(current => current.map((item, itemIndex) => itemIndex === index ? value : item))} />
         </div>
       ))}
@@ -237,12 +181,12 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
     return (value.getAlpha() < 1 ? value.toHex8String() : value.toHexString()).toUpperCase()
   }
   const optionRows = [
-    { key: 'fontName' as const, label: `${t('common.font')}:`, values: styles.fontNames, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ fontFamily: value }}>{fontOptions.find(item => item.value === value)?.label || value}</span>, apply: (value: string) => updateTheme({ fontName: value }) },
-    { key: 'fontColor' as const, label: `${t('toolbar.textColor')}:`, values: styles.fontColors, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ fontColor: value }) },
-    { key: 'backgroundColor' as const, label: `${t('common.backgroundColor')}:`, values: styles.backgroundColors, visual: (value: string) => <span className="h-[25px] w-[150px] truncate rounded-[var(--radius-control)] border px-[5px] text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ backgroundColor: value }) },
+    { key: 'fontName' as const, label: `${t('common.font')}:`, values: styles.fontNames, visual: (value: string) => <span className="h-6.25 w-37.5 truncate rounded-control border px-1.25 text-center text-xs leading-[25px]" style={{ fontFamily: value }}>{editorFontOptions.find(item => item.value === value)?.label || value}</span>, apply: (value: string) => updateTheme({ fontName: value }) },
+    { key: 'fontColor' as const, label: `${t('toolbar.textColor')}:`, values: styles.fontColors, visual: (value: string) => <span className="h-6.25 w-37.5 truncate rounded-control border px-1.25 text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ fontColor: value }) },
+    { key: 'backgroundColor' as const, label: `${t('common.backgroundColor')}:`, values: styles.backgroundColors, visual: (value: string) => <span className="h-6.25 w-37.5 truncate rounded-control border px-1.25 text-center text-xs leading-[25px]" style={{ backgroundColor: value, color: readable(value) }}>{hex(value)}</span>, apply: (value: string) => updateTheme({ backgroundColor: value }) },
   ]
   return (
-    <div className="flex h-[500px] flex-col">
+    <div className="flex h-125 flex-col">
       <Tabs onValueChange={value => selectTab(value as 'single' | 'all')} value={activeTab}>
         <TabsList className="w-full justify-start border-b" variant="line">
           <TabsTrigger value="single">{t('designPanel.extractCurrent')}</TabsTrigger>
@@ -251,13 +195,13 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
       </Tabs>
       <div className="mr-[-20px] flex-1 overflow-auto pr-5">
         {optionRows.map(row => row.values.length ? (
-          <div className="border-b border-dashed pt-3 pb-2.5 text-[13px]" key={row.key}>
-            <div className="mb-[5px] flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{row.label}</div>
+          <div className="border-b border-dashed pt-3 pb-2.5 text-control" key={row.key}>
+            <div className="mb-1.25 flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{row.label}</div>
             {row.values.map((value, index) => (
-              <div className="mt-[3px] flex items-center justify-between" key={value}>
+              <div className="mt-0.75 flex items-center justify-between" key={value}>
                 {row.visual(value)}
                 <div className="ml-2.5 flex flex-1 items-center justify-between text-xs">
-                  <span className={selection[row.key] === index ? 'text-[15px] opacity-100' : 'text-[15px] opacity-0'}><CheckIcon /></span>
+                  <span className={selection[row.key] === index ? 'text-field opacity-100' : 'text-field opacity-0'}><CheckIcon /></span>
                   <Button onClick={() => setSelection(current => ({ ...current, [row.key]: index }))} size="xs" type="button" variant="ghost">{t('common.select')}</Button>
                   <Button onClick={() => {
                     row.apply(value); setSelection(current => ({ ...current, [row.key]: index })) 
@@ -268,9 +212,9 @@ function ThemeStylesExtract({ runtime }: { runtime: EditorRuntime }) {
           </div>
         ) : null)}
         {styles.themeColors.length ? (
-          <div className="border-b border-dashed pt-3 pb-2.5 text-[13px]">
-            <div className="mb-[5px] flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{`${t('common.themeColor')}: `}<span>({t('designPanel.excludeColorTip')})</span></div>
-            <div className="mona-extract-colors">
+          <div className="border-b border-dashed pt-3 pb-2.5 text-control">
+            <div className="mb-1.25 flex items-center [&_span]:text-xs [&_span]:text-muted-foreground">{`${t('common.themeColor')}: `}<span>({t('designPanel.excludeColorTip')})</span></div>
+            <div className="grid grid-cols-10 gap-[1.111111%] [&_button]:relative [&_button]:h-6.25 [&_button]:rounded-control [&_button]:border [&_button]:p-0 [&_button.is-disabled]:opacity-20 [&_button.is-disabled]:before:absolute [&_button.is-disabled]:before:top-2.75 [&_button.is-disabled]:before:-left-px [&_button.is-disabled]:before:h-0.5 [&_button.is-disabled]:before:w-6 [&_button.is-disabled]:before:rotate-45 [&_button.is-disabled]:before:bg-black [&_button.is-disabled]:before:content-[''] [&_button.is-disabled]:after:absolute [&_button.is-disabled]:after:top-2.75 [&_button.is-disabled]:after:-left-px [&_button.is-disabled]:after:h-0.5 [&_button.is-disabled]:after:w-6 [&_button.is-disabled]:after:-rotate-45 [&_button.is-disabled]:after:bg-black [&_button.is-disabled]:after:content-['']">
               {styles.themeColors.map((color, index) => (
                 <Toggle
                   aria-label={color}
@@ -361,7 +305,7 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
         ]} value={background.gradient?.type || 'linear'} /> : null}
       </div>
       {background.type === 'image' ? (
-        <label className="relative mb-2.5 block h-0 rounded-[var(--radius-control)] border border-dashed pb-[56.25%] transition-colors hover:border-foreground hover:text-foreground">
+        <label className="relative mb-2.5 block h-0 rounded-control border border-dashed pb-[56.25%] transition-colors hover:border-foreground hover:text-foreground">
           <input accept="image/*" hidden onChange={event => {
             const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(src => updateImage({ src }))
           }} type="file" />
@@ -382,14 +326,14 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       }} options={ratioOptions} value={ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'} /></div>
       <div className="w-full text-center text-xs text-muted-foreground">{canvasSize}</div>
       <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mb-2.5 flex justify-between"><span>{t('designPanel.globalTheme')}</span><Button className="gap-[3px] text-xs" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
-      <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
+      <div className="mb-2.5 flex justify-between"><span>{t('designPanel.globalTheme')}</span><Button className="gap-0.75 text-xs" onClick={() => setMore(value => !value)} size="xs" type="button" variant="ghost"><span>{t('common.more')}</span>{more ? <DownIcon /> : <RightIcon />}</Button></div>
+      <DesignRow label={`${t('common.font')}:`}><InspectorSelect ariaLabel={t('common.font')} onChange={fontName => updateTheme({ fontName })} options={[{ label: t('common.defaultFont'), value: '' }, ...editorFontOptions]} search searchLabel={t('canvas.fontSearch')} value={presentation.theme.fontName} /></DesignRow>
       <DesignRow label={`${t('common.fontColor')}:`}><InspectorColorButton ariaLabel={t('common.fontColor')} color={presentation.theme.fontColor} onChange={fontColor => updateTheme({ fontColor })} /></DesignRow>
       <DesignRow label={`${t('common.backgroundColor')}:`}><InspectorColorButton ariaLabel={t('common.backgroundColor')} color={presentation.theme.backgroundColor} onChange={backgroundColor => updateTheme({ backgroundColor })} /></DesignRow>
       <DesignRow label={`${t('common.themeColor')}:`}><ThemeColorListButton colors={presentation.theme.themeColors} onClick={() => setThemeColorsOpen(true)} /></DesignRow>
       {more ? (
         <>
-          <DesignRow label={t('toolbar.borderStyle')}><InspectorSelect ariaLabel={t('toolbar.borderStyle')} onChange={style => updateTheme({ outline: { ...presentation.theme.outline, style } })} options={lineStyleOptions} renderLabel={option => <LineStylePreview type={option?.value || 'solid'} />} renderOption={option => <LineStylePreview type={option.value} />} value={presentation.theme.outline.style || 'solid'} /></DesignRow>
+          <DesignRow label={t('toolbar.borderStyle')}><InspectorSelect ariaLabel={t('toolbar.borderStyle')} onChange={style => updateTheme({ outline: { ...presentation.theme.outline, style } })} options={lineStyleOptions} renderLabel={option => <LinePreview type={option?.value || 'solid'} />} renderOption={option => <LinePreview type={option.value} />} value={presentation.theme.outline.style || 'solid'} /></DesignRow>
           <DesignRow label={t('toolbar.borderColor')}><InspectorColorButton ariaLabel={t('toolbar.borderColor')} color={presentation.theme.outline.color || '#000'} onChange={color => updateTheme({ outline: { ...presentation.theme.outline, color } })} /></DesignRow>
           <DesignRow label={t('toolbar.borderWidth')}><InspectorNumberInput ariaLabel={t('toolbar.borderWidth')} onChange={width => updateTheme({ outline: { ...presentation.theme.outline, width } })} value={presentation.theme.outline.width || 0} /></DesignRow>
           <DesignRow label={t('toolbar.shadowHorizontal')} style={{ height: 30 }}><InspectorSlider ariaLabel={t('toolbar.shadowHorizontal')} max={20} min={-20} onChange={h => updateTheme({ shadow: { ...presentation.theme.shadow, h } })} value={presentation.theme.shadow.h} /></DesignRow>
@@ -405,11 +349,11 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
       <div className="mb-2.5 flex justify-between">{t('designPanel.presetThemes')}</div>
       <div className="flex flex-wrap content-start">
         {PRESET_THEMES.map((preset, index) => (
-          <div className="group/preset relative mb-[4%] w-[48%] rounded-[var(--radius-control)] pb-[27%] [&:not(:nth-child(2n))]:mr-[4%]" key={index} style={{ backgroundColor: preset.background, fontFamily: preset.fontname }}>
-            <div className="absolute inset-0 flex flex-col justify-center rounded-[var(--radius-control)] border p-2">
-              <div className="text-[15px]" style={{ color: preset.fontColor }}>{t('designPanel.sampleText')}</div>
+          <div className="group/preset relative mb-[4%] w-[48%] rounded-control pb-[27%] [&:not(:nth-child(2n))]:mr-[4%]" key={index} style={{ backgroundColor: preset.background, fontFamily: preset.fontname }}>
+            <div className="absolute inset-0 flex flex-col justify-center rounded-control border p-2">
+              <div className="text-field" style={{ color: preset.fontColor }}>{t('designPanel.sampleText')}</div>
               <div className="mt-1.5 flex [&>span]:mr-0.5 [&>span]:size-3">{preset.colors.map((color, colorIndex) => <span key={colorIndex} style={{ backgroundColor: color }} />)}</div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-[3px] bg-black/25 opacity-0 transition-opacity group-hover/preset:opacity-100">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.75 bg-black/25 opacity-0 transition-opacity group-hover/preset:opacity-100">
                 <Button className="h-6 text-xs" onClick={() => applyPreset(preset)} size="xs" type="button">{t('designPanel.set')}</Button>
                 <Button className="h-6 text-xs" onClick={() => applyPreset(preset, true)} size="xs" type="button">{t('designPanel.setAndApply')}</Button>
               </div>

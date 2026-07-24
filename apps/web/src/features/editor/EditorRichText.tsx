@@ -40,6 +40,7 @@ export function EditorRichText({
   element,
   fallbackColor,
   fallbackFontName,
+  editing,
   isHandleElement,
   modifierPressed,
   onMouseDown,
@@ -48,6 +49,7 @@ export function EditorRichText({
   element: RichTextHostElement
   fallbackColor?: string
   fallbackFontName?: string
+  editing: boolean
   isHandleElement: boolean
   modifierPressed: () => boolean
   onMouseDown: (event: MouseEvent) => void
@@ -338,7 +340,7 @@ export function EditorRichText({
 
   return (
     <div
-      className={`mona-rich-text mona-prosemirror-editor${formatPainterActive ? ' is-format-painter' : ''}`}
+      className={`mona-rich-text mona-prosemirror-editor${editing ? ' is-editing' : ''}${formatPainterActive ? ' is-format-painter' : ''}`}
       onPointerDown={event => event.stopPropagation()}
       ref={mountRef}
     />

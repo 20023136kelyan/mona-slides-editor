@@ -9,7 +9,19 @@ import VolumeNoticeIcon from '~icons/icon-park-outline/volume-notice'
 import VolumeSmallIcon from '~icons/icon-park-outline/volume-small'
 import type { PPTAudioElement, PPTVideoElement } from '@mona/presentation-core/model'
 
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useOptionalEditorApplication } from '@/features/editor/services/editor-application'
+import { cn } from '@/lib/utils'
+
+// Player controls sit on video, so they stay white-on-transparent with the
+// dimmed-until-hover treatment the bar has always used.
+const PLAYER_ICON = 'relative flex h-full w-9 items-center border-0 bg-transparent p-0 text-start text-xl text-white [&>span]:text-white [&>span]:opacity-80 [&>span]:transition-all hover:[&>span]:opacity-100 [&_svg]:block [&_svg]:size-[1em]'
 
 export interface MediaElementEditor {
   active: boolean
@@ -179,10 +191,10 @@ function AudioPlayer({ autoplay = false, element, ref, scale, style }: { autopla
         src={element.src || undefined}
       />
       <div className="mona-audio-controller">
-        <div className="mona-player-icons">
-          <button aria-label={paused ? 'Play' : 'Pause'} className="mona-player-icon is-play" onClick={toggle} type="button"><span>{paused ? <PlayIcon /> : <PauseIcon />}</span></button>
-          <div className="mona-player-volume">
-            <button aria-label="Volume" className="mona-player-icon" onClick={toggleVolume} type="button"><span>{volume === 0 ? <VolumeMuteIcon /> : volume === 1 ? <VolumeNoticeIcon /> : <VolumeSmallIcon />}</span></button>
+        <div className="absolute bottom-0 left-3.5 flex h-9.5 items-center">
+          <Button aria-label={paused ? 'Play' : 'Pause'} className={cn(PLAYER_ICON, 'text-[26px]')} onClick={toggle} size={null} type="button" variant={null}><span>{paused ? <PlayIcon /> : <PauseIcon />}</span></Button>
+          <div className="relative flex h-full cursor-pointer items-center">
+            <Button aria-label="Volume" className={PLAYER_ICON} onClick={toggleVolume} size={null} type="button" variant={null}><span>{volume === 0 ? <VolumeMuteIcon /> : volume === 1 ? <VolumeNoticeIcon /> : <VolumeSmallIcon />}</span></Button>
             <div className="mona-player-volume-wrap" onClick={event => {
               const bar = volumeBarRef.current
               if (bar) setVolume((event.clientX - bar.getBoundingClientRect().left) / 45)
@@ -406,14 +418,14 @@ function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean;
       </div>
       <div className="mona-video-controller-mask" />
       <div className="mona-video-controller">
-        <div className="mona-player-icons is-left">
-          <button aria-label={paused ? 'Play' : 'Pause'} className="mona-player-icon is-play" onClick={event => {
+        <div className="absolute bottom-0 left-5 flex h-9.5 items-center">
+          <Button aria-label={paused ? 'Play' : 'Pause'} className={cn(PLAYER_ICON, 'w-10 text-[26px]')} onClick={event => {
             event.stopPropagation(); toggle()
-          }} type="button"><span>{paused ? <PlayIcon /> : <PauseIcon />}</span></button>
-          <div className="mona-player-volume">
-            <button aria-label="Volume" className="mona-player-icon" onClick={event => {
+          }} size={null} type="button" variant={null}><span>{paused ? <PlayIcon /> : <PauseIcon />}</span></Button>
+          <div className="relative flex h-full cursor-pointer items-center">
+            <Button aria-label="Volume" className={cn(PLAYER_ICON, 'w-10')} onClick={event => {
               event.stopPropagation(); toggleVolume()
-            }} type="button"><span>{volume === 0 ? <VolumeMuteIcon /> : volume === 1 ? <VolumeNoticeIcon /> : <VolumeSmallIcon />}</span></button>
+            }} size={null} type="button" variant={null}><span>{volume === 0 ? <VolumeMuteIcon /> : volume === 1 ? <VolumeNoticeIcon /> : <VolumeSmallIcon />}</span></Button>
             <div className="mona-player-volume-wrap" onClick={event => {
               event.stopPropagation()
               const bar = volumeBarRef.current
@@ -424,18 +436,27 @@ function VideoPlayer({ autoplay = false, element, scale }: { autoplay?: boolean;
           </div>
           <span className="mona-video-time"><span>{secondToTime(currentTime)}</span> / <span>{secondToTime(duration)}</span></span>
         </div>
-        <div className="mona-player-icons is-right">
-          <div className="mona-video-speed">
-            <button className="mona-player-icon is-speed" onClick={event => {
-              event.stopPropagation(); setRateMenu(value => !value)
-            }} type="button"><span>{rate === 1 ? t('foundation.editor.media.speed') : `${rate}x`}</span></button>
-            {rateMenu ? <div className="mona-video-speed-menu" onMouseLeave={() => setRateMenu(false)}>{rates.map(value => <button className={value === rate ? 'is-active' : ''} key={value} onClick={event => {
-              event.stopPropagation(); if (videoRef.current) videoRef.current.playbackRate = value; setRate(value)
-            }} type="button">{value}x</button>)}</div> : null}
+        <div className="absolute right-3.75 bottom-0 flex h-9.5 items-center">
+          <div className="relative h-3">
+            <DropdownMenu onOpenChange={setRateMenu} open={rateMenu}>
+              <DropdownMenuTrigger asChild>
+                <Button className={cn(PLAYER_ICON, 'w-10 text-xs')} onClick={event => event.stopPropagation()} size={null} type="button" variant={null}>
+                  <span>{rate === 1 ? t('foundation.editor.media.speed') : `${rate}x`}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-auto min-w-17.5" side="top">
+                {rates.map(value => (
+                  <DropdownMenuItem className={cn('justify-center', value === rate && 'font-bold')} key={value} onSelect={() => {
+                    if (videoRef.current) videoRef.current.playbackRate = value
+                    setRate(value)
+                  }}>{value}x</DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <button className={`mona-player-icon is-loop${loop ? ' is-active' : ''}`} onClick={event => {
+          <Button className={cn(PLAYER_ICON, 'w-10 text-xs', loop && '[&>span]:opacity-100')} onClick={event => {
             event.stopPropagation(); setLoop(value => !value)
-          }} type="button"><span>{t('foundation.editor.media.loopStatus', { status: t(`foundation.editor.media.${loop ? 'on' : 'off'}`) })}</span></button>
+          }} size={null} type="button" variant={null}><span>{t('foundation.editor.media.loopStatus', { status: t(`foundation.editor.media.${loop ? 'on' : 'off'}`) })}</span></Button>
         </div>
         <div
           className="mona-player-bar-wrap"

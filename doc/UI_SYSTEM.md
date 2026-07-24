@@ -21,17 +21,17 @@ New editor chrome must not introduce a private visual language in `editor.css` w
 
 Application chrome is neutral and uses shadcn semantic tokens: `background`, `foreground`, `muted`, `border`, `input`, `ring`, and their foreground counterparts.
 
-Mona’s red-to-amber palette is reserved for identity surfaces such as the AI mark, branded illustrations, and future product artwork:
+`--primary` is a soft charcoal (`oklch(0.32 0 0)`) — neutral like the rest of chrome, but lighter than near-black so primary buttons and active toggles feel less heavy.
 
+Mona’s logo palette (from `public/favicon.svg`) stays reserved for identity surfaces (AI mark, brand artwork):
+
+- `--brand-yellow` (`#ffaf00`)
+- `--brand-amber` (`#ff8205`)
+- `--brand-orange` (`#fa500f`)
+- `--brand-red` (`#e10500`)
 - `--brand-deep-red`
-- `--brand-red`
-- `--brand-orange`
-- `--brand-amber`
-- `--brand-yellow`
 
-Brand colors are not control states. Selection, focus, disabled, destructive, success, and warning states use semantic UI tokens.
-
-Direct-manipulation selection uses the neutral `--editor-selection*` scale. This keeps canvas handles, thumbnails, inspector states, and slideshow tools consistent without turning Mona's brand palette into application chrome.
+Direct-manipulation selection uses the neutral `--editor-selection*` scale (foreground-based), separate from brand tokens.
 
 ## Radius policy
 

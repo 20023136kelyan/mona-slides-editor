@@ -24,8 +24,10 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InspectorButton, InspectorNumberInput, InspectorSelect, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
+import { cancelListReorder, startListReorder } from '@/features/editor/editor-list-reorder'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { cn } from '@/lib/utils'
 
 const catalogs = {
   attention: ATTENTION_ANIMATIONS,
@@ -65,7 +67,6 @@ export function ElementAnimationPanel({
   const suppressSequenceClickRef = useRef(false)
   const poolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const previewingRef = useRef(false)
-  const reorderCleanupRef = useRef<(() => void) | null>(null)
   const historyKey = 'element-animation-panel'
   const formatted = selectFormattedCurrentSlideAnimations(presentation)
   const sequence = formatted.flatMap((group, groupIndex) => group.animations.flatMap((animation, animationIndex) => {
@@ -81,8 +82,7 @@ export function ElementAnimationPanel({
 
   useEffect(() => () => {
     if (poolTimerRef.current) clearTimeout(poolTimerRef.current)
-    reorderCleanupRef.current?.()
-    reorderCleanupRef.current = null
+    cancelListReorder()
     previewingRef.current = false
   }, [])
 
@@ -186,50 +186,25 @@ export function ElementAnimationPanel({
     updateAnimations(next, 'Reorder element animations')
   }
 
-  const startReorder = (event: ReactPointerEvent<HTMLElement>, oldIndex: number) => {
-    if (event.button !== 0) return
-    const target = event.target instanceof Element ? event.target : null
-    if (target?.closest('button, input, .mona-panel-select')) return
-    const startY = event.clientY
-    let newIndex = oldIndex
-    let moved = false
-    reorderCleanupRef.current?.()
-    const move = (pointer: PointerEvent) => {
-      if (!moved && Math.abs(pointer.clientY - startY) < 4) return
-      moved = true
-      setDraggingIndex(oldIndex)
-      const rows = [...(panelRef.current?.querySelectorAll<HTMLElement>('.mona-animation-sequence-item') || [])]
-      const firstAfterPointer = rows.findIndex(row => pointer.clientY <= row.getBoundingClientRect().top + (row.getBoundingClientRect().height / 2))
-      newIndex = firstAfterPointer === -1 ? Math.max(rows.length - 1, 0) : firstAfterPointer
-    }
-    const cleanup = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', stop)
-      window.removeEventListener('pointercancel', stop)
-      reorderCleanupRef.current = null
-    }
-    const stop = () => {
-      cleanup()
+  const startReorder = (event: ReactPointerEvent<HTMLElement>, oldIndex: number) => startListReorder(event, oldIndex, {
+    getRows: () => panelRef.current?.querySelectorAll<HTMLElement>('.mona-animation-sequence-item') || [],
+    onDragStart: setDraggingIndex,
+    onDragEnd: moved => {
       setDraggingIndex(null)
-      if (!moved) return
-      suppressSequenceClickRef.current = true
-      reorder(oldIndex, newIndex)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', stop, { once: true })
-    window.addEventListener('pointercancel', stop, { once: true })
-    reorderCleanupRef.current = cleanup
-  }
+      if (moved) suppressSequenceClickRef.current = true
+    },
+    onReorder: reorder,
+  })
 
   const poolTitleTone = activeTab === 'in'
-    ? 'border-l-[#68a490] bg-[rgba(104,164,144,0.15)]'
+    ? 'border-l-anim-in bg-[rgba(104,164,144,0.15)]'
     : activeTab === 'out'
-      ? 'border-l-[#d86344] bg-[rgba(216,99,68,0.15)]'
-      : 'border-l-[#e8b76a] bg-[rgba(232,183,106,0.15)]'
+      ? 'border-l-anim-out bg-[rgba(216,99,68,0.15)]'
+      : 'border-l-anim-attention bg-[rgba(232,183,106,0.15)]'
   const pool = (
     <div>
       <Tabs onValueChange={value => setActiveTab(value as AnimationType)} value={activeTab}>
-        <TabsList className="mb-5 flex h-auto select-none rounded-none border-b border-[#d9d9d9] bg-transparent p-0 text-[13px] leading-none">
+        <TabsList className="mb-5 flex h-auto select-none rounded-none border-b border-[#d9d9d9] bg-transparent p-0 text-control leading-none">
           {([
             ['in', t('foundation.editor.animation.entrance'), '#68a490'],
             ['out', t('foundation.editor.animation.exit'), '#d86344'],
@@ -244,14 +219,14 @@ export function ElementAnimationPanel({
           ))}
         </TabsList>
       </Tabs>
-      <div className="relative mr-[-10px] h-[500px] w-[400px] overflow-hidden overflow-y-auto pr-[5px] text-xs">
+      <div className="relative mr-[-10px] h-125 w-100 overflow-hidden overflow-y-auto pr-1.25 text-xs">
         {catalogs[activeTab].map(group => (
-          <div className="mb-[5px] last:mb-0" key={group.type}>
-            <div className={`mb-2.5 w-full border-l-4 py-1 pr-0 pl-2.5 text-[13px] ${poolTitleTone}`}>{t(`foundation.editor.animation.group.${group.type}`, { defaultValue: humanize(group.type) })}:</div>
+          <div className="mb-1.25 last:mb-0" key={group.type}>
+            <div className={`mb-2.5 w-full border-l-4 py-1 pr-0 pl-2.5 text-control ${poolTitleTone}`}>{t(`foundation.editor.animation.group.${group.type}`, { defaultValue: humanize(group.type) })}:</div>
             <div className="flex flex-wrap content-start">
               {group.children.map(item => (
                 <Button
-                  className="mb-[5px] h-10 w-[24%] border-0 bg-transparent p-0 text-center text-[#41464b] leading-10 not-[:nth-child(4n)]:mr-[1.333333%] hover:bg-transparent [&_span]:block [&_span]:rounded-[var(--radius-control)] [&_span]:bg-[#f9f9f9]"
+                  className="mb-1.25 h-10 w-[24%] border-0 bg-transparent p-0 text-center text-foreground leading-10 not-[:nth-child(4n)]:mr-[1.333333%] hover:bg-transparent [&_span]:block [&_span]:rounded-control [&_span]:bg-[#f9f9f9]"
                   key={item.value}
                   onClick={() => chooseEffect(activeTab, item.value)}
                   onMouseEnter={() => setHoverEffect(item.value)}
@@ -287,7 +262,16 @@ export function ElementAnimationPanel({
       <div className="mona-animation-sequence">
         {sequence.map((item, index) => (
           <div
-            className={`mona-animation-sequence-item is-${item.type}${element?.id === item.elId ? ' is-active' : ''}${draggingIndex === index ? ' is-dragging' : ''}`}
+            className={cn(
+              // class kept: getRows() querySelectors it for keyboard reordering
+              'mona-animation-sequence-item mb-2 rounded-surface border border-[#d9d9d9] p-2 transition-all duration-500',
+              `is-${item.type}`,
+              element?.id === item.elId && 'is-active',
+              element?.id === item.elId && item.type === 'in' && 'border-anim-in',
+              element?.id === item.elId && item.type === 'out' && 'border-anim-out',
+              element?.id === item.elId && item.type === 'attention' && 'border-anim-attention',
+              draggingIndex === index && 'is-dragging opacity-75',
+            )}
             key={item.id}
             onClick={() => {
               if (suppressSequenceClickRef.current) {

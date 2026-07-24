@@ -20,14 +20,14 @@ import {
   InspectorSelect,
   InspectorSlider,
   InspectorSwitch,
-  inspectorRowFullClass,
+  inspectorRowClass,
 } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
 
 export function PropertyRow({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div className="flex w-full items-center mb-2.5">
+    <div className={inspectorRowClass}>
       <div className="w-[48%] text-xs">{label}</div>
       <div className="w-[52%] [&>*]:w-full">{children}</div>
     </div>
@@ -129,7 +129,7 @@ export function ElementFlipControls({
 }) {
   const { t } = useTranslation()
   return (
-    <InspectorButtonGroup className={`${inspectorRowFullClass} mona-panel-flip-group`}>
+    <InspectorButtonGroup className={`${inspectorRowClass} mona-panel-flip-group`}>
       <InspectorButton active={Boolean(element.flipV)} ariaLabel={t('foundation.editor.shape.verticalFlip')} onClick={() => commitUpdate(runtime, element, { flipV: !element.flipV }, `element-flip-${element.id}`)} style={{ flex: 1 }}><FlipVerticalIcon /> {t('foundation.editor.shape.verticalFlip')}</InspectorButton>
       <InspectorButton active={Boolean(element.flipH)} ariaLabel={t('foundation.editor.shape.horizontalFlip')} onClick={() => commitUpdate(runtime, element, { flipH: !element.flipH }, `element-flip-${element.id}`)} style={{ flex: 1 }}><FlipHorizontalIcon /> {t('foundation.editor.shape.horizontalFlip')}</InspectorButton>
     </InspectorButtonGroup>

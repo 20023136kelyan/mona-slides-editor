@@ -174,14 +174,14 @@ function PresetCard({
   const { t } = useTranslation()
   return (
     <button
-      className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-[var(--radius-control)] p-1 text-center outline-none hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-control p-1 text-center outline-none hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring"
       onClick={() => onSelect(preset)}
       type="button"
     >
-      <span className="grid size-16 place-items-center rounded-[var(--radius-control)] border border-border/70 bg-background">
+      <span className="grid size-16 place-items-center rounded-control border border-border/70 bg-background">
         <ChartPreviewGlyph preset={preset} />
       </span>
-      <span className="line-clamp-2 w-full text-[11px] leading-tight text-muted-foreground">
+      <span className="line-clamp-2 w-full text-tiny leading-tight text-muted-foreground">
         {t(`foundation.editor.charts.presets.${preset.id}`)}
       </span>
     </button>
@@ -300,7 +300,7 @@ export function EditorChartsPanel({
           value={draftQuery}
         />
         <Button
-          className="h-9 w-full justify-start gap-2 rounded-[var(--radius-action)]"
+          className="h-9 w-full justify-start gap-2 rounded-action"
           onClick={() => onInsertChart({ chartType: 'bar', seriesCount: 2, openDataEditor: true })}
           type="button"
           variant="outline"

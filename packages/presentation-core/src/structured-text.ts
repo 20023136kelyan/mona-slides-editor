@@ -115,9 +115,14 @@ const escapeHtml = (value: string): string => value
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;')
 
+// Runs keep their authored spacing verbatim. Escaping every space to &nbsp;
+// would preserve the spacing but remove every soft wrap opportunity, leaving
+// the paragraph as one unbreakable token that the browser then breaks
+// mid-word. Exact spacing is preserved by `white-space: pre-wrap` on the
+// compiled paragraph instead, which keeps runs and leading indentation intact
+// while still wrapping at spaces the way PowerPoint does.
 const escapeText = (value: string): string => escapeHtml(value)
   .replace(/\r\n?|\n/g, '<br>')
-  .replace(/ /g, '&nbsp;')
 
 const normalizeHex = (value: string | undefined): string | undefined => {
   if (!value) return undefined
@@ -256,16 +261,39 @@ const alignmentMap: Record<string, string> = {
   thaiDist: 'justify',
 }
 
+/**
+ * Maps a bulleted paragraph's hanging indent onto its list item.
+ *
+ * PowerPoint places the marker at `marL + indent` and the text at `marL`,
+ * where `indent` is negative for a hanging bullet. Applied to the paragraph
+ * itself that pair cancels out — the negative text-indent pulls the first line
+ * back to make room for a marker that CSS has already moved outside the box,
+ * leaving the bullet flush against the text. Carried by the list item instead,
+ * the margin positions the marker and the padding becomes the gap, which is
+ * what the author actually specified.
+ */
+const listItemIndentStyle = (
+  properties: StructuredTextParagraphProperties,
+  scale: number,
+): string => {
+  if (properties.marginLeft === undefined && properties.indent === undefined) return ''
+  const textLeft = (properties.marginLeft ?? 0) * scale
+  const hanging = Math.max(0, -(properties.indent ?? 0) * scale)
+  return `margin-left:${Math.max(0, textLeft - hanging)}px;padding-left:${hanging}px`
+}
+
 const paragraphStyle = (
   properties: StructuredTextParagraphProperties,
   scale: number,
   lineSpacingReduction: number,
+  inListItem: boolean,
 ): string => {
   const styles: string[] = []
   if (properties.alignment) styles.push(`text-align:${alignmentMap[properties.alignment] ?? properties.alignment}`)
   if (properties.rightToLeft) styles.push('direction:rtl', 'unicode-bidi:plaintext')
-  if (properties.marginLeft !== undefined) styles.push(`padding-left:${properties.marginLeft * scale}px`)
-  if (properties.indent !== undefined) styles.push(`text-indent:${properties.indent * scale}px`)
+  // A list item owns the indent so that the marker lands in the hanging space.
+  if (!inListItem && properties.marginLeft !== undefined) styles.push(`padding-left:${properties.marginLeft * scale}px`)
+  if (!inListItem && properties.indent !== undefined) styles.push(`text-indent:${properties.indent * scale}px`)
   if (properties.lineSpacing) {
     const reduction = Math.max(0, 1 - lineSpacingReduction / 100)
     if (properties.lineSpacing.unit === 'percent') {
@@ -281,13 +309,30 @@ const paragraphStyle = (
   return styles.join(';')
 }
 
+const serifFamilies = /^(baskerville|book antiqua|bookman|cambria|caslon|century schoolbook|constantia|didot|garamond|georgia|minion|palatino|rockwell|sabon|times)/i
+const monospaceFamilies = /^(consolas|courier|lucida console|menlo|monaco|sf mono|source code)/i
+
+/**
+ * A run names one family. When that family is unavailable the browser falls
+ * back to the document default — a serif — because an inline declaration
+ * replaces the inherited stack rather than extending it. Naming the matching
+ * generic keeps an unresolved face in the right category instead of turning
+ * every corporate sans into Times.
+ */
+const fontFamilyStack = (family: string): string => {
+  const generic = monospaceFamilies.test(family)
+    ? 'monospace'
+    : serifFamilies.test(family) ? 'serif' : 'sans-serif'
+  return `${JSON.stringify(family)}, ${generic}`
+}
+
 const runStyle = (
   properties: StructuredTextRunProperties,
   scale: number,
   fontScale: number,
 ): string => {
   const styles: string[] = []
-  if (properties.fontFamily) styles.push(`font-family:${JSON.stringify(properties.fontFamily)}`)
+  if (properties.fontFamily) styles.push(`font-family:${fontFamilyStack(properties.fontFamily)}`)
   if (properties.fontSize !== undefined) styles.push(`font-size:${properties.fontSize * scale * fontScale}px`)
   if (properties.color?.value) styles.push(`color:${properties.color.value}`)
   if (properties.bold !== undefined) styles.push(`font-weight:${properties.bold ? '700' : '400'}`)
@@ -324,6 +369,82 @@ const numberingStyle: Record<string, string> = {
   romanUcPeriod: 'upper-roman',
 }
 
+/** En space: a fixed half-em gap that does not collapse. */
+const BULLET_SEPARATOR = '\u2002'
+
+const symbolBulletFonts = new Set([
+  'monotype sorts',
+  'symbol',
+  'webdings',
+  'wingdings',
+  'wingdings 2',
+  'wingdings 3',
+  'zapfdingbats',
+])
+
+// The glyph a symbol face draws for a codepoint, expressed in Unicode. These
+// faces are licensed and cannot be fetched, so without the mapping a deck's
+// square bullet renders as a literal section sign.
+const symbolBulletEquivalents: Record<string, string> = {
+  '¨': '□',
+  '·': '•',
+  l: '●',
+  n: '■',
+  u: '◆',
+  v: '❖',
+  '§': '▪',
+  Ø: '➢',
+  û: '✘',
+  ü: '✔',
+}
+
+/**
+ * Resolves a bullet character to something the rendering font can actually
+ * draw. PowerPoint stores symbol-face bullets either as the raw character or
+ * offset into the private use area, so both forms are normalised before the
+ * lookup.
+ */
+const resolveBulletCharacter = (
+  bullet: NonNullable<StructuredTextParagraphProperties['bullet']>,
+): { authoredFont: boolean; character: string } => {
+  const character = bullet.character ?? ''
+  if (!character || !bullet.fontFamily || !symbolBulletFonts.has(bullet.fontFamily.toLowerCase())) {
+    return { authoredFont: true, character }
+  }
+  const code = character.codePointAt(0) ?? 0
+  const normalized = code >= 0xF000 && code <= 0xF0FF ? String.fromCodePoint(code - 0xF000) : character
+  const equivalent = symbolBulletEquivalents[normalized]
+  // A substituted glyph must render in the body font, not the symbol face it
+  // was translated out of.
+  return equivalent ? { authoredFont: false, character: equivalent } : { authoredFont: true, character }
+}
+
+/**
+ * A bullet carries its own font, colour, and size in PowerPoint — a Wingdings
+ * marker is a glyph in that face, not the character the body font draws for
+ * that codepoint. CSS can only reach a marker through `::marker`, which no
+ * inline style attribute can target, so the values travel as custom properties
+ * that the stylesheet's `::marker` rule consumes.
+ */
+const bulletMarkerStyle = (
+  bullet: NonNullable<StructuredTextParagraphProperties['bullet']>,
+  context: StructuredTextCompileContext,
+  scale: number,
+  fontScale: number,
+  authoredFont: boolean,
+): string => {
+  const styles: string[] = []
+  const color = resolveColor(bullet.color, context)
+  if (color) styles.push(`--mona-bullet-color:${color}`)
+  if (bullet.fontFamily && authoredFont) styles.push(`--mona-bullet-font:${JSON.stringify(bullet.fontFamily)}`)
+  if (bullet.size) {
+    styles.push(bullet.size.unit === 'percent'
+      ? `--mona-bullet-size:${bullet.size.value}%`
+      : `--mona-bullet-size:${bullet.size.value * scale * fontScale}px`)
+  }
+  return styles.join(';')
+}
+
 const materializedFieldText = (
   run: StructuredTextRun,
   context: StructuredTextCompileContext,
@@ -357,12 +478,32 @@ const renderRun = (
     : span
 }
 
+/**
+ * The run properties that establish a paragraph's line box: the inherited
+ * defaults, but at the size its own runs render at.
+ */
+const paragraphRunContext = (
+  paragraph: StructuredTextParagraph,
+  properties: StructuredTextParagraphProperties,
+): StructuredTextRunProperties => {
+  const defaultRun = properties.defaultRun ?? {}
+  const sizes = paragraph.runs
+    .map(run => run.properties?.fontSize)
+    .filter((size): size is number => typeof size === 'number')
+  if (sizes.length) return { ...defaultRun, fontSize: Math.max(...sizes) }
+  // An empty paragraph is a real line whose height PowerPoint takes from the
+  // end-paragraph properties, not from whatever the body would inherit.
+  const endSize = paragraph.endProperties?.fontSize
+  return endSize === undefined ? defaultRun : { ...defaultRun, fontSize: endSize }
+}
+
 const renderParagraph = (
   paragraph: StructuredTextParagraph,
   context: StructuredTextCompileContext,
   scale: number,
   fontScale: number,
   lineSpacingReduction: number,
+  inListItem = false,
 ): string => {
   const properties = paragraph.properties ?? {}
   const defaultTabSize = properties.defaultTabSize ?? 36
@@ -377,9 +518,17 @@ const renderParagraph = (
   // line box. Applying them only to child spans makes relative line spacing
   // resolve against the browser's default 16px paragraph size instead of the
   // inherited PowerPoint font size.
+  //
+  // The size that context uses has to be the size the runs actually render at,
+  // not the inherited default they override. Percentage line spacing is a
+  // multiplier on the element's own font size, so a paragraph left at an
+  // inherited 18pt while its runs are 13pt spaces every line for text half
+  // again as tall as the glyphs, and a centre-anchored body then overflows in
+  // both directions. PowerPoint sizes a line from the text on it, so the
+  // largest run wins.
   const style = [
-    paragraphStyle(properties, scale, lineSpacingReduction),
-    runStyle(properties.defaultRun ?? {}, scale, fontScale),
+    paragraphStyle(properties, scale, lineSpacingReduction, inListItem),
+    runStyle(paragraphRunContext(paragraph, properties), scale, fontScale),
   ].filter(Boolean).join(';')
   return `<p data-ppt-paragraph-id="${escapeHtml(paragraph.sourceId)}" data-ppt-level="${paragraph.level}"${style ? ` style="${escapeHtml(style)}"` : ''}>${content || '<br>'}</p>`
 }
@@ -392,6 +541,7 @@ const renderHtml = (
   const lineSpacingReduction = body.bodyProperties?.autoFit?.lineSpacingReduction ?? 0
   let html = ''
   const listStack: Array<{ level: number; tag: 'ol' | 'ul'; style: string }> = []
+  const listItem = (marker: string) => `<li${marker ? ` style="${escapeHtml(marker)}"` : ''}>`
   const closeTopList = () => {
     const openList = listStack.pop()
     if (!openList) return
@@ -405,8 +555,14 @@ const renderHtml = (
     tag: 'ol' | 'ul',
     style: string,
     startAt: number | undefined,
+    marker: string,
   ) => {
-    html += `<${tag} data-ppt-level="${level}" style="list-style-type:${escapeHtml(style)}"${tag === 'ol' && startAt ? ` start="${startAt}"` : ''}><li>`
+    // The indent and the marker properties are declared on the list as well as
+    // on each item. Custom properties inherit, so `::marker` still resolves
+    // them, and the list survives editing surfaces whose schema keeps a list's
+    // style attribute but not an item's.
+    const listStyle = [`list-style-type:${style}`, marker].filter(Boolean).join(';')
+    html += `<${tag} data-ppt-level="${level}" style="${escapeHtml(listStyle)}"${tag === 'ol' && startAt ? ` start="${startAt}"` : ''}>${listItem(marker)}`
     listStack.push({ level, style, tag })
   }
   for (const paragraph of body.paragraphs) {
@@ -417,11 +573,20 @@ const renderHtml = (
       continue
     }
     const tag = bullet.type === 'auto-number' ? 'ol' : 'ul'
+    const resolved = resolveBulletCharacter(bullet)
     const style = bullet.type === 'auto-number'
       ? numberingStyle[bullet.numberingScheme ?? ''] ?? 'decimal'
-      : bullet.character
-        ? JSON.stringify(bullet.character)
+      : resolved.character
+        // A string marker gets no separation from the text, unlike the `disc`
+        // keyword, so the separator belongs in the string. An en space is a
+        // fixed half-em that approximates the authored hanging indent on
+        // surfaces whose schema drops the exact indent declared below.
+        ? JSON.stringify(`${resolved.character}${BULLET_SEPARATOR}`)
         : 'disc'
+    const marker = [
+      bulletMarkerStyle(bullet, context, body.scale, fontScale, resolved.authoredFont),
+      listItemIndentStyle(paragraph.properties ?? {}, body.scale),
+    ].filter(Boolean).join(';')
 
     while (listStack.length && listStack[listStack.length - 1]!.level > paragraph.level) {
       closeTopList()
@@ -429,16 +594,16 @@ const renderHtml = (
 
     const current = listStack[listStack.length - 1]
     if (!current || current.level < paragraph.level) {
-      openList(paragraph.level, tag, style, bullet.startAt)
+      openList(paragraph.level, tag, style, bullet.startAt, marker)
     }
     else if (current.tag === tag && current.style === style) {
-      html += '</li><li>'
+      html += `</li>${listItem(marker)}`
     }
     else {
       closeTopList()
-      openList(paragraph.level, tag, style, bullet.startAt)
+      openList(paragraph.level, tag, style, bullet.startAt, marker)
     }
-    html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction)
+    html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction, true)
   }
   closeLists()
   return html

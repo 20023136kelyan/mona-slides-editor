@@ -113,6 +113,7 @@ export async function parse(file, options = {}) {
   const { width, height, defaultTextStyle } = await getSlideInfo(zip)
   const { themeContent, themeColors } = await getTheme(zip)
   const usedFonts = await getUsedFonts(zip)
+  const embeddedFonts = await getEmbeddedFonts(zip)
 
   for (const filename of filesInfo.slides) {
     const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle, loadedImages, loadedVideos, loadedAudios, parseOptions, xmlCache)
@@ -121,6 +122,7 @@ export async function parse(file, options = {}) {
 
   return {
     slides,
+    embeddedFonts,
     usedFonts,
     themeColors,
     size: {
@@ -162,20 +164,96 @@ async function getContentTypes(zip) {
   }
 }
 
+const MAX_USED_FONTS = 64
+
+// Every Office theme declares ~40 supplemental script fallbacks
+// (<a:font script="Deva" typeface="Nirmala UI"/> and friends). Those are not
+// fonts the deck uses; collecting them would swamp the real typefaces and cost
+// one network request each. The renderer resolves a supplemental face only
+// when a run's language actually selects that script.
+const stripThemeScriptFallbacks = xml => xml.replace(/<a:font\b[^>]*\/>/g, '')
+
+const collectTypefaces = (xml, target) => {
+  for (const match of xml.matchAll(/typeface="([^"]*)"/g)) {
+    const typeface = match[1].trim()
+    // '+mj-lt' / '+mn-ea' are theme references resolved during rendering.
+    if (!typeface || typeface.startsWith('+')) continue
+    if (target.size >= MAX_USED_FONTS) return
+    target.add(typeface)
+  }
+}
+
+/**
+ * Returns the typefaces the deck actually references: theme major/minor faces
+ * plus every face named by a text run, paragraph default, or bullet in the
+ * slides, layouts, masters, and notes.
+ *
+ * This deliberately reads the raw part text rather than the parsed tree: the
+ * same attribute appears under a:latin/a:ea/a:cs/a:sym/a:buFont across many
+ * different parents, and enumerating those paths adds no accuracy.
+ */
 async function getUsedFonts(zip) {
+  const usedFonts = new Set()
+  const paths = Object.keys(zip.files).filter(path => (
+    /^ppt\/(slides|slideLayouts|slideMasters|notesSlides|notesMasters|theme)\/[^/]+\.xml$/.test(path)
+  ))
+  for (const path of paths) {
+    if (usedFonts.size >= MAX_USED_FONTS) break
+    try {
+      const xml = await zip.file(path).async('string')
+      collectTypefaces(path.startsWith('ppt/theme/') ? stripThemeScriptFallbacks(xml) : xml, usedFonts)
+    }
+    catch { /* An unreadable part must not fail the import. */ }
+  }
+  return [...usedFonts]
+}
+
+const asArray = value => (value === undefined || value === null ? [] : Array.isArray(value) ? value : [value])
+
+const EMBEDDED_FONT_STYLES = {
+  'p:bold': { italic: false, weight: 700 },
+  'p:boldItalic': { italic: true, weight: 700 },
+  'p:italic': { italic: true, weight: 400 },
+  'p:regular': { italic: false, weight: 400 },
+}
+
+/**
+ * Extracts the font payloads a deck embeds through p:embeddedFontLst.
+ *
+ * The bytes are returned untouched. PowerPoint writes these parts as plain
+ * TrueType/OpenType data, but some producers emit the obfuscated ODTTF variant
+ * used elsewhere in OOXML, so the consumer registers them optimistically and
+ * falls back to substitution when the browser rejects the payload.
+ */
+async function getEmbeddedFonts(zip) {
   const content = await readXmlFile(zip, 'ppt/presentation.xml')
-  const embeddedFontList = getTextByPathList(content, ['p:presentation', 'p:embeddedFontLst', 'p:embeddedFont'])
-  const usedFonts = []
+  const declared = getTextByPathList(content, ['p:presentation', 'p:embeddedFontLst', 'p:embeddedFont'])
+  if (!declared) return []
 
-  if (!embeddedFontList) return usedFonts
-
-  const embeddedFonts = embeddedFontList.constructor === Array ? embeddedFontList : [embeddedFontList]
-  for (const embeddedFont of embeddedFonts) {
-    const typeface = getTextByPathList(embeddedFont, ['p:font', 'attrs', 'typeface'])
-    if (typeface && !usedFonts.includes(typeface)) usedFonts.push(typeface)
+  const relationships = await readXmlFile(zip, 'ppt/_rels/presentation.xml.rels')
+  const relationshipArray = getTextByPathList(relationships, ['Relationships', 'Relationship'])
+  const targets = {}
+  for (const relationship of asArray(relationshipArray)) {
+    const attrs = relationship?.['attrs']
+    if (attrs?.['Id'] && attrs['Target']) targets[attrs['Id']] = attrs['Target']
   }
 
-  return usedFonts
+  const fonts = []
+  for (const embeddedFont of asArray(declared)) {
+    const typeface = getTextByPathList(embeddedFont, ['p:font', 'attrs', 'typeface'])
+    if (!typeface) continue
+    for (const [key, descriptor] of Object.entries(EMBEDDED_FONT_STYLES)) {
+      const relationshipId = getTextByPathList(embeddedFont, [key, 'attrs', 'r:id'])
+      if (!relationshipId || !targets[relationshipId]) continue
+      const path = resolvePackageTarget('ppt/presentation.xml', targets[relationshipId])
+      try {
+        const data = await zip.file(path).async('base64')
+        if (data) fonts.push({ ...descriptor, data, partPath: path, typeface })
+      }
+      catch { /* A missing or unreadable payload falls back to substitution. */ }
+    }
+  }
+  return fonts
 }
 
 async function getSlideInfo(zip) {
@@ -1496,7 +1574,10 @@ async function genTable(node, warpObj) {
         }
         const text = genTextBody(tcNode['a:txBody'], tcNode, undefined, undefined, undefined, warpObj)
         const cell = await getTableCellParams(tcNode, thisTblStyle, a_sorce, warpObj)
-        const td = { text }
+        // See the single-cell branch below: the generated HTML remains the
+        // editing surface while the cell's runs are retained for inheritance.
+        const textBody = getStructuredTextBody(tcNode['a:txBody'], warpObj)
+        const td = { text, ...(textBody ? { textBody } : {}) }
         if (cell.rowSpan) td.rowSpan = cell.rowSpan
         if (cell.colSpan) td.colSpan = cell.colSpan
         if (cell.vMerge) td.vMerge = cell.vMerge
@@ -1529,7 +1610,12 @@ async function genTable(node, warpObj) {
 
       const text = genTextBody(tcNodes['a:txBody'], tcNodes, undefined, undefined, undefined, warpObj)
       const cell = await getTableCellParams(tcNodes, thisTblStyle, a_sorce, warpObj)
-      const td = { text }
+      // The generated HTML stays as the editing surface, but a cell's runs are
+      // retained the same way an ordinary text body's are so that cell text
+      // inherits theme fonts and colours instead of being reduced to whatever
+      // the first span happened to declare.
+      const textBody = getStructuredTextBody(tcNodes['a:txBody'], warpObj)
+      const td = { text, ...(textBody ? { textBody } : {}) }
       if (cell.rowSpan) td.rowSpan = cell.rowSpan
       if (cell.colSpan) td.colSpan = cell.colSpan
       if (cell.vMerge) td.vMerge = cell.vMerge

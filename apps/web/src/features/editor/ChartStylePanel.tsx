@@ -10,23 +10,12 @@ import type { PresentationState } from '@mona/presentation-core'
 import type { ChartOptions, PPTChartElement } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import { ButtonGroup } from '@/components/ui/button-group'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
-import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
-import { InspectorCheckbox, InspectorColorButton } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorCheckbox, InspectorColorButton, inspectorDividerClass, inspectorRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import { EditorModal } from '@/features/editor/EditorModal'
 import { CHART_PRESET_THEMES } from '@/features/editor/editor-chart'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
-
-function ChartCheckbox({ checked, children, onChange, style }: {
-  checked: boolean
-  children: React.ReactNode
-  onChange: (value: boolean) => void
-  style?: React.CSSProperties
-}) {
-  return <InspectorCheckbox checked={checked} onChange={onChange} style={style}>{children}</InspectorCheckbox>
-}
 
 function ChartThemeBlocks({ colors }: { colors: readonly string[] }) {
   return <div className="mona-chart-theme-blocks">{colors.slice(0, 12).map((color, index) => <span key={`${color}-${index}`}><i style={{ backgroundColor: color }} /></span>)}</div>
@@ -43,24 +32,15 @@ function CustomThemeModal({ colors, onClose, onSave }: {
   return (
     <EditorModal onClose={onClose} open title={t('foundation.editor.chartStyle.chartThemeColors')} width={310}>
       <div className="flex flex-col">
-        <div className="mb-[15px] text-[17px] font-bold">{t('foundation.editor.chartStyle.chartThemeColors')}</div>
+        <div className="mb-3.75 text-[17px] font-bold">{t('foundation.editor.chartStyle.chartThemeColors')}</div>
         <div>
           {themeColors.map((color, index) => (
-            <div className="mb-2.5 flex w-full items-center" key={index}>
-              <div className="w-2/5 text-[13px]">{t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })}</div>
-              <ButtonGroup className="mona-chart-custom-color-group w-3/5">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-chart-custom-color-button" variant="outline">
-                      <span><i style={{ backgroundColor: color }} /></span><PaletteIcon />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-panel-popover-content" sideOffset={8}>
-                    <EditorColorPicker onChange={value => setThemeColors(current => current.map((candidate, colorIndex) => colorIndex === index ? value : candidate))} value={color} />
-                  </PopoverContent>
-                </Popover>
+            <div className={inspectorRowClass} key={index}>
+              <div className="w-2/5 text-control">{t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })}</div>
+              <div className="flex w-3/5 items-center gap-1 [&>:first-child]:min-w-0 [&>:first-child]:flex-1">
+                <InspectorColorButton ariaLabel={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} color={color} onChange={value => setThemeColors(current => current.map((candidate, colorIndex) => colorIndex === index ? value : candidate))} />
                 {index ? <Button aria-label={t('foundation.editor.chartStyle.deleteColor')} onClick={() => setThemeColors(current => current.filter((_, colorIndex) => colorIndex !== index))} size="editor-icon" variant="outline"><CloseSmallIcon /></Button> : null}
-              </ButtonGroup>
+              </div>
             </div>
           ))}
           <Button className="w-full" disabled={!canAddThemeColor} onClick={() => setThemeColors(current => [...current, '#00000000'])} size="editor" variant="outline"><PlusIcon /> {t('foundation.editor.chartStyle.addThemeColor')}</Button>
@@ -93,16 +73,16 @@ export function ChartStylePanel({ element, onEditData, presentation, runtime }: 
   const hasStackOptions = ['bar', 'column', 'area', 'line'].includes(element.chartType)
 
   return (
-    <div className="text-[13px] text-foreground select-none">
+    <div className="text-control text-foreground select-none">
       <Button className="w-full" onClick={onEditData} size="editor" variant="outline"><EditIcon /> {t('foundation.editor.chartStyle.editChart')}</Button>
-      <div className="my-6 w-full border-t border-black/[0.06]" />
+      <div className={inspectorDividerClass} />
       {hasStackOptions ? (
         <>
-          <div className="mb-2.5 flex w-full items-center">
-            <ChartCheckbox checked={!!element.options?.stack} onChange={stack => updateOptions({ stack })} style={{ flex: 2 }}>{t('foundation.editor.chartStyle.stacked')}</ChartCheckbox>
-            {element.chartType === 'line' ? <ChartCheckbox checked={!!element.options?.lineSmooth} onChange={lineSmooth => updateOptions({ lineSmooth })} style={{ flex: 3 }}>{t('foundation.editor.chartStyle.smooth')}</ChartCheckbox> : null}
+          <div className={inspectorRowClass}>
+            <InspectorCheckbox checked={!!element.options?.stack} onChange={stack => updateOptions({ stack })} style={{ flex: 2 }}>{t('foundation.editor.chartStyle.stacked')}</InspectorCheckbox>
+            {element.chartType === 'line' ? <InspectorCheckbox checked={!!element.options?.lineSmooth} onChange={lineSmooth => updateOptions({ lineSmooth })} style={{ flex: 3 }}>{t('foundation.editor.chartStyle.smooth')}</InspectorCheckbox> : null}
           </div>
-          <div className="my-6 w-full border-t border-black/[0.06]" />
+          <div className={inspectorDividerClass} />
         </>
       ) : null}
       <PropertyRow label={t('foundation.editor.chartStyle.chartBackground')}><InspectorColorButton ariaLabel={t('foundation.editor.chartStyle.chartBackground')} color={element.fill || '#fff'} onChange={fill => commit({ fill })} /></PropertyRow>
@@ -129,7 +109,7 @@ export function ChartStylePanel({ element, onEditData, presentation, runtime }: 
           </PopoverContent>
         </Popover>
       </PropertyRow>
-      <div className="my-6 w-full border-t border-black/[0.06]" />
+      <div className={inspectorDividerClass} />
       <ElementOutlineControls element={element} presentation={presentation} runtime={runtime} />
       {customThemeOpen ? <CustomThemeModal colors={element.themeColors} onClose={() => setCustomThemeOpen(false)} onSave={setThemeColors} /> : null}
     </div>

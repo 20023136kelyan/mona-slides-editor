@@ -509,6 +509,22 @@ export interface ShapeText {
  *
  * keypoints?: 关键点位置百分比
  */
+/**
+ * How a picture fill is laid into its shape.
+ *
+ * PowerPoint's `a:stretch` fits the picture to the shape's bounds and distorts
+ * it when the aspect ratios differ; it is not a cover-crop. `rect` insets the
+ * destination from each edge as a fraction of the shape, and negative values
+ * push an edge outward so the picture overflows and the shape crops it.
+ */
+export interface PicturePatternFit {
+  alignment?: string
+  mode: 'stretch' | 'tile'
+  rect?: { b: number; l: number; r: number; t: number }
+  scaleX?: number
+  scaleY?: number
+}
+
 export interface PPTShapeElement extends PPTBaseElement {
   type: 'shape'
   viewBox: [number, number]
@@ -517,6 +533,11 @@ export interface PPTShapeElement extends PPTBaseElement {
   fill: string
   gradient?: Gradient
   pattern?: string
+  /**
+   * How an imported picture fill is laid into the shape. Absent for a
+   * Mona-authored pattern, which keeps the editor's cover-crop behaviour.
+   */
+  patternFit?: PicturePatternFit
   powerPointPattern?: PatternFill
   outline?: PPTElementOutline
   opacity?: number
@@ -695,6 +716,11 @@ export interface TableCell {
   colspan: number
   rowspan: number
   text: string
+  /**
+   * Imported paragraph/run model for the cell. `text` stays the editing
+   * surface and is recompiled from this body until a direct edit detaches it.
+   */
+  structuredText?: StructuredTextBody
   style?: TableCellStyle
 }
 

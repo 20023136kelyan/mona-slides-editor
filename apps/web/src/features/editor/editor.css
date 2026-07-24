@@ -188,171 +188,6 @@
 .mona-thumbnail-container.is-drop-target[data-drop-side="after"]::before { right: 0; }
 .mona-thumbnail-list.is-drag-cancelled .mona-thumbnail-container { transition-duration: 100ms; }
 
-.mona-page-settings {
-  display: flex;
-  width: 320px;
-  flex-direction: column;
-  gap: 14px;
-}
-.mona-page-settings-heading,
-.mona-page-settings-row,
-.mona-page-duration-input {
-  display: flex;
-  align-items: center;
-}
-.mona-page-settings-heading { justify-content: space-between; }
-.mona-page-settings-heading > span { color: var(--muted-foreground); font-size: 11px; }
-.mona-page-settings-field { display: grid; gap: 6px; }
-.mona-page-settings-field label,
-.mona-page-settings-row label { font-size: 12px; font-weight: 600; }
-.mona-page-settings-row { justify-content: space-between; gap: 20px; }
-.mona-page-settings-row p { margin-top: 3px; color: var(--muted-foreground); font-size: 10px; }
-.mona-page-duration-input { position: relative; gap: 7px; }
-.mona-page-duration-input > svg {
-  position: absolute;
-  left: 9px;
-  width: 15px;
-  height: 15px;
-  color: var(--muted-foreground);
-}
-.mona-page-duration-input input { padding-left: 30px; }
-.mona-page-duration-input > span { color: var(--muted-foreground); font-size: 11px; }
-
-.mona-page-grid-workspace {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-  background: #f3f4f7;
-  padding: 18px 22px 0;
-}
-.mona-page-grid-header {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding-bottom: 16px;
-}
-.mona-page-grid-header > div:first-child { min-width: 0; }
-.mona-page-grid-header h2 { margin: 0; font-size: 18px; font-weight: 650; }
-.mona-page-grid-header span { color: var(--muted-foreground); font-size: 11px; }
-.mona-page-grid-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: none;
-}
-.mona-page-grid-actions::-webkit-scrollbar { display: none; }
-.mona-page-grid {
-  display: grid;
-  min-height: 0;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  align-content: start;
-  gap: 22px;
-  overflow-y: auto;
-  padding: 4px 6px 28px;
-}
-.mona-page-grid-item {
-  position: relative;
-  min-width: 0;
-  cursor: pointer;
-  outline: none;
-  transition: opacity 120ms ease, transform 180ms ease;
-}
-.mona-page-grid-item.is-drag-chosen { opacity: .72; }
-.mona-page-grid-item.is-dragging { cursor: grabbing; opacity: .92; }
-.mona-page-grid-item.is-drag-ghost { opacity: .3; }
-.mona-page-grid-item.is-drop-target::before {
-  position: absolute;
-  z-index: 8;
-  top: 0;
-  bottom: 22px;
-  width: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--editor-selection-strong);
-  box-shadow: 0 0 0 2px #fff;
-  content: '';
-}
-.mona-page-grid-item.is-drop-target[data-drop-side="before"]::before { left: -12px; }
-.mona-page-grid-item.is-drop-target[data-drop-side="after"]::before { right: -12px; }
-.mona-page-grid-preview {
-  position: relative;
-  width: fit-content;
-  max-width: 100%;
-  border-radius: var(--radius-surface);
-  box-shadow: 0 0 0 1px rgb(16 18 25 / 9%);
-  transition: box-shadow 120ms ease, opacity 120ms ease;
-}
-.mona-page-grid-preview .mona-scaled-slide {
-  overflow: hidden;
-  border-radius: inherit;
-}
-.mona-page-grid-item:hover .mona-page-grid-preview { box-shadow: 0 0 0 2px rgb(16 18 25 / 24%); }
-.mona-page-grid-item.is-selected .mona-page-grid-preview,
-.mona-page-grid-item.is-active .mona-page-grid-preview { box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(16 18 25 / 82%); }
-.mona-page-grid-item.is-hidden .mona-page-grid-preview { opacity: .55; }
-.mona-page-grid-number {
-  position: absolute;
-  bottom: 6px;
-  left: 6px;
-  min-width: 20px;
-  border-radius: var(--radius-control);
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(16 18 25 / 15%);
-  padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 650;
-  text-align: center;
-}
-.mona-page-grid-hidden {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: var(--radius-control);
-  background: rgb(255 255 255 / 92%);
-  padding: 3px 6px;
-  color: rgb(16 18 25 / 70%);
-  font-size: 9px;
-  font-weight: 650;
-}
-.mona-page-grid-hidden svg { width: 12px; height: 12px; }
-.mona-page-grid-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 2px 0;
-}
-.mona-page-grid-meta strong {
-  overflow: hidden;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mona-page-grid-meta span { flex: none; color: var(--muted-foreground); font-size: 10px; }
-/* Same tile language as the filmstrip's add button: a solid wash one step
-   deeper than the workspace — no dashed outlines in this chrome. */
-.mona-page-grid-add {
-  display: flex;
-  min-height: 170px;
-  flex-direction: column;
-  gap: 8px;
-  border: 0;
-  border-radius: var(--radius-surface);
-  background: #e7e9ee;
-  color: rgb(16 18 25 / 70%);
-}
-.mona-page-grid-add:hover { background: #dde0e6; color: rgb(16 18 25); }
 .mona-section-title {
   max-width: 128px;
   height: 18px;
@@ -360,20 +195,7 @@
   color: #555;
   font-size: 11px;
 }
-.mona-section-title-text {
-  position: relative;
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: text;
-}
+
 .mona-section-title-text:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .mona-section-title-text::before {
   width: 0;
@@ -438,8 +260,6 @@
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
-.mona-table-generator-row > .mona-panel-number { width: 75%; }
-
 /* Speaker notes live in the floating side panel, like every other panel:
    a slide label on top, the editor filling the rest. */
 .mona-editor-remark {
@@ -470,35 +290,6 @@
   font-size: 12px;
   pointer-events: none;
 }
-.mona-remark-menu {
-  position: fixed;
-  z-index: 9999;
-  display: flex;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  background-color: #fff;
-  padding: 6px 4px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
-}
-.mona-remark-menu button,
-.mona-remark-menu label {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 3px;
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 0;
-  background-color: #fff;
-  padding: 3px;
-  font-size: 16px;
-  cursor: pointer;
-}
-.mona-remark-menu button:hover,
-.mona-remark-menu label:hover,
-.mona-remark-menu button[data-state="on"] { background-color: var(--editor-selection); color: var(--primary-foreground); }
-.mona-remark-menu input[type='color'] { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .mona-shape-create-canvas {
   position: absolute;
   z-index: 2;
@@ -689,8 +480,12 @@
 }
 
 .mona-selection-frame {
-  --mona-handle-size: 10px;
+  /* Selection chrome: a solid hairline with round handles, the idiom modern
+     design tools use. Handles are positioned from this size via calc(), so
+     changing it re-centres every handle automatically. */
+  --mona-handle-size: 12px;
   --mona-outline-width: 1px;
+  --mona-border-radius: 9999px;
   position: absolute;
   z-index: 100;
   box-sizing: border-box;
@@ -703,7 +498,7 @@
   position: absolute;
   inset: 0;
   box-sizing: border-box;
-  border: 0 dashed var(--editor-selection);
+  border: 0 solid var(--editor-selection);
   pointer-events: auto;
 }
 
@@ -879,7 +674,6 @@
 @keyframes mona-transition-scale { from { transform: scale(.25); } to { transform: scale(1); } }
 @keyframes mona-transition-scale-reverse { from { transform: scale(2); } to { transform: scale(1); } }
 
-
 .mona-theme-color-block {
   height: 20px;
   flex: 1;
@@ -887,36 +681,6 @@
 }
 .mona-theme-color-block + .mona-theme-color-block { margin-left: 2px; }
 .mona-theme-color-block > span { display: block; width: 100%; height: 100%; }
-.mona-viewport-setting-row > .mona-panel-number { flex: 1; }
-.mona-theme-colors-row { display: flex; width: 100%; align-items: center; margin-bottom: 10px; }
-.mona-theme-colors-row > .mona-panel-popover-trigger { width: 60%; }
-
-.mona-extract-handler > span.is-active { opacity: 1; }
-.mona-extract-colors { display: flex; flex-wrap: wrap; align-content: flex-start; }
-.mona-extract-colors button {
-  position: relative;
-  width: 9%;
-  height: 25px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-control);
-  margin: 0 1.111111% 1.111111% 0;
-  padding: 0;
-}
-.mona-extract-colors button:nth-child(10n) { margin-right: 0; }
-.mona-extract-colors button.is-disabled { opacity: .2; }
-.mona-extract-colors button.is-disabled::before,
-.mona-extract-colors button.is-disabled::after {
-  position: absolute;
-  top: 11px;
-  left: -1px;
-  width: 24px;
-  height: 2px;
-  background: #000;
-  content: '';
-  transform: rotate(45deg);
-}
-.mona-extract-colors button.is-disabled::after { transform: rotate(-45deg); }
-
 .mona-design-gradient-bar {
   position: relative;
   left: 3px;
@@ -944,7 +708,6 @@
 .mona-position-tabs-list { width: 100%; margin-bottom: 4px; }
 .mona-position-tabs-list > button { flex: 1; }
 .mona-position-layers { min-height: 260px; }
-.mona-selection-panel.is-embedded { min-height: 260px; height: calc(100vh - 170px); }
 .mona-position-row {
   display: flex;
   width: 100%;
@@ -971,20 +734,7 @@
   font-size: 16px;
 }
 .mona-position-icon-button.is-active { color: var(--editor-selection); }
-.mona-position-text-button {
-  display: block;
-  height: 30px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  color: #41464b;
-  cursor: pointer;
-  font: inherit;
-  line-height: 30px;
-}
-.mona-position-text-button:hover { background: #efefef; }
-.mona-position-text-button:hover { border-radius: var(--radius-control); }
+
 .mona-position-text-button svg {
   display: inline-block;
   box-sizing: content-box;
@@ -1036,17 +786,7 @@
   margin-right: -12px;
   padding-right: 12px;
 }
-.mona-animation-sequence-item {
-  margin-bottom: 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-surface);
-  padding: 8px;
-  transition: all .5s;
-}
-.mona-animation-sequence-item.is-in.is-active { border-color: #68a490; }
-.mona-animation-sequence-item.is-out.is-active { border-color: #d86344; }
-.mona-animation-sequence-item.is-attention.is-active { border-color: #e8b76a; }
-.mona-animation-sequence-item.is-dragging { opacity: .75; }
+
 .mona-animation-sequence-content { display: flex; height: 18px; align-items: center; cursor: grab; }
 .mona-animation-sequence-content:active { cursor: grabbing; }
 .mona-animation-index { flex: 1; }
@@ -1142,7 +882,6 @@
   font-size: 12px;
 }
 .mona-image-filter-row > div:first-child { width: 60px; }
-.mona-image-filter-row > .mona-panel-slider { flex: 1; margin: 0 6px; }
 .mona-image-full-button { width: 100%; margin-bottom: 10px; }
 .mona-visually-hidden {
   position: absolute;
@@ -1186,63 +925,9 @@
   padding: 5px 10px 5px 5px;
 }
 
-.mona-shape-replace-list {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-}
-
-.mona-shape-thumbnail {
-  position: relative;
-  width: 14%;
-  height: 0;
-  flex-shrink: 0;
-  margin-bottom: 3.2%;
-  border: 0;
-  background: transparent;
-  padding: 0 0 14%;
-  color: #999;
-  cursor: pointer;
-}
-
-.mona-shape-thumbnail:not(:nth-child(6n)) { margin-right: 3.2%; }
-.mona-shape-thumbnail svg {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  overflow: visible;
-  transform: translate(-50%, -50%);
-}
-.mona-shape-thumbnail:hover path:not(.is-outlined) { stroke: var(--editor-selection); }
-.mona-shape-thumbnail:hover path.is-outlined { fill: var(--editor-selection); }
-
 .mona-shape-fill-control { min-width: auto; flex: 1 1 0%; }
 .mona-shape-fill-control > * { width: 100%; }
 .mona-shape-fill-spacer { width: 10px; }
-
-.mona-gradient-bar {
-  position: relative;
-  left: 5px;
-  box-sizing: border-box;
-  width: calc(100% - 10px);
-  height: 18px;
-  margin: 3px 0;
-  padding: 1px 0;
-}
-.mona-gradient-bar-track { height: 16px; border: 1px solid #d9d9d9; }
-.mona-gradient-stop {
-  position: absolute;
-  top: 0;
-  box-sizing: border-box;
-  width: 10px;
-  height: 18px;
-  border: 2px solid #fff;
-  border-radius: var(--radius-detail);
-  outline: 1px solid #d9d9d9;
-  box-shadow: 0 0 2px 2px #d9d9d9;
-  cursor: pointer;
-}
-.mona-gradient-stop.is-active { outline-color: var(--editor-selection); box-shadow: 0 0 2px 2px var(--editor-selection); }
 
 .mona-pattern-image-wrapper { margin-bottom: 10px; }
 .mona-pattern-image {
@@ -1262,81 +947,6 @@
   transition: all .25s;
 }
 .mona-pattern-image:hover { border-color: var(--editor-selection); color: var(--editor-selection); }
-
-.mona-line-type-pool {
-  display: flex;
-  box-sizing: border-box;
-  width: 235px;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  margin-bottom: 20px;
-  border: 1px solid #e5e7eb;
-  padding: 5px;
-}
-.mona-line-type-item {
-  position: relative;
-  display: flex;
-  width: 14%;
-  height: 0;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0;
-  border: 0;
-  background: transparent;
-  padding: 0 0 14%;
-  color: #999;
-  cursor: pointer;
-}
-.mona-line-type-item:not(:nth-child(6n)) { margin-right: 3.2%; }
-.mona-line-type-item svg { position: absolute; top: 50%; left: 50%; overflow: visible; transform: translate(-50%, -50%); }
-.mona-line-type-item:hover { color: var(--editor-selection); }
-
-.mona-element-outline-controls .mona-panel-row,
-.mona-element-shadow-controls .mona-panel-row { height: 30px; }
-
-.mona-text-presets {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.mona-text-preset {
-  position: relative;
-  display: flex;
-  box-sizing: border-box;
-  width: 50%;
-  height: 50px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d6d6d6;
-  background: transparent;
-  padding: 0;
-  color: #41464b;
-  font-family: inherit;
-  line-height: normal;
-  text-align: start;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.mona-text-preset:hover {
-  z-index: 1;
-  border-color: var(--editor-selection);
-  color: var(--editor-selection);
-}
-
-.mona-text-preset:nth-child(2n) { margin-left: -1px; }
-.mona-text-preset:nth-child(n + 3) { margin-top: -1px; }
-/* Preview sizes keep the hierarchy but always FIT the 50px tile with
-   English two-word labels (26px bold used to overflow and clip). */
-.mona-text-preset { overflow: hidden; padding: 2px 6px; line-height: 1.1; align-items: center; justify-content: center; text-align: center; }
-.mona-text-preset.is-large-title { font-size: 19px; font-weight: 700; }
-.mona-text-preset.is-small-title { font-size: 16px; font-weight: 700; }
-.mona-text-preset.is-body { font-size: 15px; }
-.mona-text-preset.is-small-body { font-size: 13px; }
-.mona-text-preset.is-caption-one { font-size: 12px; font-style: italic; }
-.mona-text-preset.is-caption-two { font-size: 12px; text-decoration: underline; }
 
 .mona-panel-popover-content {
   z-index: 9999;
@@ -1363,76 +973,6 @@
   color: #666;
   padding: 8px;
 }
-
-.mona-list-style-option {
-  width: 50px;
-  height: 50px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background: #fff;
-  padding: 5px 4px 5px 18px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-.mona-list-style-option:hover {
-  border-color: var(--editor-selection);
-  color: var(--editor-selection);
-}
-
-.mona-list-style-option ul {
-  margin: 0;
-  padding: 0;
-}
-
-.mona-list-style-option li {
-  height: 10px;
-  padding-left: 1px;
-}
-
-.mona-list-style-option li span {
-  display: inline-block;
-  width: 20px;
-  height: 1px;
-  vertical-align: middle;
-  background: currentColor;
-}
-
-.mona-text-link-popover { width: 240px; }
-.mona-text-link-popover > input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 32px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  outline: 0;
-  padding: 0 10px;
-  color: #333;
-  font: inherit;
-  line-height: 30px;
-  transition: border-color .25s;
-}
-.mona-text-link-popover > input:hover,
-.mona-text-link-popover > input:focus { border-color: var(--editor-selection); }
-.mona-text-link-actions { margin-top: 10px; text-align: right; }
-.mona-text-link-actions button {
-  height: 24px;
-  border: 1px solid #d9d9d9;
-  border-radius: var(--radius-control);
-  background: #fff;
-  padding: 0 7px;
-  color: #333;
-  font: inherit;
-  font-size: 12px;
-  line-height: 22px;
-}
-.mona-text-link-actions button + button { margin-left: 5px; }
-.mona-text-link-actions button:hover:not(:disabled) { border-color: var(--editor-selection); color: var(--editor-selection); }
-.mona-text-link-actions button:disabled { background: #f5f5f5; color: #b7b7b7; cursor: default; }
-.mona-text-link-actions button.is-primary { border-color: var(--editor-selection); background: var(--editor-selection); color: #fff; }
-.mona-text-link-actions button.is-primary:hover { border-color: var(--editor-selection-hover); background: var(--editor-selection-hover); color: #fff; }
-
 
 /* GEOMETRY: selection transform/crop handles (restored). */
 .mona-crop-controls {
@@ -1474,28 +1014,32 @@
   box-sizing: border-box;
   width: var(--mona-handle-size);
   height: var(--mona-handle-size);
-  border: var(--mona-outline-width) solid var(--editor-selection);
+  border: var(--mona-handle-stroke) solid var(--mona-handle-border);
   border-radius: var(--mona-border-radius, 1px);
   background: #fff;
+  box-shadow: 0 1px 3px rgb(16 18 25 / 24%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   pointer-events: auto;
 }
 
 .mona-transform-handle.is-top-left { top: calc(var(--mona-handle-size) / -2); left: calc(var(--mona-handle-size) / -2); }
 
-.mona-transform-handle.is-top { top: calc(var(--mona-handle-size) / -2); left: calc(50% - var(--mona-handle-size) / 2); }
+.mona-transform-handle.is-top { top: calc(var(--mona-handle-thin) / -2); left: calc(50% - var(--mona-handle-long) / 2); width: var(--mona-handle-long); height: var(--mona-handle-thin); }
 
 .mona-transform-handle.is-top-right { top: calc(var(--mona-handle-size) / -2); right: calc(var(--mona-handle-size) / -2); }
 
-.mona-transform-handle.is-right { top: calc(50% - var(--mona-handle-size) / 2); right: calc(var(--mona-handle-size) / -2); }
+.mona-transform-handle.is-right { top: calc(50% - var(--mona-handle-long) / 2); right: calc(var(--mona-handle-thin) / -2); height: var(--mona-handle-long); width: var(--mona-handle-thin); }
 
 .mona-transform-handle.is-bottom-right { right: calc(var(--mona-handle-size) / -2); bottom: calc(var(--mona-handle-size) / -2); }
 
-.mona-transform-handle.is-bottom { bottom: calc(var(--mona-handle-size) / -2); left: calc(50% - var(--mona-handle-size) / 2); }
+.mona-transform-handle.is-bottom { bottom: calc(var(--mona-handle-thin) / -2); left: calc(50% - var(--mona-handle-long) / 2); width: var(--mona-handle-long); height: var(--mona-handle-thin); }
 
 .mona-transform-handle.is-bottom-left { bottom: calc(var(--mona-handle-size) / -2); left: calc(var(--mona-handle-size) / -2); }
 
-.mona-transform-handle.is-left { top: calc(50% - var(--mona-handle-size) / 2); left: calc(var(--mona-handle-size) / -2); }
+.mona-transform-handle.is-left { top: calc(50% - var(--mona-handle-long) / 2); left: calc(var(--mona-handle-thin) / -2); height: var(--mona-handle-long); width: var(--mona-handle-thin); }
 
 .mona-transform-handle.is-top-left.rotate-0,
 .mona-transform-handle.is-bottom-right.rotate-0,
@@ -1535,7 +1079,7 @@
 
 .mona-rotate-handle {
   top: calc(-1 * var(--mona-rotate-offset));
-  left: calc(50% - var(--mona-handle-size) / 2);
+  left: calc(50% - var(--mona-rotate-size) / 2);
   cursor: grab;
 }
 
@@ -1801,7 +1345,6 @@
 
 .mona-ruler-range { background-color: var(--editor-selection-soft); }
 
-
 .mona-editor-status {
   position: absolute;
   width: 1px;
@@ -1990,45 +1533,7 @@
 
 .mona-chart-corner-triangle { position: absolute; right: 4px; bottom: 4px; }
 
-.mona-chart-editor-buttons-right .mona-chart-editor-button { margin-left: 10px; }
-
-.mona-chart-type-menu {
-  z-index: 9999;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-overlay);
-  background: #fff;
-  padding: 10px;
-  color: #41464b;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -2px rgb(0 0 0 / 10%);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  font-size: 13px;
-  line-height: normal;
-}
-
-.mona-chart-type-menu.is-data-editor { width: 136.671875px; translate: -2px 0; }
-
-.mona-chart-type-menu.is-contextual { width: 142px; }
-
-.mona-chart-type-menu > button {
-  display: block;
-  min-width: 80px;
-  width: 100%;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 6px 10px;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-align: center;
-}
-
-.mona-chart-type-menu > button:hover { background: #f1f1f1; }
-
-.mona-chart-type-menu > button + button { margin-top: 2px; }
-
-.mona-chart-theme-button,
-.mona-chart-custom-color-button {
+.mona-chart-theme-button {
   position: relative;
   display: flex;
   width: 100%;
@@ -2043,13 +1548,9 @@
   cursor: pointer;
 }
 
-.mona-chart-custom-color-button { appearance: auto; font-family: Arial; }
+.mona-chart-theme-button:hover { border-color: var(--ring); color: inherit; }
 
-.mona-chart-theme-button:hover,
-.mona-chart-custom-color-button:hover { border-color: var(--ring); color: inherit; }
-
-.mona-chart-theme-button > svg,
-.mona-chart-custom-color-button > svg { width: 32px; flex-shrink: 0; color: #bfbfbf; font-size: 13px; }
+.mona-chart-theme-button > svg { width: 32px; flex-shrink: 0; color: #bfbfbf; font-size: 13px; }
 
 .mona-chart-theme-blocks {
   display: flex;
@@ -2092,18 +1593,6 @@
 .mona-chart-preset-theme > span { height: 20px; flex: 1; }
 
 .mona-chart-preset-themes.is-slide-theme { margin-bottom: -10px; }
-
-.mona-chart-custom-color-group .mona-chart-custom-color-button { min-width: 0; flex: 1; }
-
-.mona-chart-custom-color-button > span {
-  height: 20px;
-  margin-left: 8px;
-  flex: 1;
-  outline: 1px dashed rgb(102 102 102 / 12%);
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAEBJREFUOE9jfPbs2X8GIoCkpCQRqhgYGEcNxBlOo2GIM2iGQLL5//8/UTnl+fPnxOWUUQNxhtNoGOLOKYM+2QAAh2Nq10DwkukAAAAASUVORK5CYII=);
-}
-
-.mona-chart-custom-color-button > span > i { display: block; width: 100%; height: 100%; }
 
 .mona-latex-edit-button { width: 100%; flex: 1; font-family: Arial; }
 
@@ -2366,8 +1855,6 @@
 
 .mona-selection-item.is-active { background-color: var(--editor-selection-soft); }
 
-.mona-selection-item.is-group-active { background-color: var(--editor-selection-medium); }
-
 .mona-selection-item:not(.is-locked):hover { background-color: var(--editor-selection-medium); transition: background-color 200ms; }
 
 .mona-selection-select {
@@ -2380,13 +1867,7 @@
   text-align: left;
 }
 
-.mona-selection-group .mona-selection-item { margin-left: 15px; }
-
 .mona-selection-item input { width: 100%; height: 16px; flex: 1; border: 0; outline: 0; background: transparent; padding: 0; font-size: 12px; }
-
-.mona-markup-panel.is-embedded { min-height: 140px; }
-
-.mona-search-panel.is-embedded { min-height: 180px; }
 
 .mona-editor-slide-canvas mark.active { background-color: #ff9632; }
 
@@ -2553,7 +2034,6 @@
 
 /* Inset (margin) cells stack the label above the field: the English labels
    ("Bottom margin:") do not fit beside a value in a half-width column. */
-.mona-panel-split-row.is-insets .mona-panel-number,
 .grid.is-insets .mona-panel-number {
   display: flex;
   height: auto;
@@ -2564,13 +2044,11 @@
   padding-left: 0;
   gap: 4px;
 }
-.mona-panel-split-row.is-insets .mona-panel-number-prefix,
 .grid.is-insets .mona-panel-number-prefix {
   flex: none;
   color: var(--muted-foreground);
   line-height: 1.4;
 }
-.mona-panel-split-row.is-insets .mona-panel-number-input-wrap,
 .grid.is-insets .mona-panel-number-input-wrap {
   height: 32px;
   box-sizing: border-box;
@@ -2580,10 +2058,27 @@
   background: var(--background);
   transition: border-color .25s;
 }
-.mona-panel-split-row.is-insets .mona-panel-number:not(.is-disabled):hover .mona-panel-number-input-wrap,
-.mona-panel-split-row.is-insets .mona-panel-number.is-focused .mona-panel-number-input-wrap,
-.grid.is-insets .mona-panel-number:not(.is-disabled):hover .mona-panel-number-input-wrap,
-.grid.is-insets .mona-panel-number.is-focused .mona-panel-number-input-wrap {
+.grid.is-insets .mona-panel-number:hover .mona-panel-number-input-wrap {
   border-color: var(--ring);
 }
 
+
+/* The rotate affordance reads as a button, not another resize dot. */
+.mona-rotate-handle {
+  width: var(--mona-rotate-size);
+  height: var(--mona-rotate-size);
+  color: var(--foreground);
+}
+
+/* Flips below the element when there is not enough room above it. */
+.mona-rotate-handle.is-below {
+  top: auto;
+  bottom: calc(-1 * var(--mona-rotate-offset));
+}
+.mona-rotate-handle > svg { width: 60%; height: 60%; }
+
+/* Two-stage text interaction, matching every other design tool: the first
+   click selects (and can drag) the element because the editor surface is
+   inert; a double-click promotes it to editing and makes it live. */
+.mona-rich-text { pointer-events: none; }
+.mona-rich-text.is-editing { pointer-events: auto; }

@@ -6,6 +6,7 @@ import type { PresentationState } from '@mona/presentation-core'
 import ArrowBackIcon from '~icons/icon-park-outline/arrow-circle-left'
 
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
 import type { ScreenPresentationController } from '@/features/screen/screen-types'
 
@@ -59,7 +60,10 @@ const Thumbnail = ({
     <Button
       aria-current={active ? 'page' : undefined}
       aria-label={t('screen.slideNumber', { current: slideIndex + 1, total: presentation.slides.length })}
-      className={`mona-screen-thumbnail${active ? ' is-active' : ''}`}
+      className={cn(
+        'mona-screen-thumbnail inline-block border-0 bg-transparent p-0 text-inherit outline-2 outline-neutral-400 hover:outline-editor-selection',
+        active && 'is-active outline-[3px] outline-editor-selection',
+      )}
       data-slide-index={slideIndex}
       onClick={onClick}
       size={null}
@@ -99,8 +103,8 @@ export function ScreenBottomThumbnails({
     ref.current?.scrollBy(event.deltaY, 0)
   }
   return (
-    <div className="mona-screen-bottom-thumbnails">
-      <div className="mona-screen-bottom-thumbnail-list" onWheel={wheel} ref={ref}>
+    <div className="group fixed bottom-[-120px] left-0 z-[4] w-full transition-[bottom] duration-200 after:absolute after:top-[-3px] after:left-0 after:h-0.75 after:w-full after:content-[''] hover:bottom-0 hover:z-20">
+      <div className="relative h-30 overflow-hidden overflow-x-auto bg-black/75 p-2.5 whitespace-nowrap [&>*+*]:ml-2.5 [&::-webkit-scrollbar]:size-0" onWheel={wheel} ref={ref}>
         {presentation.slides.map((slide, index) => (
           <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => turnSlideToIndex(index)} presentation={presentation} size={100 / presentation.viewportRatio} slideIndex={index} visible={index < slidesLoadLimit} />
         ))}
@@ -150,9 +154,9 @@ export function ScreenAllSlides({
     return () => root.removeEventListener('keydown', keydown)
   }, [onClose])
   return (
-    <dialog aria-label={t('screen.allSlides')} className="mona-screen-all-slides" open ref={rootRef}>
-      <div className="mona-screen-all-slides-return"><Button aria-label={t('common.close')} onClick={onClose} ref={closeRef} size={null} type="button" variant={null}><ArrowBackIcon /></Button></div>
-      <div className="mona-screen-all-slides-content">
+    <dialog aria-label={t('screen.allSlides')} className="fixed top-0 left-0 z-[99] m-0 size-full max-h-none max-w-none border-0 bg-screen-surface-deep p-0" open ref={rootRef}>
+      <div className="h-15 px-7.5 pt-5"><Button aria-label={t('common.close')} className="border-0 bg-transparent p-0 text-[36px] text-white hover:text-editor-selection" onClick={onClose} ref={closeRef} size={null} type="button" variant={null}><ArrowBackIcon /></Button></div>
+      <div className="flex h-[calc(100%-100px)] flex-wrap content-start gap-3 overflow-auto px-7.5 pt-5 pb-7.5 [&_.mona-screen-thumbnail]:w-37.5">
         {presentation.slides.map((slide, index) => (
           <Thumbnail active={index === presentation.slideIndex} key={slide.id} onClick={() => {
             turnSlideToIndex(index); onClose() 
@@ -174,7 +178,7 @@ export function ScreenPresenterThumbnails({
   const slidesLoadLimit = useSlidesLoadLimit(presentation.slides.length)
   useScrollActiveOnChange(ref, presentation.slideIndex)
   return (
-    <div className="mona-screen-presenter-thumbnails" onWheel={event => {
+    <div className="relative h-37.5 overflow-hidden overflow-x-auto border-t border-screen-panel-border p-3.75 whitespace-nowrap [&>*+*]:ml-2.5 [&::-webkit-scrollbar]:size-0" onWheel={event => {
       event.preventDefault(); ref.current?.scrollBy(event.deltaY, 0) 
     }} ref={ref}>
       {presentation.slides.map((slide, index) => (

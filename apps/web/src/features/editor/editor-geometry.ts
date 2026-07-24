@@ -716,16 +716,109 @@ export const groupElements = (
   return elements
 }
 
+/**
+ * Lifts a native group's children into the slide's own coordinate space.
+ *
+ * The renderer places a group's children inside a box of
+ * `coordinateWidth`×`coordinateHeight` scaled to the group's size, then
+ * rotates and flips the whole box about its centre. Dissolving the group has
+ * to apply that same transform to each child so nothing moves on screen.
+ */
+const dissolveGroup = (group: Extract<PPTElement, { type: 'group' }>): PPTElement[] => {
+  const scaleX = group.width / Math.max(group.coordinateWidth || group.width, 0.001)
+  const scaleY = group.height / Math.max(group.coordinateHeight || group.height, 0.001)
+  const centreX = group.left + group.width / 2
+  const centreY = group.top + group.height / 2
+  const radians = (group.rotate || 0) * Math.PI / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  const flipX = group.flipH ? -1 : 1
+  const flipY = group.flipV ? -1 : 1
+
+  /** Maps a point from the group's local box into slide coordinates. */
+  const mapPoint = (localX: number, localY: number) => {
+    const x = group.left + localX * scaleX
+    const y = group.top + localY * scaleY
+    const offsetX = (x - centreX) * flipX
+    const offsetY = (y - centreY) * flipY
+    return {
+      x: centreX + offsetX * cos - offsetY * sin,
+      y: centreY + offsetX * sin + offsetY * cos,
+    }
+  }
+
+  /** Maps a direction, which the group's offset does not affect. */
+  const mapVector = (localX: number, localY: number): [number, number] => {
+    const x = localX * scaleX * flipX
+    const y = localY * scaleY * flipY
+    return [x * cos - y * sin, x * sin + y * cos]
+  }
+
+  return group.elements.map(child => {
+    if (child.type === 'line') {
+      // A line has no box: its position is an origin plus point vectors, and
+      // it carries no rotation of its own, so the group's rotation has to be
+      // baked into those vectors.
+      const origin = mapPoint(child.left, child.top)
+      const line: PPTLineElement = {
+        ...child,
+        end: mapVector(child.end[0], child.end[1]),
+        left: origin.x,
+        start: mapVector(child.start[0], child.start[1]),
+        top: origin.y,
+      }
+      if (child.broken) line.broken = mapVector(child.broken[0], child.broken[1])
+      if (child.broken2) line.broken2 = mapVector(child.broken2[0], child.broken2[1])
+      if (child.curve) line.curve = mapVector(child.curve[0], child.curve[1])
+      if (child.cubic) {
+        line.cubic = [
+          mapVector(child.cubic[0][0], child.cubic[0][1]),
+          mapVector(child.cubic[1][0], child.cubic[1][1]),
+        ]
+      }
+      return line
+    }
+
+    const width = child.width * scaleX
+    const height = child.height * scaleY
+    const centre = mapPoint(child.left + child.width / 2, child.top + child.height / 2)
+    const lifted = {
+      ...child,
+      height,
+      left: centre.x - width / 2,
+      rotate: (child.rotate || 0) + (group.rotate || 0),
+      top: centre.y - height / 2,
+      width,
+    }
+    // Mirroring the group mirrors each child in place as well. Only images,
+    // shapes, and nested groups carry a flip of their own; a mirrored group
+    // holding anything else keeps that child's position but not its handedness.
+    const flippable = lifted.type === 'image' || lifted.type === 'shape' || lifted.type === 'group'
+    if (flippable && group.flipH) lifted.flipH = !lifted.flipH
+    if (flippable && group.flipV) lifted.flipV = !lifted.flipV
+    return lifted
+  })
+}
+
 export const ungroupElements = (
   sourceElements: readonly PPTElement[],
   selectedIds: ReadonlySet<string>,
 ): PPTElement[] | undefined => {
-  if (!sourceElements.some(element => selectedIds.has(element.id) && element.groupId)) return undefined
+  const dissolves = sourceElements.some(element => (
+    selectedIds.has(element.id) && (Boolean(element.groupId) || element.type === 'group')
+  ))
+  if (!dissolves) return undefined
   const elements = jsonCloneElements(sourceElements)
+  const result: PPTElement[] = []
   for (const element of elements) {
     if (selectedIds.has(element.id) && element.groupId) delete element.groupId
+    if (selectedIds.has(element.id) && element.type === 'group') {
+      result.push(...dissolveGroup(element))
+      continue
+    }
+    result.push(element)
   }
-  return elements
+  return result
 }
 
 export const setElementLocks = (input: {

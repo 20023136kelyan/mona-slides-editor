@@ -29,39 +29,17 @@ import {
   InspectorPopoverButton,
   InspectorSelect,
   InspectorSwitch,
-  inspectorRowFullClass,
+  inspectorDividerClass,
+  inspectorRowClass,
   inspectorSelectGroupClass,
 } from '@/features/editor/EditorInspectorPrimitives'
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
+import { editorFontOptions, editorFontSizeOptions } from '@/features/editor/editor-text-options'
 import { executeTableCommand, parseTableCellKey, updateTableCellStyles, type TableCommand, type TableCommandPosition } from '@/features/editor/editor-table'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 
-const fontOptions = [
-  { label: '思源黑体', value: 'SourceHanSans' },
-  { label: '思源宋体', value: 'SourceHanSerif' },
-  { label: '文鼎PL楷体', value: 'WenDingPLKaiTi' },
-  { label: '文鼎PL宋体', value: 'WenDingPLSongTi' },
-  { label: '朱雀仿宋', value: 'ZhuQueFangSong' },
-  { label: '霞鹜文楷', value: 'LXGWWenKai' },
-  { label: '霞鹜新致宋', value: 'LXGWNeoZhiSong' },
-  { label: '霞鹜新晰黑', value: 'LXGWNeoXiHei' },
-  { label: '阿里巴巴普惠体', value: 'AlibabaPuHuiTi' },
-  { label: '得意黑', value: 'DeYiHei' },
-  { label: 'MiSans', value: 'MiSans' },
-  { label: 'Source Serif 4', value: 'SourceSerif4' },
-  { label: 'JetBrains Mono', value: 'JetBrainsMono' },
-  { label: 'Literata', value: 'Literata' },
-  { label: 'Inter', value: 'Inter' },
-  { label: 'Roboto', value: 'Roboto' },
-  { label: 'Open Sans', value: 'OpenSans' },
-  { label: 'Montserrat', value: 'Montserrat' },
-  { label: 'Source Sans Pro', value: 'SourceSansPro' },
-  { label: 'Merriweather', value: 'Merriweather' },
-  { label: 'Lato', value: 'Lato' },
-] as const
-
-const fontSizeOptions = ['12px', '14px', '16px', '18px', '20px', '22px', '24px', '28px', '32px'].map(value => ({ label: value, value }))
+const fontSizeOptions = editorFontSizeOptions.slice(0, 9)
 
 export function TableStylePanel({
   element,
@@ -110,11 +88,11 @@ export function TableStylePanel({
   }
   return (
     <div className="mona-table-style-panel">
-      <div className={`${inspectorSelectGroupClass} ${inspectorRowFullClass}`}>
-        <InspectorSelect ariaLabel={t('foundation.editor.text.fontFamily')} icon={<FontSizeIcon />} onChange={fontname => updateText({ fontname })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('foundation.editor.text.fontSearch')} style={{ width: '50%' }} value={attrs.fontname} />
+      <div className={`${inspectorSelectGroupClass} ${inspectorRowClass}`}>
+        <InspectorSelect ariaLabel={t('foundation.editor.text.fontFamily')} icon={<FontSizeIcon />} onChange={fontname => updateText({ fontname })} options={[{ label: t('common.defaultFont'), value: '' }, ...editorFontOptions]} search searchLabel={t('foundation.editor.text.fontSearch')} style={{ width: '50%' }} value={attrs.fontname} />
         <InspectorSelect ariaLabel={t('foundation.editor.text.fontSize')} icon={<AddTextIcon />} onChange={fontsize => updateText({ fontsize })} options={fontSizeOptions} search searchLabel={t('foundation.editor.text.fontSizeSearch')} style={{ width: '50%' }} value={attrs.fontsize} />
       </div>
-      <InspectorButtonGroup className={`${inspectorRowFullClass} mona-table-color-row`}>
+      <InspectorButtonGroup className={`${inspectorRowClass} mona-table-color-row`}>
         <InspectorColorButton ariaLabel={t('foundation.editor.table.textColor')} color={attrs.color} icon={<TextIcon />} onChange={color => updateText({ color })} style={{ width: '50%' }} />
         <InspectorColorButton ariaLabel={t('foundation.editor.table.cellFill')} color={attrs.backcolor} icon={<FillIcon />} onChange={backcolor => updateText({ backcolor })} style={{ width: '50%' }} />
       </InspectorButtonGroup>
@@ -139,9 +117,9 @@ export function TableStylePanel({
           ['bottom', AlignBottomIcon, 'alignBottom'],
         ] as const).map(([value, Icon, label]) => <InspectorButton active={attrs.vAlign === value} ariaLabel={t(`foundation.editor.table.${label}`)} key={value} onClick={() => updateText({ vAlign: value as TextAlignVertical })} style={{ flex: 1 }}><Icon /></InspectorButton>)}
       </InspectorButtonGroup>
-      <div className="my-6 w-full border-t border-black/[0.06]" />
+      <div className={inspectorDividerClass} />
       <ElementOutlineControls element={element} fixed presentation={presentation} runtime={runtime} />
-      <div className="my-6 w-full border-t border-black/[0.06]" />
+      <div className={inspectorDividerClass} />
       <PropertyRow label={t('foundation.editor.tableStyle.rowActions')}>
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addRow')} onClick={() => command('insert-row', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addRow')}</InspectorButton>
@@ -162,13 +140,12 @@ export function TableStylePanel({
           </div>}><DownIcon /></InspectorPopoverButton>
         </InspectorButtonGroup>
       </PropertyRow>
-      <div className="my-6 w-full border-t border-black/[0.06]" />
-      <div className="mona-panel-row mona-table-theme-switch">
-        <div className="w-[48%] text-xs">{t('foundation.editor.tableStyle.enableTheme')}</div>
-        <div className="mona-panel-row-control mona-panel-switch-wrapper"><InspectorSwitch ariaLabel={t('foundation.editor.tableStyle.enableTheme')} checked={!!element.theme} onChange={checked => checked
+      <div className={inspectorDividerClass} />
+      <PropertyRow label={t('foundation.editor.tableStyle.enableTheme')}>
+        <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.tableStyle.enableTheme')} checked={!!element.theme} onChange={checked => checked
           ? commit({ theme: { color: presentation.theme.themeColors[0]!, rowHeader: true, rowFooter: false, colHeader: false, colFooter: false } })
           : runtime.commit('Disable table theme', [{ type: 'element.properties.remove', payload: { id: element.id, property: 'theme' } }], { historyKey: `table-style-${element.id}` })} /></div>
-      </div>
+      </PropertyRow>
       {element.theme ? <>
         <div className="mona-table-theme-options">
           <InspectorCheckbox className="mona-panel-checkbox" checked={element.theme.rowHeader} onChange={rowHeader => updateTheme({ rowHeader })}>{t('foundation.editor.tableStyle.headerRow')}</InspectorCheckbox>

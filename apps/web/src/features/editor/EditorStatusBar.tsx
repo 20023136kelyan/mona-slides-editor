@@ -82,7 +82,7 @@ function EditorTimer() {
       <PopoverContent
         aria-label={t('foundation.editor.statusBar.presentationTimer')}
         align="start"
-        className="mona-editor-timer flex w-[230px] flex-col gap-2.5"
+        className="mona-editor-timer flex w-57.5 flex-col gap-2.5"
         side="top"
         sideOffset={10}
       >
@@ -90,10 +90,10 @@ function EditorTimer() {
         <div className="mona-editor-timer-adjust grid grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-1.5">
           <Button aria-label={t('foundation.editor.statusBar.subtractMinute')} onClick={() => setDuration(remaining - 60_000)} size="editor-icon" type="button" variant="ghost">−</Button>
           <div className="mona-editor-timer-fields grid grid-cols-[1fr_auto_1fr] items-start gap-1">
-            <label className="grid gap-0.5 text-center text-[10px] text-muted-foreground">
+            <label className="grid gap-0.5 text-center text-mini text-muted-foreground">
               <Input
                 aria-label={t('foundation.editor.statusBar.minutes')}
-                className="h-[38px] px-1 text-center tabular-nums"
+                className="h-9.5 px-1 text-center tabular-nums"
                 max={99}
                 min={0}
                 onChange={event => setDuration(Number(event.target.value) * 60_000 + seconds * 1000)}
@@ -103,10 +103,10 @@ function EditorTimer() {
               <span>{t('foundation.editor.statusBar.minutesShort')}</span>
             </label>
             <span aria-hidden="true">:</span>
-            <label className="grid gap-0.5 text-center text-[10px] text-muted-foreground">
+            <label className="grid gap-0.5 text-center text-mini text-muted-foreground">
               <Input
                 aria-label={t('foundation.editor.statusBar.seconds')}
-                className="h-[38px] px-1 text-center tabular-nums"
+                className="h-9.5 px-1 text-center tabular-nums"
                 max={59}
                 min={0}
                 onChange={event => setDuration(minutes * 60_000 + Number(event.target.value) * 1000)}
@@ -154,7 +154,7 @@ function PageNumberControl({
   }
   return (
     <form
-      className="mona-page-number-control flex h-7 shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-[rgb(16_18_25/70%)]"
+      className="mona-page-number-control flex h-7 shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-ink/70"
       onSubmit={event => {
         event.preventDefault()
         commit()
@@ -162,7 +162,7 @@ function PageNumberControl({
     >
       <Input
         aria-label={t('foundation.editor.statusBar.goToPage')}
-        className="h-7 w-[38px] appearance-none border-0 bg-transparent px-[3px] text-right font-semibold shadow-none [appearance:textfield] focus-visible:border-transparent focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-7 w-9.5 appearance-none border-0 bg-transparent px-0.75 text-right font-semibold shadow-none [appearance:textfield] focus-visible:border-transparent focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         inputMode="numeric"
         max={total}
         min={1}
@@ -247,12 +247,12 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
   const gridActive = session.workspaceMode === 'page-grid'
   const zoomMenuItemClass = cn(
     'mona-canvas-tool-menu-item',
-    'flex min-w-20 justify-center rounded-[var(--radius-control)] border-0 bg-transparent px-4 py-2 text-inherit text-[#41464b] hover:bg-[#f1f1f1]',
+    'flex min-w-20 justify-center rounded-control border-0 bg-transparent px-4 py-2 text-inherit text-foreground hover:bg-[#f1f1f1]',
   )
 
   return (
     <div
-      className="mona-editor-statusbar @container flex h-[46px] flex-none items-center gap-2 bg-transparent px-3 backdrop-blur-[18px] backdrop-saturate-[1.7]"
+      className="mona-editor-statusbar @container flex h-11.5 flex-none items-center gap-2 bg-transparent px-3 backdrop-blur-[18px] backdrop-saturate-[1.7]"
       ref={rootRef}
     >
       {/* aria-labels are explicit: the visible labels disappear under the
@@ -292,28 +292,28 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
         <PopoverTrigger asChild>
           <Button aria-label={t('foundation.editor.statusBar.help')} className={statusBarItemClassName()} size="editor" type="button" variant="ghost"><CircleHelp /><span>{t('foundation.editor.statusBar.help')}</span></Button>
         </PopoverTrigger>
-        <PopoverContent aria-label={t('foundation.editor.statusBar.help')} align="start" className="mona-editor-shortcuts w-[250px]" side="top" sideOffset={10}>
+        <PopoverContent aria-label={t('foundation.editor.statusBar.help')} align="start" className="mona-editor-shortcuts w-62.5" side="top" sideOffset={10}>
           <strong className="mb-2 block">{t('foundation.editor.statusBar.shortcuts')}</strong>
           <dl className="grid gap-0.5">
-            <div className="flex min-h-[30px] items-center justify-between gap-5">
+            <div className="flex min-h-7.5 items-center justify-between gap-5">
               <dt className="text-xs text-muted-foreground">{t('foundation.editor.statusBar.present')}</dt>
-              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">F5</dd>
+              <dd className="flex-none rounded-detail border border-border bg-muted px-1.5 py-0.5 text-mini whitespace-nowrap">F5</dd>
             </div>
-            <div className="flex min-h-[30px] items-center justify-between gap-5">
+            <div className="flex min-h-7.5 items-center justify-between gap-5">
               <dt className="text-xs text-muted-foreground">{t('foundation.editor.thumbnails.newSlide')}</dt>
-              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Enter</dd>
+              <dd className="flex-none rounded-detail border border-border bg-muted px-1.5 py-0.5 text-mini whitespace-nowrap">Enter</dd>
             </div>
-            <div className="flex min-h-[30px] items-center justify-between gap-5">
+            <div className="flex min-h-7.5 items-center justify-between gap-5">
               <dt className="text-xs text-muted-foreground">{t('foundation.editor.contextual.duplicate')}</dt>
-              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Ctrl D</dd>
+              <dd className="flex-none rounded-detail border border-border bg-muted px-1.5 py-0.5 text-mini whitespace-nowrap">Ctrl D</dd>
             </div>
-            <div className="flex min-h-[30px] items-center justify-between gap-5">
+            <div className="flex min-h-7.5 items-center justify-between gap-5">
               <dt className="text-xs text-muted-foreground">{t('foundation.editor.action.delete')}</dt>
-              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Delete</dd>
+              <dd className="flex-none rounded-detail border border-border bg-muted px-1.5 py-0.5 text-mini whitespace-nowrap">Delete</dd>
             </div>
-            <div className="flex min-h-[30px] items-center justify-between gap-5">
+            <div className="flex min-h-7.5 items-center justify-between gap-5">
               <dt className="text-xs text-muted-foreground">{t('foundation.editor.action.selectAll')}</dt>
-              <dd className="flex-none rounded-[var(--radius-detail)] border border-border bg-muted px-1.5 py-0.5 text-[10px] whitespace-nowrap">Ctrl A</dd>
+              <dd className="flex-none rounded-detail border border-border bg-muted px-1.5 py-0.5 text-mini whitespace-nowrap">Ctrl A</dd>
             </div>
           </dl>
         </PopoverContent>
@@ -323,10 +323,10 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
         aria-label={t('foundation.editor.canvasTool.zoomIn')}
         className={cn(
           'mona-statusbar-zoom-slider',
-          'w-[110px] min-w-14 grow-0 shrink basis-auto',
+          'w-27.5 min-w-14 grow-0 shrink basis-auto',
           '[&_[data-slot=slider-track]]:h-1 [&_[data-slot=slider-track]]:bg-[#e2e4e9]',
           '[&_[data-slot=slider-range]]:bg-[#b9bdc7]',
-          '[&_[data-slot=slider-thumb]]:size-[14px] [&_[data-slot=slider-thumb]]:border-[rgb(16_18_25/15%)] [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-thumb]]:shadow-[0_1px_3px_rgb(0_0_0/15%)]',
+          '[&_[data-slot=slider-thumb]]:size-3.5 [&_[data-slot=slider-thumb]]:border-ink/15 [&_[data-slot=slider-thumb]]:bg-white [&_[data-slot=slider-thumb]]:shadow-[0_1px_3px_rgb(0_0_0/15%)]',
         )}
         max={300}
         min={10}
@@ -339,7 +339,7 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       <Popover onOpenChange={setMenuOpen} open={menuOpen}>
         <PopoverTrigger asChild>
           <Button
-            className="mona-canvas-zoom-text inline-block w-11 cursor-pointer p-0 text-center text-xs text-[#41464b]"
+            className="mona-canvas-zoom-text inline-block w-11 cursor-pointer p-0 text-center text-xs text-foreground"
             size="editor"
             type="button"
             variant="ghost"
@@ -348,7 +348,7 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
         <PopoverContent
           aria-label={t('foundation.editor.canvasTool.zoomIn')}
           align="center"
-          className="mona-canvas-tool-popover z-[120] w-auto rounded-[var(--radius-control)] border border-[#e5e7eb] bg-white p-2.5 text-[13px] leading-normal text-[#41464b] shadow-md"
+          className="mona-canvas-tool-popover z-[120] w-auto rounded-control border border-[#e5e7eb] bg-white p-2.5 text-control leading-normal text-foreground shadow-md"
           side="top"
           sideOffset={10}
         >
@@ -379,7 +379,7 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       />
       <Button
         aria-label={t('foundation.editor.canvasTool.fit')}
-        className="mona-statusbar-icon size-8 rounded-[var(--radius-action)] text-[15px] text-[rgb(16_18_25/70%)] [&_svg]:size-[15px]"
+        className="mona-statusbar-icon size-8 rounded-action text-field text-ink/70 [&_svg]:size-3.75"
         onClick={resetView}
         size="editor-icon"
         type="button"
@@ -387,7 +387,7 @@ export function EditorStatusBar({ notesVisible, onToggleNotes, runtime }: {
       ><FullScreenIcon /></Button>
       <Button
         aria-label={t('foundation.editor.statusBar.present')}
-        className="mona-statusbar-icon size-8 rounded-[var(--radius-action)] text-[15px] text-[rgb(16_18_25/70%)] [&_svg]:size-[15px]"
+        className="mona-statusbar-icon size-8 rounded-action text-field text-ink/70 [&_svg]:size-3.75"
         onClick={() => startPresentation({ fromStart: false })}
         size="editor-icon"
         type="button"

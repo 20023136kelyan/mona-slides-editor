@@ -3,8 +3,12 @@
 @import "shadcn/tailwind.css";
 @import "./assets/fonts.css";
 @import "./assets/fonts-sliced.css";
-@import "./features/presentation-renderer/renderer.css";
-@import "./features/editor/editor.css";
+/* Feature stylesheets carry geometry/direct-manipulation exceptions only.
+   They are imported into the `components` layer so a Tailwind utility at a
+   call site always wins — previously these were unlayered and silently
+   overrode primitives (Input, Button, PopoverContent all hit this). */
+@import "./features/presentation-renderer/renderer.css" layer(components);
+@import "./features/editor/editor.css" layer(components);
 
 /* Links inherit their surface color unless a feature gives them a semantic
    link treatment. This avoids leaking branding into editable slide content. */
@@ -32,6 +36,13 @@ a {
 }
 
 @custom-variant dark (&:is(.dark *));
+
+/* Base step for the dynamic spacing scale. This must live in a non-inline
+   @theme so the variable is emitted; fractional utilities such as p-1.25
+   resolve against it (previously they silently generated nothing). */
+@theme {
+    --spacing: 0.25rem;
+}
 
 @theme inline {
     --font-heading: var(--font-sans);
@@ -72,6 +83,42 @@ a {
     --color-brand-orange: var(--brand-orange);
     --color-brand-amber: var(--brand-amber);
     --color-brand-yellow: var(--brand-yellow);
+    /* Promoted from :root so the design system exposes real utilities
+       (text-control, rounded-control, bg-editor-selection) instead of an
+       arbitrary [var(--…)] at every call site. */
+    /* Editor type scale. These are the sizes the chrome actually uses, named
+       so call sites stop hardcoding px. */
+    --text-micro: 0.5625rem;   /* 9px  */
+    --text-mini: 0.625rem;     /* 10px */
+    --text-tiny: 0.6875rem;    /* 11px */
+    --text-control: 0.8125rem; /* 13px */
+    --text-field: 0.9375rem;   /* 15px */
+    /* Editor chrome breakpoints, named so responsive variants read as intent. */
+    --breakpoint-compact: 680px;
+    --breakpoint-narrow: 900px;
+    --breakpoint-snug: 1100px;
+    --breakpoint-wide: 1160px;
+    --radius-detail: var(--radius-detail);
+    --radius-control: var(--radius-control);
+    --radius-surface: var(--radius-surface);
+    --radius-action: var(--radius-action);
+    --radius-overlay: var(--radius-overlay);
+    --radius-pill: var(--radius-pill);
+    --color-anim-in: var(--anim-in);
+    --color-anim-out: var(--anim-out);
+    --color-anim-attention: var(--anim-attention);
+    --color-ink: var(--ink);
+    --color-ink-deep: var(--ink-deep);
+    --color-editor-selection: var(--editor-selection);
+    --color-editor-selection-hover: var(--editor-selection-hover);
+    --color-editor-selection-subtle: var(--editor-selection-subtle);
+    --color-editor-selection-soft: var(--editor-selection-soft);
+    --color-editor-selection-medium: var(--editor-selection-medium);
+    --color-editor-selection-strong: var(--editor-selection-strong);
+    --color-screen-surface: var(--screen-surface);
+    --color-screen-surface-deep: var(--screen-surface-deep);
+    --color-screen-panel: var(--screen-panel);
+    --color-screen-panel-border: var(--screen-panel-border);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -83,12 +130,12 @@ a {
 
 :root {
     --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    /* Brand colors are intentionally separate from neutral application UI. */
+    /* Logo palette from public/favicon.svg (yellow → amber → red). */
     --brand-deep-red: #c4001d;
-    --brand-red: #e61300;
+    --brand-red: #e10500;
     --brand-orange: #fa500f;
-    --brand-amber: #ff8204;
-    --brand-yellow: #ffaf01;
+    --brand-amber: #ff8205;
+    --brand-yellow: #ffaf00;
     /* Component radii are derived here; feature CSS must not invent values. */
     --radius-detail: 0.125rem;
     --radius-control: 0.375rem;
@@ -102,7 +149,8 @@ a {
     --card-foreground: oklch(0.145 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
+    /* Neutral charcoal — softer than near-black, still clear for primary actions. */
+    --primary: oklch(0.32 0 0);
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
@@ -116,8 +164,27 @@ a {
     --ring: oklch(0.708 0 0);
     /* Direct-manipulation selection stays neutral and is shared by every
        editor surface, including geometry-specific controls. */
+    /* Presentation shell: the slideshow runs on its own dark surface, kept
+       independent of the light editor chrome so projected slides stay neutral. */
+    --screen-surface: #1d1d1d;
+    --screen-surface-deep: #1a1a1a;
+    --screen-panel: #2a2a2a;
+    --screen-panel-border: #3a3a3a;
+    /* Editor "ink": the slightly blue near-black the chrome uses for text,
+       scrims and hairlines. Alpha comes from Tailwind's /N modifier
+       (text-ink/70) rather than a hand-written rgba at each call site. */
+    /* Animation categories are colour-coded in the sequence list. */
+    --anim-in: #68a490;
+    --anim-out: #d86344;
+    --anim-attention: #e8b76a;
+    --ink: rgb(16 18 25);
+    --ink-deep: rgb(15 16 21);
+    /* Direct-manipulation selection carries brand colour so the frame reads as
+       "this is selected" rather than as another neutral outline. Scoped to the
+       selection frame, so hover/active chrome elsewhere stays neutral. */
+    --selection-accent: var(--brand-red);
     --editor-selection: var(--foreground);
-    --editor-selection-hover: var(--primary);
+    --editor-selection-hover: var(--foreground);
     --editor-selection-subtle: color-mix(in oklab, var(--editor-selection) 5%, transparent);
     --editor-selection-soft: color-mix(in oklab, var(--editor-selection) 12%, transparent);
     --editor-selection-medium: color-mix(in oklab, var(--editor-selection) 25%, transparent);
@@ -130,7 +197,7 @@ a {
     --radius: var(--radius-surface);
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary: oklch(0.32 0 0);
     --sidebar-primary-foreground: oklch(0.985 0 0);
     --sidebar-accent: oklch(0.97 0 0);
     --sidebar-accent-foreground: oklch(0.205 0 0);
@@ -145,7 +212,7 @@ a {
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
+    --primary: oklch(0.78 0 0);
     --primary-foreground: oklch(0.205 0 0);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
@@ -164,8 +231,8 @@ a {
     --chart-5: oklch(0.269 0 0);
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.78 0 0);
+    --sidebar-primary-foreground: oklch(0.205 0 0);
     --sidebar-accent: oklch(0.269 0 0);
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);

@@ -27,3 +27,12 @@ export const editorFontSizeOptions = [
   '36px', '40px', '44px', '48px', '54px', '60px', '66px', '72px', '76px',
   '80px', '88px', '96px', '104px', '112px', '120px',
 ].map(value => ({ label: value, value }))
+
+export const editorLineHeightOptions = [0.9, 1, 1.15, 1.2, 1.4, 1.5, 1.8, 2, 2.5, 3]
+  .map(value => ({ label: `${value}×`, value }))
+
+export const editorParagraphSpaceOptions = [0, 5, 10, 15, 20, 25, 30, 40, 50, 80]
+  .map(value => ({ label: `${value}px`, value }))
+
+export const editorWordSpaceOptions = [0, 1, 2, 3, 4, 5, 6, 8, 10]
+  .map(value => ({ label: `${value}px`, value }))

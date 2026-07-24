@@ -407,16 +407,16 @@ export function DrawingWorkspace({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          <span aria-hidden="true" className="mona-drawing-palette-divider" />
+          <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-ink/10" />
           <Popover>
             <PopoverTrigger asChild>
               <Button aria-label={t('foundation.editor.drawing.stroke')} size="editor-icon" type="button" variant="ghost">
                 <SlidersHorizontal />
               </Button>
             </PopoverTrigger>
-            <PopoverContent aria-label={t('foundation.editor.drawing.stroke')} align="center" className="mona-drawing-stroke-popover" side="bottom">
+            <PopoverContent aria-label={t('foundation.editor.drawing.stroke')} align="center" className="grid w-55 gap-2.5 [&_strong]:text-xs" side="bottom">
               <strong>{t('foundation.editor.drawing.strokeColor')}</strong>
-              <div className="mona-drawing-colors">
+              <div className="flex gap-1.5 [&_button]:before:size-4.5 [&_button]:before:rounded-pill [&_button]:before:border-2 [&_button]:before:border-white [&_button]:before:bg-[var(--drawing-color)] [&_button]:before:shadow-[0_0_0_1px_rgb(16_18_25/16%)] [&_button]:before:content-[''] [&_button.is-active]:before:shadow-[0_0_0_2px_#fff,0_0_0_4px_#171717]">
                 {STROKE_COLORS.map(color => (
                   <Button
                     aria-label={color}
@@ -458,7 +458,7 @@ export function DrawingWorkspace({
             <PopoverTrigger asChild>
               <Button aria-label={t('foundation.editor.drawing.export')} disabled={!apiReady || !hasContent} size="editor-icon" type="button" variant="ghost"><Download /></Button>
             </PopoverTrigger>
-            <PopoverContent aria-label={t('foundation.editor.drawing.export')} align="end" className="mona-drawing-export-popover" side="bottom">
+            <PopoverContent aria-label={t('foundation.editor.drawing.export')} align="end" className="flex w-55 flex-col gap-0.5 [&_button]:justify-start" side="bottom">
               <Button onClick={() => {
                 const scene = checkpoint()
                 saveAs(drawingSceneBlob(scene), `${slideId}.excalidraw`)

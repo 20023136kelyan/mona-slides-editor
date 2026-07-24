@@ -10,6 +10,16 @@ import { Button } from '@/components/ui/button'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { ScaledSlide } from '@/features/presentation-renderer/ScaledSlide'
+import { cn } from '@/lib/utils'
+
+// `mona-page-grid-item` stays: sortablejs and several querySelector calls
+// target it. Drop indicator uses the data-drop-side attribute the DnD sets.
+const PAGE_GRID_ITEM = 'mona-page-grid-item group/page relative min-w-0 cursor-pointer outline-none transition-[opacity,transform] '
+  + '[&.is-drag-chosen]:opacity-72 [&.is-dragging]:cursor-grabbing [&.is-dragging]:opacity-92 [&.is-drag-ghost]:opacity-30 '
+  + '[&.is-drop-target]:before:absolute [&.is-drop-target]:before:top-0 [&.is-drop-target]:before:bottom-5.5 [&.is-drop-target]:before:z-[8] '
+  + '[&.is-drop-target]:before:w-1 [&.is-drop-target]:before:rounded-pill [&.is-drop-target]:before:bg-editor-selection-strong '
+  + '[&.is-drop-target]:before:shadow-[0_0_0_2px_#fff] [&.is-drop-target]:before:content-[""] '
+  + '[&.is-drop-target[data-drop-side=before]]:before:-left-3 [&.is-drop-target[data-drop-side=after]]:before:-right-3'
 
 export const EditorPageGrid = memo(function EditorPageGrid({
   runtime,
@@ -233,14 +243,14 @@ export const EditorPageGrid = memo(function EditorPageGrid({
   }
 
   return (
-    <section aria-label={t('foundation.editor.statusBar.gridView')} className="mona-page-grid-workspace">
+    <section aria-label={t('foundation.editor.statusBar.gridView')} className="mona-page-grid-workspace flex min-h-0 flex-1 flex-col overflow-hidden bg-[#f3f4f7] px-5.5 pt-4.5">
       <span aria-live="polite" className="sr-only" ref={announcementRef}>{announcement}</span>
-      <header className="mona-page-grid-header">
+      <header className="flex flex-none items-center justify-between gap-5 pb-4 [&>div:first-child]:min-w-0 [&_h2]:m-0 [&_h2]:text-lg [&_h2]:font-[650] [&>div>span]:text-tiny [&>div>span]:text-muted-foreground">
         <div>
           <h2>{t('foundation.editor.statusBar.gridView')}</h2>
           <span>{t('foundation.editor.statusBar.selectedPages', { count: selectedIndexes.length })}</span>
         </div>
-        <div className="mona-page-grid-actions">
+        <div className="flex min-w-0 items-center justify-end gap-1 overflow-x-auto [overscroll-behavior-inline:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Button onClick={() => runtime.selectAllSlides()} size="sm" type="button" variant="ghost"><ListChecks />{t('foundation.editor.action.selectAll')}</Button>
           <Button onClick={() => runtime.createSlide()} size="sm" type="button" variant="ghost"><Plus />{t('foundation.editor.thumbnails.addSlide')}</Button>
           <Button onClick={() => updateSelected(false)} size="sm" type="button" variant="ghost"><Eye />{t('foundation.editor.statusBar.showPages')}</Button>
@@ -253,7 +263,7 @@ export const EditorPageGrid = memo(function EditorPageGrid({
       <div
         aria-label={t('foundation.editor.statusBar.gridView')}
         aria-multiselectable="true"
-        className="mona-page-grid"
+        className="grid min-h-0 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] content-start gap-5.5 overflow-y-auto px-1.5 pt-1 pb-7"
         ref={gridRef}
         role="listbox"
       >
@@ -262,7 +272,12 @@ export const EditorPageGrid = memo(function EditorPageGrid({
             aria-label={`${t('foundation.editor.showSlide', { number: index + 1 })}${slide.title ? `: ${slide.title}` : ''}`}
             aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown"
             aria-selected={selectedIndexes.includes(index)}
-            className={`mona-page-grid-item${index === presentation.slideIndex ? ' is-active' : ''}${selectedIndexes.includes(index) ? ' is-selected' : ''}${slide.hidden ? ' is-hidden' : ''}`}
+            className={cn(
+              PAGE_GRID_ITEM,
+              index === presentation.slideIndex && 'is-active',
+              selectedIndexes.includes(index) && 'is-selected',
+              slide.hidden && 'is-hidden [&_[data-grid-preview]]:opacity-55',
+            )}
             data-id={slide.id}
             key={slide.id}
             onDoubleClick={() => returnToCanvas('canvas')}
@@ -281,7 +296,7 @@ export const EditorPageGrid = memo(function EditorPageGrid({
             role="option"
             tabIndex={index === presentation.slideIndex ? 0 : -1}
           >
-            <div className="mona-page-grid-preview">
+            <div className="relative w-fit max-w-full rounded-surface shadow-[0_0_0_1px_rgb(16_18_25/9%)] transition-[box-shadow,opacity] duration-[120ms] group-hover/page:shadow-[0_0_0_2px_rgb(16_18_25/24%)] [.is-active_&]:shadow-[0_0_0_2px_#fff,0_0_0_5px_rgb(16_18_25/82%)] [.is-selected_&]:shadow-[0_0_0_2px_#fff,0_0_0_5px_rgb(16_18_25/82%)] [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-[inherit]" data-grid-preview>
               <ScaledSlide
                 fixedWidth={240}
                 slide={slide}
@@ -292,16 +307,16 @@ export const EditorPageGrid = memo(function EditorPageGrid({
                 viewportSize={presentation.viewportSize}
                 visible
               />
-              <span className="mona-page-grid-number">{index + 1}</span>
-              {slide.hidden ? <span className="mona-page-grid-hidden"><EyeOff />{t('foundation.editor.statusBar.hidden')}</span> : null}
+              <span className="absolute bottom-1.5 left-1.5 min-w-5 rounded-control bg-white px-1.5 py-0.5 text-center text-mini font-[650] shadow-[0_1px_3px_rgb(16_18_25/15%)]">{index + 1}</span>
+              {slide.hidden ? <span className="absolute top-1.5 right-1.5 inline-flex items-center gap-1 rounded-control bg-white/92 px-1.5 py-0.75 text-micro font-[650] text-ink/70 [&_svg]:size-3"><EyeOff />{t('foundation.editor.statusBar.hidden')}</span> : null}
             </div>
-            <div className="mona-page-grid-meta">
+            <div className="flex min-w-0 items-center justify-between gap-2 px-0.5 pt-2.5 [&_strong]:overflow-hidden [&_strong]:text-xs [&_strong]:text-ellipsis [&_strong]:whitespace-nowrap [&>span]:flex-none [&>span]:text-mini [&>span]:text-muted-foreground">
               <strong>{slide.title || t('foundation.editor.statusBar.untitledPage')}</strong>
               <span>{slide.durationMs ? `${slide.durationMs / 1000}s` : t('foundation.editor.statusBar.manual')}</span>
             </div>
           </article>
         ))}
-        <Button className="mona-page-grid-add" onClick={() => runtime.createSlide()} type="button" variant="outline">
+        <Button className="flex min-h-42.5 flex-col gap-2 rounded-surface border-0 bg-[#e7e9ee] text-ink/70 hover:bg-[#dde0e6] hover:text-ink" onClick={() => runtime.createSlide()} type="button" variant="outline">
           <Plus />
           <span>{t('foundation.editor.thumbnails.addSlide')}</span>
         </Button>

@@ -684,4 +684,77 @@ describe('PowerPoint import provenance', () => {
       }),
     ]))
   })
+
+  it('reports a chart family it cannot draw instead of presenting it as a bar chart', () => {
+    const parsed: ParsedPptxPresentation = {
+      size: { height: 540, width: 960 },
+      slides: [{
+        elements: [{
+          chartType: 'stockChart' as const,
+          colors: ['#123456'],
+          data: [{ key: 'Close', values: [{ x: '0', y: 12 }], xlabels: { 0: 'Mon' } }],
+          height: 200,
+          left: 0,
+          order: 1,
+          top: 0,
+          type: 'chart' as const,
+          width: 300,
+        }] as never,
+        fill: { type: 'color', value: '#ffffff' },
+        layoutElements: [],
+        note: '',
+      }],
+      themeColors: [],
+      usedFonts: [],
+    }
+    const conversion = convertParsedPptxPresentation({
+      coordinateLabel: index => String(index),
+      parsed,
+      ratio: 1,
+      sourceManifest,
+      sourcePackage,
+      theme,
+    })
+
+    // The series survive and stay editable, so this is an approximation
+    // rather than a loss - but the report has to name it.
+    expect(conversion.slides[0]?.elements[0]).toMatchObject({ type: 'chart' })
+    expect(conversion.report.slides[0]?.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'pptx.chart.unsupported-type',
+        disposition: 'approximated',
+        message: expect.stringContaining('stockChart'),
+      }),
+    ]))
+  })
+
+  it('reports a picture mask that has no clip path instead of squaring it off silently', () => {
+    const parsed: ParsedPptxPresentation = {
+      size: { height: 540, width: 960 },
+      slides: [{
+        elements: [{ ...image(1, 'star'), geom: 'star5' }],
+        fill: { type: 'color', value: '#ffffff' },
+        layoutElements: [],
+        note: '',
+      }],
+      themeColors: [],
+      usedFonts: [],
+    }
+    const conversion = convertParsedPptxPresentation({
+      coordinateLabel: index => String(index),
+      parsed,
+      ratio: 1,
+      sourceManifest,
+      sourcePackage,
+      theme,
+    })
+
+    expect(conversion.slides[0]?.elements[0]).toMatchObject({ clip: { shape: 'rect' }, type: 'image' })
+    expect(conversion.report.slides[0]?.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'pptx.image.unsupported-mask',
+        message: expect.stringContaining('star5'),
+      }),
+    ]))
+  })
 })

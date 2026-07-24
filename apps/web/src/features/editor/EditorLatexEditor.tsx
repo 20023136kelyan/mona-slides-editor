@@ -121,7 +121,7 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
       if (!open) onClose()
     }} open>
       <DialogContent
-        className="w-[880px] max-w-none gap-0 overflow-hidden p-5 sm:max-w-none"
+        className="w-220 max-w-none gap-0 overflow-hidden p-5 sm:max-w-none"
         onOpenAutoFocus={event => {
           event.preventDefault()
           textAreaRef.current?.focus()
@@ -129,26 +129,26 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
         showCloseButton={false}
       >
         <DialogHeader className="sr-only"><DialogTitle>{t('foundation.editor.latex.edit')}</DialogTitle></DialogHeader>
-        <div className="h-[560px]">
+        <div className="h-140">
           <div className="flex h-[calc(100%-50px)]">
-            <div className="flex h-full w-[540px] shrink-0 flex-col">
+            <div className="flex h-full w-135 shrink-0 flex-col">
               <div className="flex-1">
                 <Textarea className="h-full resize-none p-2.5 font-mono leading-relaxed" onChange={event => setLatex(event.target.value)} placeholder={t('foundation.editor.latex.placeholder')} ref={textAreaRef} rows={4} value={latex} />
               </div>
-              <div className="mt-5 flex h-40 items-center justify-center rounded-[var(--radius-surface)] border text-center select-none">
+              <div className="mt-5 flex h-40 items-center justify-center rounded-surface border text-center select-none">
                 {!latex ? <div className="text-sm text-muted-foreground">{t('foundation.editor.latex.preview')}</div> : (
                   <div className="flex h-full w-full items-center justify-center p-2.5"><FormulaContent height={138} latex={latex} width={518} /></div>
                 )}
               </div>
             </div>
-            <div className="ml-5 flex h-full w-[280px] flex-col overflow-hidden rounded-[var(--radius-surface)] border bg-background select-none">
+            <div className="ml-5 flex h-full w-70 flex-col overflow-hidden rounded-surface border bg-background select-none">
               <LatexCardTabs onChange={value => setToolbarState(value as FormulaToolbarState)} tabs={formulaTabs} value={toolbarState} />
               <div className="h-[calc(100%-40px)] text-sm">
                 {toolbarState === 'symbol' ? (
                   <div className="flex h-full flex-col">
                     <div className="mx-2.5 mt-2.5"><LatexLineTabs onChange={setSelectedSymbolKey} tabs={symbolTabs} value={selectedSymbolKey} /></div>
                     <div className="flex flex-1 flex-wrap overflow-auto p-3">
-                      {selectedSymbol.children.map(item => <div className="flex cursor-pointer items-center justify-center rounded-[var(--radius-control)] hover:bg-muted" key={item.latex} onClick={() => insertSymbol(item.latex)}><FormulaSymbol latex={item.latex} /></div>)}
+                      {selectedSymbol.children.map(item => <div className="flex cursor-pointer items-center justify-center rounded-control hover:bg-muted" key={item.latex} onClick={() => insertSymbol(item.latex)}><FormulaSymbol latex={item.latex} /></div>)}
                     </div>
                   </div>
                 ) : (
@@ -156,7 +156,7 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
                     {FORMULA_LIST.map((item, index) => (
                       <div key={item.latex}>
                         <div className="mb-1.5">{t('foundation.editor.latex.formulaPresets.' + index)}</div>
-                        <div className="flex h-[60px] cursor-pointer items-center rounded-[var(--radius-control)] bg-muted p-[5px]" onClick={() => setLatex(item.latex)}><FormulaContent height={60} latex={item.latex} width={236} /></div>
+                        <div className="flex h-15 cursor-pointer items-center rounded-control bg-muted p-1.25" onClick={() => setLatex(item.latex)}><FormulaContent height={60} latex={item.latex} width={236} /></div>
                       </div>
                     ))}
                   </div>
@@ -164,7 +164,7 @@ export function EditorLatexEditor({ initialValue = '', onClose, onSave }: {
               </div>
             </div>
           </div>
-          <div className="flex h-[50px] items-end justify-end gap-2.5">
+          <div className="flex h-12.5 items-end justify-end gap-2.5">
             <Button onClick={onClose} size="editor" variant="outline">{t('foundation.editor.latex.cancel')}</Button>
             <Button onClick={confirm} size="editor">{t('foundation.editor.latex.confirm')}</Button>
           </div>

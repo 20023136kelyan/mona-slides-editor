@@ -3,6 +3,7 @@ import { SVGPathData, SVGPathDataTransformer } from 'svg-pathdata'
 import type {
   ChartItem,
   Element as PptxElement,
+  EmbeddedFont as EmbeddedPptxFont,
   Fill as PptxFill,
   Shape as PptxShape,
   Slide as ParsedSlide,
@@ -49,6 +50,8 @@ import { renderLatex } from '@/features/editor/editor-latex'
 export { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
 
 export interface ParsedPptxPresentation {
+  /** Absent only in hand-built fixtures; the parser always reports it. */
+  embeddedFonts?: EmbeddedPptxFont[]
   slides: ParsedSlide[]
   themeColors: string[]
   usedFonts: string[]
@@ -75,6 +78,13 @@ const retainStructuredText = (
       scale,
     }
   : undefined
+
+// A picture bullet points at an image part that the structured-text parser does
+// not resolve, so the marker falls back to a disc. That is a downgrade, and it
+// is reported rather than left to look authored.
+const hasPictureBullet = (body: StructuredTextBody | undefined): boolean => Boolean(
+  body?.paragraphs.some(paragraph => paragraph.properties?.bullet?.type === 'picture'),
+)
 
 const getTextNodeStyleSpan = (textNode: Text, styleProp: 'color' | 'fontSize') => {
   let parent = textNode.parentElement
@@ -625,6 +635,9 @@ export const convertParsedPptxPresentation = ({
           if (metrics.margin) text.paragraphSpace = metrics.margin
           pushElement(text)
           disposition = 'approximated'
+          if (hasPictureBullet(structuredText)) {
+            issue = { code: 'pptx.bullet.picture-unsupported', message: 'Picture bullets are not resolved; the paragraph falls back to a disc marker' }
+          }
         }
         else if (element.type === 'image') {
           const image: PPTImageElement = {
@@ -635,7 +648,16 @@ export const convertParsedPptxPresentation = ({
           const clipShapes = ['rect', 'snip1Rect', 'snip2DiagRect', 'roundRect', 'ellipse', 'triangle', 'rtTriangle', 'diamond', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'chevron', 'homePlate', 'rightArrow', 'parallelogram', 'trapezoid']
           let geometry = element.geom || 'rect'
           if (geometry.includes('custom:')) geometry = geometry.replace('custom:', '')
-          if (!clipShapes.includes(geometry)) geometry = 'rect'
+          if (!clipShapes.includes(geometry)) {
+            // The picture still imports at the right bounds, but its mask is
+            // squared off. Silently swapping a star-cropped photo for a
+            // rectangle is exactly the kind of loss the report exists to name.
+            issue = {
+              code: 'pptx.image.unsupported-mask',
+              message: `Picture mask ${geometry} has no Mona clip path; the image is cropped to its bounding rectangle instead`,
+            }
+            geometry = 'rect'
+          }
           if (element.rect) image.clip = { range: [[element.rect.l || 0, element.rect.t || 0], [100 - (element.rect.r || 0), 100 - (element.rect.b || 0)]], shape: geometry }
           else if (element.geom) image.clip = { range: [[0, 0], [100, 100]], shape: geometry }
           if (element.link) image.link = { target: element.link, type: 'web' }
@@ -727,6 +749,10 @@ export const convertParsedPptxPresentation = ({
               outline: { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) },
               path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
               pattern: element.fill?.type === 'image' ? element.fill.value.base64 : undefined,
+              // Canva and other web editors paint pictures as shape fills
+              // rather than picture elements, so the fill mode decides whether
+              // the artwork is stretched to the shape or cropped by it.
+              patternFit: element.fill?.type === 'image' ? element.fill.value.fit : undefined,
               powerPointPattern: element.fill?.type === 'pattern'
                 ? {
                     backgroundColor: element.fill.value.backgroundColor,
@@ -809,6 +835,9 @@ export const convertParsedPptxPresentation = ({
               destination.viewBox = maxX / maxY > originWidth / originHeight ? [maxX, maxX * originHeight / originWidth] : [maxY * originWidth / originHeight, maxY]
             }
             if (destination.path && destination.viewBox[0] && destination.viewBox[1]) pushElement(destination)
+            if (hasPictureBullet(structuredText)) {
+              issue = { code: 'pptx.bullet.picture-unsupported', message: 'Picture bullets are not resolved; the paragraph falls back to a disc marker' }
+            }
           }
           disposition = destinationElements.length > outputCountBefore ? 'approximated' : 'dropped'
           if (disposition === 'dropped') {
@@ -817,7 +846,8 @@ export const convertParsedPptxPresentation = ({
         }
         else if (element.type === 'table') {
           const baseStyle: TableCellStyle = { color: slideTheme.fontColor, fontname: slideTheme.fontName }
-          const data: TableCell[][] = element.data.map(row => row.map(cell => {
+          const tableId = sourceIdentity?.stableId ?? createPresentationId(10)
+          const data: TableCell[][] = element.data.map((row, rowIndex) => row.map((cell, columnIndex) => {
             const container = document.createElement('div')
             container.innerHTML = cell.text
             const paragraph = container.querySelector('p')
@@ -833,11 +863,17 @@ export const convertParsedPptxPresentation = ({
                 width: +((border.borderWidth ?? 0) * ratio).toFixed(2),
               },
             ])) as TableCell['borders']
+            const structuredText = retainStructuredText(
+              cell.textBody,
+              `${tableId}/cell/r${rowIndex}c${columnIndex}`,
+              ratio,
+            )
             return {
               borders,
               colspan: cell.colSpan || 1,
               id: createPresentationId(10),
               rowspan: cell.rowSpan || 1,
+              ...(structuredText ? { structuredText } : {}),
               style: {
                 ...baseStyle,
                 align: ['left', 'right', 'center'].includes(alignment) ? alignment as 'center' | 'left' | 'right' : 'left',
@@ -929,6 +965,12 @@ export const convertParsedPptxPresentation = ({
           options.title = element.title || undefined
           options.valueAxisTitle = element.valueAxisTitle || undefined
           const importedBarDirection = 'barDir' in element ? element.barDir : undefined
+          // Chart families Mona has no equivalent for. They still import with
+          // their retained series so the data stays visible and editable, but
+          // the drawn marks are not the source family and the report has to
+          // say so rather than presenting a candlestick as a bar chart.
+          const unmodelledChartTypes = new Set(['stockChart', 'surface3DChart', 'surfaceChart'])
+          const unmodelled = new Set<string>()
           const mapChartType = (value: string): ChartType => {
             if (value === 'barChart' || value === 'bar3DChart') return importedBarDirection === 'bar' ? 'column' : 'bar'
             if (value === 'lineChart' || value === 'line3DChart') return 'line'
@@ -937,11 +979,13 @@ export const convertParsedPptxPresentation = ({
             if (value === 'pieChart' || value === 'pie3DChart') return 'pie'
             if (value === 'radarChart') return 'radar'
             if (value === 'doughnutChart') return 'ring'
+            unmodelled.add(value)
             return 'bar'
           }
           if (element.seriesChartTypes?.length) {
             options.seriesTypes = element.seriesChartTypes.map(mapChartType)
           }
+          if (unmodelledChartTypes.has(element.chartType)) unmodelled.add(element.chartType)
           let chartType: ChartType = 'bar'
           switch (element.chartType) {
             case 'barChart': case 'bar3DChart': chartType = element.barDir === 'bar' ? 'column' : 'bar'; if (['stacked', 'percentStacked'].includes(element.grouping || '')) options.stack = true; if (element.grouping === 'percentStacked') options.percentStacked = true; break
@@ -954,6 +998,12 @@ export const convertParsedPptxPresentation = ({
           }
           pushElement({ chartType, data: { labels, legends, series }, height: element.height, id: createPresentationId(10), left: element.left, options, rotate: element.rotate ?? 0, textColor: slideTheme.fontColor, themeColors: element.colors.filter(Boolean).length ? element.colors.filter(Boolean) : slideTheme.themeColors, top: element.top, type: 'chart', width: element.width })
           disposition = 'approximated'
+          if (unmodelled.size) {
+            issue = {
+              code: 'pptx.chart.unsupported-type',
+              message: `PowerPoint chart type ${[...unmodelled].sort().join(', ')} has no Mona chart family; its series are retained but drawn as ${chartType}`,
+            }
+          }
         }
         else if (element.type === 'group') {
           const children: PPTElement[] = []

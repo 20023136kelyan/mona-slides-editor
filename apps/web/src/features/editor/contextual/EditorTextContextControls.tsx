@@ -64,7 +64,7 @@ export function EditorRichTextContextControls({
     <>
       <InspectorSelect
         ariaLabel={t('foundation.editor.text.fontFamily')}
-        className={`${contextualGhostSelect} w-[110px] mr-px`}
+        className={`${contextualGhostSelect} w-27.5 mr-px`}
         onChange={value => execute({ command: 'fontname', value })}
         options={[{ label: t('common.defaultFont'), value: '' }, ...editorFontOptions]}
         search
@@ -73,7 +73,7 @@ export function EditorRichTextContextControls({
       />
       <InspectorSelect
         ariaLabel={t('foundation.editor.text.fontSize')}
-        className={`${contextualGhostSelect} w-[80px]`}
+        className={`${contextualGhostSelect} w-20`}
         onChange={value => execute({ command: 'fontsize', value })}
         options={editorFontSizeOptions}
         search
