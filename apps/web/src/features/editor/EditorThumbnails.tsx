@@ -544,7 +544,7 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
           const editing = !!editingSectionId && (editingSectionId === sectionId || (index === 0 && editingSectionId === 'default'))
           return (
             <div
-              className="mona-thumbnail-container"
+              className="mona-thumbnail-container group/tile"
               data-id={slide.id}
               key={slide.id}
             >
@@ -594,12 +594,12 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                   )}
                 </div>
               ) : null}
-              <div className="mona-thumbnail-visual">
+              <div className="mona-thumbnail-visual has-[.mona-thumbnail-item.is-selected]:[&_.mona-thumbnail-note-flag]:bg-[var(--editor-selection)]">
                 <Button
                   aria-label={`${t('foundation.editor.showSlide', { number: index + 1 })}${slide.title ? `: ${slide.title}` : ''}`}
                   aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight Shift+F10"
                   aria-pressed={selectedIndexes.includes(index)}
-                  className={`mona-thumbnail-item${index === presentation.slideIndex ? ' is-active' : ''}${selectedIndexes.includes(index) ? ' is-selected' : ''}${slide.hidden ? ' is-hidden' : ''}`}
+                  className={`mona-thumbnail-item relative flex cursor-grab flex-col items-start border-0 bg-transparent p-0 active:cursor-grabbing${index === presentation.slideIndex ? ' is-active' : ''}${selectedIndexes.includes(index) ? ' is-selected' : ''}${slide.hidden ? ' is-hidden' : ''} [&_.mona-scaled-slide]:overflow-hidden [&_.mona-scaled-slide]:rounded-[var(--radius-surface)] [&_.mona-scaled-slide]:shadow-[0_0_0_1px_rgb(16_18_25/7%)] [&_.mona-scaled-slide]:transition-[box-shadow] [&_.mona-scaled-slide]:duration-120 hover:[&_.mona-scaled-slide]:shadow-[0_0_0_1.5px_rgb(16_18_25/25%)] [&.is-active_.mona-scaled-slide]:shadow-[0_0_0_2px_#fff,0_0_0_4px_rgb(16_18_25/85%)] [&.is-selected_.mona-scaled-slide]:shadow-[0_0_0_2px_#fff,0_0_0_4px_rgb(16_18_25/85%)] [&.is-active_.mona-thumbnail-label]:text-[rgb(16_18_25)] [&.is-hidden_.mona-scaled-slide]:opacity-55 [&.is-hidden_.mona-scaled-slide]:grayscale-[0.25]`}
                   onContextMenu={event => openContextMenu(event, 'slide')}
                   onDoubleClick={() => onStartSlideshow(true)}
                   onKeyDown={event => handleThumbnailKeyDown(event, index)}
@@ -610,14 +610,14 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                   variant={null}
                 >
                   <FilmstripThumbnailPreview slide={slide} sourcePackages={presentation.sourcePackages} theme={presentation.theme} viewportRatio={presentation.viewportRatio} viewportSize={presentation.viewportSize} visible={index < slidesLoadLimit} />
-                  <div className="mona-thumbnail-label absolute bottom-1 left-1 z-[1] rounded-[var(--radius-detail)] bg-[rgb(16_18_25/72%)] px-1 text-[10px] font-semibold leading-[14px] text-white">{index + 1}</div>
+                  <div className="mona-thumbnail-label absolute bottom-1 left-1 z-[1] cursor-grab rounded-[var(--radius-control)] bg-white px-[5px] text-[10px] font-semibold leading-4 text-[rgb(16_18_25/80%)] shadow-[0_0_0_0.5px_rgb(16_18_25/10%),0_1px_2px_rgb(16_18_25/8%)] active:cursor-grabbing">{index + 1}</div>
                   {slide.hidden ? <div aria-label={t('foundation.editor.statusBar.hidden')} className="mona-thumbnail-hidden-flag absolute top-1 left-1 z-[2] inline-flex h-[18px] items-center gap-0.5 rounded-[var(--radius-control)] bg-white/92 px-1.5 text-[9px] font-semibold text-[rgb(16_18_25/70%)] shadow-[0_0_0_0.5px_rgb(16_18_25/10%)] [&_svg]:size-[11px]"><EyeOff /></div> : null}
                   {slide.durationMs ? <div aria-label={t('foundation.editor.statusBar.duration')} className="mona-thumbnail-duration-flag absolute top-1 right-1 z-[2] inline-flex h-[18px] items-center gap-0.5 rounded-[var(--radius-control)] bg-white/92 px-1.5 text-[9px] font-semibold text-[rgb(16_18_25/70%)] shadow-[0_0_0_0.5px_rgb(16_18_25/10%)] [&_svg]:size-[11px]"><Clock3 />{slide.durationMs / 1000}s</div> : null}
                 </Button>
                 {slide.notes?.length ? (
                   <Button
                     aria-label={`${t('foundation.editor.thumbnails.notes')}: ${t('foundation.editor.showSlide', { number: index + 1 })}${slide.title ? `, ${slide.title}` : ''}`}
-                    className="mona-thumbnail-note-flag"
+                    className="mona-thumbnail-note-flag absolute top-1 right-1 z-[3] h-3 min-h-3 w-4 min-w-4 rounded-[var(--radius-detail)] bg-[var(--editor-selection-strong)] p-0 text-center text-[8px] font-semibold leading-3 text-white hover:bg-[var(--editor-selection)] hover:text-white focus-visible:bg-[var(--editor-selection)]"
                     onClick={event => {
                       event.stopPropagation()
                       focusSlide(index)
@@ -629,9 +629,10 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                 ) : null}
               </div>
               {index < presentation.slides.length - 1 ? (
-                <div className="mona-page-boundary-actions" role="group">
+                <div className="mona-page-boundary-actions absolute top-1/2 right-0 z-[6] flex w-[26px] translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[var(--radius-action)] border border-[rgb(16_18_25/12%)] bg-white opacity-0 shadow-[0_1px_4px_rgb(16_18_25/18%)] transition-opacity duration-120 group-hover/tile:z-[7] group-hover/tile:opacity-100 focus-within:z-[7] focus-within:opacity-100" role="group">
                   <Button
                     aria-label={t('foundation.editor.statusBar.transitionBoundary', { from: index + 1, to: index + 2 })}
+                    className="inline-flex size-[26px] flex-none rounded-none border-0 bg-transparent text-[rgb(16_18_25/80%)] shadow-none hover:bg-[rgb(16_18_25/4%)] hover:text-[rgb(16_18_25)] [&_svg]:size-3.5"
                     onClick={event => {
                       event.stopPropagation()
                       onOpenTransition(index + 1)
@@ -643,6 +644,7 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
                   ><BetweenHorizontalEnd /></Button>
                   <Button
                     aria-label={t('foundation.editor.statusBar.insertAfter', { number: index + 1 })}
+                    className="inline-flex size-[26px] flex-none rounded-none border-0 border-t border-[rgb(16_18_25/12%)] bg-transparent text-[rgb(16_18_25/80%)] shadow-none hover:bg-[rgb(16_18_25/4%)] hover:text-[rgb(16_18_25)] [&_svg]:size-3.5"
                     onClick={event => {
                       event.stopPropagation()
                       runtime.focusSlide(index)
@@ -660,7 +662,7 @@ export const EditorThumbnails = memo(function EditorThumbnails({ runtime, onOpen
         })}
         <Button
           aria-label={t('foundation.editor.thumbnails.addSlide')}
-          className="mona-filmstrip-add"
+          className="mona-filmstrip-add m-[5px_0_5px_5px] flex-none rounded-[var(--radius-surface)] border-0 bg-[#e7e9ee] text-[15px] text-[rgb(16_18_25/70%)] hover:bg-[#dde0e6] hover:text-[rgb(16_18_25)]"
           onClick={() => runtime.createSlide()}
           size="editor-icon"
           style={{ height: Math.round(128 * presentation.viewportRatio), width: 128 }}

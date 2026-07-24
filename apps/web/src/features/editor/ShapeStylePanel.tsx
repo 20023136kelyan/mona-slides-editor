@@ -16,14 +16,7 @@ import { SHAPE_LIST, SHAPE_PATH_FORMULAS } from '@mona/presentation-core/shape-p
 import type { Gradient, GradientColor, GradientType, PPTShapeElement, ShapeText, TextInset } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import {
-  InspectorButton,
-  InspectorButtonGroup,
-  InspectorColorButton,
-  InspectorNumberInput,
-  InspectorSelect,
-  InspectorSlider,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorSelect, InspectorSlider, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
 import {
   ElementFlipControls,
   ElementOpacityControl,
@@ -240,7 +233,7 @@ export function ShapeStylePanel({
         ))}
       </div>
 
-      <div className="mona-panel-split-row mona-shape-fill-row">
+      <div className="mona-shape-fill-row mb-2.5 flex w-full items-center gap-0">
         <div className="mona-shape-fill-control"><InspectorSelect<FillType> ariaLabel={t('foundation.editor.shape.fillType')} onChange={changeFillType} options={[
           { label: t('foundation.editor.shape.solidFill'), value: 'fill' },
           { label: t('foundation.editor.shape.gradientFill'), value: 'gradient' },
@@ -276,34 +269,34 @@ export function ShapeStylePanel({
       ) : null}
 
       <ElementFlipControls element={element} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       {element.text?.content ? (
         <>
           <RichTextBaseControls element={element} runtime={runtime} />
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
           <PropertyRow label={t('foundation.editor.text.lineSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.lineSpacing')} icon={<RowHeightIcon />} onChange={value => updateText({ lineHeight: value })} options={lineHeightOptions} value={element.text.lineHeight || 1.5} /></PropertyRow>
           <PropertyRow label={t('foundation.editor.text.paragraphSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.paragraphSpacing')} icon={<VerticalSpacingIcon />} onChange={value => updateText({ paragraphSpace: value })} options={paragraphSpaceOptions} value={element.text.paragraphSpace === undefined ? 5 : element.text.paragraphSpace} /></PropertyRow>
           <PropertyRow label={t('foundation.editor.text.letterSpacing')}><InspectorSelect ariaLabel={t('foundation.editor.text.letterSpacing')} icon={<FullwidthIcon />} onChange={value => updateText({ wordSpace: value })} options={wordSpaceOptions} value={element.text.wordSpace || 0} /></PropertyRow>
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
           <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets"><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginTop')} label={t('foundation.editor.text.marginTop')} max={50} min={0} onChange={value => updateInset(0, value)} value={inset[0]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginBottom')} label={t('foundation.editor.text.marginBottom')} max={50} min={0} onChange={value => updateInset(2, value)} value={inset[2]} /></div>
           <div className="grid w-full grid-cols-2 items-center gap-2.5 mb-2.5 is-insets"><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginLeft')} label={t('foundation.editor.text.marginLeft')} max={50} min={0} onChange={value => updateInset(3, value)} value={inset[3]} /><InspectorNumberInput ariaLabel={t('foundation.editor.text.marginRight')} label={t('foundation.editor.text.marginRight')} max={50} min={0} onChange={value => updateInset(1, value)} value={inset[1]} /></div>
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
           <InspectorButtonGroup className="flex w-full items-center mb-2.5">
             <InspectorButton active={(element.text.align || 'middle') === 'top'} ariaLabel={t('foundation.editor.text.alignTop')} onClick={() => updateText({ align: 'top' })} style={{ flex: 1 }}><AlignTopIcon /></InspectorButton>
             <InspectorButton active={(element.text.align || 'middle') === 'middle'} ariaLabel={t('foundation.editor.text.alignMiddle')} onClick={() => updateText({ align: 'middle' })} style={{ flex: 1 }}><AlignMiddleIcon /></InspectorButton>
             <InspectorButton active={(element.text.align || 'middle') === 'bottom'} ariaLabel={t('foundation.editor.text.alignBottom')} onClick={() => updateText({ align: 'bottom' })} style={{ flex: 1 }}><AlignBottomIcon /></InspectorButton>
           </InspectorButtonGroup>
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
         </>
       ) : null}
 
       <ElementOutlineControls element={element} presentation={presentation} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <ElementOpacityControl element={element} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <InspectorButton active={Boolean(painter)} ariaLabel={t('foundation.editor.shape.formatPainter')} onClick={() => runtime.shapeFormatPainter.toggle(element)} onDoubleClick={() => runtime.shapeFormatPainter.toggle(element, true)} style={{ width: '100%' }}><FormatBrushIcon /> {t('foundation.editor.shape.formatPainter')}</InspectorButton>
     </div>
   )

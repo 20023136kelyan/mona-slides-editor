@@ -22,11 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Toggle } from '@/components/ui/toggle'
 import { EditorLayersPanel } from '@/features/editor/EditorLayersPanel'
-import {
-  InspectorButton,
-  InspectorButtonGroup,
-  InspectorNumberInput,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, InspectorNumberInput, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
 import {
   alignElementsToCanvas,
   orderElement,
@@ -127,7 +123,7 @@ export function ElementPositionPanel({
         <InspectorButton ariaLabel={t('foundation.editor.position.moveBackward')} onClick={() => order('down')} style={{ flex: 1 }}><SentToBackIcon /> {t('foundation.editor.position.moveBackward')}</InspectorButton>
       </InspectorButtonGroup>
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <div className="mona-position-title">{t('foundation.editor.position.alignment')}</div>
       <InspectorButtonGroup className="mona-position-row">
@@ -141,7 +137,7 @@ export function ElementPositionPanel({
         <InspectorButton ariaLabel={t('foundation.editor.position.alignBottom')} onClick={() => align('bottom')} style={{ flex: 1 }}><AlignBottomIcon /></InspectorButton>
       </InspectorButtonGroup>
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <div className="mona-position-row">
         <InspectorNumberInput ariaLabel={t('foundation.editor.position.x')} label={t('foundation.editor.position.x')} min={-1000} onChange={value => update({ left: value })} step={5} style={{ width: '45%' }} value={left} />
@@ -203,7 +199,7 @@ export function ElementPositionPanel({
 
       {!['audio', 'line', 'video'].includes(element.type) ? (
         <>
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
           <div className="mona-position-row">
             <InspectorNumberInput ariaLabel={t('foundation.editor.position.rotation')} label={t('foundation.editor.position.rotation')} max={180} min={-180} onChange={value => update({ rotate: value } as Partial<PPTElement>)} step={5} style={{ width: '45%' }} value={rotate} />
             <div style={{ width: '7%' }} />

@@ -84,7 +84,8 @@
 .mona-agent-suggestions[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 .mona-agent-suggestions[data-fade-start][data-fade-end] { mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
 
-/* GEOMETRY: contextual toolbar floats over the stage; pill chrome is Tailwind on the component. */
+/* GEOMETRY: contextual toolbar floats over the stage; pill chrome + controls
+   are Tailwind on the component / contextual-control-styles.ts. */
 .mona-editor-contextbar {
   position: absolute;
   z-index: 30;
@@ -93,83 +94,6 @@
   left: 0;
   pointer-events: none;
 }
-.mona-contextual-toolbar-group { pointer-events: auto; }
-
-.mona-contextual-controls {
-  position: static;
-  display: flex;
-  box-sizing: border-box;
-  width: max-content;
-  height: 34px;
-  flex: none;
-  align-items: center;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  color: #41464b;
-  box-shadow: none;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-  line-height: normal;
-  text-size-adjust: auto;
-  visibility: visible;
-}
-.mona-contextual-deep-actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 2px;
-  margin-left: 5px;
-  border-left: 1px solid var(--border);
-  padding-left: 5px;
-}
-.mona-contextual-toolbar-group > .mona-contextual-deep-actions:first-child {
-  margin-left: 0;
-  border-left: 0;
-  padding-left: 0;
-}
-.mona-contextual-kind-icon,
-.mona-contextual-selection-label {
-  display: inline-flex;
-  height: 30px;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  color: rgb(16 18 25 / 70%);
-}
-.mona-contextual-kind-icon { width: 28px; justify-content: center; }
-.mona-contextual-kind-icon svg,
-.mona-contextual-selection-label svg { width: 16px; height: 16px; }
-.mona-contextual-selection-label {
-  border-right: 1px solid var(--border);
-  padding: 0 10px 0 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.mona-contextual-child-badge {
-  display: inline-flex;
-  height: 24px;
-  flex: none;
-  align-items: center;
-  margin-right: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--muted);
-  padding: 0 8px;
-  color: var(--muted-foreground);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.mona-contextual-transparency-popover {
-  display: flex;
-  width: 220px;
-  flex-direction: column;
-  gap: 10px;
-  padding: 6px;
-  color: var(--foreground);
-  font-size: 12px;
-}
-.mona-contextual-transparency-popover .mona-panel-slider { width: 100%; }
 
 /* Bottom bar, Canva-style: no surface of its own — the workspace color
    runs through it; the filmstrip row on top, then a slim status bar. */
@@ -240,25 +164,12 @@
 }
 .mona-thumbnail-visual {
   /* Padding absorbs the selection ring so content-visibility doesn't clip it. */
+  position: relative;
   padding: 5px;
   content-visibility: auto;
   contain-intrinsic-size: auto 138px auto 82px;
 }
-
-.mona-thumbnail-visual,
-.mona-thumbnail-item {
-  position: relative;
-}
-.mona-thumbnail-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: grab;
-}
-.mona-thumbnail-item:active { cursor: grabbing; }
+/* Sortable + drop-marker geometry — keep in CSS (e2e / drag contract). */
 .mona-thumbnail-container.is-drag-chosen { opacity: .72; }
 .mona-thumbnail-container.is-dragging { cursor: grabbing; opacity: .92; }
 .mona-thumbnail-container.is-drag-ghost { opacity: .32; }
@@ -276,150 +187,6 @@
 .mona-thumbnail-container.is-drop-target[data-drop-side="before"]::before { left: 0; }
 .mona-thumbnail-container.is-drop-target[data-drop-side="after"]::before { right: 0; }
 .mona-thumbnail-list.is-drag-cancelled .mona-thumbnail-container { transition-duration: 100ms; }
-.mona-thumbnail-item .mona-scaled-slide {
-  /* Canva page tiles: genuinely rounded artwork (clipped), no border at
-     rest — just a hairline ring so white slides keep definition. Rings are
-     box-shadows: they follow the radius exactly, so no notched corners. */
-  overflow: hidden;
-  border-radius: var(--radius-surface);
-  outline: 0;
-  box-shadow: 0 0 0 1px rgb(16 18 25 / 7%);
-  transition: box-shadow 120ms ease;
-}
-.mona-thumbnail-item:hover .mona-scaled-slide { box-shadow: 0 0 0 1.5px rgb(16 18 25 / 25%); }
-.mona-thumbnail-item.is-active .mona-scaled-slide,
-.mona-thumbnail-item.is-selected .mona-scaled-slide {
-  /* Dark ring with a white gap, like Canva's selected page. */
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgb(16 18 25 / 85%);
-}
-.mona-thumbnail-item.is-active .mona-thumbnail-label { color: rgb(16 18 25); }
-.mona-thumbnail-item.is-active .mona-scaled-slide,
-.mona-thumbnail-item.is-selected .mona-scaled-slide { outline-color: var(--editor-selection); }
-.mona-thumbnail-item.is-hidden .mona-scaled-slide {
-  opacity: .55;
-  filter: grayscale(.25);
-}
-/* Canva keeps the page number INSIDE the tile, bottom-left, on a small
-   white badge so it stays legible over any slide art. */
-.mona-thumbnail-label {
-  position: absolute;
-  z-index: 1;
-  bottom: 4px;
-  left: 4px;
-  border-radius: var(--radius-control);
-  background: #fff;
-  box-shadow: 0 0 0 .5px rgb(16 18 25 / 10%), 0 1px 2px rgb(16 18 25 / 8%);
-  padding: 0 5px;
-  color: rgb(16 18 25 / 80%);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  cursor: grab;
-}
-.mona-thumbnail-label:active { cursor: grabbing; }
-.mona-thumbnail-note-flag {
-  position: absolute;
-  z-index: 3;
-  top: 4px;
-  right: 4px;
-  min-width: 16px;
-  width: 16px;
-  height: 12px;
-  min-height: 12px;
-  border-radius: var(--radius-detail);
-  background: var(--editor-selection-strong);
-  padding: 0;
-  color: #fff;
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 12px;
-  text-align: center;
-  cursor: pointer;
-}
-.mona-thumbnail-note-flag:hover,
-.mona-thumbnail-note-flag:focus-visible { background: var(--editor-selection); color: #fff; }
-.mona-thumbnail-visual:has(.mona-thumbnail-item.is-selected) .mona-thumbnail-note-flag { background: var(--editor-selection); }
-.mona-thumbnail-hidden-flag,
-.mona-thumbnail-duration-flag {
-  position: absolute;
-  z-index: 2;
-  top: 4px;
-  display: inline-flex;
-  height: 18px;
-  align-items: center;
-  gap: 3px;
-  border-radius: var(--radius-control);
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 0 0 .5px rgb(16 18 25 / 10%);
-  padding: 0 5px;
-  color: rgb(16 18 25 / 70%);
-  font-size: 9px;
-  font-weight: 600;
-}
-.mona-thumbnail-hidden-flag { left: 4px; }
-.mona-thumbnail-duration-flag { right: 4px; }
-.mona-thumbnail-hidden-flag svg,
-.mona-thumbnail-duration-flag svg { width: 11px; height: 11px; }
-.mona-page-boundary-actions {
-  position: absolute;
-  z-index: 6;
-  top: 50%;
-  /* Container right edge ≈ midpoint of the gutter between this tile and the
-     next; translate centers the stack on that seam so each control overlaps
-     both slides equally. */
-  right: 0;
-  display: flex;
-  width: 26px;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid rgb(16 18 25 / 12%);
-  border-radius: var(--radius-action);
-  background: #fff;
-  box-shadow: 0 1px 4px rgb(16 18 25 / 18%);
-  opacity: 0;
-  transform: translate(50%, -50%);
-  transition: opacity 120ms ease;
-}
-.mona-thumbnail-container:hover .mona-page-boundary-actions,
-.mona-page-boundary-actions:focus-within {
-  z-index: 7;
-  opacity: 1;
-}
-.mona-page-boundary-actions button {
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: rgb(16 18 25 / 80%);
-}
-.mona-page-boundary-actions button + button {
-  border-top: 1px solid rgb(16 18 25 / 12%);
-}
-.mona-page-boundary-actions button:hover {
-  background: rgb(16 18 25 / 4%);
-  color: rgb(16 18 25);
-}
-.mona-page-boundary-actions button svg { width: 14px; height: 14px; }
-/* Last item of the scrollable row: sized inline to the exact tile geometry
-   (128 × 128·viewportRatio), so it always matches the thumbnails' shape. */
-.mona-filmstrip-add {
-  flex: none;
-  border: 0;
-  border-radius: var(--radius-surface);
-  /* One step deeper than the workspace so the tile reads on #f3f4f7. */
-  background: #e7e9ee;
-  color: rgb(16 18 25 / 70%);
-  font-size: 15px;
-  /* Level with the tiles inside their containers' 5px ring padding. */
-  margin: 5px 0 5px 5px;
-}
-.mona-filmstrip-add:hover { background: #dde0e6; color: rgb(16 18 25); }
 
 .mona-page-settings {
   display: flex;
@@ -913,88 +680,6 @@
   top: 0;
   left: 0;
 }
-.mona-contextual-control-row {
-  display: inline-flex;
-  width: max-content;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-.mona-contextual-controls * {
-  border-style: none;
-  border-color: currentcolor;
-  outline-color: currentcolor;
-}
-.mona-contextual-border-panel { width: 218px; user-select: none; }
-.mona-contextual-border-panel .mona-panel-row:last-child { margin-bottom: 0; }
-.mona-contextual-line-style-list {
-  display: flex;
-  width: 98px;
-  flex-direction: column;
-  gap: 4px;
-}
-.mona-contextual-line-style-list > button {
-  height: 32px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 0 10px;
-  color: #41464b;
-  cursor: pointer;
-}
-.mona-contextual-line-style-list > button:hover { background: var(--editor-selection-subtle); }
-.mona-contextual-line-style-list > button.is-active { color: var(--editor-selection); }
-.mona-contextual-line-width { width: 120px; flex-shrink: 0; padding: 0 8px; }
-.mona-contextual-text-color {
-  width: 15px;
-  height: 4px;
-  margin-top: 1px;
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAAXNSR0IArs4c6QAAACdJREFUGFdjfPbs2X8GBgYGSUlJEMXAiCHw//9/sIrnz59DVKALAADNxxVfaiODNQAAAABJRU5ErkJggg==);
-}
-.mona-contextual-text-color.is-white { height: 5px; border: 1px solid #ddd; }
-.mona-contextual-text-color > span { display: block; width: 100%; height: 100%; }
-.mona-contextual-divider { width: 1px; height: 18px; flex-shrink: 0; margin: 0 4px; background: #e5e7eb; }
-.mona-table-command-menu { width: 100px; }
-.mona-table-command-menu > button {
-  display: block;
-  width: 100%;
-  height: 30px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 0 10px;
-  color: #41464b;
-  font-family: inherit;
-  font-size: 13px;
-  text-align: center;
-  cursor: pointer;
-}
-.mona-table-command-menu > button:hover { background: #f1f1f1; }
-.mona-contextual-controls .mona-panel-select {
-  height: 30px;
-  border: 0;
-  background: #f9f9f9;
-}
-.mona-contextual-controls .mona-panel-select-label { height: 30px; line-height: 30px; }
-.mona-contextual-controls .mona-panel-select-icon { height: 30px; line-height: normal; }
-.mona-contextual-controls .i-icon {
-  flex-shrink: 1;
-  border-style: none;
-  border-color: currentcolor;
-  tab-size: 8;
-  -webkit-tap-highlight-color: rgb(0 0 0 / 18%);
-}
-.mona-contextual-controls .i-icon * { box-sizing: content-box; }
-/* Inside the pill every control is a ghost: the select triggers drop their
-   field chrome and pick up the shared hover wash instead. */
-.mona-contextual-controls .mona-panel-select {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-.mona-contextual-controls .mona-panel-select:hover { background: rgb(15 16 21 / 6%); }
-.mona-contextual-controls .mona-panel-select[data-state="open"] { background: rgb(15 16 21 / 8%); }
-
 .mona-element-hit-target {
   position: absolute;
   border: 0;
@@ -1345,75 +1030,6 @@
   text-size-adjust: auto;
   -webkit-tap-highlight-color: rgb(0 0 0 / 18%);
 }
-.mona-animation-pool-tabs {
-  display: flex;
-  height: auto;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #d9d9d9;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  font-size: 13px;
-  line-height: 1;
-  user-select: none;
-}
-.mona-animation-pool-tabs > button {
-  width: 33.333%;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 8px 10px;
-  color: #333;
-  cursor: pointer;
-  font: inherit;
-  text-align: center;
-}
-.mona-animation-pool-tabs > button[data-state="active"] { border-bottom-color: var(--animation-color); box-shadow: none; }
-.mona-animation-pool {
-  position: relative;
-  width: 400px;
-  height: 500px;
-  overflow: hidden auto;
-  margin-right: -10px;
-  padding-right: 5px;
-  font-size: 12px;
-}
-.mona-animation-pool-mask { position: absolute; inset: 0; }
-.mona-animation-pool-group:not(:last-child) { margin-bottom: 5px; }
-.mona-animation-pool-title {
-  width: 100%;
-  margin-bottom: 10px;
-  border-left: 4px solid #aaa;
-  border-top-style: none;
-  border-right-style: none;
-  border-bottom-style: none;
-  border-top-color: #41464b;
-  border-right-color: #41464b;
-  border-bottom-color: #41464b;
-  outline-color: #41464b;
-  background: #eee;
-  padding: 4px 0 4px 10px;
-  font-size: 13px;
-}
-.mona-animation-pool.is-in .mona-animation-pool-title { border-left-color: #68a490; background: rgba(104, 164, 144, .15); }
-.mona-animation-pool.is-out .mona-animation-pool-title { border-left-color: #d86344; background: rgba(216, 99, 68, .15); }
-.mona-animation-pool.is-attention .mona-animation-pool-title { border-left-color: #e8b76a; background: rgba(232, 183, 106, .15); }
-.mona-animation-pool-items { display: flex; flex-wrap: wrap; align-content: flex-start; }
-.mona-animation-pool-item {
-  width: 24%;
-  height: 40px;
-  margin-bottom: 5px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #41464b;
-  cursor: pointer;
-  font: inherit;
-  line-height: 40px;
-  text-align: center;
-}
-.mona-animation-pool-item:not(:nth-child(4n)) { margin-right: 1.333333%; }
-.mona-animation-pool-item > span { display: block; border-radius: var(--radius-control); background: #f9f9f9; }
 .mona-animation-sequence {
   flex: 1;
   overflow: auto;
@@ -1445,7 +1061,6 @@
   cursor: pointer;
   font-size: inherit;
 }
-.mona-animation-configs > .mona-panel-divider { margin: 16px 0; }
 .mona-animation-config-row { display: flex; align-items: center; }
 .mona-animation-config-row + .mona-animation-config-row { margin-top: 5px; }
 .mona-animation-config-row > .mona-panel-button { width: 100%; }
@@ -1601,7 +1216,6 @@
 .mona-shape-thumbnail:hover path:not(.is-outlined) { stroke: var(--editor-selection); }
 .mona-shape-thumbnail:hover path.is-outlined { fill: var(--editor-selection); }
 
-.mona-panel-split-row.mona-shape-fill-row { display: flex; gap: 0; }
 .mona-shape-fill-control { min-width: auto; flex: 1 1 0%; }
 .mona-shape-fill-control > * { width: 100%; }
 .mona-shape-fill-spacer { width: 10px; }
@@ -1724,12 +1338,6 @@
 .mona-text-preset.is-caption-one { font-size: 12px; font-style: italic; }
 .mona-text-preset.is-caption-two { font-size: 12px; text-decoration: underline; }
 
-.mona-panel-divider {
-  width: 100%;
-  margin: 24px 0;
-  border-block-start: 1px solid rgb(5 5 5 / 6%);
-}
-
 .mona-panel-popover-content {
   z-index: 9999;
   box-sizing: border-box;
@@ -1790,19 +1398,6 @@
   vertical-align: middle;
   background: currentColor;
 }
-
-.mona-panel-popover-menu-item {
-  min-width: 80px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  padding: 6px 10px;
-  color: #333;
-  font: inherit;
-}
-
-.mona-panel-popover-menu-item.is-centered { text-align: center; }
-.mona-panel-popover-menu-item:hover { background: #f1f1f1; }
 
 .mona-text-link-popover { width: 240px; }
 .mona-text-link-popover > input {

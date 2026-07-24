@@ -34,12 +34,22 @@ import { EditorShapeLineContextControls } from '@/features/editor/contextual/Edi
 import { EditorTableContextControls } from '@/features/editor/contextual/EditorTableContextControls'
 import { EditorTextContextControls } from '@/features/editor/contextual/EditorTextContextControls'
 import {
+  contextualAction,
+  contextualChildBadge,
   contextualControlIcon,
   contextualControlLabeled,
+  contextualControlRow,
+  contextualControlsShell,
   contextualControlTextColor,
+  contextualDeepActions,
+  contextualDivider,
   contextualGhostSelect,
+  contextualSelectionLabel,
+  contextualTextColorBar,
   contextualToggleFlat,
+  contextualTransparencyPopover,
 } from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import type {
   ContextualSelectionKind,
   ElementCapabilityKind,
@@ -69,7 +79,7 @@ function ContextAction({
   onClick: () => void
 }) {
   return (
-    <Button aria-label={children} className="mona-contextual-action inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-action)] px-2.5 text-[13px] font-semibold whitespace-nowrap text-[rgb(16_18_25/70%)] hover:bg-[rgb(15_16_21/6%)] hover:text-[rgb(15_16_21)] [&_svg]:size-4" onClick={onClick} size="editor" title={children} type="button" variant="ghost">
+    <Button aria-label={children} className={contextualAction} onClick={onClick} size="editor" title={children} type="button" variant="ghost">
       {icon}
       <span>{children}</span>
     </Button>
@@ -95,7 +105,7 @@ function GroupChildControls({ context }: { context: ContextualControlRegistryCon
   const { t } = useTranslation()
   return (
     <>
-      <span className="mona-contextual-child-badge">{t('foundation.editor.contextual.groupChild')}</span>
+      <span className={cn('mona-contextual-child-badge', contextualChildBadge)}>{t('foundation.editor.contextual.groupChild')}</span>
       {context.capabilities.targetKind ? elementControlRegistry[context.capabilities.targetKind](context) : null}
     </>
   )
@@ -165,9 +175,9 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
     : t('foundation.editor.contextual.mixedSelection', { count: capabilities.selectedElements.length })
 
   return (
-    <div className="mona-contextual-controls mona-contextual-multi-controls">
-      <div className="mona-contextual-control-row">
-        <span className="mona-contextual-selection-label"><Layers3 />{selectionLabel}</span>
+    <div className={cn('mona-contextual-multi-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
+        <span className={contextualSelectionLabel}><Layers3 />{selectionLabel}</span>
         {capabilities.canFill ? (
           <InspectorPopoverButton
             ariaLabel={t('foundation.editor.contextual.fill', { state: capabilities.values.fill === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
@@ -205,7 +215,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
             ariaLabel={t('foundation.editor.contextual.transparency', { state: capabilities.values.transparency === 'mixed' ? t('foundation.editor.contextual.mixed') : '' })}
             className={contextualControlLabeled}
             content={(
-              <div className="mona-contextual-transparency-popover">
+              <div className={contextualTransparencyPopover}>
                 <span>{capabilities.values.transparency === 'mixed' ? t('foundation.editor.contextual.mixed') : `${transparency}%`}</span>
                 <InspectorSlider ariaLabel={t('foundation.editor.contextual.transparencyLabel')} max={100} min={0} onChange={updateTransparency} value={transparency} />
               </div>
@@ -234,7 +244,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
         ) : null}
         {capabilities.canEditText ? (
           <>
-            <div className="mona-contextual-divider" />
+            <div className={contextualDivider} />
             <InspectorSelect
               ariaLabel={t('foundation.editor.text.fontFamily')}
               className={`${contextualGhostSelect} w-[110px] mr-px`}
@@ -258,7 +268,7 @@ function EditorMultiContextControls({ capabilities, presentation, runtime }: Pic
               content={<EditorColorPicker onChange={value => updateText({ command: 'color', value })} value={capabilities.values.textColor === 'mixed' ? '#171717' : capabilities.values.textColor ?? '#171717'} />}
             >
               <Type />
-              <span className="mona-contextual-text-color">
+              <span className={contextualTextColorBar}>
                 <span style={{ backgroundColor: capabilities.values.textColor === 'mixed' ? 'transparent' : capabilities.values.textColor ?? '#171717' }} />
               </span>
             </InspectorPopoverButton>
@@ -313,8 +323,8 @@ function EditorPageContextControls({ currentSlide, onOpenInspector, presentation
   ]
   const activeRatio = ratioOptions.some(option => option.value === presentation.viewportRatio) ? presentation.viewportRatio : 'custom'
   return (
-    <div className="mona-contextual-controls mona-contextual-slide-controls">
-      <div className="mona-contextual-control-row">
+    <div className={cn('mona-contextual-slide-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.contextual.pageBackground')}
           className={contextualControlLabeled}
@@ -330,7 +340,7 @@ function EditorPageContextControls({ currentSlide, onOpenInspector, presentation
           />
           <span>{t('foundation.editor.contextual.background')}</span>
         </InspectorPopoverButton>
-        <div className="mona-contextual-divider" />
+        <div className={contextualDivider} />
         <InspectorSelect
           ariaLabel={t('designPanel.customCanvas')}
           className={`${contextualGhostSelect} w-[88px]`}
@@ -369,7 +379,7 @@ export function ContextualDeepActions({
   const page = capabilities.selectionKind === 'page'
   const multiple = capabilities.selectionKind === 'group' || capabilities.selectionKind === 'mixed'
   return (
-    <div className="mona-contextual-deep-actions ml-1.5 flex flex-none items-center gap-0.5 border-l border-border pl-1.5 first:ml-0 first:border-l-0 first:pl-0">
+    <div className={cn('mona-contextual-deep-actions', contextualDeepActions)}>
       {page ? (
         <ContextAction icon={<SwatchBook />} onClick={() => onOpenInspector('slideDesign')}>{t('foundation.editor.toolbar.design')}</ContextAction>
       ) : (

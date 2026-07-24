@@ -153,8 +153,11 @@ Policy lives in [`UI_SYSTEM.md`](UI_SYSTEM.md). Ownership banner for geometry CS
 | Drawer shell | Tailwind width/border; collapse via `ui/button` |
 | Status bar | Tailwind + [`editor-statusbar-chrome.ts`](../apps/web/src/features/editor/editor-statusbar-chrome.ts) |
 | Agent dock skin | Mostly Tailwind; layout/width still CSS (`.mona-agent-dock`, dock region) |
-| Contextual **pill shell** | Tailwind on toolbar group |
+| Contextual **pill shell** + control skins | Tailwind on toolbar group; recipes in `contextual/contextual-control-styles.ts` |
 | Inspector layout recipes | Helpers in `EditorInspectorPrimitives.tsx` (transitional) |
+| Filmstrip tile chrome | Tailwind on tiles/flags/add/boundary; drag/drop/mask geometry stays CSS |
+| Animation pool | Tailwind in `ElementAnimationPanel` (no `.mona-animation-pool-*` skin) |
+| Light inspector modals | Prefer `EditorModal` (chart theme colors; design panel already) |
 
 Shared control registry: [`apps/web/src/components/ui`](../apps/web/src/components/ui). Mona density extensions live as CVA variants (for example `Button` `variant="editor"` / `size="editor"`).
 
@@ -162,12 +165,10 @@ Shared control registry: [`apps/web/src/components/ui`](../apps/web/src/componen
 
 | Area | Notes |
 | --- | --- |
-| Contextual **control** skins | Shell migrated; control dots, selects, border panels still CSS |
-| Filmstrip | Geometry + tile language in CSS; some labels/flags use Tailwind in TSX |
+| Filmstrip | List scroll, edge fade masks, `content-visibility`, Sortable drop markers |
 | Panel region animation | `.mona-panel-region` width transition (geometry contract) |
 | Canvas / selection | Stage, viewport, handles, live region `.mona-editor-status` |
-| Residual `mona-panel-*` | Still referenced from style panels + inspector primitives |
-| Animation pool | Dense `.mona-animation-pool-*` skin (inspector / style-panel pass) |
+| Residual `mona-panel-*` hooks | Control density hooks (`mona-panel-button` / `select` / `number` / popover content) still used by inspector primitives |
 
 ### Document paint vs feature shells
 
@@ -308,12 +309,24 @@ Settled in the export / pools pass:
 - Export dialog chrome is Tailwind + shadcn (`EditorExportDialog`); no `.mona-export-*` skin
 - Creation pools (element category tiles, shape/line grids) and templates/symbols compose Tailwind in `EditorRail` / panel kit — charts already use `EditorChartsPanel`
 
-Preferred order for the remaining chrome pass:
+Settled in the contextual-controls pass:
 
-1. Contextual toolbar **control** skins (keep absolute geometry)
-2. Filmstrip tile chrome (keep drag/drop/mask geometry)
-3. Retire residual `mona-panel-*` from style panels / `EditorInspectorPrimitives`
-4. Style-panel / inspector density + modal policy unification (`EditorModal` vs raw Dialogs vs Sheet)
-5. Animation pool dense `.mona-animation-pool-*` skin
+- Contextual pill control atoms + shell (dividers, badges, border/transparency
+  popovers, ghost selects, table command menus) live in
+  [`contextual/contextual-control-styles.ts`](../apps/web/src/features/editor/contextual/contextual-control-styles.ts)
+- `editor.css` keeps only the absolute `.mona-editor-contextbar` geometry
+
+Settled in the filmstrip / inspector / animation-pool pass:
+
+- Filmstrip tile chrome (rings, labels, flags, add tile, boundary actions) is Tailwind;
+  CSS keeps scroll/fade masks, `content-visibility`, and Sortable drop markers
+- Layout recipes (`inspectorRowFullClass`, dividers, select groups, popover menu items)
+  replace residual `mona-panel-*` layout classes in style panels
+- Chart custom theme colors use `EditorModal` (same shell as design-panel theme modals)
+- Animation pool skin is Tailwind in `ElementAnimationPanel`
+
+Remaining chrome (lower urgency): dense `mona-panel-button` / `select` / `number` control
+hooks inside inspector primitives; heavy Dialogs (SvgPath / Latex / ChartData) can stay
+raw until a shared dense-editor Dialog recipe exists.
 
 Geometry that must stay in CSS: stage/viewport, selection and transform/crop handles, filmstrip drag markers and edge masks, `CollapsiblePanelRegion` width animation, color-picker pointers, rich-text document surface.

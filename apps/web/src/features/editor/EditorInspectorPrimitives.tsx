@@ -44,6 +44,8 @@ export const inspectorDividerClass = 'my-6 w-full border-t border-black/[0.06]'
 export const inspectorButtonGroupClass = 'flex items-center [&_.mona-panel-button]:rounded-none [&_.mona-panel-button]:border-r-0 [&_:first-child]:rounded-l-[var(--radius-control)] [&_:last-child]:rounded-r-[var(--radius-control)] [&_:last-child]:border-r'
 export const inspectorSelectGroupClass = 'flex items-center'
 export const inspectorSwitchWrapperClass = 'w-full text-right'
+export const inspectorPopoverMenuItemClass = 'min-w-20 rounded-[var(--radius-control)] border-0 bg-transparent px-2.5 py-1.5 text-[#333] hover:bg-[#f1f1f1]'
+export const inspectorPopoverMenuItemCenteredClass = `${inspectorPopoverMenuItemClass} text-center`
 
 export function InspectorRow({
   children,

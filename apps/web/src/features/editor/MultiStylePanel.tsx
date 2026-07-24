@@ -19,13 +19,7 @@ import type {
 import type { PresentationState } from '@mona/presentation-core'
 import type { RichTextAction } from '@mona/rich-text'
 
-import {
-  InspectorButton,
-  InspectorButtonGroup,
-  InspectorColorButton,
-  InspectorNumberInput,
-  InspectorSelect,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorSelect, inspectorDividerClass, inspectorSelectGroupClass } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
 
@@ -166,7 +160,7 @@ export function MultiStylePanel({
         <div className="w-[52%] [&>*]:w-full"><InspectorColorButton ariaLabel={t('foundation.editor.multi.fillColor')} color={fill} onChange={updateFill} /></div>
       </div>
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <div className="flex w-full items-center mb-2.5">
         <div className="w-[48%] text-xs">{t('foundation.editor.multi.borderStyle')}</div>
@@ -190,9 +184,9 @@ export function MultiStylePanel({
         <div className="w-[52%] [&>*]:w-full"><InspectorNumberInput ariaLabel={t('foundation.editor.multi.borderWidth')} min={0} onChange={width => updateOutline({ width })} value={outline.width || 0} /></div>
       </div>
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
-      <div className="mona-panel-select-group mona-multi-panel-row">
+      <div className={`${inspectorSelectGroupClass} mona-multi-panel-row`}>
         <InspectorSelect
           ariaLabel={t('foundation.editor.text.fontFamily')}
           icon={<FontSizeIcon />}

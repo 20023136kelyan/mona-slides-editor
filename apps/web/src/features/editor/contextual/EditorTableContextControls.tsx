@@ -17,9 +17,15 @@ import {
   InspectorSelect,
 } from '@/features/editor/EditorInspectorPrimitives'
 import {
+  contextualBorderPanel,
   contextualControlLabeled,
   contextualControlLabeledBorder,
+  contextualControlRow,
+  contextualControlsShell,
+  contextualDivider,
+  tableCommandMenu,
 } from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import { LinePreview, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
@@ -69,14 +75,14 @@ export function EditorTableContextControls({
   const fill = element.data[firstSelected[0]]?.[firstSelected[1]]?.style?.backcolor || ''
 
   return (
-    <div className="mona-contextual-controls mona-contextual-table-controls">
-      <div className="mona-contextual-control-row">
+    <div className={cn('mona-contextual-table-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
         <InspectorPopoverButton ariaLabel={t('foundation.editor.table.fill')} className={contextualControlLabeled} content={<EditorColorPicker onChange={backcolor => commit({ data: updateTableCellStyles(element, selectedCells, { backcolor }) }, 'Update table cell fill')} value={fill || '#ffffff'} />}><FillIcon /><span>{t('foundation.editor.table.fill')}</span></InspectorPopoverButton>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.table.border')}
           className={contextualControlLabeledBorder}
           content={(
-            <div className="mona-contextual-border-panel">
+            <div className={contextualBorderPanel}>
               <PropertyRow label={t('foundation.editor.text.borderStyle')}><InspectorSelect<LineStyleType> ariaLabel={t('foundation.editor.text.borderStyle')} onChange={style => updateOutline({ style })} options={lineStyleOptions} renderLabel={option => <LinePreview type={option?.value || 'solid'} />} renderOption={option => <LinePreview type={option.value} />} value={element.outline.style || 'solid'} /></PropertyRow>
               <PropertyRow label={t('foundation.editor.text.borderColor')}><InspectorColorButton ariaLabel={t('foundation.editor.text.borderColor')} color={element.outline.color || '#000'} onChange={color => updateOutline({ color })} /></PropertyRow>
               <PropertyRow label={t('foundation.editor.text.borderWidth')}><InspectorNumberInput ariaLabel={t('foundation.editor.text.borderWidth')} onChange={width => updateOutline({ width })} value={element.outline.width || 0} /></PropertyRow>
@@ -85,12 +91,12 @@ export function EditorTableContextControls({
           onOpenChange={setBorderOpen}
           open={borderOpen}
         ><SelectedIcon /><span>{t('foundation.editor.table.border')}</span></InspectorPopoverButton>
-        <div className="mona-contextual-divider" />
+        <div className={contextualDivider} />
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.table.add')}
           className={contextualControlLabeled}
           content={(
-            <div className="mona-table-command-menu">
+            <div className={tableCommandMenu}>
               <Button onClick={() => command('insert-row', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.insertRowAbove')}</Button>
               <Button onClick={() => command('insert-row', 'after')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.insertRowBelow')}</Button>
               <Button onClick={() => command('insert-col', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.insertColumnLeft')}</Button>
@@ -102,7 +108,7 @@ export function EditorTableContextControls({
           ariaLabel={t('foundation.editor.table.delete')}
           className={contextualControlLabeled}
           content={(
-            <div className="mona-table-command-menu">
+            <div className={tableCommandMenu}>
               <Button onClick={() => command('delete-row')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteRow')}</Button>
               <Button onClick={() => command('delete-col')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteColumn')}</Button>
             </div>

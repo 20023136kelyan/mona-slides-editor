@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
 import {
   contextualControlLabeled,
+  contextualControlRow,
+  contextualControlsShell,
+  contextualKindIcon,
   contextualToggleFlat,
 } from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
 import { InspectorPopoverButton } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
@@ -36,9 +40,9 @@ export function EditorMediaContextControls({ element, runtime }: {
   }
 
   return (
-    <div className="mona-contextual-controls mona-contextual-media-controls">
-      <div className="mona-contextual-control-row">
-        <span aria-hidden="true" className="mona-contextual-kind-icon">{element.type === 'audio' ? <Music2 /> : <Video />}</span>
+    <div className={cn('mona-contextual-media-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
+        <span aria-hidden="true" className={contextualKindIcon}>{element.type === 'audio' ? <Music2 /> : <Video />}</span>
         <input
           accept={element.type === 'audio' ? 'audio/*' : 'video/*'}
           aria-hidden="true"

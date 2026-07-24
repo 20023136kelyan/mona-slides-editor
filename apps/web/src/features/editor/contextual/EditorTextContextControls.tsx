@@ -26,10 +26,16 @@ import {
 } from '@/features/editor/EditorInspectorPrimitives'
 import {
   contextualControlIcon,
+  contextualControlRow,
+  contextualControlsShell,
   contextualControlTextColor,
+  contextualDivider,
   contextualGhostSelect,
+  contextualTextColorBar,
+  contextualTextColorBarWhite,
   contextualToggleActive,
 } from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { editorFontOptions, editorFontSizeOptions } from '@/features/editor/editor-text-options'
 
@@ -74,14 +80,14 @@ export function EditorRichTextContextControls({
         searchLabel={t('foundation.editor.text.fontSizeSearch')}
         value={attrs.fontsize}
       />
-      <div className="mona-contextual-divider" />
+      <div className={contextualDivider} />
       <InspectorPopoverButton
         ariaLabel={t('foundation.editor.text.textColor')}
         className={contextualControlTextColor}
         content={<EditorColorPicker onChange={value => execute({ command: 'color', value })} value={attrs.color} />}
       >
         <TextIcon />
-        <span className={`mona-contextual-text-color${isOpaqueWhite ? ' is-white' : ''}`}>
+        <span className={cn(contextualTextColorBar, isOpaqueWhite && contextualTextColorBarWhite)}>
           <span style={{ backgroundColor: attrs.color }} />
         </span>
       </InspectorPopoverButton>
@@ -99,7 +105,7 @@ export function EditorRichTextContextControls({
           pressed={Boolean(attrs[command])}
         ><CommandIcon /></Toggle>
       ))}
-      <div className="mona-contextual-divider" />
+      <div className={contextualDivider} />
       {([
         ['left', AlignLeftIcon, 'alignLeft'],
         ['center', AlignCenterIcon, 'alignCenter'],
@@ -114,7 +120,7 @@ export function EditorRichTextContextControls({
           pressed={attrs.align === value}
         ><AlignmentIcon /></Toggle>
       ))}
-      <div className="mona-contextual-divider" />
+      <div className={contextualDivider} />
       <Toggle
         aria-label={t('foundation.editor.text.bullets')}
         className={`${contextualControlIcon} ${contextualToggleActive}`}
@@ -147,8 +153,8 @@ export function EditorTextContextControls({
   runtime: EditorRuntime
 }) {
   return (
-    <div className="mona-contextual-controls mona-contextual-text-controls">
-      <div className="mona-contextual-control-row">
+    <div className={cn('mona-contextual-text-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
         <EditorRichTextContextControls elementId={element.id} runtime={runtime} />
       </div>
     </div>

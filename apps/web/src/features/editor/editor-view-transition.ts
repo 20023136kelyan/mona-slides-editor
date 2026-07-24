@@ -21,9 +21,23 @@ export const navigateWithSlideTransition = (update: () => void) => {
     update()
     return
   }
-  doc.startViewTransition(() => {
+  const transition = doc.startViewTransition(() => {
     // The browser snapshots the before/after states around this callback, so
     // the React commit must land synchronously inside it.
     flushSync(update)
-  })
+  }) as {
+    finished?: Promise<unknown>
+    ready?: Promise<unknown>
+    updateCallbackDone?: Promise<unknown>
+  }
+  // Skipped transitions (interrupted by a newer one, or torn down mid-test)
+  // reject with AbortError. Use name checks — `instanceof DOMException` can
+  // fail across vitest-browser realms and leave the rejection unhandled.
+  const ignoreSkipped = (error: unknown) => {
+    if (error && typeof error === 'object' && 'name' in error && (error as { name: string }).name === 'AbortError') return
+    console.error(error)
+  }
+  void transition.updateCallbackDone?.catch(ignoreSkipped)
+  void transition.ready?.catch(ignoreSkipped)
+  void transition.finished?.catch(ignoreSkipped)
 }

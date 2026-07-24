@@ -23,11 +23,7 @@ import { editorActions, selectPresentation } from '@mona/editor-state'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  InspectorButton,
-  InspectorNumberInput,
-  InspectorSelect,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorNumberInput, InspectorSelect, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 
@@ -225,27 +221,37 @@ export function ElementAnimationPanel({
     reorderCleanupRef.current = cleanup
   }
 
+  const poolTitleTone = activeTab === 'in'
+    ? 'border-l-[#68a490] bg-[rgba(104,164,144,0.15)]'
+    : activeTab === 'out'
+      ? 'border-l-[#d86344] bg-[rgba(216,99,68,0.15)]'
+      : 'border-l-[#e8b76a] bg-[rgba(232,183,106,0.15)]'
   const pool = (
-    <div className="mona-animation-pool-popover">
+    <div>
       <Tabs onValueChange={value => setActiveTab(value as AnimationType)} value={activeTab}>
-        <TabsList className="mona-animation-pool-tabs">
+        <TabsList className="mb-5 flex h-auto select-none rounded-none border-b border-[#d9d9d9] bg-transparent p-0 text-[13px] leading-none">
           {([
-            ['in', t('foundation.editor.animation.entrance')],
-            ['out', t('foundation.editor.animation.exit')],
-            ['attention', t('foundation.editor.animation.emphasis')],
-          ] as const).map(([key, label]) => (
-            <TabsTrigger key={key} style={{ '--animation-color': key === 'in' ? '#68a490' : key === 'out' ? '#d86344' : '#e8b76a' } as React.CSSProperties} value={key}>{label}</TabsTrigger>
+            ['in', t('foundation.editor.animation.entrance'), '#68a490'],
+            ['out', t('foundation.editor.animation.exit'), '#d86344'],
+            ['attention', t('foundation.editor.animation.emphasis'), '#e8b76a'],
+          ] as const).map(([key, label, color]) => (
+            <TabsTrigger
+              className="w-1/3 rounded-none border-0 border-b-2 border-transparent bg-transparent px-2.5 py-2 text-center text-[#333] shadow-none data-[state=active]:border-b-[var(--animation-color)] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              key={key}
+              style={{ '--animation-color': color } as React.CSSProperties}
+              value={key}
+            >{label}</TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
-      <div className={`mona-animation-pool is-${activeTab}`}>
+      <div className="relative mr-[-10px] h-[500px] w-[400px] overflow-hidden overflow-y-auto pr-[5px] text-xs">
         {catalogs[activeTab].map(group => (
-          <div className="mona-animation-pool-group" key={group.type}>
-            <div className="mona-animation-pool-title">{t(`foundation.editor.animation.group.${group.type}`, { defaultValue: humanize(group.type) })}:</div>
-            <div className="mona-animation-pool-items">
+          <div className="mb-[5px] last:mb-0" key={group.type}>
+            <div className={`mb-2.5 w-full border-l-4 py-1 pr-0 pl-2.5 text-[13px] ${poolTitleTone}`}>{t(`foundation.editor.animation.group.${group.type}`, { defaultValue: humanize(group.type) })}:</div>
+            <div className="flex flex-wrap content-start">
               {group.children.map(item => (
                 <Button
-                  className="mona-animation-pool-item"
+                  className="mb-[5px] h-10 w-[24%] border-0 bg-transparent p-0 text-center text-[#41464b] leading-10 not-[:nth-child(4n)]:mr-[1.333333%] hover:bg-transparent [&_span]:block [&_span]:rounded-[var(--radius-control)] [&_span]:bg-[#f9f9f9]"
                   key={item.value}
                   onClick={() => chooseEffect(activeTab, item.value)}
                   onMouseEnter={() => setHoverEffect(item.value)}
@@ -258,7 +264,7 @@ export function ElementAnimationPanel({
             </div>
           </div>
         ))}
-        {poolMask ? <div className="mona-animation-pool-mask" /> : null}
+        {poolMask ? <div className="absolute inset-0" /> : null}
       </div>
     </div>
   )
@@ -276,7 +282,7 @@ export function ElementAnimationPanel({
         ) : <div className="mona-animation-tip"><ClickIcon /> {t('foundation.editor.animation.selectTip')}</div>}
       </div>
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <div className="mona-animation-sequence">
         {sequence.map((item, index) => (
@@ -323,7 +329,7 @@ export function ElementAnimationPanel({
             </div>
             {handleAnimations[0]?.elId === item.elId ? (
               <div className="mona-animation-configs">
-                <div className="mona-panel-divider" />
+                <div className={`${inspectorDividerClass} !my-4`} />
                 <div className="mona-animation-config-row">
                   <div style={{ width: '35%' }}>{t('foundation.editor.animation.duration')}</div>
                   <InspectorNumberInput ariaLabel={`${t('foundation.editor.animation.duration')} ${item.animationEffect}`} max={3000} min={500} onChange={value => {
@@ -360,7 +366,7 @@ export function ElementAnimationPanel({
 
       {sequence.length >= 2 ? (
         <>
-          <div className="mona-panel-divider" />
+          <div className={inspectorDividerClass} />
           <InspectorButton ariaLabel={previewing ? t('foundation.editor.animation.stopAll') : t('foundation.editor.animation.previewAll')} onClick={runAll}>{previewing ? <PauseIcon /> : <PlayIcon />} {previewing ? t('foundation.editor.animation.stopAll') : t('foundation.editor.animation.previewAll')}</InspectorButton>
         </>
       ) : null}

@@ -11,7 +11,7 @@ import UngroupIcon from '~icons/icon-park-outline/ungroup'
 import { editorActions } from '@mona/editor-state'
 import { createPresentationId, type PresentationState } from '@mona/presentation-core'
 
-import { InspectorButton, InspectorButtonGroup } from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
 import {
   alignActiveElements,
   alignElementsToCanvas,
@@ -101,7 +101,7 @@ export function MultiPositionPanel({
         </InspectorButtonGroup>
       ) : null}
 
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <InspectorButtonGroup className="mona-multi-panel-row">
         <InspectorButton ariaLabel={t('foundation.editor.multi.group')} disabled={!canCombine} onClick={group} style={{ flex: 1 }}><GroupIcon className="mona-multi-button-icon" />{t('foundation.editor.multi.group')}</InspectorButton>

@@ -31,12 +31,22 @@ import { LinePreview, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
 import {
+  contextualBorderPanel,
   contextualControlIcon,
   contextualControlLabeled,
   contextualControlLabeledBorder,
+  contextualControlRow,
+  contextualControlsShell,
+  contextualDivider,
   contextualGhostSelect,
+  contextualLineStyleItem,
+  contextualLineStyleItemActive,
+  contextualLineStyleList,
+  contextualLineWidth,
   contextualToggleFlat,
+  contextualTransparencyPopover,
 } from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import { EditorRichTextContextControls } from '@/features/editor/contextual/EditorTextContextControls'
 
 const markerOptions: Array<{ label: string; value: LinePoint }> = [
@@ -86,7 +96,7 @@ function ShapeControls({
         ariaLabel={t('foundation.editor.shape.border')}
         className={contextualControlLabeledBorder}
         content={(
-          <div className="mona-contextual-border-panel">
+          <div className={contextualBorderPanel}>
             <PropertyRow label={t('foundation.editor.text.borderStyle')}>
               <InspectorSelect<LineStyleType>
                 ariaLabel={t('foundation.editor.text.borderStyle')}
@@ -107,14 +117,14 @@ function ShapeControls({
         }}
         open={borderOpen}
       ><SelectedIcon /><span>{t('foundation.editor.shape.border')}</span></InspectorPopoverButton>
-      <div className="mona-contextual-divider" />
+      <div className={contextualDivider} />
       <Toggle aria-label={t('foundation.editor.shape.horizontalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipH: !element.flipH }, `shape-flip-${element.id}`)} pressed={Boolean(element.flipH)}><FlipHorizontalIcon /></Toggle>
       <Toggle aria-label={t('foundation.editor.shape.verticalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipV: !element.flipV }, `shape-flip-${element.id}`)} pressed={Boolean(element.flipV)}><FlipVerticalIcon /></Toggle>
       <InspectorPopoverButton
         ariaLabel={t('foundation.editor.contextual.transparencyLabel')}
         className={contextualControlLabeled}
         content={(
-          <div className="mona-contextual-transparency-popover">
+          <div className={contextualTransparencyPopover}>
             <span>{transparency}%</span>
             <InspectorSlider ariaLabel={t('foundation.editor.contextual.transparencyLabel')} max={100} min={0} onChange={value => update({ opacity: 1 - value / 100 }, `shape-transparency-${element.id}`)} value={transparency} />
           </div>
@@ -122,7 +132,7 @@ function ShapeControls({
       ><Blend /><span>{t('foundation.editor.contextual.transparencyLabel')}</span></InspectorPopoverButton>
       {element.text?.content ? (
         <>
-          <div className="mona-contextual-divider" />
+          <div className={contextualDivider} />
           <EditorRichTextContextControls elementId={element.id} runtime={runtime} />
         </>
       ) : null}
@@ -152,8 +162,20 @@ function LineControls({
         ariaLabel={t('foundation.editor.line.styleLabel')}
         className={contextualControlLabeled}
         content={(
-          <div className="mona-contextual-line-style-list">
-            {lineStyleOptions.map(option => <Button aria-pressed={element.style === option.value} className={element.style === option.value ? 'is-active' : ''} key={option.value} onClick={() => update({ style: option.value })} size="editor" type="button" variant="ghost"><LinePreview type={option.value} /></Button>)}
+          <div className={contextualLineStyleList}>
+            {lineStyleOptions.map(option => (
+              <Button
+                aria-pressed={element.style === option.value}
+                className={cn(contextualLineStyleItem, element.style === option.value && contextualLineStyleItemActive)}
+                key={option.value}
+                onClick={() => update({ style: option.value })}
+                size="editor"
+                type="button"
+                variant="ghost"
+              >
+                <LinePreview type={option.value} />
+              </Button>
+            ))}
           </div>
         )}
         onOpenChange={open => {
@@ -172,8 +194,8 @@ function LineControls({
         }}
         open={lineColorOpen}
       ><PaletteIcon /><span>{t('foundation.editor.line.colorLabel')}</span></InspectorPopoverButton>
-      <div className="mona-contextual-line-width"><InspectorSlider ariaLabel={t('foundation.editor.line.width')} max={12} min={1} onChange={width => update({ width })} value={element.width} /></div>
-      <div className="mona-contextual-divider" />
+      <div className={contextualLineWidth}><InspectorSlider ariaLabel={t('foundation.editor.line.width')} max={12} min={1} onChange={width => update({ width })} value={element.width} /></div>
+      <div className={contextualDivider} />
       <InspectorSelect<LinePoint>
         ariaLabel={t('foundation.editor.line.startMarker')}
         className={contextualGhostSelect}
@@ -207,8 +229,8 @@ export function EditorShapeLineContextControls({
   runtime: EditorRuntime
 }) {
   return (
-    <div className={`mona-contextual-controls mona-contextual-${element.type}-controls`}>
-      <div className="mona-contextual-control-row">
+    <div className={cn(`mona-contextual-${element.type}-controls`, contextualControlsShell)}>
+      <div className={contextualControlRow}>
         {element.type === 'shape'
           ? <ShapeControls element={element} presentation={presentation} runtime={runtime} />
           : <LineControls element={element} runtime={runtime} />}

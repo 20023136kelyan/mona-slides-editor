@@ -6,7 +6,12 @@ import type { PPTChartElement } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { contextualControlLabeled } from '@/features/editor/contextual/contextual-control-styles'
+import {
+  contextualControlLabeled,
+  contextualControlRow,
+  contextualControlsShell,
+} from '@/features/editor/contextual/contextual-control-styles'
+import { cn } from '@/lib/utils'
 import { CHART_TYPES } from '@/features/editor/editor-chart'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
@@ -26,8 +31,8 @@ export function EditorChartContextControls({
   }
 
   return (
-    <div className="mona-contextual-controls mona-contextual-chart-controls">
-      <div className="mona-contextual-control-row">
+    <div className={cn('mona-contextual-chart-controls', contextualControlsShell)}>
+      <div className={contextualControlRow}>
         <Button className={contextualControlLabeled} onClick={onEditData} variant="ghost"><EditIcon /><span>{t('foundation.editor.chartStyle.editData')}</span></Button>
         <Popover>
           <PopoverTrigger asChild><Button className={contextualControlLabeled} variant="ghost"><ChartIcon /><span>{t('foundation.editor.chartStyle.type')}</span></Button></PopoverTrigger>

@@ -23,15 +23,7 @@ import {
   ElementShadowControls,
   PropertyRow,
 } from '@/features/editor/ElementStyleCommons'
-import {
-  InspectorButton,
-  InspectorButtonGroup,
-  InspectorColorButton,
-  InspectorNumberInput,
-  InspectorPopoverButton,
-  InspectorSlider,
-  InspectorSwitch,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorPopoverButton, InspectorSlider, InspectorSwitch, inspectorDividerClass, inspectorRowFullClass } from '@/features/editor/EditorInspectorPrimitives'
 import { getImageBeforeCrop, getPresetImageCrop, getReplacementImageCommands } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { CLIP_PATHS, getImageFilter } from '@/features/presentation-renderer/render-utils'
@@ -147,7 +139,7 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       <div className="mona-image-origin-preview" style={{ backgroundImage: `url(${element.src})` }} />
       <ElementFlipControls element={element} runtime={runtime} />
 
-      <InspectorButtonGroup className="mona-image-crop-group mona-panel-row-full">
+      <InspectorButtonGroup className={`mona-image-crop-group ${inspectorRowFullClass}`}>
         <InspectorButton ariaLabel={t('foundation.editor.image.cropImage')} onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} style={{ width: 'calc(100% - 32px)' }}><TailoringIcon /> {t('foundation.editor.image.cropImage')}</InspectorButton>
         <InspectorPopoverButton
           ariaLabel={t('foundation.editor.image.cropOptions')}
@@ -188,13 +180,13 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       </InspectorButtonGroup>
 
       <PropertyRow label={t('foundation.editor.image.cornerRadius')}><InspectorNumberInput ariaLabel={t('foundation.editor.image.cornerRadius')} onChange={radius => commitUpdate(runtime, element, { radius })} value={element.radius || 0} /></PropertyRow>
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <PropertyRow label={t('foundation.editor.image.colorMask')}>
         <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.image.colorMask')} checked={hasColorMask} onChange={checked => checked ? commitUpdate(runtime, element, { colorMask: defaultMask }) : commitRemove(runtime, element, 'colorMask')} /></div>
       </PropertyRow>
       {hasColorMask ? <PropertyRow label={t('foundation.editor.image.maskColor')}><InspectorColorButton ariaLabel={t('foundation.editor.image.maskColor')} color={element.colorMask || defaultMask} onChange={colorMask => commitUpdate(runtime, element, { colorMask })} /></PropertyRow> : null}
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <PropertyRow label={t('foundation.editor.image.enableFilter')}>
         <div className="w-full text-right"><InspectorSwitch ariaLabel={t('foundation.editor.image.enableFilter')} checked={hasFilters} onChange={checked => checked ? commitUpdate(runtime, element, { filters: {} }) : commitRemove(runtime, element, 'filters')} /></div>
@@ -232,11 +224,11 @@ export function ImageStylePanel({ element, presentation, runtime }: {
           </div>
         </>
       ) : null}
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <ElementOutlineControls element={element} presentation={presentation} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
 
       <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={replaceInputRef} tabIndex={-1} type="file" />
       <InspectorButton ariaLabel={t('foundation.editor.image.replaceImage')} className="mona-image-full-button" onClick={() => replaceInputRef.current?.click()}><TransformIcon /> {t('foundation.editor.image.replaceImage')}</InspectorButton>

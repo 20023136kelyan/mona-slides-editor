@@ -6,12 +6,7 @@ import type { PresentationState } from '@mona/presentation-core'
 import type { Broken2LineDirection, LinePoint, LineStyleType, PPTLineElement } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
-import {
-  InspectorButton,
-  InspectorColorButton,
-  InspectorNumberInput,
-  InspectorSelect,
-} from '@/features/editor/EditorInspectorPrimitives'
+import { InspectorButton, InspectorColorButton, InspectorNumberInput, InspectorSelect, inspectorDividerClass } from '@/features/editor/EditorInspectorPrimitives'
 import {
   ElementShadowControls,
   LinePointMarker,
@@ -125,9 +120,9 @@ export function LineStylePanel({
             : update({ broken2Direction: direction })} options={directionOptions} value={element.broken2Direction || 'auto'} />
         </PropertyRow>
       ) : null}
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <InspectorButton ariaLabel={t('foundation.editor.line.swap')} onClick={() => update({ start: element.end, end: element.start }, `line-swap-${element.id}`)} style={{ width: '100%' }}><SwitchIcon /> {t('foundation.editor.line.swap')}</InspectorButton>
-      <div className="mona-panel-divider" />
+      <div className={inspectorDividerClass} />
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
     </div>
   )

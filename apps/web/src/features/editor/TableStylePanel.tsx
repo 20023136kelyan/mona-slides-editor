@@ -20,6 +20,7 @@ import type { PresentationState } from '@mona/presentation-core'
 import type { PPTTableElement, TableCellStyle, TableTheme, TextAlign, TextAlignVertical } from '@mona/presentation-core/model'
 
 import { Button } from '@/components/ui/button'
+import { tableCommandMenu } from '@/features/editor/contextual/contextual-control-styles'
 import {
   InspectorButton,
   InspectorButtonGroup,
@@ -28,6 +29,8 @@ import {
   InspectorPopoverButton,
   InspectorSelect,
   InspectorSwitch,
+  inspectorRowFullClass,
+  inspectorSelectGroupClass,
 } from '@/features/editor/EditorInspectorPrimitives'
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import { executeTableCommand, parseTableCellKey, updateTableCellStyles, type TableCommand, type TableCommandPosition } from '@/features/editor/editor-table'
@@ -107,11 +110,11 @@ export function TableStylePanel({
   }
   return (
     <div className="mona-table-style-panel">
-      <div className="mona-panel-select-group mona-panel-row-full">
+      <div className={`${inspectorSelectGroupClass} ${inspectorRowFullClass}`}>
         <InspectorSelect ariaLabel={t('foundation.editor.text.fontFamily')} icon={<FontSizeIcon />} onChange={fontname => updateText({ fontname })} options={[{ label: t('common.defaultFont'), value: '' }, ...fontOptions]} search searchLabel={t('foundation.editor.text.fontSearch')} style={{ width: '50%' }} value={attrs.fontname} />
         <InspectorSelect ariaLabel={t('foundation.editor.text.fontSize')} icon={<AddTextIcon />} onChange={fontsize => updateText({ fontsize })} options={fontSizeOptions} search searchLabel={t('foundation.editor.text.fontSizeSearch')} style={{ width: '50%' }} value={attrs.fontsize} />
       </div>
-      <InspectorButtonGroup className="mona-panel-row-full mona-table-color-row">
+      <InspectorButtonGroup className={`${inspectorRowFullClass} mona-table-color-row`}>
         <InspectorColorButton ariaLabel={t('foundation.editor.table.textColor')} color={attrs.color} icon={<TextIcon />} onChange={color => updateText({ color })} style={{ width: '50%' }} />
         <InspectorColorButton ariaLabel={t('foundation.editor.table.cellFill')} color={attrs.backcolor} icon={<FillIcon />} onChange={backcolor => updateText({ backcolor })} style={{ width: '50%' }} />
       </InspectorButtonGroup>
@@ -142,7 +145,7 @@ export function TableStylePanel({
       <PropertyRow label={t('foundation.editor.tableStyle.rowActions')}>
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addRow')} onClick={() => command('insert-row', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addRow')}</InspectorButton>
-          <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.rowActions')} className="mona-table-action-menu-trigger" content={<div className="mona-table-command-menu">
+          <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.rowActions')} className="mona-table-action-menu-trigger" content={<div className={tableCommandMenu}>
             <Button onClick={() => command('insert-row', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addAbove')}</Button>
             <Button onClick={() => command('insert-row', 'after')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addBelow')}</Button>
             <Button onClick={() => command('delete-row')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteRow')}</Button>
@@ -152,7 +155,7 @@ export function TableStylePanel({
       <PropertyRow label={t('foundation.editor.tableStyle.columnActions')}>
         <InspectorButtonGroup>
           <InspectorButton ariaLabel={t('foundation.editor.tableStyle.addColumn')} onClick={() => command('insert-col', 'after')} style={{ flex: 1 }}>{t('foundation.editor.tableStyle.addColumn')}</InspectorButton>
-          <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.columnActions')} className="mona-table-action-menu-trigger" content={<div className="mona-table-command-menu">
+          <InspectorPopoverButton ariaLabel={t('foundation.editor.tableStyle.columnActions')} className="mona-table-action-menu-trigger" content={<div className={tableCommandMenu}>
             <Button onClick={() => command('insert-col', 'before')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addLeft')}</Button>
             <Button onClick={() => command('insert-col', 'after')} size="editor" type="button" variant="ghost">{t('foundation.editor.tableStyle.addRight')}</Button>
             <Button onClick={() => command('delete-col')} size="editor" type="button" variant="ghost">{t('foundation.editor.table.deleteColumn')}</Button>

@@ -11,11 +11,11 @@ import type { ChartOptions, PPTChartElement } from '@mona/presentation-core/mode
 
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ElementOutlineControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
 import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
 import { InspectorCheckbox, InspectorColorButton } from '@/features/editor/EditorInspectorPrimitives'
+import { EditorModal } from '@/features/editor/EditorModal'
 import { CHART_PRESET_THEMES } from '@/features/editor/editor-chart'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
@@ -41,37 +41,33 @@ function CustomThemeModal({ colors, onClose, onSave }: {
   const [themeColors, setThemeColors] = useState([...colors])
   const canAddThemeColor = themeColors.length < 10
   return (
-    <Dialog onOpenChange={open => {
-      if (!open) onClose()
-    }} open>
-      <DialogContent className="w-[310px] gap-0 overflow-hidden p-5" showCloseButton={false}>
-        <div className="flex flex-col">
-          <DialogHeader><DialogTitle className="mb-[15px] text-[17px] font-bold">{t('foundation.editor.chartStyle.chartThemeColors')}</DialogTitle></DialogHeader>
-          <div>
-            {themeColors.map((color, index) => (
-              <div className="mb-2.5 flex w-full items-center" key={index}>
-                <div className="w-2/5 text-[13px]">{t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })}</div>
-                <ButtonGroup className="mona-chart-custom-color-group w-3/5">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-chart-custom-color-button" variant="outline">
-                        <span><i style={{ backgroundColor: color }} /></span><PaletteIcon />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-panel-popover-content" sideOffset={8}>
-                      <EditorColorPicker onChange={value => setThemeColors(current => current.map((candidate, colorIndex) => colorIndex === index ? value : candidate))} value={color} />
-                    </PopoverContent>
-                  </Popover>
-                  {index ? <Button aria-label={t('foundation.editor.chartStyle.deleteColor')} onClick={() => setThemeColors(current => current.filter((_, colorIndex) => colorIndex !== index))} size="editor-icon" variant="outline"><CloseSmallIcon /></Button> : null}
-                </ButtonGroup>
-              </div>
-            ))}
-            <Button className="w-full" disabled={!canAddThemeColor} onClick={() => setThemeColors(current => [...current, '#00000000'])} size="editor" variant="outline"><PlusIcon /> {t('foundation.editor.chartStyle.addThemeColor')}</Button>
-          </div>
-          <Button className="mt-3 w-full" onClick={() => onSave(themeColors)} size="editor">{t('foundation.editor.chartData.confirm')}</Button>
+    <EditorModal onClose={onClose} open title={t('foundation.editor.chartStyle.chartThemeColors')} width={310}>
+      <div className="flex flex-col">
+        <div className="mb-[15px] text-[17px] font-bold">{t('foundation.editor.chartStyle.chartThemeColors')}</div>
+        <div>
+          {themeColors.map((color, index) => (
+            <div className="mb-2.5 flex w-full items-center" key={index}>
+              <div className="w-2/5 text-[13px]">{t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })}</div>
+              <ButtonGroup className="mona-chart-custom-color-group w-3/5">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-chart-custom-color-button" variant="outline">
+                      <span><i style={{ backgroundColor: color }} /></span><PaletteIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent aria-label={t('foundation.editor.chartStyle.themeColorNumber', { number: index + 1 })} className="mona-panel-popover-content" sideOffset={8}>
+                    <EditorColorPicker onChange={value => setThemeColors(current => current.map((candidate, colorIndex) => colorIndex === index ? value : candidate))} value={color} />
+                  </PopoverContent>
+                </Popover>
+                {index ? <Button aria-label={t('foundation.editor.chartStyle.deleteColor')} onClick={() => setThemeColors(current => current.filter((_, colorIndex) => colorIndex !== index))} size="editor-icon" variant="outline"><CloseSmallIcon /></Button> : null}
+              </ButtonGroup>
+            </div>
+          ))}
+          <Button className="w-full" disabled={!canAddThemeColor} onClick={() => setThemeColors(current => [...current, '#00000000'])} size="editor" variant="outline"><PlusIcon /> {t('foundation.editor.chartStyle.addThemeColor')}</Button>
         </div>
-      </DialogContent>
-    </Dialog>
+        <Button className="mt-3 w-full" onClick={() => onSave(themeColors)} size="editor">{t('foundation.editor.chartData.confirm')}</Button>
+      </div>
+    </EditorModal>
   )
 }
 

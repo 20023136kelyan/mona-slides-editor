@@ -20,6 +20,7 @@ import {
   InspectorSelect,
   InspectorSlider,
   InspectorSwitch,
+  inspectorRowFullClass,
 } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { lineStyleOptions } from '@/features/editor/editor-style-options'
@@ -128,7 +129,7 @@ export function ElementFlipControls({
 }) {
   const { t } = useTranslation()
   return (
-    <InspectorButtonGroup className="mona-panel-row-full mona-panel-flip-group">
+    <InspectorButtonGroup className={`${inspectorRowFullClass} mona-panel-flip-group`}>
       <InspectorButton active={Boolean(element.flipV)} ariaLabel={t('foundation.editor.shape.verticalFlip')} onClick={() => commitUpdate(runtime, element, { flipV: !element.flipV }, `element-flip-${element.id}`)} style={{ flex: 1 }}><FlipVerticalIcon /> {t('foundation.editor.shape.verticalFlip')}</InspectorButton>
       <InspectorButton active={Boolean(element.flipH)} ariaLabel={t('foundation.editor.shape.horizontalFlip')} onClick={() => commitUpdate(runtime, element, { flipH: !element.flipH }, `element-flip-${element.id}`)} style={{ flex: 1 }}><FlipHorizontalIcon /> {t('foundation.editor.shape.horizontalFlip')}</InspectorButton>
     </InspectorButtonGroup>
