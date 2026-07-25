@@ -7,6 +7,10 @@
     "packages/*"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=24.13.1",
+    "npm": ">=11.0.0"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "npm exec -w @mona/web -- vite --host 127.0.0.1 --port 5173",

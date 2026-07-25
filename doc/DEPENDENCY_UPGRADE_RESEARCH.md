@@ -537,7 +537,26 @@ Verification after each step, per the root scripts:
 npm run lint && npm run type-check && npm run test:core && npm run test:react
 ```
 
-Note that `npm run type-check` is currently red on the web workspace from
-in-flight work unrelated to dependencies (`EditorCanvas.tsx` and
-`editor-canvas-gesture-commit.ts`). That needs to be green before starting, or
-every subsequent step inherits an ambiguous signal.
+An earlier draft of this document recorded `npm run type-check` as red on the
+web workspace, from in-flight work in `EditorCanvas.tsx` and
+`editor-canvas-gesture-commit.ts`. That is no longer true — the work landed in
+`dbfc88ff` and the check exits 0. Nothing blocks the sequence.
+
+Four further corrections were found while turning this research into an
+execution plan, each verified against the installed tree rather than inferred:
+
+- **`txml/txml` already resolves under the installed 5.1.1.** Its exports map
+  carries an explicit `"./txml"` entry alongside the `"./*"` wildcard that v6
+  removes, so the import-path fix in D01 is version-independent and can land
+  ahead of the version bump.
+- **The `image-size` root override exists for pptxgenjs, which declares
+  `^1.0.0`.** 1.2.1 is the terminal 1.x, so the override must be **deleted**,
+  not repointed — repointing it to 2.0.2 would force pptxgenjs onto a major
+  whose path-read API moved, putting export at risk. See D09.
+- **Both of oxlint's peers are optional** (`peerDependenciesMeta` marks
+  `oxlint-tsgolint` and `vite-plus` optional), so the `vite-plus` caveat in D08
+  is not an install gate.
+- **The only automated coverage of ProseMirror undo never runs in CI.**
+  `apps/web/e2e/pptx-private-rendering.spec.ts:42` is `test.skip`-gated on
+  fixtures that `.gitignore:28` excludes. Green CI is therefore not sufficient
+  acceptance for the D02 upgrade; a manual private-deck pass is required.
