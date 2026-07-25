@@ -18,7 +18,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "nanoid": "5.1.16"
+    "nanoid": "6.0.0"
   },
   "devDependencies": {
     "typescript": "7.0.2",
