@@ -174,11 +174,3 @@ export function parseOMath(oMath) {
     return ''
   }).join('')
 }
-
-export function latexFormart(latex) {
-  return latex.replaceAll(/&lt;/g, '<')
-    .replaceAll(/&gt;/g, '>')
-    .replaceAll(/&amp;/g, '&')
-    .replaceAll(/&apos;/g, "'")
-    .replaceAll(/&quot;/g, '"')
-}

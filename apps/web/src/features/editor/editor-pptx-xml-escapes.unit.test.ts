@@ -115,15 +115,16 @@ describe('OOXML entity decoding', () => {
     expect(await decodeInFirstRun('&#1114112;')).toBe('&#1114112;')
   })
 
-  it('accepts an uppercase named entity, which XML does not', async () => {
-    // Leniency of the current `/gi` regex. txml 6 is case-sensitive and will
-    // leave this as the literal `&AMP;`.
-    expect(await decodeInFirstRun('&AMP;')).toBe('&')
+  it('leaves an uppercase named entity alone, because XML is case-sensitive', async () => {
+    // `&AMP;` is not a valid XML entity — the five predefined names are
+    // lowercase — so it is text, not an escape. The decoder this replaced
+    // carried an `i` flag and resolved it to `&`.
+    expect(await decodeInFirstRun('&AMP;')).toBe('&AMP;')
   })
 
-  it('accepts an uppercase hex marker, which XML does not', async () => {
-    // The same leniency. A conforming hex reference is `&#x2022;`; txml 6 will
-    // leave `&#X2022;` as literal text.
-    expect(await decodeInFirstRun('&#X2022;')).toBe('•')
+  it('leaves an uppercase hex marker alone, because XML requires a lowercase x', async () => {
+    // Same reason: a conforming hex reference is `&#x2022;`. `&#X2022;` is
+    // text. The previous decoder resolved it to a bullet.
+    expect(await decodeInFirstRun('&#X2022;')).toBe('&#X2022;')
   })
 })
