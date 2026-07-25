@@ -27,7 +27,7 @@
     "profile:memory": "node scripts/profile-editor-memory.mjs",
     "test:production-stability": "playwright test --config=playwright.production.config.ts",
     "corpus:inspect": "node scripts/inspect-pptx-corpus.mjs --write tests/corpus/corpus-ground-truth.json",
-    "type-check:packages": "npm run type-check -w @mona/agent-protocol && npm run type-check -w @mona/presentation-core && npm exec -w @mona/presentation-core -- tsc -p ../test-fixtures/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-interactions/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-state/tsconfig.json",
+    "type-check:packages": "npm run type-check -w @mona/agent-protocol && npm run type-check -w @mona/presentation-core && npm exec -w @mona/presentation-core -- tsc -p ../test-fixtures/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-interactions/tsconfig.json && npm exec -w @mona/presentation-core -- tsc -p ../editor-state/tsconfig.json && npm run type-check -w @mona/rich-text && npm run type-check -w @mona/pptx-parser",
     "check:architecture": "node scripts/check-architecture-boundaries.mjs",
     "test:core": "npm exec -w @mona/presentation-core -- vitest run --config vitest.integration.config.ts",
     "benchmark:state": "MONA_WRITE_PERFORMANCE_BASELINE=1 npm exec -w @mona/presentation-core -- vitest run --config vitest.integration.config.ts tests/performance/editor-state-performance.test.ts",

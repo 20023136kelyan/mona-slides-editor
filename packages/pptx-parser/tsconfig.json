@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noEmit": true,
+    // The whole point of this project is to check a hand-written .d.ts, and
+    // skipLibCheck skips exactly that. It stays off here, unlike every other
+    // package, or the gate silently passes on anything.
+    "skipLibCheck": false,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["index.d.ts"]
+}

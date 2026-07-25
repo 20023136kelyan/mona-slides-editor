@@ -6,6 +6,9 @@
   "main": "./src/pptxtojson.js",
   "module": "./src/pptxtojson.js",
   "types": "./index.d.ts",
+  "scripts": {
+    "type-check": "tsc -p tsconfig.json"
+  },
   "exports": {
     ".": {
       "types": "./index.d.ts",
