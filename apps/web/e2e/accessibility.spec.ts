@@ -28,13 +28,8 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await page.reload()
   await expect(canvas).toBeVisible()
 
-  const file = page.getByRole('button', { name: 'File', exact: true })
-  await tabTo(page, file)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('menu')).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(file).toBeFocused()
-
+  // The rail spans the full height and precedes the header in the DOM, so this
+  // walk follows that order: rail first, then the header's controls.
   const elements = page.getByRole('navigation', { name: 'Editor tools' })
     .getByRole('button', { name: 'Elements', exact: true })
   await tabTo(page, elements)
@@ -42,10 +37,23 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(elements).toBeFocused()
+  // The drawer now sits between the rail and the header, so every control it
+  // holds is in the tab path. Collapse it from the focused rail button before
+  // walking on, or the shape pool alone outruns the step budget.
+  const elementsPanel = page.getByRole('complementary', { name: 'Elements' })
+  if (await elementsPanel.isVisible()) await page.keyboard.press('Enter')
+  await expect(elementsPanel).toBeHidden()
+
+  const file = page.getByRole('button', { name: 'File', exact: true })
+  await tabTo(page, file)
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(file).toBeFocused()
 
   // The AI panel is opened from the top bar; it's no longer a tool-rail item.
   const ai = page.getByRole('button', { name: 'Generate presentation with AI' })
-  await tabTo(page, ai, 80, 'Shift+Tab')
+  await tabTo(page, ai, 80)
   await page.keyboard.press('Enter')
   const composer = page.getByRole('textbox', { name: 'Message Mona AI' })
   await expect(composer).toBeFocused()
@@ -55,18 +63,18 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await page.keyboard.press('Escape')
   await expect(ai).toBeFocused()
 
-  const exportButton = page.getByRole('button', { name: 'Export', exact: true })
-  await tabTo(page, exportButton, 20)
+  // Export moved into the header's Share popover. A popover is not a modal, so
+  // the contract is: it takes focus on open, and Escape returns it to the
+  // trigger — not that focus is trapped inside.
+  const shareButton = page.getByRole('button', { name: 'Share', exact: true })
+  await tabTo(page, shareButton, 20)
   await page.keyboard.press('Enter')
-  const dialog = page.getByRole('dialog', { name: 'Export' })
-  await expect(dialog).toBeVisible()
-  for (let step = 0; step < 12; step += 1) {
-    await page.keyboard.press('Tab')
-    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true)
-  }
+  const sharePanel = page.getByRole('dialog', { name: 'Share' })
+  await expect(sharePanel).toBeVisible()
+  expect(await page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true)
   await page.keyboard.press('Escape')
-  await expect(dialog).toHaveCount(0)
-  await expect(exportButton).toBeFocused()
+  await expect(sharePanel).toHaveCount(0)
+  await expect(shareButton).toBeFocused()
 })
 
 test('moves keyboard focus through contextual, filmstrip, and grid workspaces', async ({ page }) => {

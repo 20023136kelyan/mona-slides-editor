@@ -455,12 +455,14 @@ describe('structured PowerPoint text compilation', () => {
     // The Wingdings private-use codepoint becomes the Unicode glyph it draws,
     // and the symbol face is dropped so the body font renders it.
     expect(result.html).toContain('list-style-type:&quot;\u25aa\u2002&quot;')
-    expect(result.html).not.toContain('--mona-bullet-font:&quot;Wingdings&quot;')
-    expect(result.html).toContain('--mona-bullet-color:#E2534D')
-    expect(result.html).toContain('--mona-bullet-size:45%')
+    expect(result.html).not.toContain('font-family:&quot;Wingdings&quot;')
+    // `::marker` inherits from its list item, so the marker's colour and size
+    // are declared on the list rather than through a rule of their own.
+    expect(result.html).toContain('color:#E2534D')
+    expect(result.html).toContain('font-size:45%')
     // A face that is not a symbol font keeps its authored character and family.
     expect(result.html).toContain('list-style-type:&quot;\u2013\u2002&quot;')
-    expect(result.html).toContain('--mona-bullet-font:&quot;Arial&quot;')
+    expect(result.html).toContain('font-family:&quot;Arial&quot;')
   })
 
   it('turns a hanging indent into a gap between the bullet and its text', () => {
@@ -487,10 +489,10 @@ describe('structured PowerPoint text compilation', () => {
       textStyleKind: 'body',
     })
 
-    // The list and its item both carry the indent: the item is exact, and the
-    // list survives editing surfaces that keep only the list's style.
-    expect(result.html).toContain('<ul data-ppt-level="0" style="list-style-type:&quot;\u2022\u2002&quot;;margin-left:0px;padding-left:27px"')
-    expect(result.html).toContain('<li style="margin-left:0px;padding-left:27px"')
+    // The list owns the indent, which is the one declaration the editing
+    // surface's schema preserves, and the item stays bare.
+    expect(result.html).toContain('padding-left:27px')
+    expect(result.html).toContain('<li>')
     // The paragraph must not re-apply the pair, which would cancel it out and
     // leave the bullet flush against the text.
     expect(result.html).not.toContain('text-indent:-27px')
@@ -528,5 +530,40 @@ describe('structured PowerPoint text compilation', () => {
     expect(paragraph).toContain('font-size:13px')
     expect(paragraph).not.toContain('font-size:18px')
     expect(result.html).toContain('<span data-ppt-run-id="p0.r0" style="font-size:13px')
+  })
+
+  it('gives a blank spacer line the body\'s text size', () => {
+    const spaced: StructuredTextBody = {
+      listStyle: [],
+      paragraphs: [
+        {
+          level: 0,
+          runs: [{ kind: 'text', properties: { fontSize: 23 }, sourceId: 'p0.r0', text: 'Consider a company' }],
+          sourceId: 'p0',
+        },
+        // Web editors space their layouts with empty paragraphs that declare
+        // no size of their own.
+        { level: 0, runs: [], sourceId: 'p1' },
+        {
+          level: 0,
+          runs: [{ kind: 'text', properties: { fontSize: 23 }, sourceId: 'p2.r0', text: 'Standard Bags' }],
+          sourceId: 'p2',
+        },
+      ],
+      scale: 1,
+      schemaVersion: 1,
+    }
+    const result = compileStructuredText(spaced, {
+      fallbackColor: '#000000',
+      fallbackFontName: 'Arial',
+      slideNumber: 1,
+      textStyleKind: 'body',
+    })
+
+    // Every paragraph, blank one included, holds a line of the body's text.
+    // Left unsized the blank collapses to the browser default and drags the
+    // content below it up the slide.
+    expect(result.html.match(/font-size:23px/g)).toHaveLength(5)
+    expect(result.html).toContain('<p data-ppt-paragraph-id="p1" data-ppt-level="0" style="font-size:23px"><br></p>')
   })
 })

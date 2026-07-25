@@ -43,6 +43,7 @@ export interface TableElementEditor {
   scale: number
   selectedCells: readonly string[]
   onContextMenu: (event: ReactMouseEvent<HTMLElement>, row: number, column: number) => void
+  onElementContextMenu?: (event: ReactMouseEvent<HTMLElement>) => void
   onElementChange: (element: PPTTableElement, label: string) => void
   onHeightChange: (height: number) => void
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
@@ -442,6 +443,7 @@ export function TableElement({ element, editor }: { element: PPTTableElement; ed
             <div
               aria-label={t('foundation.editor.selectElement', { type: element.name || element.type, id: element.id })}
               className={`mona-table-mask${element.lock ? ' is-locked' : ''}`}
+              onContextMenu={event => editor.onElementContextMenu?.(event)}
               onDoubleClick={event => {
                 event.stopPropagation()
                 if (!element.lock) {

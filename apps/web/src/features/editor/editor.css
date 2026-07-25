@@ -67,9 +67,20 @@
 .mona-panel-region[data-open="true"] { width: var(--panel-region-w); }
 /* Left drawer open width; surface fill is Tailwind `bg-sidebar` on the region. */
 .mona-drawer-region { --panel-region-w: 22rem; }
+/* `overflow` cannot transition, so flipping it to visible on open would paint
+   the fixed-width panel outside the still-animating region and the reveal would
+   read as a snap. Hold the clip for the width transition, then release it so the
+   collapse pill can overhang. Removing the attribute on close drops the
+   animation instantly, which is what keeps the closing clip animating. */
 .mona-drawer-region[data-open="true"] {
   z-index: 20;
-  overflow: visible;
+  animation: mona-drawer-release-clip 0s linear 260ms forwards;
+}
+@keyframes mona-drawer-release-clip {
+  to { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mona-drawer-region[data-open="true"] { animation-delay: 0s; }
 }
 /* Right dock reveals from its right edge — content pinned right. */
 .mona-dock-region { --panel-region-w: var(--dock-w); justify-content: flex-end; }

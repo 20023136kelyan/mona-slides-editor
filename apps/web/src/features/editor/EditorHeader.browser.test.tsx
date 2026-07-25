@@ -271,7 +271,10 @@ test('keeps compact desktop header groups separate from the editable title', asy
     expect(document.querySelector<HTMLElement>('.mona-editor-header-left')!.getBoundingClientRect().right).toBeLessThanOrEqual(focusedCenter.left)
     expect(focusedCenter.right).toBeLessThanOrEqual(document.querySelector<HTMLElement>('.mona-editor-header-right')!.getBoundingClientRect().left)
 
-    for (const name of ['File', 'View', 'Tools', 'Comments', 'Start slideshow (F5)', 'Generate presentation with AI', 'Share', 'Settings']) {
+    // At this width the header folds File/View/Tools into the single icon menu
+    // and drops the remaining text labels, so the controls are icon-only.
+    await expect.element(page.getByRole('button', { name: 'File', exact: true })).not.toBeInTheDocument()
+    for (const name of ['Menu bar', 'Comments', 'Start slideshow (F5)', 'Generate presentation with AI', 'Share']) {
       await expect.element(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
     // The compact header runs on a 28px control scale; every visible control
@@ -313,7 +316,7 @@ test('names header regions and supports roving focus across document menus', asy
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
   expect(document.activeElement?.textContent).toBe('View')
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' }))
-  expect(document.activeElement?.getAttribute('aria-label')).toBe('Settings')
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Share')
   document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }))
   expect(document.activeElement?.textContent).toBe('File')
   await expect.element(view).toBeVisible()

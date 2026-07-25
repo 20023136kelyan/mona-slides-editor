@@ -253,14 +253,6 @@
 
 :is(.ProseMirror, .ProseMirror-static) ul { list-style-type: disc; }
 :is(.ProseMirror, .ProseMirror-static) ol { list-style-type: decimal; }
-/* A PowerPoint bullet has its own face, colour, and size, set per list item by
-   the structured-text compiler. Without the authored face a Wingdings marker
-   renders as whatever letter the body font maps that codepoint to. */
-:is(.ProseMirror, .ProseMirror-static) li::marker {
-  color: var(--mona-bullet-color, currentcolor);
-  font-family: var(--mona-bullet-font, inherit);
-  font-size: var(--mona-bullet-size, inherit);
-}
 /* the source editor serializes custom markers as inline list-style-type on ul/ol; li must inherit it. */
 :is(.ProseMirror, .ProseMirror-static) ul li { list-style-type: inherit; }
 :is(.ProseMirror, .ProseMirror-static) ol li { list-style-type: inherit; }

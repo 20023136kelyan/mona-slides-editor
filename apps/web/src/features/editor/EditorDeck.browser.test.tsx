@@ -431,7 +431,9 @@ test('opens AI as a structural dock and collapses the left panel on a compact vi
   expect(document.querySelectorAll('.mona-editor-drawer')).toHaveLength(1)
   expect(getComputedStyle(document.querySelector<HTMLElement>('.mona-drawer-region')!).display).toBe('none')
 
-  await page.getByRole('complementary', { name: 'Untitled page' }).getByRole('button', { name: 'Close' }).click()
+  // The dock has no close control of its own; the header AI button is the
+  // single toggle for it.
+  await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   expect(document.querySelector('.mona-agent-dock')).toBeNull()
 })
 

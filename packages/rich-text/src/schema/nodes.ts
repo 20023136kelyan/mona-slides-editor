@@ -10,6 +10,10 @@ const orderedList: NodeSpec = {
     listStyleType: { default: '' },
     fontsize: { default: '' },
     color: { default: '' },
+    // An imported PowerPoint list indents its text by the authored margin.
+    // Without an attribute for it the editing surface drops the indent and
+    // every marker collapses against its text.
+    indent: { default: '' },
     pptLevel: { default: '' },
   },
   content: 'list_item+',
@@ -20,20 +24,22 @@ const orderedList: NodeSpec = {
       const element = dom as HTMLElement
       const order = (element.hasAttribute('start') ? element.getAttribute('start') : 1) || 1
       const attr: Attr = { order: +order }
-      const { listStyleType, fontSize, color } = element.style
+      const { listStyleType, fontSize, color, paddingLeft } = element.style
       if (listStyleType) attr.listStyleType = listStyleType
       if (fontSize) attr.fontsize = fontSize
       if (color) attr.color = color
+      if (paddingLeft) attr.indent = paddingLeft
       if (element.dataset.pptLevel) attr.pptLevel = element.dataset.pptLevel
       return attr
     },
   }],
   toDOM: (node: Node) => {
-    const { order, listStyleType, fontsize, color, pptLevel } = node.attrs
+    const { order, listStyleType, fontsize, color, indent, pptLevel } = node.attrs
     let style = ''
     if (listStyleType) style += `list-style-type: ${listStyleType};`
     if (fontsize) style += `font-size: ${fontsize};`
     if (color) style += `color: ${color};`
+    if (indent) style += `padding-left: ${indent};`
     const attr: Attr = { style }
     if (order !== 1) attr.start = order
     if (pptLevel !== '') attr['data-ppt-level'] = pptLevel
@@ -46,6 +52,10 @@ const bulletList: NodeSpec = {
     listStyleType: { default: '' },
     fontsize: { default: '' },
     color: { default: '' },
+    // An imported PowerPoint list indents its text by the authored margin.
+    // Without an attribute for it the editing surface drops the indent and
+    // every marker collapses against its text.
+    indent: { default: '' },
     pptLevel: { default: '' },
   },
   content: 'list_item+',
@@ -54,20 +64,22 @@ const bulletList: NodeSpec = {
     tag: 'ul',
     getAttrs: dom => {
       const attr: Attr = {}
-      const { listStyleType, fontSize, color } = (dom as HTMLElement).style
+      const { listStyleType, fontSize, color, paddingLeft } = (dom as HTMLElement).style
       if (listStyleType) attr.listStyleType = listStyleType
       if (fontSize) attr.fontsize = fontSize
       if (color) attr.color = color
+      if (paddingLeft) attr.indent = paddingLeft
       if ((dom as HTMLElement).dataset.pptLevel) attr.pptLevel = (dom as HTMLElement).dataset.pptLevel!
       return attr
     },
   }],
   toDOM: (node: Node) => {
-    const { listStyleType, fontsize, color, pptLevel } = node.attrs
+    const { listStyleType, fontsize, color, indent, pptLevel } = node.attrs
     let style = ''
     if (listStyleType) style += `list-style-type: ${listStyleType};`
     if (fontsize) style += `font-size: ${fontsize};`
     if (color) style += `color: ${color};`
+    if (indent) style += `padding-left: ${indent};`
     const attr: Attr = { style }
     if (pptLevel !== '') attr['data-ppt-level'] = pptLevel
     return ['ul', attr, 0]

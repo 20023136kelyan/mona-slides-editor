@@ -1,4 +1,5 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the shadcn Sidebar primitive renders a div; the navigation landmark is applied explicitly. */
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   BarChart3,
@@ -6,9 +7,11 @@ import {
   ChevronRight,
   Folder,
   Image,
+  Languages,
   LayoutGrid,
   LayoutTemplate,
   PencilLine,
+  Settings,
   Shapes,
   Sparkles,
   Type,
@@ -19,10 +22,17 @@ import type { ComponentType } from 'react'
 
 import { cn } from '@/lib/utils'
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -30,7 +40,9 @@ import {
 } from '@/components/ui/sidebar'
 import type { EditorCreateTool } from '@/features/editor/editor-create-tool'
 import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
+import { InspectorSelect } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
+import { LOCALES, isSupportedLocale, setLocale, type SupportedLocale } from '@/i18n'
 
 type RailItem = {
   active: boolean
@@ -42,6 +54,59 @@ type RailItem = {
   onFocus?: () => void
   onPointerEnter?: () => void
   stub?: boolean
+}
+
+// Bottom slot of the creation rail. It holds application settings today and is
+// the designated home for the account control, so it stays visually separated
+// from the creation items above rather than joining that menu.
+function RailSettingsMenu() {
+  const { i18n, t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const resolvedLanguage = i18n.resolvedLanguage ?? ''
+  const activeLocale: SupportedLocale = isSupportedLocale(resolvedLanguage) ? resolvedLanguage : 'en-US'
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <SidebarMenuButton
+          aria-label={t('header.settings')}
+          className="mona-editor-rail-settings h-10 w-full px-3 max-snug:justify-center max-snug:px-0"
+          isActive={open}
+          title={t('header.settings')}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-3 max-snug:flex-none">
+            <Settings className="h-4 w-4 shrink-0" />
+            <span className="truncate max-snug:hidden">{t('header.settings')}</span>
+          </div>
+        </SidebarMenuButton>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        aria-label={t('header.settings')}
+        className="w-68 rounded-overlay p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]"
+        // Anchored to the last rail item, so the panel sits flush against the
+        // viewport floor without a gutter; keep one as it grows into account content.
+        collisionPadding={12}
+        side="right"
+        sideOffset={8}
+      >
+        <div className="flex items-center gap-2 border-b border-border px-0.5 pt-0.5 pb-2 text-sm font-semibold"><Settings className="size-3.5" /><span>{t('header.settings')}</span></div>
+        <div className="flex items-center gap-4 pt-2.5">
+          <span className="flex-1 text-muted-foreground">{t('locale.language')}</span>
+          <InspectorSelect
+            ariaLabel={t('locale.language')}
+            className="mona-rail-locale-select h-7 w-35 flex-none border-transparent hover:bg-muted"
+            icon={<Languages />}
+            onChange={locale => {
+              if (isSupportedLocale(locale)) void setLocale(locale)
+            }}
+            options={LOCALES.map(locale => ({ label: t(locale.labelKey), value: locale.code }))}
+            value={activeLocale}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 // Persistent creation rail built on shadcn SidebarMenu composition.
@@ -142,6 +207,12 @@ export function EditorRail({
       role="navigation"
       side="left"
     >
+      <SidebarHeader className="h-11 flex-none justify-center border-b border-sidebar-border px-3 max-snug:items-center max-snug:px-0">
+        <div aria-label="Mona" className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-foreground">
+          <img alt="" aria-hidden="true" className="size-4 flex-none" src="/favicon.svg" />
+          <span className="truncate max-snug:hidden">Mona</span>
+        </div>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -159,6 +230,17 @@ export function EditorRail({
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-sidebar-border p-0">
+        <SidebarGroup className="py-1">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <RailSettingsMenu />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarFooter>
     </Sidebar>
   )
 }

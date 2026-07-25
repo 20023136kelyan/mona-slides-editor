@@ -996,12 +996,18 @@ export const convertParsedPptxPresentation = ({
             case 'radarChart': chartType = 'radar'; break
             case 'doughnutChart': chartType = 'ring'; break
           }
-          pushElement({ chartType, data: { labels, legends, series }, height: element.height, id: createPresentationId(10), left: element.left, options, rotate: element.rotate ?? 0, textColor: slideTheme.fontColor, themeColors: element.colors.filter(Boolean).length ? element.colors.filter(Boolean) : slideTheme.themeColors, top: element.top, type: 'chart', width: element.width })
+          pushElement({ chartType, ...(element.resources ? { chartSource: element.resources } : {}), ...(element.chartSpace ? { chartSpace: element.chartSpace } : {}), data: { labels, legends, series }, height: element.height, id: createPresentationId(10), left: element.left, options, rotate: element.rotate ?? 0, textColor: slideTheme.fontColor, themeColors: element.colors.filter(Boolean).length ? element.colors.filter(Boolean) : slideTheme.themeColors, top: element.top, type: 'chart', width: element.width })
           disposition = 'approximated'
           if (unmodelled.size) {
             issue = {
               code: 'pptx.chart.unsupported-type',
               message: `PowerPoint chart type ${[...unmodelled].sort().join(', ')} has no Mona chart family; its series are retained but drawn as ${chartType}`,
+            }
+          }
+          else if (element.resources?.externalWorkbook) {
+            issue = {
+              code: 'pptx.chart.external-workbook',
+              message: `Chart data links to ${element.resources.externalWorkbook}, which the deck does not embed; the cached values render but the source cannot be opened`,
             }
           }
         }

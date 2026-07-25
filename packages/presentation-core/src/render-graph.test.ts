@@ -646,4 +646,37 @@ describe('PowerPoint render graph', () => {
     // A cell with no retained body is left exactly as authored.
     expect(rendered?.type === 'table' ? rendered.data[0]![1]!.text : '').toBe('<p>plain</p>')
   })
+
+  it('compiles bodies nested inside a group', () => {
+    const nested = structuredTitle('nested-title', 'slide', { defaultRun: { fontSize: 18 } })
+    const group = {
+      coordinateHeight: 200,
+      coordinateWidth: 400,
+      elements: [nested],
+      height: 200,
+      id: 'group-1',
+      left: 0,
+      rotate: 0,
+      top: 0,
+      type: 'group' as const,
+      width: 400,
+    }
+    const slide: Slide = {
+      elements: [group],
+      id: 'slide-1',
+      source: {
+        kind: 'pptx',
+        packageId: 'pptx:source',
+        slidePart: 'ppt/slides/slide1.xml',
+      },
+    }
+
+    const nodes = resolveSlideRenderGraph(slide, [])
+    const rendered = nodes[0]?.element
+    expect(rendered?.type).toBe('group')
+    const child = rendered?.type === 'group' ? rendered.elements[0] : undefined
+    // A grouped body compiles exactly like an ungrouped one; otherwise the
+    // same content renders differently purely by being grouped.
+    expect(child?.type === 'text' ? child.content : '').toContain('data-ppt-paragraph-id')
+  })
 })

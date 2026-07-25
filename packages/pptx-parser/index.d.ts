@@ -367,6 +367,117 @@ export interface ChartValue {
 export interface ChartXLabel {
   [key: string]: string
 }
+export interface ChartSpaceReference {
+  /** Number format the cache itself declares, such as `General`. */
+  formatCode?: string
+  /** The workbook range the cached points came from. */
+  formula?: string
+  kind: 'multiLevelString' | 'number' | 'numberLiteral' | 'string' | 'stringLiteral'
+  pointCount?: number
+}
+
+export interface ChartSpaceNumberFormat {
+  formatCode: string
+  sourceLinked?: boolean
+}
+
+export interface ChartSpaceDataLabels {
+  numberFormat?: ChartSpaceNumberFormat
+  position?: string
+  showBubbleSize?: boolean
+  showCategoryName?: boolean
+  showLegendKey?: boolean
+  showPercent?: boolean
+  showSeriesName?: boolean
+  showValue?: boolean
+}
+
+export interface ChartSpaceSeriesReferences {
+  bubbleSizes?: ChartSpaceReference
+  categories?: ChartSpaceReference
+  name?: ChartSpaceReference
+  values?: ChartSpaceReference
+  xValues?: ChartSpaceReference
+  yValues?: ChartSpaceReference
+}
+
+export interface ChartSpaceSeries {
+  bubbleSizes?: Array<number | undefined>
+  categories?: Array<string | undefined>
+  dataLabels?: ChartSpaceDataLabels
+  index: number
+  markerSymbol?: string
+  name?: string
+  order: number
+  /** Where each cached array came from in the workbook. */
+  references?: ChartSpaceSeriesReferences
+  smooth?: boolean
+  values?: Array<number | undefined>
+  xValues?: Array<number | undefined>
+  yValues?: Array<number | undefined>
+}
+
+export interface ChartSpaceFamily {
+  /** Axis ids this family plots against; a secondary axis is a second pair. */
+  axisIds: string[]
+  barDirection?: string
+  dataLabels?: ChartSpaceDataLabels
+  gapWidth?: number
+  grouping?: string
+  holeSize?: number
+  /** The OOXML element name, such as `barChart` or `lineChart`. */
+  kind: string
+  marker?: boolean
+  overlap?: number
+  series: ChartSpaceSeries[]
+  style?: string
+  varyColors?: boolean
+}
+
+export interface ChartSpaceAxis {
+  baseTimeUnit?: string
+  crossAxisId?: string
+  deleted?: boolean
+  id: string
+  kind: 'category' | 'date' | 'series' | 'value'
+  majorGridlines?: boolean
+  majorTickMark?: string
+  majorUnit?: number
+  minorGridlines?: boolean
+  minorTickMark?: string
+  minorUnit?: number
+  numberFormat?: ChartSpaceNumberFormat
+  position?: string
+  scaling?: { logBase?: number; max?: number; min?: number; orientation?: string }
+  tickLabelPosition?: string
+  title?: string
+}
+
+export interface ChartSpace {
+  autoTitleDeleted?: boolean
+  displayBlanksAs?: string
+  /** Relationship tying the chart's formulas to a workbook part. */
+  externalData?: { autoUpdate?: boolean; relationshipId?: string }
+  legend?: { overlay?: boolean; position?: string }
+  plotArea: { axes: ChartSpaceAxis[]; families: ChartSpaceFamily[] }
+  plotVisibleOnly?: boolean
+  schemaVersion: 1
+  title?: { overlay?: boolean; text?: string }
+}
+
+export interface ChartResources {
+  /** Target of a workbook the deck links to but does not embed. */
+  externalWorkbook?: string
+  /** The chart part itself. */
+  partPath: string
+  relationshipIds: Record<string, string>
+  themeOverridePart?: string
+  /** Drawing overlay a chart may carry. */
+  userShapesPart?: string
+  /** Embedded workbook holding the chart's data, when the deck ships one. */
+  workbookPart?: string
+}
+
 export interface ChartItem {
   key: string
   values: ChartValue[]
@@ -374,6 +485,10 @@ export interface ChartItem {
 }
 export type ScatterChartData = number[][]
 export interface ChartMetadata {
+  /** Structure the chart part declares, retained beside the simplified view. */
+  chartSpace?: ChartSpace
+  /** The chart part and the parts it owns. */
+  resources?: ChartResources
   categoryAxisTitle?: string
   gapWidth?: string
   holeSize?: string
@@ -550,3 +665,27 @@ export const parse: (file: ArrayBuffer, options?: Options) => Promise<{
     height: number
   }
 }>
+
+export type WorkbookCellValue = boolean | number | string | undefined
+
+export interface EmbeddedWorkbook {
+  /**
+   * Resolves a range such as `Sheet1!$B$2:$B$5` in reading order. A cell the
+   * workbook never stored comes back `undefined` rather than shifting the
+   * values after it.
+   */
+  readRange: (formula: string) => Promise<WorkbookCellValue[] | undefined>
+  sheetNames: string[]
+}
+
+/**
+ * Opens a chart's embedded workbook for reading. The bytes are never written
+ * back, so the retained part stays exactly as the deck shipped it.
+ */
+export const openEmbeddedWorkbook: (bytes: ArrayBuffer | Uint8Array) => Promise<EmbeddedWorkbook>
+
+export const parseRangeFormula: (formula: string) => {
+  end: { column: number; row: number }
+  sheet: string
+  start: { column: number; row: number }
+} | undefined

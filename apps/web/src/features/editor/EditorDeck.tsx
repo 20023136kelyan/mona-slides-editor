@@ -12,7 +12,7 @@ import { SidebarContent, SidebarHeader, SidebarInset, SidebarProvider } from '@/
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EditorCanvas } from '@/features/editor/EditorCanvas'
 import { EditorContextToolbar } from '@/features/editor/EditorContextToolbar'
-import { EditorHeader } from '@/features/editor/EditorHeader'
+import { EditorHeader, EditorSkipLink } from '@/features/editor/EditorHeader'
 import { EditorPageGrid } from '@/features/editor/EditorPageGrid'
 import { EditorRail } from '@/features/editor/EditorRailNavigation'
 import { EditorStatusBar } from '@/features/editor/EditorStatusBar'
@@ -557,7 +557,7 @@ function EditorDeckContent({
       }}
     >
       <div className="mona-editor-shell w-full">
-      <EditorHeader runtime={runtime} />
+      <EditorSkipLink />
       <SidebarProvider className="mona-editor-workspace">
       <EditorRail
         activePanel={railPanel}
@@ -634,6 +634,11 @@ function EditorDeckContent({
       </EditorRailDrawer>
       </Suspense>
       </CollapsiblePanelRegion>
+      {/* Rail, task drawer, and agent dock all span the full height as siblings.
+          The header lives between them and flexes, so opening any side surface
+          narrows the header and the canvas together. */}
+      <div className="mona-editor-main flex min-w-0 flex-1 flex-col">
+      <EditorHeader runtime={runtime} />
       <SidebarInset className="mona-editor-inset" data-testid="mona-editor-surface" id="mona-editor-surface">
       {session.workspaceMode === 'page-grid' ? (
         <EditorErrorBoundary>
@@ -692,6 +697,7 @@ function EditorDeckContent({
       />
       {banner}
       </SidebarInset>
+      </div>
       <CollapsiblePanelRegion className="mona-panel-region mona-dock-region" open={agentOpen}>
         {agentOpen ? (
           <Suspense fallback={<aside className="mona-agent-dock grid h-full w-[var(--dock-w)] shrink-0 place-items-center overflow-hidden border-l border-sidebar-border bg-sidebar text-xs text-muted-foreground" role="status">{t('foundation.editor.agent.loading')}</aside>}>

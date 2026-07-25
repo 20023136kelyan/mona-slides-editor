@@ -254,6 +254,18 @@ const materializeStructuredText = (
   slideNumber: number,
 ): PPTElement => {
   if (element.type === 'table') return materializeTableText(element, hierarchy, slide)
+  // A group's children are ordinary bodies that happen to sit in a nested
+  // coordinate space. Skipping them leaves their imported HTML compatibility
+  // markup on screen while every ungrouped body renders compiled text, so the
+  // same content changes size and spacing purely by being grouped.
+  if (element.type === 'group') {
+    return {
+      ...element,
+      elements: element.elements.map(child => (
+        materializeStructuredText(child, hierarchy, slide, slideNumber)
+      )),
+    }
+  }
   const structuredText = elementStructuredText(element)
   if (!structuredText) return materializeSlideNumber(element, slideNumber)
   const { layout, master, sourcePackage, theme } = hierarchy

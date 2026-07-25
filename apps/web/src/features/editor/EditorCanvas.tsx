@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -19,7 +18,6 @@ import type { InteractionSnapshot, PointerPosition } from '@mona/editor-interact
 import {
   angleFromPoint,
   clientPointToSlide,
-  rectToBounds,
   type ResizeHandle,
 } from '@mona/editor-interactions/geometry'
 import {
@@ -36,7 +34,7 @@ import {
   selectShowRuler,
 } from '@mona/editor-state'
 import { createPresentationId, selectFormattedCurrentSlideAnimations, type PresentationCommand } from '@mona/presentation-core'
-import type { PPTElement, PPTImageElement, PPTShapeElement, PPTTableElement, PPTTextElement } from '@mona/presentation-core/model'
+import type { PPTElement, PPTShapeElement } from '@mona/presentation-core/model'
 
 import { EditorContextMenu, LinkEditor } from '@/features/editor/EditorContextMenu'
 import { EditorRichText } from '@/features/editor/EditorRichText'
@@ -51,19 +49,11 @@ import { loadDrawingWorkspace } from '@/features/editor/drawing/load-drawing-wor
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
 import {
   canDeleteTableAxis,
-  deleteTableColumn,
-  deleteTableRow,
-  insertTableColumn,
-  insertTableRow,
-  mergeTableCells,
-  splitTableCell,
-  tableCellKey,
 } from '@/features/editor/editor-table'
 import {
   type EditorRuntime,
 } from '@/features/editor/editor-runtime'
 import {
-  alignElementsToCanvas,
   buildEditorGridPath,
   canResizeSelection,
   getElementBounds,
@@ -71,18 +61,14 @@ import {
   getImageCropGeometry,
   getGroupRotationCenter,
   getGroupRotationReference,
-  getLassoSelectionIds,
   groupElements,
   getTransformBounds,
-  orderElement,
-  resolveCreateGestureSelection,
   setElementLocks,
   ungroupElements,
   type CropControlHandle,
   type LineControlHandle,
 } from '@/features/editor/editor-geometry'
 import {
-  applyElementUpdates,
   createElementFromGesture,
   derivePreview,
   DRAG_ACTIVATION_DISTANCE,
@@ -93,13 +79,17 @@ import {
   legacyMousePoint,
   pointerModifiers,
   toCommands,
-  TRANSFORM_ACTIVATION_DISTANCE,
   type GestureContext,
 } from '@/features/editor/editor-canvas-preview'
 import { EditorRulers } from '@/features/editor/EditorRulers'
 import { useCanvasClipboard } from '@/features/editor/use-canvas-clipboard'
-import { useCanvasHotkeys, writeClipboard } from '@/features/editor/use-canvas-hotkeys'
+import { useCanvasHotkeys } from '@/features/editor/use-canvas-hotkeys'
+import { commitCanvasGesture } from '@/features/editor/editor-canvas-gesture-commit'
+import { runCanvasMenuAction } from '@/features/editor/editor-canvas-menu-actions'
+import { useCanvasContextMenu } from '@/features/editor/use-canvas-context-menu'
 import { useCanvasCropDraft } from '@/features/editor/use-canvas-crop-draft'
+import { useCanvasGesturePreview } from '@/features/editor/use-canvas-gesture-preview'
+import { useCanvasSelection } from '@/features/editor/use-canvas-selection'
 import { useCanvasLinkEditor } from '@/features/editor/use-canvas-link-editor'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
@@ -112,13 +102,6 @@ const DrawingWorkspace = lazy(() => loadDrawingWorkspace().then(module => ({
 const subscribeToNothing = () => () => {}
 const zeroRevision = () => 0
 
-
-interface ContextMenuState {
-  readonly cell?: { column: number; row: number }
-  readonly elementId?: string
-  readonly position: PointerPosition
-  readonly surface: 'canvas' | 'element' | 'table-cell'
-}
 
 export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore = null, onBuildSketch, onCreateToolChange, onCustomShapeChange, onDrawingModeChange, onEditChart, onEditLatex, onSketchVisibilityChange, runtime }: {
   activeCreateTool: EditorCreateTool | null
@@ -148,6 +131,10 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
   const canvasZoom = useEditorSelector(runtime.store, selectCanvasZoom)
   const cropElementId = useEditorSelector(runtime.store, selectCropElementId)
   const { cropDraft, finishCropEditing, updateCropDraft } = useCanvasCropDraft({ cropElementId, runtime })
+  const { closeMenu, menu, openCanvasMenu, openElementMenu, openTableCellMenu } = useCanvasContextMenu({
+    runtime,
+    selectElement: (event, element) => selectElement(event, element),
+  })
   const gridLineSize = useEditorSelector(runtime.store, selectGridLineSize)
   const showRuler = useEditorSelector(runtime.store, selectShowRuler)
   useSyncExternalStore(
@@ -156,21 +143,21 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     drawingStore?.getRevision ?? zeroRevision,
   )
   const activeTool = activeCreateTool
-  const interaction = useSyncExternalStore(
-    runtime.interaction.subscribe,
-    runtime.interaction.getSnapshot,
-    runtime.interaction.getSnapshot,
-  )
   const stageRef = useRef<HTMLElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
-  const gestureRef = useRef<GestureContext | null>(null)
   const ctrlOrMetaPressedRef = useRef(false)
   const shiftPressedRef = useRef(false)
   const spacePressedRef = useRef(false)
+  const { handleMediaPointerDown, handleTextEditorMouseDown, selectElement } = useCanvasSelection({
+    finishCropEditing,
+    onElementPointerDown: (event, element) => handleElementPointerDown(event, element),
+    runtime,
+    spacePressedRef,
+    stageRef,
+  })
   // the source editor throttles undo/redo (100ms, leading) so key auto-repeat cannot
   // burn through the snapshot stack.
-  const [gestureContext, setGestureContext] = useState<GestureContext | null>(null)
   const [viewportFit, setViewportFit] = useState({ denominator: 1, dimension: 0, height: 0, width: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
   const [shapeTextEditorId, setShapeTextEditorId] = useState<string | null>(null)
@@ -180,13 +167,12 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     tableEditorIdRef.current = elementId
     setTableEditorIdState(elementId)
   }
-  const [menu, setMenu] = useState<ContextMenuState | null>(null)
 
   // Portaled transients (context menu, link dialog) escape the hidden
   // <Activity> wrapper during slideshows; close them when screening starts.
   useEffect(() => {
     return subscribeToPresentationStart(() => {
-      setMenu(null)
+      closeMenu()
       closeLinkEditor()
     })
   }, [closeLinkEditor, subscribeToPresentationStart])
@@ -383,44 +369,14 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     }
   }, [currentSlide, runtime])
 
-  useEffect(() => {
-    if (!menu) return undefined
-    const close = () => setMenu(null)
-    document.body.addEventListener('scroll', close)
-    window.addEventListener('resize', close)
-    return () => {
-      document.body.removeEventListener('scroll', close)
-      window.removeEventListener('resize', close)
-    }
-  }, [menu])
-
   const scale = viewportFit.dimension * (canvasZoom / 100) / viewportFit.denominator
-  const preview = derivePreview(gestureContext, interaction, currentSlide, presentation.viewportSize, presentation.viewportRatio)
-  const previewSlide = preview.duplicateElements
-    ? (() => {
-      const replacements = new Map(preview.duplicateElements.map(element => [element.id, element]))
-      return {
-        ...currentSlide,
-        elements: currentSlide.elements.map(element => replacements.get(element.id) ?? element),
-      }
-    })()
-    : applyElementUpdates(currentSlide, preview.updates)
-  const selectedElements = previewSlide.elements.filter(element => activeElementIds.includes(element.id))
-  const activeGroupElement = session.activeGroupElementId
-    ? selectedElements.find(element => element.id === session.activeGroupElementId)
-    : undefined
-  const transformElements = activeGroupElement ? [activeGroupElement] : selectedElements
-  const selectionBounds = selectedElements.length ? getElementsBounds(selectedElements) : undefined
+  const {
+    cropGeometry, cropSourceImage, gestureRef, pan, preview, previewSlide,
+    rawGestureOriginRef, selectedElements, selectionBounds, setGestureContext, transformElements,
+  } = useCanvasGesturePreview({
+    activeElementIds, canvasPan, cropDraft, cropElementId, currentSlide, presentation, runtime, session,
+  })
   const menuElement = menu?.elementId ? previewSlide.elements.find(element => element.id === menu.elementId) : undefined
-  const pan = preview.pan ?? canvasPan
-  const cropSourceImage = cropElementId
-    ? previewSlide.elements.find((element): element is PPTImageElement => element.id === cropElementId && element.type === 'image')
-    : undefined
-  const cropGeometry = preview.cropGeometry ?? (
-    cropDraft?.element.id === cropElementId
-      ? cropDraft.geometry
-      : cropSourceImage ? getImageCropGeometry(cropSourceImage) : undefined
-  )
   const renderedSlide = {
     ...previewSlide,
     elements: previewSlide.elements.filter(element => (
@@ -460,7 +416,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     return clientPointToSlide(inputPoint(event), rect, scale)
   }
 
-  const rawGestureOriginRef = useRef<PointerPosition | null>(null)
 
   const begin = (
     event: ReactPointerEvent<HTMLElement>,
@@ -478,34 +433,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
       modifiers: pointerModifiers(event.nativeEvent),
     })
     event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const selectElement = (event: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>, element: PPTElement) => {
-    const liveState = runtime.store.getState()
-    const liveSession = selectSession(liveState)
-    const liveSlide = selectCurrentSlide(liveState) ?? EMPTY_EDITOR_SLIDE
-    const liveElement = liveSlide.elements.find(item => item.id === element.id) ?? element
-    const liveActiveElementIds = liveSession.activeElementIds
-    if (liveSession.cropElementId) finishCropEditing(true)
-    const modifier = event.ctrlKey || event.metaKey || event.shiftKey
-    const groupMemberIds = liveElement.groupId
-      ? liveSlide.elements.filter(item => item.groupId === liveElement.groupId).map(item => item.id)
-      : [liveElement.id]
-    // the source editor seeds a grouped selection with the element that was actually
-    // clicked, then appends the group's slide-order members and de-duplicates.
-    // Selection order is observable in group operations and toolbar state.
-    const groupIds = [...new Set([liveElement.id, ...groupMemberIds])]
-    let next = liveActiveElementIds
-    if (!liveActiveElementIds.includes(liveElement.id)) next = modifier ? [...new Set([...liveActiveElementIds, ...groupIds])] : groupIds
-    else if (modifier) {
-      const removed = new Set(groupIds)
-      const candidate = liveActiveElementIds.filter(id => !removed.has(id))
-      if (candidate.length) next = candidate
-    }
-    runtime.store.dispatch(editorActions.selectionChanged(next))
-    runtime.store.dispatch(editorActions.handleElementChanged(liveElement.id))
-    runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
-    return next
   }
 
   const handleElementPointerDown = (event: ReactPointerEvent<HTMLElement>, element: PPTElement) => {
@@ -582,122 +509,6 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     })
   }
 
-  const handleMediaPointerDown = (event: ReactPointerEvent<HTMLElement>, element: PPTElement, canMove: boolean) => {
-    if (canMove) {
-      handleElementPointerDown(event, element)
-      return
-    }
-    const liveState = runtime.store.getState()
-    const liveSession = selectSession(liveState)
-    const liveSlide = selectCurrentSlide(liveState) ?? EMPTY_EDITOR_SLIDE
-    const liveElement = liveSlide.elements.find(item => item.id === element.id) ?? element
-    if (liveSession.activeTool || spacePressedRef.current || liveElement.lock) return
-    if (event.button !== 0) {
-      event.stopPropagation()
-      return
-    }
-    event.stopPropagation()
-    stageRef.current?.focus()
-    runtime.store.dispatch(editorActions.canvasFocusChanged(true))
-    runtime.store.dispatch(editorActions.thumbnailsFocusChanged(false))
-    if (!liveSession.activeElementIds.includes(liveElement.id)) selectElement(event, liveElement)
-    else if (event.ctrlKey || event.metaKey || event.shiftKey) selectElement(event, liveElement)
-    else if (liveSession.handleElementId !== liveElement.id) {
-      runtime.store.dispatch(editorActions.handleElementChanged(liveElement.id))
-      runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
-    }
-    if (liveSession.cropElementId) finishCropEditing(true)
-  }
-
-  const handleTextEditorMouseDown = (event: MouseEvent, element: PPTTextElement | PPTShapeElement) => {
-    const liveRootState = runtime.store.getState()
-    const liveSlide = selectCurrentSlide(liveRootState) ?? EMPTY_EDITOR_SLIDE
-    const liveElement = liveSlide.elements.find((item): item is PPTTextElement | PPTShapeElement => (
-      item.id === element.id && (item.type === 'text' || item.type === 'shape')
-    )) ?? element
-    if (liveElement.lock) return
-    event.stopPropagation()
-    stageRef.current?.focus()
-    runtime.store.dispatch(editorActions.canvasFocusChanged(true))
-    runtime.store.dispatch(editorActions.thumbnailsFocusChanged(false))
-    if (liveRootState.session.cropElementId) finishCropEditing(true)
-
-    const state = runtime.store.getState().session
-    const selected = state.activeElementIds.includes(liveElement.id)
-    const modifier = event.ctrlKey || event.metaKey || event.shiftKey
-
-    if (!selected) selectElement(event, liveElement)
-    else if (modifier) {
-      const groupIds = liveElement.groupId
-        ? liveSlide.elements.filter(item => item.groupId === liveElement.groupId).map(item => item.id)
-        : [liveElement.id]
-      const removed = new Set(groupIds)
-      const candidate = state.activeElementIds.filter(id => !removed.has(id))
-      if (candidate.length) {
-        runtime.store.dispatch(editorActions.selectionChanged(candidate))
-        runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
-      }
-    }
-    else if (state.handleElementId !== liveElement.id) {
-      runtime.store.dispatch(editorActions.handleElementChanged(liveElement.id))
-    }
-    else if (state.activeGroupElementId !== liveElement.id) {
-      const startPageX = event.pageX
-      const startPageY = event.pageY
-      const target = event.target as HTMLElement
-      target.onmouseup = mouseUpEvent => {
-        if (startPageX === mouseUpEvent.pageX && startPageY === mouseUpEvent.pageY) {
-          runtime.store.dispatch(editorActions.activeGroupElementChanged(liveElement.id))
-          target.onmouseup = null
-        }
-      }
-    }
-  }
-
-  const handleElementContextMenu = (event: ReactMouseEvent<HTMLElement>, element: PPTElement) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const liveState = runtime.store.getState()
-    const liveSession = selectSession(liveState)
-    const liveSlide = selectCurrentSlide(liveState) ?? EMPTY_EDITOR_SLIDE
-    const liveElement = liveSlide.elements.find(item => item.id === element.id) ?? element
-    if (!liveElement.lock) {
-      if (!liveSession.activeElementIds.includes(liveElement.id)) selectElement(event.nativeEvent, liveElement)
-      else if (event.ctrlKey || event.metaKey || event.shiftKey) selectElement(event.nativeEvent, liveElement)
-      else if (liveSession.handleElementId !== liveElement.id) {
-        runtime.store.dispatch(editorActions.handleElementChanged(liveElement.id))
-      }
-    }
-    setMenu({
-      elementId: liveElement.id,
-      position: { x: event.clientX, y: event.clientY },
-      surface: 'element',
-    })
-  }
-
-  const handleTableCellContextMenu = (
-    event: ReactMouseEvent<HTMLElement>,
-    element: PPTTableElement,
-    row: number,
-    column: number,
-  ) => {
-    event.preventDefault()
-    event.stopPropagation()
-    if (!selectSession(runtime.store.getState()).activeElementIds.includes(element.id)) {
-      runtime.store.dispatch(editorActions.selectionChanged([element.id]))
-    }
-    runtime.store.dispatch(editorActions.handleElementChanged(element.id))
-    const selected = selectSession(runtime.store.getState()).selectedTableCells
-    const key = tableCellKey(row, column)
-    if (!selected.includes(key)) runtime.store.dispatch(editorActions.selectedTableCellsChanged([key]))
-    setMenu({
-      cell: { row, column },
-      elementId: element.id,
-      position: { x: event.clientX, y: event.clientY },
-      surface: 'table-cell',
-    })
-  }
-
   const createTextAtPoint = (point: PointerPosition) => {
     const viewportRect = canvasRef.current?.getBoundingClientRect()
     if (!viewportRect) return
@@ -732,7 +543,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     stageRef.current?.focus()
     runtime.store.dispatch(editorActions.canvasFocusChanged(true))
     runtime.store.dispatch(editorActions.thumbnailsFocusChanged(false))
-    setMenu(null)
+    closeMenu()
     if (cropElementId) finishCropEditing(true)
     if (event.button !== 0) {
       // Canvas.vue receives every mousedown button. A secondary-button blank
@@ -824,167 +635,19 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
     }
   }
 
-  const finishGesture = (event: ReactPointerEvent<HTMLElement>) => {
-    const context = gestureRef.current
-    const snapshot = runtime.interaction.getSnapshot()
-    if (!context || snapshot.status !== 'active') return
-    const finalPreview = derivePreview(context, snapshot, currentSlide, presentation.viewportSize, presentation.viewportRatio)
-    let finalUpdates = finalPreview.updates
-    if (context.kind === 'resize' && context.elements.length === 1) {
-      const element = context.elements[0]
-      if (element?.type === 'text' && !element.fixedHeight) {
-        const content = canvasRef.current?.querySelector<HTMLElement>(
-          `[data-element-id="${CSS.escape(element.id)}"] .mona-text-content`,
-        )
-        if (content) {
-          const measuredUpdates = new Map<string, Partial<PPTElement>>(finalUpdates)
-          const props = measuredUpdates.get(element.id) ?? {}
-          const styles = getComputedStyle(content)
-          const measured = Number.parseFloat(element.vertical ? styles.width : styles.height)
-          measuredUpdates.set(element.id, (element.vertical
-            ? { ...props, width: measured }
-            : { ...props, height: measured }) as Partial<PPTElement>)
-          finalUpdates = measuredUpdates
-        }
-      }
-      else if (element?.type === 'table') {
-        const table = canvasRef.current?.querySelector<HTMLElement>(
-          `[data-element-id="${CSS.escape(element.id)}"] .mona-static-table`,
-        )
-        if (table) {
-          const measuredUpdates = new Map<string, Partial<PPTElement>>(finalUpdates)
-          measuredUpdates.set(element.id, {
-            ...(measuredUpdates.get(element.id) ?? {}),
-            height: table.offsetHeight,
-          } as Partial<PPTElement>)
-          finalUpdates = measuredUpdates
-        }
-      }
-    }
-    runtime.interaction.complete()
-    gestureRef.current = null
-    rawGestureOriginRef.current = null
-    setGestureContext(null)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-
-    if (context.kind === 'drag') {
-      const painterTarget = currentSlide.elements.find((element): element is Extract<PPTElement, { type: 'shape' }> => (
-        element.id === context.sourceHandleElementId && element.type === 'shape'
-      ))
-      if (painterTarget) runtime.shapeFormatPainter.apply(painterTarget)
-    }
-
-    if (context.kind === 'pan' && finalPreview.pan) {
-      runtime.store.dispatch(editorActions.canvasPanChanged(finalPreview.pan))
-      runtime.store.dispatch(editorActions.canvasDraggedChanged(true))
-      return
-    }
-    if (context.kind === 'drag' && !context.activated) {
-      if (snapshot.delta.x === 0 && snapshot.delta.y === 0) {
-        if (context.pendingToggleIds?.length) {
-          runtime.store.dispatch(editorActions.selectionChanged(context.pendingToggleIds))
-          runtime.store.dispatch(editorActions.activeGroupElementChanged(null))
-        }
-        else if (context.pendingActiveGroupElementId) {
-          runtime.store.dispatch(editorActions.activeGroupElementChanged(context.pendingActiveGroupElementId))
-        }
-      }
-      // Quirk retired: the source editor recorded a history snapshot for sub-threshold
-      // moved drags even though no document field changed.
-      return
-    }
-    if (context.kind === 'lasso' && finalPreview.lasso) {
-      const selection = rectToBounds(finalPreview.lasso)
-      const intersecting = event.ctrlKey || event.metaKey || event.shiftKey
-      const ids = getLassoSelectionIds({
-        elements: currentSlide.elements,
-        hiddenElementIds: new Set(session.hiddenElementIds),
-        intersecting,
-        selection,
-      })
-      runtime.store.dispatch(editorActions.selectionChanged(ids))
-      return
-    }
-    if (context.kind === 'create') {
-      const selection = resolveCreateGestureSelection({
-        lastPointer: snapshot.pointer,
-        modifiers: snapshot.modifiers,
-        rawPointer: inputPoint(event.nativeEvent),
-        start: snapshot.origin,
-        tool: context.tool.type,
-      })
-      const element = createElementFromGesture(
-        context.tool,
-        selection,
-        context.viewportRect,
-        context.viewportScale,
-        presentation.theme,
-      )
-      if (runtime.commit(`Create ${context.tool.type}`, [{ type: 'element.add', elements: element }])) {
-        runtime.store.dispatch(editorActions.selectionChanged([element.id]))
-        onCreateToolChange(null)
-      }
-      return
-    }
-    if (context.kind === 'crop') {
-      if (exceedsActivationDistance(snapshot.delta, TRANSFORM_ACTIVATION_DISTANCE) && finalPreview.cropGeometry) {
-        updateCropDraft({
-          dirty: true,
-          element: context.element,
-          geometry: finalPreview.cropGeometry,
-        })
-      }
-      return
-    }
-    const activationDistance = context.kind === 'drag' ? context.activationDistance : TRANSFORM_ACTIVATION_DISTANCE
-    if (!exceedsActivationDistance(snapshot.delta, activationDistance) || !finalUpdates.size) {
-      // Quirk retired: the source editor recorded a duplicate snapshot when the handle
-      // of an already-rotated element was clicked without movement.
-      return
-    }
-    if (context.kind === 'drag' && context.duplicateActivated) {
-      if (!context.duplicatePreviewReady) {
-        runtime.recordHistorySnapshot('drag-elements')
-        return
-      }
-      const duplicateUpdates = new Map<string, Partial<PPTElement>>()
-      context.duplicateElements.forEach((duplicate, index) => {
-        const source = context.elements[index]
-        const props = source ? finalUpdates.get(source.id) : undefined
-        if (props) duplicateUpdates.set(duplicate.id, props)
-      })
-      runtime.commit(
-        'Duplicate and move elements',
-        toCommands(duplicateUpdates),
-        { historyKey: 'drag-elements' },
-      )
-      return
-    }
-    if (context.kind === 'rotate' && context.mode === 'group') {
-      // Vue's group-rotate hook returns before applying when deltaAngle is 0;
-      // an identical-value commit would still schedule a history snapshot.
-      const unchanged = [...finalUpdates.entries()].every(([id, props]) => {
-        const original = context.elements.find(element => element.id === id)
-        return original && Object.entries(props).every(([key, value]) => (original as unknown as Record<string, unknown>)[key] === value)
-      })
-      if (unchanged) return
-    }
-    if (context.kind === 'drag' || context.kind === 'resize' || context.kind === 'rotate') {
-      const labels = { drag: 'Move elements', resize: 'Resize elements', rotate: 'Rotate elements' } as const
-      runtime.commit(
-        labels[context.kind],
-        toCommands(finalUpdates),
-        context.kind === 'drag' ? { historyKey: 'drag-elements' } : undefined,
-      )
-      return
-    }
-    if (context.kind === 'line-point' || context.kind === 'shape-keypoint') {
-      runtime.commit(
-        context.kind === 'line-point' ? 'Move line control point' : 'Move shape keypoint',
-        toCommands(finalUpdates),
-      )
-    }
-  }
+  const finishGesture = (event: ReactPointerEvent<HTMLElement>) => commitCanvasGesture(event, {
+    canvasRef,
+    currentSlide,
+    gestureRef,
+    inputPoint,
+    onCreateToolChange,
+    presentation,
+    rawGestureOriginRef,
+    runtime,
+    session,
+    setGestureContext,
+    updateCropDraft,
+  })
 
   const cancelGesture = (event: ReactPointerEvent<HTMLElement>) => {
     const context = gestureRef.current
@@ -1227,124 +890,20 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
   }
 
   function handleContextAction(action: string) {
-    setMenu(null)
-    stageRef.current?.focus()
-    const liveRootState = runtime.store.getState()
-    const livePresentation = selectPresentation(liveRootState)
-    const liveSession = selectSession(liveRootState)
-    const liveCurrentSlide = selectCurrentSlide(liveRootState) ?? EMPTY_EDITOR_SLIDE
-    const liveActiveElementIds = liveSession.activeElementIds
-    const liveMenuElement = menu?.elementId
-      ? liveCurrentSlide.elements.find(element => element.id === menu.elementId)
-      : undefined
-    if (action.startsWith('table-') && liveMenuElement?.type === 'table' && menu?.cell) {
-      const selected = liveSession.selectedTableCells.length
-        ? liveSession.selectedTableCells
-        : [tableCellKey(menu.cell.row, menu.cell.column)]
-      let next: PPTTableElement | null = null
-      if (action === 'table-insert-column-left') next = insertTableColumn(liveMenuElement, menu.cell.column)
-      else if (action === 'table-insert-column-right') next = insertTableColumn(liveMenuElement, menu.cell.column + 1)
-      else if (action === 'table-insert-row-above') next = insertTableRow(liveMenuElement, menu.cell.row)
-      else if (action === 'table-insert-row-below') next = insertTableRow(liveMenuElement, menu.cell.row + 1)
-      else if (action === 'table-delete-column') next = deleteTableColumn(liveMenuElement, menu.cell.column)
-      else if (action === 'table-delete-row') next = deleteTableRow(liveMenuElement, menu.cell.row)
-      else if (action === 'table-merge') {
-        next = mergeTableCells(liveMenuElement, selected)
-        runtime.store.dispatch(editorActions.selectedTableCellsChanged([]))
-      }
-      else if (action === 'table-split') {
-        next = splitTableCell(liveMenuElement, menu.cell.row, menu.cell.column)
-        runtime.store.dispatch(editorActions.selectedTableCellsChanged([]))
-      }
-      else if (action === 'table-select-column') {
-        runtime.store.dispatch(editorActions.selectedTableCellsChanged(liveMenuElement.data.map((_row, row) => tableCellKey(row, menu.cell!.column))))
-      }
-      else if (action === 'table-select-row') {
-        runtime.store.dispatch(editorActions.selectedTableCellsChanged(liveMenuElement.data[menu.cell.row]!.map((_cell, column) => tableCellKey(menu.cell!.row, column))))
-      }
-      else if (action === 'table-select-all') {
-        runtime.store.dispatch(editorActions.selectedTableCellsChanged(liveMenuElement.data.flatMap((row, rowIndex) => row.map((_cell, column) => tableCellKey(rowIndex, column)))))
-      }
-      if (next && next !== liveMenuElement) {
-        runtime.commit('Edit table', [{
-          type: 'element.update',
-          payload: { id: next.id, props: { data: next.data, width: next.width, colWidths: next.colWidths } },
-        }])
-      }
-      return
-    }
-    if (action === 'copy') void writeClipboard(runtime.copySelection())
-    else if (action === 'cut') void writeClipboard(runtime.cutSelection())
-    else if (action === 'paste') {
-      if (!runtime.paste().length && navigator.clipboard) {
-        void navigator.clipboard.readText().then(serialized => runtime.paste(serialized)).catch(() => undefined)
-      }
-    }
-    else if (action === 'delete') deleteCurrentSelection()
-    else if (action === 'select-all') runtime.selectAll()
-    else if (action === 'ruler') runtime.store.dispatch(editorActions.rulerVisibilityChanged(!showRuler))
-    else if (action === 'grid-toggle') runtime.store.dispatch(editorActions.gridLineSizeChanged(gridLineSize ? 0 : 50))
-    else if (action.startsWith('grid-')) runtime.store.dispatch(editorActions.gridLineSizeChanged(Number(action.slice(5))))
-    else if (action === 'reset-slide') {
-      const elementIds = liveCurrentSlide.elements.map(element => element.id)
-      if (elementIds.length && runtime.commit('Reset slide', [{ type: 'element.delete', elementIds }])) {
-        runtime.store.dispatch(editorActions.selectionChanged([]))
-      }
-    }
-    else if (action === 'slideshow') {
-      startPresentation({ fromStart: true })
-    }
-    else if (action.startsWith('align-')) {
-      const command = action.slice('align-'.length) as Parameters<typeof alignElementsToCanvas>[0]['command']
-      const elements = alignElementsToCanvas({
-        command,
-        elements: liveCurrentSlide.elements,
-        selectedIds: new Set(liveActiveElementIds),
-        viewportHeight: livePresentation.viewportSize * livePresentation.viewportRatio,
-        viewportWidth: livePresentation.viewportSize,
-      })
-      runtime.commit('Align elements to slide', [{ type: 'slide.update', props: { elements } }])
-    }
-    else if (['bring-front', 'bring-forward', 'send-back', 'send-backward'].includes(action)) {
-      const orderTarget = liveMenuElement ?? liveCurrentSlide.elements.find(element => element.id === liveSession.handleElementId)
-      if (!orderTarget) return
-      const command = ({
-        'bring-front': 'top',
-        'bring-forward': 'up',
-        'send-back': 'bottom',
-        'send-backward': 'down',
-      } as const)[action as 'bring-front' | 'bring-forward' | 'send-back' | 'send-backward']
-      const elements = orderElement(liveCurrentSlide.elements, orderTarget.id, command)
-      if (elements) runtime.commit('Reorder elements', [{ type: 'slide.update', props: { elements } }])
-    }
-    else if (action === 'group') {
-      const selected = new Set(liveActiveElementIds)
-      const elements = groupElements(liveCurrentSlide.elements, selected, createPresentationId(10))
-      runtime.commit('Group elements', [{ type: 'slide.update', props: { elements } }])
-    }
-    else if (action === 'ungroup') {
-      const elements = ungroupElements(liveCurrentSlide.elements, new Set(liveActiveElementIds))
-      if (!elements) return
-      const changed = runtime.commit('Ungroup elements', [{ type: 'slide.update', props: { elements } }])
-      const selectedId = liveMenuElement?.id ?? liveSession.handleElementId ?? liveActiveElementIds[0]
-      if (changed && selectedId) runtime.store.dispatch(editorActions.selectionChanged([selectedId]))
-    }
-    else if (action === 'lock' || action === 'unlock') {
-      commitElementLockChange({
-        action,
-        elements: liveCurrentSlide.elements,
-        selectedIds: liveActiveElementIds,
-        targetElementId: liveMenuElement?.id,
-      })
-    }
-    else if (action === 'set-link' && liveMenuElement) {
-      openLinkEditorFor(liveMenuElement)
-    }
+    return runCanvasMenuAction(action, {
+    closeMenu,
+    commitElementLockChange,
+    deleteCurrentSelection,
+    gridLineSize,
+    menu,
+    openLinkEditorFor,
+    runtime,
+    showRuler,
+    stageRef,
+      startPresentation,
+    })
   }
 
-
-  // useEffectEvent replaces the manual ref-mirroring pattern: the long-lived
-  // native listeners below always observe the latest render's handlers.
   const dispatchDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => handleKeyDown(event))
   const dispatchDocumentPaste = useEffectEvent((event: ClipboardEvent) => handlePaste(event))
   const dispatchStageWheel = useEffectEvent((event: WheelEvent) => handleWheel(event))
@@ -1432,11 +991,11 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
         event.preventDefault()
         if (activeTool) {
           onCreateToolChange(null)
-          setMenu(null)
+          closeMenu()
           return
         }
         stageRef.current?.focus()
-        setMenu({ position: { x: event.clientX, y: event.clientY }, surface: 'canvas' })
+        openCanvasMenu({ x: event.clientX, y: event.clientY })
       }}
       ref={stageRef}
       role="application"
@@ -1505,7 +1064,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
             <SlideRenderer
               mediaEditor={element => ({
                 active: session.handleElementId === element.id,
-                onContextMenu: event => handleElementContextMenu(event, element),
+                onContextMenu: event => openElementMenu(event, element),
                 onPointerDown: (event, canMove) => handleMediaPointerDown(event, element, canMove),
                 scale,
                 viewportRatio: presentation.viewportRatio,
@@ -1527,7 +1086,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                     />
                   )
                   : undefined,
-                onContextMenu: event => handleElementContextMenu(event, element),
+                onContextMenu: event => openElementMenu(event, element),
                 onDoubleClick: event => {
                   event.stopPropagation()
                   if (element.lock) return
@@ -1546,7 +1105,8 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                 isHandle: session.handleElementId === element.id,
                 scale,
                 selectedCells: session.selectedTableCells,
-                onContextMenu: (event, row, column) => handleTableCellContextMenu(event, element, row, column),
+                onContextMenu: (event, row, column) => openTableCellMenu(event, element, row, column),
+                onElementContextMenu: event => openElementMenu(event, element),
                 onElementChange: (next, label) => {
                   runtime.commit(label, [{
                     type: 'element.update',
@@ -1581,7 +1141,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                     runtime={runtime}
                   />
                 ),
-                onContextMenu: event => handleElementContextMenu(event, element),
+                onContextMenu: event => openElementMenu(event, element),
                 // Text had no promotion step, so the always-live editor caught
                 // the first click. Mirror the shape path: double-click edits.
                 onDoubleClick: event => {
@@ -1632,7 +1192,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                   className="mona-element-hit-target"
                   data-element-hit={element.id}
                   key={element.id}
-                  onContextMenu={event => handleElementContextMenu(event, element)}
+                  onContextMenu={event => openElementMenu(event, element)}
                   onDoubleClick={event => {
                     event.stopPropagation()
                     if (element.type === 'chart' && !element.lock) onEditChart(element.id)
@@ -1829,7 +1389,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
           grouped={!!menuElement?.groupId || menuElement?.type === 'group'}
           locked={!!menuElement?.lock}
           onAction={handleContextAction}
-          onDismiss={() => setMenu(null)}
+          onDismiss={() => closeMenu()}
           position={menu.position}
           showRuler={showRuler}
           surface={menu.surface}

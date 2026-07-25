@@ -649,8 +649,138 @@ export interface ChartData {
  *
  * lineColor?: 网格颜色
  */
+/**
+ * A chart part's own structure, retained beside the simplified view Mona's
+ * current renderer consumes.
+ *
+ * A chart part is a chart *space*: a plot area holding one or more families,
+ * each with its own series and axis references. The flat `chartType` union
+ * cannot express a combo chart, a series on a secondary axis, or a number
+ * format, so it remains a compatibility adapter while this is the record of
+ * what the deck declared.
+ */
+export interface PowerPointChartReference {
+  /** Number format the cache itself declares, such as `General`. */
+  formatCode?: string
+  /** The workbook range the cached points came from. */
+  formula?: string
+  kind: 'multiLevelString' | 'number' | 'numberLiteral' | 'string' | 'stringLiteral'
+  pointCount?: number
+}
+
+export interface PowerPointChartSeriesReferences {
+  bubbleSizes?: PowerPointChartReference
+  categories?: PowerPointChartReference
+  name?: PowerPointChartReference
+  values?: PowerPointChartReference
+  xValues?: PowerPointChartReference
+  yValues?: PowerPointChartReference
+}
+
+export interface PowerPointChartNumberFormat {
+  formatCode: string
+  sourceLinked?: boolean
+}
+
+export interface PowerPointChartDataLabels {
+  numberFormat?: PowerPointChartNumberFormat
+  position?: string
+  showBubbleSize?: boolean
+  showCategoryName?: boolean
+  showLegendKey?: boolean
+  showPercent?: boolean
+  showSeriesName?: boolean
+  showValue?: boolean
+}
+
+export interface PowerPointChartSeries {
+  bubbleSizes?: Array<number | undefined>
+  categories?: Array<string | undefined>
+  dataLabels?: PowerPointChartDataLabels
+  index: number
+  markerSymbol?: string
+  name?: string
+  order: number
+  /** Where each cached array came from in the workbook. */
+  references?: PowerPointChartSeriesReferences
+  smooth?: boolean
+  values?: Array<number | undefined>
+  xValues?: Array<number | undefined>
+  yValues?: Array<number | undefined>
+}
+
+export interface PowerPointChartFamily {
+  /** Axis ids this family plots against; a secondary axis is a second pair. */
+  axisIds: string[]
+  barDirection?: string
+  dataLabels?: PowerPointChartDataLabels
+  gapWidth?: number
+  grouping?: string
+  holeSize?: number
+  /** The OOXML element name, such as `barChart` or `lineChart`. */
+  kind: string
+  marker?: boolean
+  overlap?: number
+  series: PowerPointChartSeries[]
+  style?: string
+  varyColors?: boolean
+}
+
+export interface PowerPointChartAxis {
+  baseTimeUnit?: string
+  crossAxisId?: string
+  deleted?: boolean
+  id: string
+  kind: 'category' | 'date' | 'series' | 'value'
+  majorGridlines?: boolean
+  majorTickMark?: string
+  majorUnit?: number
+  minorGridlines?: boolean
+  minorTickMark?: string
+  minorUnit?: number
+  numberFormat?: PowerPointChartNumberFormat
+  position?: string
+  scaling?: { logBase?: number; max?: number; min?: number; orientation?: string }
+  tickLabelPosition?: string
+  title?: string
+}
+
+export interface PowerPointChartSpace {
+  autoTitleDeleted?: boolean
+  displayBlanksAs?: string
+  /** Relationship tying the chart's formulas to a workbook part. */
+  externalData?: { autoUpdate?: boolean; relationshipId?: string }
+  legend?: { overlay?: boolean; position?: string }
+  plotArea: { axes: PowerPointChartAxis[]; families: PowerPointChartFamily[] }
+  plotVisibleOnly?: boolean
+  schemaVersion: 1
+  title?: { overlay?: boolean; text?: string }
+}
+
+/**
+ * Where an imported chart's parts live inside the retained package.
+ *
+ * A chart is not a single part: its data sits in an embedded workbook, and it
+ * may own a drawing overlay and a theme override. Holding the addresses keeps
+ * the retained bytes reachable — an edit can find the workbook, and an export
+ * can copy what it did not touch rather than regenerating it.
+ */
+export interface PowerPointChartSource {
+  /** Target of a workbook the deck links to but does not embed. */
+  externalWorkbook?: string
+  partPath: string
+  relationshipIds?: Record<string, string>
+  themeOverridePart?: string
+  userShapesPart?: string
+  workbookPart?: string
+}
+
 export interface PPTChartElement extends PPTBaseElement {
   type: 'chart'
+  /** Addresses of this chart's parts in the retained package. */
+  chartSource?: PowerPointChartSource
+  /** What the chart part declares, retained without interpretation. */
+  chartSpace?: PowerPointChartSpace
   fill?: string
   chartType: ChartType
   data: ChartData

@@ -261,27 +261,6 @@ const alignmentMap: Record<string, string> = {
   thaiDist: 'justify',
 }
 
-/**
- * Maps a bulleted paragraph's hanging indent onto its list item.
- *
- * PowerPoint places the marker at `marL + indent` and the text at `marL`,
- * where `indent` is negative for a hanging bullet. Applied to the paragraph
- * itself that pair cancels out — the negative text-indent pulls the first line
- * back to make room for a marker that CSS has already moved outside the box,
- * leaving the bullet flush against the text. Carried by the list item instead,
- * the margin positions the marker and the padding becomes the gap, which is
- * what the author actually specified.
- */
-const listItemIndentStyle = (
-  properties: StructuredTextParagraphProperties,
-  scale: number,
-): string => {
-  if (properties.marginLeft === undefined && properties.indent === undefined) return ''
-  const textLeft = (properties.marginLeft ?? 0) * scale
-  const hanging = Math.max(0, -(properties.indent ?? 0) * scale)
-  return `margin-left:${Math.max(0, textLeft - hanging)}px;padding-left:${hanging}px`
-}
-
 const paragraphStyle = (
   properties: StructuredTextParagraphProperties,
   scale: number,
@@ -291,7 +270,8 @@ const paragraphStyle = (
   const styles: string[] = []
   if (properties.alignment) styles.push(`text-align:${alignmentMap[properties.alignment] ?? properties.alignment}`)
   if (properties.rightToLeft) styles.push('direction:rtl', 'unicode-bidi:plaintext')
-  // A list item owns the indent so that the marker lands in the hanging space.
+  // A bulleted paragraph's indent belongs to its list, which owns the space
+  // the marker hangs in; applying it here as well would double it.
   if (!inListItem && properties.marginLeft !== undefined) styles.push(`padding-left:${properties.marginLeft * scale}px`)
   if (!inListItem && properties.indent !== undefined) styles.push(`text-indent:${properties.indent * scale}px`)
   if (properties.lineSpacing) {
@@ -420,28 +400,45 @@ const resolveBulletCharacter = (
 }
 
 /**
- * A bullet carries its own font, colour, and size in PowerPoint — a Wingdings
- * marker is a glyph in that face, not the character the body font draws for
- * that codepoint. CSS can only reach a marker through `::marker`, which no
- * inline style attribute can target, so the values travel as custom properties
- * that the stylesheet's `::marker` rule consumes.
+ * Styles the list so its markers match the text they belong to.
+ *
+ * `::marker` inherits from its list item, and a list item inherits from the
+ * list, so the marker's size and colour are set on the list itself rather than
+ * through a rule of their own. A bullet with no authored size is the size of
+ * its paragraph's text — leaving it unset makes markers render at whatever the
+ * container's font size happens to be, which is why they came out tiny.
+ *
+ * The indent goes here too. PowerPoint puts the text at `marL`, and expressing
+ * that as the list's own padding keeps it in one place, where the editing
+ * surface's schema can preserve it.
  */
-const bulletMarkerStyle = (
+const bulletListStyle = (
   bullet: NonNullable<StructuredTextParagraphProperties['bullet']>,
+  properties: StructuredTextParagraphProperties,
+  markerFontSize: number | undefined,
   context: StructuredTextCompileContext,
   scale: number,
   fontScale: number,
   authoredFont: boolean,
 ): string => {
   const styles: string[] = []
-  const color = resolveColor(bullet.color, context)
-  if (color) styles.push(`--mona-bullet-color:${color}`)
-  if (bullet.fontFamily && authoredFont) styles.push(`--mona-bullet-font:${JSON.stringify(bullet.fontFamily)}`)
-  if (bullet.size) {
-    styles.push(bullet.size.unit === 'percent'
-      ? `--mona-bullet-size:${bullet.size.value}%`
-      : `--mona-bullet-size:${bullet.size.value * scale * fontScale}px`)
+  if (bullet.size?.unit === 'percent' && markerFontSize === undefined) {
+    // Without a known text size the authored percentage still resolves, just
+    // against whatever the list inherits.
+    styles.push(`font-size:${bullet.size.value}%`)
   }
+  else {
+    const size = bullet.size?.unit === 'percent'
+      ? markerFontSize! * bullet.size.value / 100
+      : bullet.size?.unit === 'points'
+        ? bullet.size.value
+        : markerFontSize
+    if (size !== undefined) styles.push(`font-size:${size * scale * fontScale}px`)
+  }
+  const color = resolveColor(bullet.color, context)
+  if (color) styles.push(`color:${color}`)
+  if (bullet.fontFamily && authoredFont) styles.push(`font-family:${JSON.stringify(bullet.fontFamily)}`)
+  if (properties.marginLeft) styles.push(`padding-left:${properties.marginLeft * scale}px`)
   return styles.join(';')
 }
 
@@ -478,6 +475,36 @@ const renderRun = (
     : span
 }
 
+const paragraphFontSize = (
+  paragraph: StructuredTextParagraph,
+  properties: StructuredTextParagraphProperties,
+): number | undefined => {
+  const sizes = paragraph.runs
+    .map(run => run.properties?.fontSize)
+    .filter((size): size is number => typeof size === 'number')
+  // PowerPoint sizes a line from the text on it, so the largest run wins; an
+  // empty paragraph takes its height from the end-paragraph properties.
+  if (sizes.length) return Math.max(...sizes)
+  return paragraph.endProperties?.fontSize ?? properties.defaultRun?.fontSize
+}
+
+/**
+ * The size a body's blank lines fall back to.
+ *
+ * Layouts built in web editors space their content with empty paragraphs, and
+ * those paragraphs often declare no size at all. Letting them fall through to
+ * the browser default shrinks every blank line to roughly half its height,
+ * which walks whatever follows up the slide — labels end up on top of the
+ * artwork they were meant to sit beneath.
+ */
+const bodyFontSize = (body: StructuredTextBody): number | undefined => {
+  for (const paragraph of body.paragraphs) {
+    const size = paragraphFontSize(paragraph, paragraph.properties ?? {})
+    if (size !== undefined) return size
+  }
+  return undefined
+}
+
 /**
  * The run properties that establish a paragraph's line box: the inherited
  * defaults, but at the size its own runs render at.
@@ -485,16 +512,11 @@ const renderRun = (
 const paragraphRunContext = (
   paragraph: StructuredTextParagraph,
   properties: StructuredTextParagraphProperties,
+  fallbackFontSize?: number,
 ): StructuredTextRunProperties => {
   const defaultRun = properties.defaultRun ?? {}
-  const sizes = paragraph.runs
-    .map(run => run.properties?.fontSize)
-    .filter((size): size is number => typeof size === 'number')
-  if (sizes.length) return { ...defaultRun, fontSize: Math.max(...sizes) }
-  // An empty paragraph is a real line whose height PowerPoint takes from the
-  // end-paragraph properties, not from whatever the body would inherit.
-  const endSize = paragraph.endProperties?.fontSize
-  return endSize === undefined ? defaultRun : { ...defaultRun, fontSize: endSize }
+  const fontSize = paragraphFontSize(paragraph, properties) ?? fallbackFontSize
+  return fontSize === undefined ? defaultRun : { ...defaultRun, fontSize }
 }
 
 const renderParagraph = (
@@ -504,6 +526,7 @@ const renderParagraph = (
   fontScale: number,
   lineSpacingReduction: number,
   inListItem = false,
+  fallbackFontSize?: number,
 ): string => {
   const properties = paragraph.properties ?? {}
   const defaultTabSize = properties.defaultTabSize ?? 36
@@ -528,7 +551,7 @@ const renderParagraph = (
   // largest run wins.
   const style = [
     paragraphStyle(properties, scale, lineSpacingReduction, inListItem),
-    runStyle(paragraphRunContext(paragraph, properties), scale, fontScale),
+    runStyle(paragraphRunContext(paragraph, properties, fallbackFontSize), scale, fontScale),
   ].filter(Boolean).join(';')
   return `<p data-ppt-paragraph-id="${escapeHtml(paragraph.sourceId)}" data-ppt-level="${paragraph.level}"${style ? ` style="${escapeHtml(style)}"` : ''}>${content || '<br>'}</p>`
 }
@@ -539,9 +562,10 @@ const renderHtml = (
 ): string => {
   const fontScale = (body.bodyProperties?.autoFit?.fontScale ?? 100) / 100
   const lineSpacingReduction = body.bodyProperties?.autoFit?.lineSpacingReduction ?? 0
+  const fallbackFontSize = bodyFontSize(body)
   let html = ''
   const listStack: Array<{ level: number; tag: 'ol' | 'ul'; style: string }> = []
-  const listItem = (marker: string) => `<li${marker ? ` style="${escapeHtml(marker)}"` : ''}>`
+  const listItem = () => '<li>'
   const closeTopList = () => {
     const openList = listStack.pop()
     if (!openList) return
@@ -557,19 +581,15 @@ const renderHtml = (
     startAt: number | undefined,
     marker: string,
   ) => {
-    // The indent and the marker properties are declared on the list as well as
-    // on each item. Custom properties inherit, so `::marker` still resolves
-    // them, and the list survives editing surfaces whose schema keeps a list's
-    // style attribute but not an item's.
     const listStyle = [`list-style-type:${style}`, marker].filter(Boolean).join(';')
-    html += `<${tag} data-ppt-level="${level}" style="${escapeHtml(listStyle)}"${tag === 'ol' && startAt ? ` start="${startAt}"` : ''}>${listItem(marker)}`
+    html += `<${tag} data-ppt-level="${level}" style="${escapeHtml(listStyle)}"${tag === 'ol' && startAt ? ` start="${startAt}"` : ''}>${listItem()}`
     listStack.push({ level, style, tag })
   }
   for (const paragraph of body.paragraphs) {
     const bullet = paragraph.properties?.bullet
     if (!bullet || bullet.type === 'none') {
       closeLists()
-      html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction)
+      html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction, false, fallbackFontSize)
       continue
     }
     const tag = bullet.type === 'auto-number' ? 'ol' : 'ul'
@@ -583,10 +603,15 @@ const renderHtml = (
         // surfaces whose schema drops the exact indent declared below.
         ? JSON.stringify(`${resolved.character}${BULLET_SEPARATOR}`)
         : 'disc'
-    const marker = [
-      bulletMarkerStyle(bullet, context, body.scale, fontScale, resolved.authoredFont),
-      listItemIndentStyle(paragraph.properties ?? {}, body.scale),
-    ].filter(Boolean).join(';')
+    const marker = bulletListStyle(
+      bullet,
+      paragraph.properties ?? {},
+      paragraphRunContext(paragraph, paragraph.properties ?? {}, fallbackFontSize).fontSize,
+      context,
+      body.scale,
+      fontScale,
+      resolved.authoredFont,
+    )
 
     while (listStack.length && listStack[listStack.length - 1]!.level > paragraph.level) {
       closeTopList()
@@ -597,13 +622,13 @@ const renderHtml = (
       openList(paragraph.level, tag, style, bullet.startAt, marker)
     }
     else if (current.tag === tag && current.style === style) {
-      html += `</li>${listItem(marker)}`
+      html += `</li>${listItem()}`
     }
     else {
       closeTopList()
       openList(paragraph.level, tag, style, bullet.startAt, marker)
     }
-    html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction, true)
+    html += renderParagraph(paragraph, context, body.scale, fontScale, lineSpacingReduction, true, fallbackFontSize)
   }
   closeLists()
   return html

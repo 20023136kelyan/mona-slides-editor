@@ -21,11 +21,12 @@ test('loads Mona and changes locale without browser errors', async ({ page }) =>
   await expect(page.getByLabel('Mona presentation editor')).toBeVisible()
   await expect(page.locator('.mona-editor-header-title-input')).toHaveValue('Untitled presentation')
 
+  // Settings lives at the bottom of the creation rail (the future account slot).
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await page.locator('.mona-header-locale-select').click()
-  await page.locator('.mona-panel-select-popover:visible .mona-panel-select-option').filter({ hasText: /^Simplified Chinese$/ }).click()
+  await page.getByRole('combobox', { name: 'Language' }).click()
+  await page.getByRole('option', { name: 'Simplified Chinese', exact: true }).click()
 
-  await expect(page.locator('.mona-editor-header-item[aria-label="设置"]')).toBeVisible()
+  await expect(page.locator('.mona-editor-rail-settings[aria-label="设置"]')).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN')
   await expect(page.locator('.mona-editor-header-title-input')).toHaveValue('Untitled presentation')
   expect(browserProblems).toEqual([])

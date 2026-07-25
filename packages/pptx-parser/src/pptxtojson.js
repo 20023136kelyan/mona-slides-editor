@@ -3,6 +3,7 @@ import { readXmlFile } from './readXmlFile'
 import { getBorder } from './border'
 import { getSlideBackgroundFills, getShapeFill, getSolidFill, getPicFill, getPicFillOpacity, getPicFilters, getImageData, getVideoData, getAudioData } from './fill'
 import { getChartInfo, getChartMetadata } from './chart'
+import { getChartSpace } from './chartSpace'
 import { getVerticalAlign, getTextAutoFit } from './paragraph'
 import { getTextInsets } from './textInsets'
 import { getPosition, getSize } from './position'
@@ -93,6 +94,8 @@ function collectRelationshipIds(value, ids = new Set(), depth = 0) {
   }
   return ids
 }
+
+export { openEmbeddedWorkbook, parseRangeFormula } from './workbook'
 
 export async function parse(file, options = {}) {
   const slides = []
@@ -1694,8 +1697,54 @@ async function genChart(node, warpObj) {
   if (chart.showSeriesName !== undefined) data.showSeriesName = chart.showSeriesName
   if (chart.showValue !== undefined) data.showValue = chart.showValue
   if (chart.seriesChartTypes !== undefined) data.seriesChartTypes = chart.seriesChartTypes
+  data.resources = await getChartResources(refName, warpObj['zip'])
+  // The typed chart space retains what the part declares — families, series,
+  // axes — beside the simplified view the current renderer consumes.
+  const chartSpace = getChartSpace(content)
+  if (chartSpace) data.chartSpace = chartSpace
 
   return data
+}
+
+const CHART_RESOURCE_KINDS = {
+  chartUserShapes: 'userShapesPart',
+  // A chart's data lives in a whole embedded workbook. Modern decks attach it
+  // as `package`; decks carrying a legacy .xls attach it as `oleObject`.
+  oleObject: 'workbookPart',
+  package: 'workbookPart',
+  themeOverride: 'themeOverridePart',
+}
+
+/**
+ * Resolves the parts a chart owns.
+ *
+ * A chart is not one part: it references an embedded workbook holding its
+ * data, and may add a drawing overlay and a theme override. Recording where
+ * they live is what lets an edit find the workbook, and what lets an export
+ * copy the parts it did not touch instead of regenerating them.
+ */
+async function getChartResources(chartPath, zip) {
+  const relationshipPath = chartPath.replace(/([^/]+)$/, '_rels/$1.rels')
+  const content = await readXmlFile(zip, relationshipPath)
+  const relationships = getTextByPathList(content, ['Relationships', 'Relationship'])
+  const resources = { partPath: chartPath, relationshipIds: {} }
+  for (const relationship of asArray(relationships)) {
+    const attrs = relationship?.['attrs']
+    if (!attrs?.['Type'] || !attrs['Target']) continue
+    const kind = attrs['Type'].split('/').pop()
+    const key = CHART_RESOURCE_KINDS[kind]
+    if (!key) continue
+    // A workbook the deck never embedded is a link to someone else's machine.
+    // It cannot be opened or round-tripped, so it is recorded as the external
+    // reference it is rather than dropped as if the chart had no source.
+    if (attrs['TargetMode'] === 'External') {
+      if (key === 'workbookPart') resources.externalWorkbook = attrs['Target']
+      continue
+    }
+    resources[key] = resolvePackageTarget(chartPath, attrs['Target'])
+    resources.relationshipIds[key] = attrs['Id']
+  }
+  return resources
 }
 
 async function genDiagram(node, warpObj, source) {

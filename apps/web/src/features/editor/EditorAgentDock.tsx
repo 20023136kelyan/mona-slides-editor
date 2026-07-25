@@ -468,8 +468,8 @@ export function EditorAgentDock({ handoff = null, runtime }: {
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
       <SidebarHeader className="flex min-h-11.5 flex-row items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
+        {/* No close control: the header's AI button is the single toggle. */}
         <h2 className="m-0 min-w-0 truncate text-control font-medium" id="mona-agent-dock-title" title={slideTitle || t('foundation.editor.statusBar.untitledPage')}>{slideTitle || t('foundation.editor.statusBar.untitledPage')}</h2>
-        <Button aria-label={t('common.close')} onClick={closeAgent} size="editor-icon" type="button" variant="ghost"><X /></Button>
       </SidebarHeader>
           <PopoverContent
             aria-label={t('foundation.editor.agent.chooseProvider')}
