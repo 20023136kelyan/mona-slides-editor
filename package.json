@@ -31,6 +31,7 @@
     "check:architecture": "node scripts/check-architecture-boundaries.mjs",
     "test:core": "npm exec -w @mona/presentation-core -- vitest run --config vitest.integration.config.ts",
     "benchmark:state": "MONA_WRITE_PERFORMANCE_BASELINE=1 npm exec -w @mona/presentation-core -- vitest run --config vitest.integration.config.ts tests/performance/editor-state-performance.test.ts",
+    "test:agent": "npm run test -w @mona/agent-server",
     "test:react": "npm run test -w @mona/web",
     "e2e:react": "npm run e2e -w @mona/web",
     "lint:react": "npm run lint -w @mona/web",

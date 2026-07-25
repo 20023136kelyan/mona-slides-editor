@@ -43,6 +43,9 @@ jobs:
       - name: Core package tests
         run: npm run test:core
 
+      - name: Agent server tests
+        run: npm run test:agent
+
       - name: App e2e
         run: npm exec -w @mona/web -- playwright test
 
