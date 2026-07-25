@@ -18,6 +18,8 @@
 .mona-editor-shell {
   /* AI dock column width (the rail and drawer take their widths from Tailwind). */
   --dock-w: 400px;
+  /* The one surface the whole canvas column paints on. */
+  --editor-canvas-surface: #f3f4f7;
   position: relative;
   display: flex;
   min-width: 0;
@@ -37,6 +39,11 @@
   overflow: hidden;
   background: var(--background);
 }
+/* The canvas column is a single continuous surface. The header, stage,
+   filmstrip and status bar all sit on it and paint nothing of their own, so the
+   blurred bars have no edge to reveal and a zoomed slide can scroll behind them
+   without the bars reading as separate chrome. */
+.mona-editor-main { background: var(--editor-canvas-surface); }
 /* Canvas column: override SidebarInset w-full so rail/drawer stay siblings. */
 .mona-editor-inset {
   min-width: 0 !important;
@@ -44,7 +51,7 @@
   width: auto !important;
   flex: 1 1 0% !important;
   overflow: hidden;
-  background: #f3f4f7;
+  background: transparent;
 }
 .mona-editor-inset > .mona-editor-stage { flex: 1; min-height: 0; overflow: hidden; }
 .mona-editor-inset > .mona-editor-bottombar {
@@ -154,8 +161,21 @@
   overflow-y: hidden;
   padding: 2px;
 }
+/* Styling ::-webkit-scrollbar opts this scroller out of the platform's
+   auto-hiding overlay scrollbar, so the bar would otherwise sit there
+   permanently. Keep the track reserved (the strip must not reflow on hover)
+   and paint the thumb only while the filmstrip is hovered or focused. */
+.mona-thumbnail-list { scrollbar-color: transparent transparent; }
+.mona-thumbnail-list:hover,
+.mona-thumbnail-list:focus-within { scrollbar-color: var(--editor-selection-soft) transparent; }
 .mona-thumbnail-list::-webkit-scrollbar { height: 6px; background: transparent; }
-.mona-thumbnail-list::-webkit-scrollbar-thumb { border-radius: var(--radius-overlay); background: #d9d9d9; }
+.mona-thumbnail-list::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-overlay);
+  background: transparent;
+  transition: background 160ms ease;
+}
+.mona-thumbnail-list:hover::-webkit-scrollbar-thumb,
+.mona-thumbnail-list:focus-within::-webkit-scrollbar-thumb { background: var(--editor-selection-soft); }
 /* Fade whichever edge hides more slides (data attrs from useEdgeFade), so
    the cut-off never reads as a hard clip. */
 .mona-thumbnail-list[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to right, transparent, #000 40px); }
@@ -325,9 +345,9 @@
   position: relative;
   padding: 0;
   outline: 0;
-  /* Canva's measured workspace color; the context bar shares it so the
-     toolbar pill reads as floating over one continuous surface. */
-  background: #f3f4f7;
+  /* The column surface is owned by .mona-editor-main; the stage stays
+     transparent so the header, stage and blurred bars read as one plane. */
+  background: transparent;
   touch-action: none;
   user-select: none;
 }

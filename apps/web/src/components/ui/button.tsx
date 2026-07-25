@@ -21,8 +21,12 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
         editor:
           'border-border bg-background text-foreground hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground',
+        // Keycap treatment: a shaded face over a 1px cast shadow reads as
+        // slightly raised. Pressing drops the shadow while the base class
+        // nudges it down a pixel, so the button physically depresses. Every
+        // tone is mixed from --foreground/--background, so it inverts in dark.
         'header-pill':
-          'border-border bg-background text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground aria-pressed:bg-foreground/[0.06] aria-pressed:text-foreground aria-expanded:bg-foreground/[0.06] aria-expanded:text-foreground',
+          'border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] text-foreground/80 shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground active:shadow-none aria-pressed:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] aria-pressed:text-foreground aria-pressed:shadow-none aria-expanded:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] aria-expanded:text-foreground aria-expanded:shadow-none',
       },
       size: {
         default:

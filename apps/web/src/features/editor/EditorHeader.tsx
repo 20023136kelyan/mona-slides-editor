@@ -391,7 +391,7 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
       <header aria-label={t('header.editorHeader')} className="@container/header" role="banner">
       <div
         aria-label={t('header.menuBar')}
-        className="mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center border-b border-border bg-background px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] @max-[1000px]/header:px-2 @max-[760px]/header:grid-cols-[max-content_minmax(0,1fr)_max-content] @max-[560px]/header:px-1"
+        className="mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] @max-[1000px]/header:px-2 @max-[760px]/header:grid-cols-[max-content_minmax(0,1fr)_max-content] @max-[560px]/header:px-1"
         onKeyDown={moveMenuFocus}
         ref={menuBarRef}
         role="menubar"
@@ -527,25 +527,23 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
             aria-expanded={agentOpen}
             aria-label={t('header.generateWithAI')}
             aria-pressed={agentOpen}
-            className="@max-[880px]/header:w-7 @max-[880px]/header:px-0 @max-[880px]/header:[&>span]:hidden"
             onClick={() => {
               if (agentOpen) closeAgent()
               else openAgent()
               setOpenPopover(null)
             }}
-            size="header-pill"
+            size="header-icon"
             title={t('header.generateWithAI')}
             variant="header-pill"
-          ><Sparkles className={cn(agentOpen && 'text-editor-selection')} /><span>{t('header.ai')}</span></Button>
+          ><Sparkles className={cn(agentOpen && 'text-editor-selection')} /></Button>
           <Popover onOpenChange={open => open ? requestExport() : closeExport()} open={exportType !== null}>
             <PopoverTrigger asChild>
               <Button
                 aria-label={t('header.share')}
-                className="@max-[880px]/header:w-7 @max-[880px]/header:px-0 @max-[880px]/header:[&>span]:hidden"
-                size="header-pill"
+                size="header-icon"
                 title={t('header.share')}
                 variant="header-pill"
-              ><Share2 /><span>{t('header.share')}</span></Button>
+              ><Share2 /></Button>
             </PopoverTrigger>
             {exportType ? <Suspense fallback={null}><EditorExportFeature runtime={runtime} /></Suspense> : null}
           </Popover>

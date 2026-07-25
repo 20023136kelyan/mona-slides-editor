@@ -639,7 +639,7 @@ function EditorDeckContent({
           narrows the header and the canvas together. */}
       <div className="mona-editor-main flex min-w-0 flex-1 flex-col">
       <EditorHeader runtime={runtime} />
-      <SidebarInset className="mona-editor-inset" data-testid="mona-editor-surface" id="mona-editor-surface">
+      <SidebarInset className="mona-editor-inset bg-transparent!" data-testid="mona-editor-surface" id="mona-editor-surface">
       {session.workspaceMode === 'page-grid' ? (
         <EditorErrorBoundary>
           <EditorPageGrid runtime={runtime} />
