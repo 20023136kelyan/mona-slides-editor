@@ -1,4 +1,4 @@
-import * as txml from 'txml/dist/txml.mjs'
+import * as txml from 'txml/txml'
 
 const XML_ENTITIES = {
   amp: '&',
