@@ -36,7 +36,7 @@
     "e2e:react": "npm run e2e -w @mona/web",
     "lint:react": "npm run lint -w @mona/web",
     "lint": "npm run lint -w @mona/web",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^18.4.3",
@@ -51,7 +51,7 @@
     "@vitest/browser": "4.1.10",
     "@vitest/browser-playwright": "4.1.10",
     "crypto-js": "^4.2.0",
-    "husky": "^8.0.3",
+    "husky": "^9.1.7",
     "jszip": "3.10.1",
     "pixelmatch": "7.2.0",
     "pngjs": "7.0.0",
