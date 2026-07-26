@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import AlignBottomIcon from '~icons/icon-park-outline/align-text-bottom-one'
@@ -27,6 +27,8 @@ import {
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { editorLineHeightOptions, editorParagraphSpaceOptions, editorWordSpaceOptions } from '@/features/editor/editor-text-options'
 import { RichTextBaseControls } from '@/features/editor/TextStylePanel'
+import { PRESENTATION_FILTERS, pickFile } from '@/features/editor/editor-files'
+import { fileToDataUrl } from '@/features/editor/editor-image'
 
 type FillType = 'fill' | 'gradient' | 'pattern'
 
@@ -65,7 +67,6 @@ export function ShapeStylePanel({
   const [gradientSelection, setGradientSelection] = useState({ elementId: element.id, index: 0 })
   const gradientIndex = gradientSelection.elementId === element.id ? gradientSelection.index : 0
   const setGradientIndex = (index: number) => setGradientSelection({ elementId: element.id, index })
-  const fileRef = useRef<HTMLInputElement>(null)
   const defaultGradient: Gradient = {
     type: 'linear',
     rotate: 0,
@@ -171,16 +172,10 @@ export function ShapeStylePanel({
       ) : null}
       {fillType === 'pattern' ? (
         <div className="mona-pattern-image-wrapper">
-          <input accept="image/*" aria-label={t('foundation.editor.shape.uploadImage')} hidden onChange={event => {
-            const file = event.target.files?.[0]
-            if (!file) return
-            const reader = new FileReader()
-            reader.addEventListener('load', () => {
-              if (typeof reader.result === 'string') update({ pattern: reader.result })
-            }, { once: true })
-            reader.readAsDataURL(file)
-          }} ref={fileRef} type="file" />
-          <Button className="mona-pattern-image" onClick={() => fileRef.current?.click()} size="editor" style={{ backgroundImage: `url(${element.pattern || ''})` }} type="button" variant="outline"><PlusIcon /></Button>
+          <Button className="mona-pattern-image" onClick={() => {
+            void pickFile(PRESENTATION_FILTERS.image, { title: t('foundation.editor.shape.uploadImage') })
+              .then(async file => { if (file) update({ pattern: await fileToDataUrl(file) }) })
+          }} size="editor" style={{ backgroundImage: `url(${element.pattern || ''})` }} type="button" variant="outline"><PlusIcon /></Button>
         </div>
       ) : null}
 

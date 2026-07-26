@@ -46,8 +46,8 @@ type RangeType = 'all' | 'current' | 'custom'
 export interface EditorExportActions {
   exportImage: (node: HTMLElement, format: 'jpeg' | 'png', quality: number, ignoreWebfont: boolean) => Promise<void>
   exportImagePptx: (nodes: NodeListOf<Element>) => Promise<void>
-  exportJson: () => void
-  exportNative: (slides: Slide[]) => void
+  exportJson: () => Promise<void>
+  exportNative: (slides: Slide[]) => Promise<void>
   exportPptx: (slides: Slide[], masterOverwrite: boolean, ignoreMedia: boolean) => Promise<void>
   printPdf: (node: HTMLElement, page: { height: number; margin: number; width: number }) => Promise<void>
 }
@@ -236,7 +236,7 @@ function NativeOptions({ actions, registerDownload, runtime }: TypeOptionsProps)
   const { t } = useTranslation()
   const presentation = useEditorSelector(runtime.store, selectPresentation)
   const rangeState = useSlideRange(presentation)
-  useEffect(() => registerDownload(() => actions.exportNative(rangeState.slides)), [actions, rangeState.slides, registerDownload])
+  useEffect(() => registerDownload(() => { void actions.exportNative(rangeState.slides) }), [actions, rangeState.slides, registerDownload])
   return (
     <>
       <ExportRangeFields state={rangeState} />
@@ -247,7 +247,7 @@ function NativeOptions({ actions, registerDownload, runtime }: TypeOptionsProps)
 
 function JsonOptions({ actions, registerDownload }: TypeOptionsProps) {
   const { t } = useTranslation()
-  useEffect(() => registerDownload(() => actions.exportJson()), [actions, registerDownload])
+  useEffect(() => registerDownload(() => { void actions.exportJson() }), [actions, registerDownload])
   return (
     <div className="mb-1 flex flex-col items-center gap-2 py-4">
       <JsonIcon aria-hidden className="size-14" />

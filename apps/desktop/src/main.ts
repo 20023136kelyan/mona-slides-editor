@@ -9,6 +9,7 @@ import { installApplicationMenu } from './app-menu.js'
 import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
 import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
+import { PRINT_PATH, printDocument, registerFileIpc } from './file-dialogs.js'
 
 /**
  * Mona's desktop shell.
@@ -79,6 +80,12 @@ const serveRenderer = () => {
     const asset = await handleAssetRequest(request)
     if (asset) return asset
     const { pathname } = new URL(request.url)
+    // The document a PDF export is being rendered from. Served here rather than
+    // from `data:` or a temp file so it shares an origin with the deck's assets
+    // and the editor's fonts, which is what it refers to.
+    if (pathname === PRINT_PATH) {
+      return new Response(printDocument(), { headers: { 'content-type': 'text/html' } })
+    }
     const target = normalize(join(RENDERER_ROOT, decodeURIComponent(pathname)))
     const inside = target === RENDERER_ROOT || target.startsWith(RENDERER_ROOT + sep)
     const file = inside && await stat(target).then(entry => entry.isFile()).catch(() => false)
@@ -146,6 +153,7 @@ const main = async (): Promise<void> => {
   serveRenderer()
   registerAgentIpc()
   registerDeckIpc()
+  registerFileIpc()
   try {
     await createWindow()
   }

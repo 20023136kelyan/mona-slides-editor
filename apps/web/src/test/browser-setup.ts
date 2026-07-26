@@ -26,6 +26,18 @@ const bridge: MonaBridge = {
     send: () => {},
   },
   browseMedia: async <Result>() => ({ data: [], total: 0, videos: [] }) as Result,
+  /**
+   * Every dialog reads as cancelled.
+   *
+   * A test that wants a file to arrive stubs this itself; defaulting to "the
+   * user picked nothing" keeps the ones that merely render an import button from
+   * appearing to open a dialog that could never be answered here.
+   */
+  files: {
+    open: async () => null,
+    printToPdf: async () => null,
+    save: async () => null,
+  },
   deck: {
     clear: async () => {},
     collectGarbage: async () => {},

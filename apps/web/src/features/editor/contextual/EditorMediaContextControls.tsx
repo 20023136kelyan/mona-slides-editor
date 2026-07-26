@@ -1,4 +1,3 @@
-import { useRef, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImageUp, Music2, Play, Repeat2, Video } from 'lucide-react'
 
@@ -18,6 +17,7 @@ import { EditorColorPicker } from '@/features/editor/EditorColorPicker'
 import { InspectorPopoverButton } from '@/features/editor/EditorInspectorPrimitives'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { fileToDataUrl } from '@/features/editor/editor-image'
+import { pickFile } from '@/features/editor/editor-files'
 
 type MediaElement = PPTAudioElement | PPTVideoElement
 
@@ -26,14 +26,14 @@ export function EditorMediaContextControls({ element, runtime }: {
   runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
-  const fileRef = useRef<HTMLInputElement>(null)
   const update = (props: Partial<MediaElement>, label: string) => runtime.commit(label, [{
     type: 'element.update',
     payload: { id: element.id, props },
   }], { historyKey: `media-context-${element.id}` })
-  const replace = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  const replace = async () => {
+    const file = await pickFile(element.type === 'audio'
+      ? [{ extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg'], name: 'Audio' }]
+      : [{ extensions: ['mp4', 'webm', 'mov', 'm4v'], name: 'Video' }])
     if (!file) return
     const ext = file.name.includes('.') ? file.name.split('.').pop()?.toLocaleLowerCase() : undefined
     update({ src: await fileToDataUrl(file), ext }, 'Replace media')
@@ -43,16 +43,7 @@ export function EditorMediaContextControls({ element, runtime }: {
     <div className={cn('mona-contextual-media-controls', contextualControlsShell)}>
       <div className={contextualControlRow}>
         <span aria-hidden="true" className={contextualKindIcon}>{element.type === 'audio' ? <Music2 /> : <Video />}</span>
-        <input
-          accept={element.type === 'audio' ? 'audio/*' : 'video/*'}
-          aria-hidden="true"
-          hidden
-          onChange={event => void replace(event)}
-          ref={fileRef}
-          tabIndex={-1}
-          type="file"
-        />
-        <Button className={contextualControlLabeled} onClick={() => fileRef.current?.click()} size="editor" type="button" variant="ghost">
+        <Button className={contextualControlLabeled} onClick={() => { void replace() }} size="editor" type="button" variant="ghost">
           <ImageUp /><span>{t('foundation.editor.contextual.replace')}</span>
         </Button>
         {element.type === 'audio' ? (

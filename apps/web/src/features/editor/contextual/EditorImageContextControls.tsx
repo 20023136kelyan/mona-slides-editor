@@ -1,4 +1,3 @@
-import { useRef, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import FlipHorizontalIcon from '~icons/icon-park-outline/flip-horizontally'
@@ -24,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { InspectorPopoverButton, InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
 import { getReplacementImageCommands } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { PRESENTATION_FILTERS, pickFile } from '@/features/editor/editor-files'
 
 const getTransparency = (element: PPTImageElement) => {
   const opacity = Number.parseFloat(element.filters?.opacity || '100%')
@@ -38,16 +38,14 @@ export function EditorImageContextControls({
   runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
-  const inputRef = useRef<HTMLInputElement>(null)
   const transparency = getTransparency(element)
   const update = (props: Partial<PPTImageElement>, historyKey: string) => runtime.commit(
     'Update image',
     [{ type: 'element.update', payload: { id: element.id, props } }],
     { historyKey },
   )
-  const replaceImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  const replaceImage = async () => {
+    const file = await pickFile(PRESENTATION_FILTERS.image)
     if (!file) return
     runtime.commit('Replace image', await getReplacementImageCommands(element, file), { historyKey: `image-replace-${element.id}` })
   }
@@ -56,8 +54,7 @@ export function EditorImageContextControls({
     <div className={cn('mona-contextual-image-controls', contextualControlsShell)}>
       <div className={contextualControlRow}>
         <Button className={contextualControlLabeled} onClick={() => runtime.store.dispatch(editorActions.cropElementChanged(element.id))} size="editor" type="button" variant="ghost"><TailoringIcon /><span>{t('foundation.editor.image.crop')}</span></Button>
-        <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={inputRef} tabIndex={-1} type="file" />
-        <Button className={contextualControlLabeled} onClick={() => inputRef.current?.click()} size="editor" type="button" variant="ghost"><TransformIcon /><span>{t('foundation.editor.image.replace')}</span></Button>
+        <Button className={contextualControlLabeled} onClick={() => { void replaceImage() }} size="editor" type="button" variant="ghost"><TransformIcon /><span>{t('foundation.editor.image.replace')}</span></Button>
         <div className={contextualDivider} />
         <Toggle aria-label={t('foundation.editor.shape.horizontalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipH: !element.flipH }, `image-flip-${element.id}`)} pressed={Boolean(element.flipH)}><FlipHorizontalIcon /></Toggle>
         <Toggle aria-label={t('foundation.editor.shape.verticalFlip')} className={`${contextualControlIcon} ${contextualToggleFlat}`} onPressedChange={() => update({ flipV: !element.flipV }, `image-flip-${element.id}`)} pressed={Boolean(element.flipV)}><FlipVerticalIcon /></Toggle>

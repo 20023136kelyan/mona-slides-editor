@@ -1,4 +1,3 @@
-import { useRef, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import PlusIcon from '~icons/icon-park-outline/plus'
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { InspectorSwitch, inspectorDividerClass, inspectorRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import { PropertyRow } from '@/features/editor/ElementStyleCommons'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
+import { PRESENTATION_FILTERS, pickFile } from '@/features/editor/editor-files'
 
 const fileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
@@ -20,14 +20,12 @@ const fileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
 
 export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement; runtime: EditorRuntime }) {
   const { t } = useTranslation()
-  const inputRef = useRef<HTMLInputElement>(null)
   const update = (props: Partial<PPTVideoElement>) => runtime.commit('Update video style', [{
     type: 'element.update',
     payload: { id: element.id, props },
   }])
-  const setPoster = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  const setPoster = async () => {
+    const file = await pickFile(PRESENTATION_FILTERS.image, { title: t('foundation.editor.media.videoPoster') })
     if (file) update({ poster: await fileAsDataUrl(file) })
   }
   const setPosterFromFirstFrame = () => {
@@ -55,8 +53,7 @@ export function VideoStylePanel({ element, runtime }: { element: PPTVideoElement
     <div className="text-control text-foreground select-none">
       <div className="mb-2.5">{t('foundation.editor.media.videoPoster')}</div>
       <div className="mb-2.5">
-        <input accept="image/*" aria-label={t('foundation.editor.media.videoPoster')} hidden onChange={event => void setPoster(event)} ref={inputRef} type="file" />
-        <Button className="relative block h-0 w-full rounded-control border border-dashed p-0 pb-[56.25%] transition-all hover:border-foreground hover:text-foreground" onClick={() => inputRef.current?.click()} type="button" variant="ghost">
+        <Button className="relative block h-0 w-full rounded-control border border-dashed p-0 pb-[56.25%] transition-all hover:border-foreground hover:text-foreground" onClick={() => { void setPoster() }} type="button" variant="ghost">
           <span className="absolute inset-0 flex items-center justify-center bg-contain bg-center bg-no-repeat" style={{ backgroundImage: element.poster ? `url(${element.poster})` : '' }}><PlusIcon /></span>
         </Button>
       </div>

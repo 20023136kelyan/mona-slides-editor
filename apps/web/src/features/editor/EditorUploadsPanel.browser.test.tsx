@@ -12,6 +12,28 @@ import type { EditorApplication } from '@/features/editor/services/editor-applic
 import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { initializeI18n, setLocale } from '@/i18n'
 
+/**
+ * Answers the next open dialog with one file, then clicks Upload files.
+ *
+ * The panel used to be driven by reaching for its hidden `<input type="file">`
+ * and forging a change event. There is no input now — the button asks the shell
+ * for files — so the stand-in is the shell's answer, which is both closer to
+ * what happens and the only part of it a test can legitimately decide.
+ */
+const uploadOneFile = async (name: string) => {
+  const pngBytes = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+    char => char.charCodeAt(0),
+  )
+  window.mona!.files.open = async () => [{
+    bytes: pngBytes.buffer.slice(0) as ArrayBuffer,
+    mediaType: 'image/png',
+    name,
+  }]
+  await page.getByRole('button', { name: 'Upload files' }).click()
+}
+
+
 const application: EditorApplication = {
   agentOpen: false,
   closeAgent: () => {},
@@ -77,14 +99,7 @@ test('keeps record funnel and library insert inside the uploads panel', async ()
   await page.getByRole('button', { name: 'Back to uploads' }).click()
   await expect.element(page.getByRole('button', { name: 'Upload files' })).toBeVisible()
 
-  const input = document.querySelector<HTMLInputElement>('.mona-uploads-file-input')!
-  const pngBytes = Uint8Array.from(
-    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
-    char => char.charCodeAt(0),
-  )
-  const file = new File([pngBytes], 'panel-hero.png', { type: 'image/png' })
-  Object.defineProperty(input, 'files', { configurable: true, value: [file] })
-  input.dispatchEvent(new Event('change', { bubbles: true }))
+  await uploadOneFile('panel-hero.png')
 
   await expect.poll(() => mediaLibraryDatabase.items.count()).toBe(1)
   await expect.element(page.getByRole('button', { name: 'Insert panel-hero.png' })).toBeVisible()

@@ -61,6 +61,19 @@ contextBridge.exposeInMainWorld('mona', {
     writeAsset: (name: string, bytes: ArrayBuffer) => ipcRenderer.invoke('mona:deck:write-asset', name, bytes),
   },
 
+  /**
+   * The operating system's own open and save dialogs.
+   *
+   * `open` returns bytes rather than paths, because the renderer has no
+   * filesystem to open a path with; `save` returns the path it wrote, or null
+   * when the user cancelled, which is an outcome rather than a failure.
+   */
+  files: {
+    open: (request: unknown) => ipcRenderer.invoke('mona:files:open', request),
+    printToPdf: (request: unknown) => ipcRenderer.invoke('mona:files:print-pdf', request),
+    save: (request: unknown) => ipcRenderer.invoke('mona:files:save', request),
+  },
+
   /** Stock photo and video search, for the media panels. */
   browseMedia: (kind: 'images' | 'videos', query: unknown) => (
     ipcRenderer.invoke('mona:media:browse', kind, query)

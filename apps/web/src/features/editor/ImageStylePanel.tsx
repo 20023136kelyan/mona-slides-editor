@@ -1,6 +1,6 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- crop thumbnails and filter previews are composite visual controls with explicit labels. */
 
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import DownIcon from '~icons/icon-park-outline/down'
@@ -27,6 +27,7 @@ import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorN
 import { getImageBeforeCrop, getPresetImageCrop, getReplacementImageCommands } from '@/features/editor/editor-image'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { CLIP_PATHS, getImageFilter } from '@/features/presentation-renderer/render-utils'
+import { PRESENTATION_FILTERS, pickFile } from '@/features/editor/editor-files'
 
 interface FilterOption {
   default: number
@@ -85,7 +86,6 @@ export function ImageStylePanel({ element, presentation, runtime }: {
   runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
-  const replaceInputRef = useRef<HTMLInputElement>(null)
   const [cropOptionsOpen, setCropOptionsOpen] = useState(false)
   const hasFilters = element.filters !== undefined
   const hasColorMask = element.colorMask !== undefined
@@ -95,9 +95,8 @@ export function ImageStylePanel({ element, presentation, runtime }: {
     setCropOptionsOpen(false)
     runtime.store.dispatch(editorActions.cropElementChanged(element.id))
   }
-  const replaceImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
+  const replaceImage = async () => {
+    const file = await pickFile(PRESENTATION_FILTERS.image)
     if (!file) return
     const commands = await getReplacementImageCommands(element, file)
     runtime.commit('Replace image', commands, { historyKey: `image-replace-${element.id}` })
@@ -230,8 +229,7 @@ export function ImageStylePanel({ element, presentation, runtime }: {
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
       <div className={inspectorDividerClass} />
 
-      <input accept="image/*" aria-hidden="true" hidden onChange={replaceImage} ref={replaceInputRef} tabIndex={-1} type="file" />
-      <InspectorButton ariaLabel={t('foundation.editor.image.replaceImage')} className="mona-image-full-button" onClick={() => replaceInputRef.current?.click()}><TransformIcon /> {t('foundation.editor.image.replaceImage')}</InspectorButton>
+      <InspectorButton ariaLabel={t('foundation.editor.image.replaceImage')} className="mona-image-full-button" onClick={() => { void replaceImage() }}><TransformIcon /> {t('foundation.editor.image.replaceImage')}</InspectorButton>
       <InspectorButton ariaLabel={t('foundation.editor.image.resetStyle')} className="mona-image-full-button" onClick={resetImage}><UndoIcon /> {t('foundation.editor.image.resetStyle')}</InspectorButton>
       <InspectorButton ariaLabel={t('foundation.editor.image.setAsBackground')} className="mona-image-full-button" onClick={() => runtime.commit('Set image as background', [{ type: 'slide.update', props: { background: { ...(presentation.slides[presentation.slideIndex]?.background || {}), type: 'image', image: { src: element.src, size: 'cover' } } } }], { historyKey: `image-background-${element.id}` })}><ThemeIcon /> {t('foundation.editor.image.setAsBackground')}</InspectorButton>
     </div>

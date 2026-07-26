@@ -27,6 +27,19 @@ export interface MonaToolRequest {
   name: string
 }
 
+/** A file the user chose, as bytes; the renderer has no path to open. */
+export interface MonaPickedFile {
+  bytes: ArrayBuffer
+  mediaType: string
+  name: string
+}
+
+/** What a dialog will accept, in the shape the platform dialogs want. */
+export interface MonaFileFilter {
+  extensions: string[]
+  name: string
+}
+
 export interface MonaBridge {
   account: () => Promise<MonaAccount>
   agent: {
@@ -38,6 +51,16 @@ export interface MonaBridge {
     send: (prompt: { effort?: string; model?: string; text: string }) => void
   }
   browseMedia: <Result>(kind: 'images' | 'videos', query: unknown) => Promise<Result>
+  /** Null from any of these means the user cancelled, which is not a failure. */
+  files: {
+    open: (request: { filters: MonaFileFilter[]; multiple?: boolean; title?: string }) => Promise<MonaPickedFile[] | null>
+    printToPdf: (request: {
+      defaultName: string
+      html: string
+      page: { height: number; margin: number; width: number }
+    }) => Promise<string | null>
+    save: (request: { bytes: ArrayBuffer; defaultName: string; filters: MonaFileFilter[] }) => Promise<string | null>
+  }
   deck: {
     clear: () => Promise<void>
     collectGarbage: (keep: readonly string[]) => Promise<void>

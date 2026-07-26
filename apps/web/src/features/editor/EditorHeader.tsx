@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -59,6 +59,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { IMPORT_FILTERS, pickFiles } from '@/features/editor/editor-files'
 import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
 import { EditorHotkeyDrawer } from '@/features/editor/EditorHotkeyDrawer'
 import type { ExportType } from '@/features/editor/EditorExportPopover'
@@ -69,7 +70,6 @@ import { useEditorApplication } from '@/features/editor/services/editor-applicat
 import { useEditorShell } from '@/features/editor/shell/editor-shell'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { isSupportedLocale, type SupportedLocale } from '@/i18n'
-import { LEGACY_NATIVE_FILE_EXTENSION } from '@/lib/legacy-compatibility'
 import { isMacChrome, monaBridge } from '@/lib/mona-bridge'
 import { cn } from '@/lib/utils'
 
@@ -212,9 +212,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   const titleCancelledRef = useRef(false)
   const fileMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
-  const pptxInputRef = useRef<HTMLInputElement>(null)
-  const jsonInputRef = useRef<HTMLInputElement>(null)
-  const nativeInputRef = useRef<HTMLInputElement>(null)
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
@@ -328,11 +325,18 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
     setOpenPopover(null)
   }
 
-  const requestImport = (type: 'json' | 'native' | 'pptx', event: ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files?.length) void importFiles({ files, type })
-    event.target.value = ''
+  /**
+   * Opens the platform dialog and imports whatever comes back.
+   *
+   * The three hidden inputs this replaces existed only because a web page cannot
+   * ask for a file any other way; the menu items had to reach in and click one.
+   * Now the menu item is the whole story, and the same call answers both the
+   * in-window menus and the macOS menu bar.
+   */
+  const requestImport = async (type: 'json' | 'native' | 'pptx') => {
     setOpenPopover(null)
+    const files = await pickFiles(IMPORT_FILTERS[type])
+    if (files.length) await importFiles({ files, type })
   }
 
   const saveLabel = persistenceSnapshot.status === 'error'
@@ -353,9 +357,9 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
     <>
       <HeaderMenuItem disabled={importing} icon={<FilePlus2 />} label={t('header.newPresentation')} onSelect={() => setResetDialogOpen(true)} />
       <DropdownMenuSeparator className="my-1.5 bg-border" />
-      <HeaderMenuItem disabled={importing} icon={<FileType2 />} label={t('header.importPptx')} onSelect={() => pptxInputRef.current?.click()} />
-      <HeaderMenuItem disabled={importing} icon={<FileArchive />} label={t('header.importNative')} onSelect={() => nativeInputRef.current?.click()} />
-      <HeaderMenuItem disabled={importing} icon={<FileJson />} label={t('header.importJson')} onSelect={() => jsonInputRef.current?.click()} />
+      <HeaderMenuItem disabled={importing} icon={<FileType2 />} label={t('header.importPptx')} onSelect={() => { void requestImport('pptx') }} />
+      <HeaderMenuItem disabled={importing} icon={<FileArchive />} label={t('header.importNative')} onSelect={() => { void requestImport('native') }} />
+      <HeaderMenuItem disabled={importing} icon={<FileJson />} label={t('header.importJson')} onSelect={() => { void requestImport('json') }} />
       <DropdownMenuSeparator className="my-1.5 bg-border" />
       <DropdownMenuSub>
         <DropdownMenuSubTrigger className={headerMenuItemClass}>
@@ -408,9 +412,9 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       'file.export.native': () => requestExport('native'),
       'file.export.pdf': () => requestExport('pdf'),
       'file.export.pptx': () => requestExport('pptx'),
-      'file.import.json': () => jsonInputRef.current?.click(),
-      'file.import.native': () => nativeInputRef.current?.click(),
-      'file.import.pptx': () => pptxInputRef.current?.click(),
+      'file.import.json': () => { void requestImport('json') },
+      'file.import.native': () => { void requestImport('native') },
+      'file.import.pptx': () => { void requestImport('pptx') },
       'file.new': () => setResetDialogOpen(true),
       'tools.find': () => openTaskPanel('search'),
       'tools.semantics': () => openTaskPanel('semantics'),
@@ -452,12 +456,9 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       >
         <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left m-0 flex min-w-0 items-center gap-1 border-0 p-0 justify-self-start @max-[760px]/header:gap-0">
           {/* Hidden on macOS: these live in the system menu bar there, and two
-              menu bars saying the same thing is worse than either alone. The file
-              inputs stay - the native menu triggers them through the same refs. */}
+              menu bars saying the same thing is worse than either alone. Both
+              routes call the same handlers, so they cannot drift apart. */}
           <nav aria-label={t('header.menuBar')} className={cn('min-w-0 items-center gap-px @max-[760px]/header:hidden', macChrome ? 'hidden' : 'flex')}>
-            <input accept="application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-hidden="true" hidden onChange={event => requestImport('pptx', event)} ref={pptxInputRef} tabIndex={-1} type="file" />
-            <input accept=".json" aria-hidden="true" hidden onChange={event => requestImport('json', event)} ref={jsonInputRef} tabIndex={-1} type="file" />
-            <input accept={`.mona,${LEGACY_NATIVE_FILE_EXTENSION}`} aria-hidden="true" hidden onChange={event => requestImport('native', event)} ref={nativeInputRef} tabIndex={-1} type="file" />
             <HeaderMenu label={t('header.menuFile')} menu="file" onOpenChange={setMenuOpen} open={openPopover} triggerRef={fileMenuTriggerRef}>
               {fileMenuItems}
             </HeaderMenu>

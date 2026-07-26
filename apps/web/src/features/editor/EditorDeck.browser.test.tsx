@@ -15,6 +15,28 @@ import type { EditorApplication } from '@/features/editor/services/editor-applic
 import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { initializeI18n, setLocale } from '@/i18n'
 
+/**
+ * Answers the next open dialog with one file, then clicks Upload files.
+ *
+ * The panel used to be driven by reaching for its hidden `<input type="file">`
+ * and forging a change event. There is no input now — the button asks the shell
+ * for files — so the stand-in is the shell's answer, which is both closer to
+ * what happens and the only part of it a test can legitimately decide.
+ */
+const uploadOneFile = async (name: string) => {
+  const pngBytes = Uint8Array.from(
+    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
+    char => char.charCodeAt(0),
+  )
+  window.mona!.files.open = async () => [{
+    bytes: pngBytes.buffer.slice(0) as ArrayBuffer,
+    mediaType: 'image/png',
+    name,
+  }]
+  await page.getByRole('button', { name: 'Upload files' }).click()
+}
+
+
 beforeAll(async () => {
   await initializeI18n()
 })
@@ -412,14 +434,7 @@ test('inserts library media as an undoable native element from Uploads', async (
   await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} runtime={runtime} /></div>)
 
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Uploads' }).click()
-  const input = document.querySelector<HTMLInputElement>('.mona-uploads-file-input')!
-  const pngBytes = Uint8Array.from(
-    atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
-    char => char.charCodeAt(0),
-  )
-  const file = new File([pngBytes], 'deck-hero.png', { type: 'image/png' })
-  Object.defineProperty(input, 'files', { configurable: true, value: [file] })
-  input.dispatchEvent(new Event('change', { bubbles: true }))
+  await uploadOneFile('deck-hero.png')
 
   await expect.element(page.getByRole('button', { name: 'Insert deck-hero.png' })).toBeVisible()
   await page.getByRole('button', { name: 'Insert deck-hero.png' }).click()

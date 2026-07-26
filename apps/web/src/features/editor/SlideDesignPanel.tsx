@@ -46,6 +46,7 @@ import {
   type PresetTheme,
 } from '@/features/editor/editor-slide-theme'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { PRESENTATION_FILTERS, pickFile } from '@/features/editor/editor-files'
 
 function DesignRow({ children, label, style }: { children: React.ReactNode; label: string; style?: React.CSSProperties }) {
   return <div className="mb-2.5 flex w-full items-center" style={style}><div className="w-2/5">{label}</div><div className="w-3/5 [&>*]:w-full">{children}</div></div>
@@ -305,12 +306,18 @@ export function SlideDesignPanel({ runtime }: { runtime: EditorRuntime }) {
         ]} value={background.gradient?.type || 'linear'} /> : null}
       </div>
       {background.type === 'image' ? (
-        <label className="relative mb-2.5 block h-0 rounded-control border border-dashed pb-[56.25%] transition-colors hover:border-foreground hover:text-foreground">
-          <input accept="image/*" hidden onChange={event => {
-            const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(src => updateImage({ src }))
-          }} type="file" />
+        <Button
+          className="relative mb-2.5 block h-0 w-full rounded-control border border-dashed p-0 pb-[56.25%] transition-colors hover:border-foreground hover:text-foreground"
+          onClick={() => {
+            void pickFile(PRESENTATION_FILTERS.image).then(async file => {
+              if (file) updateImage({ src: await fileToDataUrl(file) })
+            })
+          }}
+          type="button"
+          variant="ghost"
+        >
           <span className="absolute inset-0 flex items-center justify-center bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${background.image?.src})` }}><PlusIcon /></span>
-        </label>
+        </Button>
       ) : null}
       {background.type === 'gradient' && background.gradient ? (
         <div>

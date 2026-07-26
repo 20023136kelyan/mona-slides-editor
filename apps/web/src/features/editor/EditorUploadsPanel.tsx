@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FileAudio,
@@ -32,6 +32,7 @@ import {
   type MediaLibraryItem,
   type MediaLibraryKind,
 } from '@/features/editor/editor-media-library'
+import { UPLOAD_FILTERS, pickFiles } from '@/features/editor/editor-files'
 
 type UploadsView = 'main' | 'record'
 type UploadsTab = 'images' | 'videos' | 'audio' | 'folders'
@@ -83,7 +84,6 @@ export function EditorUploadsPanel({
 }) {
   const { t } = useTranslation()
   const { notifications } = useEditorApplication()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<UploadsView>('main')
   const [tab, setTab] = useState<UploadsTab>(initialTab)
   // Uploads, Videos and Audio are separate rail entries sharing this panel.
@@ -120,13 +120,13 @@ export function EditorUploadsPanel({
     })()
   }
 
-  const uploadFiles = async (fileList: FileList | null) => {
-    if (!fileList?.length) return
+  const uploadFiles = async (files: readonly File[]) => {
+    if (!files.length) return
     setUploading(true)
     try {
       let added = 0
       let firstKind: MediaLibraryKind | null = null
-      for (const file of Array.from(fileList)) {
+      for (const file of files) {
         const item = await addMediaLibraryFile(file)
         if (!item) continue
         added += 1
@@ -142,7 +142,6 @@ export function EditorUploadsPanel({
     }
     finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -204,17 +203,6 @@ export function EditorUploadsPanel({
 
   return (
     <PanelChrome className="mona-uploads-panel">
-      <input
-        accept="image/*,video/*,audio/*"
-        aria-hidden="true"
-        className="mona-uploads-file-input hidden"
-        multiple
-        onChange={event => void uploadFiles(event.target.files)}
-        ref={fileInputRef}
-        tabIndex={-1}
-        type="file"
-      />
-
       <PanelHeader>
         {/* Both actions rode along inside the old search field's trailing slot.
             With the field hoisted to the drawer they become controls in their
@@ -223,7 +211,9 @@ export function EditorUploadsPanel({
           <Button
             className="h-9 justify-start gap-2 rounded-action"
             disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              void pickFiles(UPLOAD_FILTERS, { multiple: true }).then(files => uploadFiles(files))
+            }}
             type="button"
             variant="outline"
           >

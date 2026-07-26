@@ -6,7 +6,6 @@ import {
   useState,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { saveAs } from 'file-saver'
 import {
   CaptureUpdateAction,
   Excalidraw,
@@ -55,6 +54,7 @@ import {
 
 import '@excalidraw/excalidraw/index.css'
 import '@/features/editor/drawing/drawing.css'
+import { saveFile } from '@/features/editor/editor-files'
 
 type DrawingTool = 'arrow' | 'ellipse' | 'eraser' | 'freedraw' | 'rectangle' | 'reference' | 'selection' | 'text'
 
@@ -460,10 +460,11 @@ export function DrawingWorkspace({
             </PopoverTrigger>
             <PopoverContent aria-label={t('foundation.editor.drawing.export')} align="end" className="flex w-55 flex-col gap-0.5 [&_button]:justify-start" side="bottom">
               <Button onClick={() => {
-                const scene = checkpoint()
-                saveAs(drawingSceneBlob(scene), `${slideId}.excalidraw`)
+                void saveFile(drawingSceneBlob(checkpoint()), `${slideId}.excalidraw`, [{ extensions: ['excalidraw'], name: 'Excalidraw Scene' }])
               }} size="sm" type="button" variant="ghost">{t('foundation.editor.drawing.downloadScene')}</Button>
-              <Button onClick={() => void exportPayload().then(({ preview }) => saveAs(preview, `${slideId}-sketch.png`))} size="sm" type="button" variant="ghost">{t('foundation.editor.drawing.downloadPng')}</Button>
+              <Button onClick={() => {
+                void exportPayload().then(({ preview }) => saveFile(preview, `${slideId}-sketch.png`, [{ extensions: ['png'], name: 'PNG' }]))
+              }} size="sm" type="button" variant="ghost">{t('foundation.editor.drawing.downloadPng')}</Button>
             </PopoverContent>
           </Popover>
           <Button aria-label={t('foundation.editor.drawing.clear')} disabled={!apiReady || !hasContent} onClick={() => setClearOpen(true)} size="editor-icon" type="button" variant="ghost"><Trash2 /></Button>
