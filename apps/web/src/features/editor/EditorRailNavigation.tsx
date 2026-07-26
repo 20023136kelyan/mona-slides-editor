@@ -77,9 +77,29 @@ type RailItem = {
 // and manually via the header toggle. Both have to hide exactly the same parts,
 // so each pairing lives here instead of being spelled out at every element —
 // missing one twin is what leaves a stray label in a 52px rail.
-const railIconRow = 'max-snug:justify-center max-snug:px-0 group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0'
+const railIconRow = 'mona-rail-shift transition-[padding] duration-200 ease-out max-snug:justify-center max-snug:px-0 group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0'
 const railIconRowInner = 'max-snug:flex-none group-data-[collapsed=true]/rail:flex-none'
-const railIconHidden = 'max-snug:hidden group-data-[collapsed=true]/rail:hidden'
+
+/**
+ * A label that folds away rather than disappearing.
+ *
+ * `hidden` was instant while the rail itself took 200ms to narrow, so the text
+ * vanished a fifth of a second before the space it occupied did. Collapsing the
+ * max-width instead lets it withdraw behind the rail's own edge as that edge
+ * arrives, which is what makes the two look like one movement.
+ *
+ * The gap between icon and label is the label's own margin, not the row's
+ * `gap`, because a row gap cannot animate away with the thing it separates —
+ * it would leave a stub of space holding the icon off centre.
+ *
+ * `max-w-56` is the rail's own width, so it can never bind and never truncates
+ * anything the rail had room for. It exists only because `none` is not a value
+ * `max-width` can transition from.
+ */
+const railIconLabel = 'mona-rail-shift ms-3 max-w-56 transition-[max-width,margin,opacity] duration-200 ease-out max-snug:ms-0 max-snug:max-w-0 max-snug:opacity-0 group-data-[collapsed=true]/rail:ms-0 group-data-[collapsed=true]/rail:max-w-0 group-data-[collapsed=true]/rail:opacity-0'
+
+/** The same fold for a fixed-size glyph, which has a width to collapse instead. */
+const railIconHidden = 'mona-rail-shift transition-[width,opacity,transform] duration-200 ease-out max-snug:w-0 max-snug:opacity-0 group-data-[collapsed=true]/rail:w-0 group-data-[collapsed=true]/rail:opacity-0'
 
 // Bottom slot of the creation rail. It holds application settings today and is
 // the designated home for the account control, so it stays visually separated
@@ -99,9 +119,9 @@ function RailSettingsMenu() {
           isActive={open}
           title={t('header.settings')}
         >
-          <div className={cn('flex min-w-0 flex-1 items-center gap-3', railIconRowInner)}>
+          <div className={cn('flex min-w-0 flex-1 items-center', railIconRowInner)}>
             <CATEGORY_ICONS.settings className="h-4 w-4 shrink-0" />
-            <span className={cn('truncate', railIconHidden)}>{t('header.settings')}</span>
+            <span className={cn('truncate', railIconLabel)}>{t('header.settings')}</span>
           </div>
         </SidebarMenuButton>
       </PopoverTrigger>
@@ -244,16 +264,16 @@ export function EditorRail({
           onFocus={item.onFocus}
           onPointerEnter={item.onPointerEnter}
         >
-          <div className={cn('flex min-w-0 flex-1 items-center gap-3', railIconRowInner)}>
+          <div className={cn('flex min-w-0 flex-1 items-center', railIconRowInner)}>
             {/* Larger while collapsed on macOS: the rail is 88px there to clear
                 the traffic lights, and a 16px glyph looks lost in it. */}
-            <Icon className={cn('shrink-0', macChrome ? 'size-4 group-data-[collapsed=true]/rail:size-5 max-snug:size-5' : 'size-4')} />
-            <span className={cn('truncate', railIconHidden)}>{item.label}</span>
+            <Icon className={cn('mona-rail-shift shrink-0 transition-[width,height] duration-200 ease-out', macChrome ? 'size-4 group-data-[collapsed=true]/rail:size-5 max-snug:size-5' : 'size-4')} />
+            <span className={cn('truncate', railIconLabel)}>{item.label}</span>
           </div>
           {item.hasPanel ? (
             <ChevronRight
               className={cn(
-                'ml-auto h-4 w-4 shrink-0 transition-transform',
+                'ml-auto h-4 w-4 shrink-0',
                 railIconHidden,
                 item.active && 'rotate-90',
               )}
@@ -269,9 +289,8 @@ export function EditorRail({
       aria-label={t('foundation.editor.rail.tools')}
       className={cn(
         'mona-editor-rail group/rail w-56 shrink-0 border-r border-sidebar-border transition-[width] duration-200 max-snug:w-[3.25rem] data-[collapsed=true]:w-[3.25rem]',
-        // The traffic lights start 18px in and span 52px, so 18px on the other
-        // side centres them in an 88px rail. Narrower and the border would cut
-        // through the green button.
+        // Wide enough to centre the traffic lights in what it occupies; the
+        // measurement and the arithmetic are in editor.css, beside the values.
         macChrome && 'max-snug:w-(--mona-rail-collapsed-mac) data-[collapsed=true]:w-(--mona-rail-collapsed-mac)',
       )}
       collapsible="none"
@@ -303,28 +322,47 @@ export function EditorRail({
           className={cn(
             'flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold tracking-tight text-foreground',
             railIconRowInner,
-            'group-data-[collapsed=true]/rail:hidden',
+            // Folds away with the rail rather than blinking out of it. Only on
+            // the manual collapse: below `snug` the toggle has nothing to offer,
+            // so the mark keeps the slot instead.
+            'mona-rail-shift max-w-56 overflow-hidden transition-[max-width,margin,opacity] duration-200 ease-out',
+            'group-data-[collapsed=true]/rail:-me-1 group-data-[collapsed=true]/rail:max-w-0 group-data-[collapsed=true]/rail:opacity-0',
           )}
         >
           <img alt="" aria-hidden="true" className="size-4 flex-none" src="/favicon.svg" />
           {/* The mark alone on macOS: the traffic lights already take the left of
               this row, and the wordmark beside them crowds it. */}
-          {macChrome ? null : <span className={cn('truncate', railIconHidden)}>Mona</span>}
+          {macChrome ? null : <span className={cn('ms-1.5 truncate', railIconHidden)}>Mona</span>}
         </div>
-        {/* Hidden here when the rail is collapsed on macOS: the header carries it
-            then, because this row has room for the traffic lights and nothing else. */}
-        <Button
-          aria-label={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
-          aria-pressed={collapsed}
-          className={cn('mona-editor-rail-toggle shrink-0 text-foreground/70 hover:text-foreground max-snug:hidden', macChrome && collapsed && 'hidden')}
-          onClick={() => setCollapsed(!collapsed)}
-          size="icon-xs"
-          title={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
-          type="button"
-          variant="ghost"
+        {/* Withdrawn rather than unmounted when the rail collapses on macOS: the
+            header grows the same keycap at the same moment, and a button that
+            vanishes here while another appears there reads as two events. Width
+            is what carries the handover — the row closes up as it goes, and the
+            header opens up as its twin arrives.
+
+            `inert` rather than `hidden`: at zero width the button is still in
+            the document, and a control nobody can see should not be reachable
+            by Tab or announced. */}
+        <div
+          className={cn(
+            'mona-rail-shift flex-none overflow-hidden transition-[width,margin,opacity] duration-200 ease-out max-snug:-ms-1 max-snug:w-0 max-snug:opacity-0',
+            macChrome && collapsed ? '-ms-1 w-0 opacity-0' : 'w-6 opacity-100',
+          )}
+          inert={macChrome && collapsed}
         >
-          {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-        </Button>
+          <Button
+            aria-label={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
+            aria-pressed={collapsed}
+            className="mona-editor-rail-toggle shrink-0 text-foreground/70 hover:text-foreground"
+            onClick={() => setCollapsed(!collapsed)}
+            size="icon-xs"
+            title={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
+            type="button"
+            variant="ghost"
+          >
+            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+          </Button>
+        </div>
       </SidebarHeader>
       <SidebarContent className="mona-editor-rail-content" ref={railScrollRef}>
         <SidebarGroup>

@@ -432,7 +432,14 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       <div
         aria-label={t('header.menuBar')}
         className={cn(
-          'mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] @max-[1000px]/header:px-2 @max-[760px]/header:grid-cols-[max-content_minmax(0,1fr)_max-content] @max-[560px]/header:px-1',
+          // The side tracks are sized to the controls in them and the title
+          // takes what is left, so it centres between the save indicator and
+          // the draw button rather than on the header. Centring on the header
+          // is what let a long title run under one group while leaving a gap at
+          // the other, because the two groups are not the same width and their
+          // widths change - the file menus go on macOS, the labels drop when
+          // the header narrows, the rail's toggle arrives and leaves.
+          'mona-editor-header relative grid h-11 flex-none grid-cols-[auto_minmax(0,1fr)_auto] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:px-2 @max-[560px]/header:px-1',
           // There is no title bar on macOS, so this strip is what the user grabs
           // to move the window. It needs no inset: the rail owns the top-left
           // corner where the traffic lights sit, and reserves the space itself.
@@ -494,15 +501,33 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
               collapsed, so a pressed toggle could never show its other state -
               it would read as permanently on to a screen reader, and the
               variant's pressed styling flattens the keycap it shares with undo
-              and redo either side of it. Here it is simply "expand". */}
-          {macChrome && railCollapsed ? (
-            <Button
-              aria-label={t('foundation.editor.rail.expandSidebar')}
-              onClick={() => setRailCollapsed(false)}
-              size="header-icon"
-              title={t('foundation.editor.rail.expandSidebar')}
-              variant="header-pill"
-            ><PanelLeftOpen /></Button>
+              and redo either side of it. Here it is simply "expand".
+
+              Mounted for the whole of macOS and opened by width rather than
+              rendered on demand, so the handover from the rail is something the
+              eye can follow: the rail's copy closes as this one opens. It also
+              makes the title glide - the grid's left track is sized to this
+              group, so a width that animates is a track that animates, where a
+              mount would have jumped it 14px.
+
+              The negative margin cancels the row's `gap` at zero width, which
+              would otherwise leave 4px of nothing where the button will be. */}
+          {macChrome ? (
+            <div
+              className={cn(
+                'mona-rail-shift flex-none overflow-hidden transition-[width,margin,opacity] duration-200 ease-out',
+                railCollapsed ? 'w-7 opacity-100' : 'w-0 -me-1 opacity-0 @max-[760px]/header:me-0',
+              )}
+              inert={!railCollapsed}
+            >
+              <Button
+                aria-label={t('foundation.editor.rail.expandSidebar')}
+                onClick={() => setRailCollapsed(false)}
+                size="header-icon"
+                title={t('foundation.editor.rail.expandSidebar')}
+                variant="header-pill"
+              ><PanelLeftOpen /></Button>
+            </div>
           ) : null}
           <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border @max-[760px]/header:mx-0.5" />
           <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 /></Button>
@@ -535,10 +560,13 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
           ) : null}
         </fieldset>
 
-        <div className="mona-editor-header-center pointer-events-none w-full min-w-0 px-3 @max-[760px]/header:px-1">
+        {/* The field keeps a maximum so a short title is not a very wide box,
+            and centres in whatever room the two groups leave it. Below that
+            maximum it simply shrinks; it never needs to overlap either group. */}
+        <div className="mona-editor-header-center pointer-events-none flex w-full min-w-0 justify-center px-3 @max-[760px]/header:px-1">
           <Input
             aria-label={t('header.presentationTitle')}
-            className="mona-editor-header-title-input pointer-events-auto h-7 w-full rounded-control border border-transparent bg-transparent px-2.5 text-center text-[13px]! font-normal text-foreground/80 text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text md:text-[13px]! placeholder:font-normal placeholder:text-muted-foreground placeholder:opacity-100"
+            className="mona-editor-header-title-input pointer-events-auto h-7 w-full max-w-[32rem] rounded-control @max-[1000px]/header:max-w-[24rem] border border-transparent bg-transparent px-2.5 text-center text-[13px]! font-normal text-foreground/80 text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text md:text-[13px]! placeholder:font-normal placeholder:text-muted-foreground placeholder:opacity-100"
             onBlur={commitTitle}
             onChange={event => setTitleValue(event.target.value)}
             onFocus={beginTitleEdit}

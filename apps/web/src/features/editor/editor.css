@@ -2276,3 +2276,18 @@
   --mona-traffic-clear: calc(var(--mona-traffic-inset) * 2 + var(--mona-traffic-span));
   --mona-rail-collapsed-mac: calc(var(--mona-traffic-clear) + 1px);
 }
+
+/* Collapsing the rail moves six things at once: the rail narrows, its labels
+   fold away, its icons grow, its brand fades, its toggle hands over to a keycap
+   in the header, and the title recentres in what is left. Done instantly they
+   read as six unrelated pops; on one duration they read as one gesture, which
+   is the whole point of animating them.
+
+   Everything that takes part carries this class, so the duration lives in a
+   single place and reduced motion has one thing to switch off. The class is
+   doubled rather than marked !important: that is enough specificity to win
+   against a Tailwind `duration-*` utility without making the rule unoverridable
+   for anything that later needs to opt out. */
+@media (prefers-reduced-motion: reduce) {
+  .mona-rail-shift.mona-rail-shift { transition-duration: 0s; }
+}
