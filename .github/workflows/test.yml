@@ -46,8 +46,10 @@ jobs:
       - name: Agent server tests
         run: npm run test:agent
 
+      # Electron needs a display. The globalSetup builds the shell bundle, so
+      # there is nothing to add here beyond the frame buffer.
       - name: App e2e
-        run: npm exec -w @mona/web -- playwright test
+        run: xvfb-run --auto-servernum npm exec -w @mona/web -- playwright test
 
       - name: Production build
         run: npm run build

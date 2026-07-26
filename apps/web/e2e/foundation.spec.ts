@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, openApp, test } from './electron-fixture'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -15,7 +15,7 @@ test('loads Mona and changes locale without browser errors', async ({ page }) =>
   })
   page.on('pageerror', (error) => browserProblems.push(`pageerror: ${error.message}`))
 
-  await page.goto('/')
+  await openApp(page)
 
   await expect(page).toHaveTitle('Mona')
   await expect(page.getByLabel('Mona presentation editor')).toBeVisible()
@@ -39,7 +39,7 @@ test('renders the complete native fixture and selects a slide read-only', async 
   })
   page.on('pageerror', (error) => browserProblems.push(`pageerror: ${error.message}`))
 
-  await page.goto('/?developmentFixture=renderer')
+  await openApp(page, '?developmentFixture=renderer')
   await expect(page.getByRole('button', { name: 'Show slide 4' })).toBeVisible()
   await expect(page.locator('.mona-thumbnail-rail [data-chart-ready] svg')).toBeVisible()
 
@@ -54,7 +54,7 @@ test('renders the complete native fixture and selects a slide read-only', async 
 
 test('keeps the canvas, left task panel, and AI dock structurally independent on desktop', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
 
   const stage = page.locator('.mona-editor-stage')
   const initialStageWidth = (await stage.boundingBox())!.width

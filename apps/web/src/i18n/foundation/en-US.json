@@ -1139,7 +1139,7 @@
       "insert": "Insert {{name}}"
     }
   },
-  "restoredWorkingCopy": "Restored your unsaved changes from this browser",
+  "restoredWorkingCopy": "Restored your unsaved changes",
   "startFresh": "Start fresh",
   "runtime": {
     "importAssetsUnstored": "Could not store {{count}} imported image(s). They will be missing when this deck is reopened."

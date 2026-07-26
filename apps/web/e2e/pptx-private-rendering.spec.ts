@@ -2,7 +2,9 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import type { ElectronApplication } from '@playwright/test'
+
+import { chooseMenuCommand, expect, importFile, openApp, test, type Page, type TestInfo } from './electron-fixture'
 
 const privateCorpusRoot = fileURLToPath(new URL('../../../tests/corpus/private/', import.meta.url))
 const fidelityArtifactRoot = resolve(privateCorpusRoot, '../../../.artifacts/pptx-fidelity')
@@ -19,9 +21,8 @@ const isFontCdnFailure = (text: string) => (
   || text === 'Failed to load resource: net::ERR_FAILED'
 )
 
-const createNewPresentation = async (page: Page) => {
-  await page.getByRole('button', { name: 'File', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'New presentation' }).click()
+const createNewPresentation = async (app: ElectronApplication, page: Page) => {
+  await chooseMenuCommand(app, 'file.new')
   await page.getByRole('button', { name: 'Create new' }).click()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
@@ -30,18 +31,18 @@ const createNewPresentation = async (page: Page) => {
 
 test.describe.configure({ mode: 'serial' })
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
-  await createNewPresentation(page)
+  await createNewPresentation(app, page)
 })
 
 for (const fixture of fixtures) {
   const fixturePath = `${privateCorpusRoot}${fixture.file}`
   test.skip(!existsSync(fixturePath), `Private corpus fixture is not present: ${fixture.file}`)
 
-  test(`renders retained PowerPoint content without silent loss for ${fixture.file}`, async ({ page }, testInfo: TestInfo) => {
+  test(`renders retained PowerPoint content without silent loss for ${fixture.file}`, async ({ app, page }, testInfo: TestInfo) => {
     const browserProblems: string[] = []
     page.on('console', message => {
       if (message.type() === 'error' || message.type() === 'warning') {
@@ -55,7 +56,7 @@ for (const fixture of fixtures) {
     })
     page.on('pageerror', error => browserProblems.push(`pageerror: ${error.message}`))
 
-    await page.locator('input[type="file"][accept^="application/vnd.openxmlformats"]').setInputFiles(fixturePath)
+    await importFile(app, 'pptx', fixturePath)
     await expect.poll(() => page.evaluate(() => (
       window.__MONA_TEST__!.getState().presentation.slides.length
     )), { timeout: 45_000 }).toBe(fixture.slides)

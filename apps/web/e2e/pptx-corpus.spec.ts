@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-import { expect, test, type Page } from '@playwright/test'
+import type { ElectronApplication } from '@playwright/test'
+
+import { chooseMenuCommand, expect, importFile, openApp, test, type Page } from './electron-fixture'
 
 interface CorpusBaseline {
   fixture: string
@@ -31,24 +33,23 @@ const fixtures = [
   path: `${corpusRoot}public/${name}.pptx`,
 }))
 
-const createNewPresentation = async (page: Page) => {
-  await page.getByRole('button', { name: 'File', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'New presentation' }).click()
+const createNewPresentation = async (app: ElectronApplication, page: Page) => {
+  await chooseMenuCommand(app, 'file.new')
   await page.getByRole('button', { name: 'Create new' }).click()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
   ))).toBe(0)
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
-  await createNewPresentation(page)
+  await createNewPresentation(app, page)
 })
 
 for (const fixture of fixtures) {
-  test(`preserves the executable PPTX corpus baseline for ${fixture.baseline.fixture}`, async ({ page }) => {
+  test(`preserves the executable PPTX corpus baseline for ${fixture.baseline.fixture}`, async ({ app, page }) => {
     const browserProblems: string[] = []
     page.on('console', message => {
       if (message.type() === 'error' || message.type() === 'warning') {
@@ -57,7 +58,7 @@ for (const fixture of fixtures) {
     })
     page.on('pageerror', error => browserProblems.push(`pageerror: ${error.message}`))
 
-    await page.locator('input[type="file"][accept^="application/vnd.openxmlformats"]').setInputFiles(fixture.path)
+    await importFile(app, 'pptx', fixture.path)
     await expect.poll(() => page.evaluate(() => (
       window.__MONA_TEST__!.getState().presentation.slides.length
     )), { timeout: 30_000 }).toBe(fixture.baseline.imported.slides)

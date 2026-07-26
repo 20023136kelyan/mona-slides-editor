@@ -1,16 +1,18 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { expect, test, type Page } from '@playwright/test'
+import type { ElectronApplication } from '@playwright/test'
+
+import { chooseMenuCommand, expect, importFile, openApp, stubSaveDialog, test, type Page } from './electron-fixture'
 
 const TEXT_CORPUS_PPTX = fileURLToPath(new URL(
   '../../../tests/corpus/public/corpus-01-text.pptx',
   import.meta.url,
 ))
 
-const createNewPresentation = async (page: Page) => {
-  await page.getByRole('button', { name: 'File', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'New presentation' }).click()
+const createNewPresentation = async (app: ElectronApplication, page: Page) => {
+  await chooseMenuCommand(app, 'file.new')
   await page.getByRole('button', { name: 'Create new' }).click()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides.length
@@ -20,15 +22,15 @@ const createNewPresentation = async (page: Page) => {
   ))).toBe(0)
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ app, page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 })
 
-test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recovers safely from invalid input', async ({ page }) => {
-  await createNewPresentation(page)
-  await page.locator('input[type="file"][accept^="application/vnd.openxmlformats"]').setInputFiles(TEXT_CORPUS_PPTX)
+test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recovers safely from invalid input', async ({ app, page }, testInfo) => {
+  await createNewPresentation(app, page)
+  await importFile(app, 'pptx', TEXT_CORPUS_PPTX)
 
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
@@ -43,17 +45,13 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
     window.__MONA_TEST__!.getState().presentation.title
   ))).toBe('Lifecycle: Corpus / Text?')
 
-  await page.getByRole('button', { name: 'Export', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Export' })
-  await dialog.getByRole('tab', { name: 'Export JSON' }).click()
-  const [jsonDownload] = await Promise.all([
-    page.waitForEvent('download'),
-    dialog.getByRole('button', { name: 'Export JSON' }).click(),
-  ])
-  expect(jsonDownload.suggestedFilename()).toBe('Lifecycle Corpus Text.json')
-  const jsonPath = await jsonDownload.path()
-  expect(jsonPath).not.toBeNull()
-  const jsonPayload = JSON.parse(await readFile(jsonPath!, 'utf8')) as {
+  await chooseMenuCommand(app, 'file.export.json')
+  const dialog = page.getByRole('dialog', { name: 'Share' })
+  const jsonPath = join(testInfo.outputDir, 'Lifecycle Corpus Text.json')
+  await stubSaveDialog(app, jsonPath)
+  await dialog.getByRole('button', { name: 'Download' }).click()
+  await expect.poll(() => readFile(jsonPath, 'utf8').then(() => true, () => false)).toBe(true)
+  const jsonPayload = JSON.parse(await readFile(jsonPath, 'utf8')) as {
     slides: Array<{ elements: unknown[] }>
     title: string
   }
@@ -61,23 +59,15 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   expect(jsonPayload.slides).toHaveLength(1)
   expect(jsonPayload.slides[0]!.elements).toHaveLength(5)
 
-  await dialog.getByRole('tab', { name: 'Export Mona file' }).click()
-  const [nativeDownload] = await Promise.all([
-    page.waitForEvent('download'),
-    dialog.getByRole('button', { name: 'Export Mona file' }).click(),
-  ])
-  expect(nativeDownload.suggestedFilename()).toBe('Lifecycle Corpus Text.mona')
-  const nativePath = await nativeDownload.path()
-  expect(nativePath).not.toBeNull()
-  const nativeArtifact = await readFile(nativePath!)
+  await chooseMenuCommand(app, 'file.export.native')
+  const nativePath = join(testInfo.outputDir, 'Lifecycle Corpus Text.mona')
+  await stubSaveDialog(app, nativePath)
+  await dialog.getByRole('button', { name: 'Download' }).click()
+  await expect.poll(() => readFile(nativePath).then(() => true, () => false)).toBe(true)
   await dialog.getByRole('button', { name: 'Close' }).click()
 
-  await createNewPresentation(page)
-  await page.locator('input[type="file"][accept^=".mona"]').setInputFiles({
-    buffer: nativeArtifact,
-    mimeType: 'application/x-mona-presentation',
-    name: 'lifecycle-round-trip.mona',
-  })
+  await createNewPresentation(app, page)
+  await importFile(app, 'native', nativePath)
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.title
   ))).toBe('Lifecycle: Corpus / Text?')
@@ -85,22 +75,21 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
   ))).toBe(5)
 
-  await createNewPresentation(page)
+  await createNewPresentation(app, page)
   const presentationBeforeFailure = await page.evaluate(() => (
     structuredClone(window.__MONA_TEST__!.getState().presentation)
   ))
-  await page.locator('input[type="file"][accept=".json"]').setInputFiles({
-    buffer: Buffer.from('not valid JSON'),
-    mimeType: 'application/json',
-    name: 'broken.json',
-  })
+  // A real file, because the dialog hands back bytes read off disk.
+  const brokenPath = join(testInfo.outputDir, 'broken.json')
+  await writeFile(brokenPath, 'not valid JSON')
+  await importFile(app, 'json', brokenPath)
   await expect(page.getByText('This file could not be read or parsed')).toBeVisible()
   expect(await page.evaluate(() => (
     structuredClone(window.__MONA_TEST__!.getState().presentation)
   ))).toEqual(presentationBeforeFailure)
 })
 
-test('exports an editable PPTX that can be imported back into Mona', async ({ page }) => {
+test('exports an editable PPTX that can be imported back into Mona', async ({ app, page }, testInfo) => {
   test.setTimeout(90_000)
   const source = await page.evaluate(() => {
     const presentation = window.__MONA_TEST__!.getState().presentation
@@ -113,24 +102,16 @@ test('exports an editable PPTX that can be imported back into Mona', async ({ pa
     }
   })
 
-  await page.getByRole('button', { name: 'Export', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Export' })
-  const [pptxDownload] = await Promise.all([
-    page.waitForEvent('download'),
-    dialog.getByRole('button', { name: 'Export PPTX' }).click(),
-  ])
-  expect(pptxDownload.suggestedFilename()).toBe('Untitled presentation.pptx')
-  const pptxPath = await pptxDownload.path()
-  expect(pptxPath).not.toBeNull()
-  const pptxArtifact = await readFile(pptxPath!)
+  await chooseMenuCommand(app, 'file.export.pptx')
+  const dialog = page.getByRole('dialog', { name: 'Share' })
+  const pptxPath = join(testInfo.outputDir, 'Untitled presentation.pptx')
+  await stubSaveDialog(app, pptxPath)
+  await dialog.getByRole('button', { name: 'Download' }).click()
+  await expect.poll(() => readFile(pptxPath).then(() => true, () => false), { timeout: 30_000 }).toBe(true)
 
   await dialog.getByRole('button', { name: 'Close' }).click()
-  await createNewPresentation(page)
-  await page.locator('input[type="file"][accept^="application/vnd.openxmlformats"]').setInputFiles({
-    buffer: pptxArtifact,
-    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    name: 'round-trip.pptx',
-  })
+  await createNewPresentation(app, page)
+  await importFile(app, 'pptx', pptxPath)
 
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides.length

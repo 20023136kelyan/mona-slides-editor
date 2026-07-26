@@ -1,8 +1,8 @@
-import { expect, test } from '@playwright/test'
+import { expect, openApp, test } from './electron-fixture'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
-  await page.goto('/?developmentFixture=editor-interactions')
+  await openApp(page, '?developmentFixture=editor-interactions')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 })
 

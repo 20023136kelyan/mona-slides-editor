@@ -1139,7 +1139,7 @@
       "insert": "插入 {{name}}"
     }
   },
-  "restoredWorkingCopy": "已恢复此浏览器中未保存的更改",
+  "restoredWorkingCopy": "已恢复未保存的修改",
   "startFresh": "重新开始",
   "runtime": {
     "importAssetsUnstored": "无法存储 {{count}} 个导入的图片。重新打开此演示文稿时它们将丢失。"

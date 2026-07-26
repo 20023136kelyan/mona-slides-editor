@@ -1,7 +1,8 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/global-setup.ts',
   outputDir: '../../.artifacts/react-playwright',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -9,22 +10,15 @@ export default defineConfig({
   reporter: 'line',
   expect: { timeout: 15_000 },
   use: {
-    baseURL: 'http://127.0.0.1:6174',
     colorScheme: 'light',
     locale: 'en-US',
     timezoneId: 'UTC',
     trace: 'retain-on-failure',
   },
-  projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1440, height: 900 },
-        deviceScaleFactor: 1,
-      },
-    },
-  ],
+  // One project, and it is not a browser. The fixture launches the Electron
+  // application; `devices` and `viewport` do not apply to a window the shell
+  // sizes itself, and `baseURL` does not apply to a page that is not a tab.
+  projects: [{ name: 'electron' }],
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1 --port 6174',
     url: 'http://127.0.0.1:6174',

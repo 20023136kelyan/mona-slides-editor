@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, openApp, test, type Page } from './electron-fixture'
 
 // Gesture smoke journeys run without reduced motion so they exercise View
 // Transitions and lock in behavior that static screenshot checks can hide:
@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
     HTMLElement.prototype.requestFullscreen = () => Promise.resolve()
     Document.prototype.exitFullscreen = () => Promise.resolve()
   })
-  await page.goto('/?developmentFixture=editor-interactions')
+  await openApp(page, '?developmentFixture=editor-interactions')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 })
 

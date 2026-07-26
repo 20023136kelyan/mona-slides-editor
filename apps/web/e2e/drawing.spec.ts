@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, openApp, test, type Page } from './electron-fixture'
 
 interface PersistedSketch {
   scene: {
@@ -84,7 +84,7 @@ test.beforeEach(async ({ page }) => {
   // Drawing persistence needs the normal working-copy loader, while the
   // agent handoff needs a deterministic provider. Keep those fixtures
   // independent so this test never depends on a hosted backend.
-  await page.goto('/?persistTest=1&agentFixture=reference')
+  await openApp(page, '?persistTest=1&agentFixture=reference')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   await clearSketches(page)
 })

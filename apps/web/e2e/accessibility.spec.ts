@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, openApp, test, type Locator, type Page } from './electron-fixture'
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
 })
 
@@ -12,8 +12,8 @@ const tabTo = async (page: Page, target: Locator, limit = 160, key = 'Tab') => {
   throw new Error(`Keyboard focus did not reach ${await target.getAttribute('aria-label') ?? await target.textContent()}`)
 }
 
-test('supports a keyboard-only editor, panel, agent, and modal walkthrough', async ({ page }) => {
-  await page.goto('/?developmentFixture=slides')
+test('supports a keyboard-only editor, panel, agent, and modal walkthrough', async ({ app, page }) => {
+  await openApp(page, '?developmentFixture=slides')
   const canvas = page.getByRole('application', { name: 'Editable slide canvas' })
   await expect(canvas).toBeVisible()
 
@@ -77,8 +77,8 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await expect(shareButton).toBeFocused()
 })
 
-test('moves keyboard focus through contextual, filmstrip, and grid workspaces', async ({ page }) => {
-  await page.goto('/?developmentFixture=editor-interactions')
+test('moves keyboard focus through contextual, filmstrip, and grid workspaces', async ({ app, page }) => {
+  await openApp(page, '?developmentFixture=editor-interactions')
   const canvas = page.getByRole('application', { name: 'Editable slide canvas' })
   await expect(canvas).toBeVisible()
 
@@ -106,9 +106,9 @@ test('moves keyboard focus through contextual, filmstrip, and grid workspaces', 
   await expect(canvas).toBeFocused()
 })
 
-test('keeps compact desktop geometry bounded with both editor side surfaces active', async ({ page }) => {
+test('keeps compact desktop geometry bounded with both editor side surfaces active', async ({ app, page }) => {
   await page.setViewportSize({ width: 1024, height: 720 })
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
@@ -150,9 +150,9 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
   expect(geometry.stageWidth).toBeGreaterThan(300)
 })
 
-test('keeps every page-grid bulk action reachable beside the agent at compact width', async ({ page }) => {
+test('keeps every page-grid bulk action reachable beside the agent at compact width', async ({ app, page }) => {
   await page.setViewportSize({ width: 1024, height: 720 })
-  await page.goto('/?developmentFixture=slides')
+  await openApp(page, '?developmentFixture=slides')
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   await page.getByRole('button', { name: 'Grid view' }).click()
 
@@ -167,8 +167,8 @@ test('keeps every page-grid bulk action reachable beside the agent at compact wi
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
 })
 
-test('keeps slideshow navigation, tools, and presenter controls keyboard-safe', async ({ page }) => {
-  await page.goto('/?developmentFixture=slides')
+test('keeps slideshow navigation, tools, and presenter controls keyboard-safe', async ({ app, page }) => {
+  await openApp(page, '?developmentFixture=slides')
   const launch = page.getByRole('button', { name: 'Start slideshow (F5)' })
   await launch.focus()
   await launch.press('Enter')
@@ -255,8 +255,8 @@ test('keeps slideshow navigation, tools, and presenter controls keyboard-safe', 
   await expect(launch).toBeFocused()
 })
 
-test('does not transiently shift selected content when guides and controls appear', async ({ page }) => {
-  await page.goto('/?developmentFixture=editor-interactions')
+test('does not transiently shift selected content when guides and controls appear', async ({ app, page }) => {
+  await openApp(page, '?developmentFixture=editor-interactions')
   const element = page.locator('.mona-render-stage [data-element-id="fixture-radial-shape"]')
   const selectionTarget = page.getByRole('button', { name: 'Select shape fixture-radial-shape' })
   await expect(element).toBeVisible()
