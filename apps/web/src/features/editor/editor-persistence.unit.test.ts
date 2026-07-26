@@ -3,31 +3,31 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { PresentationState } from '@mona/presentation-core'
 
 import {
-  collectBlobUrls,
   initDeckPersistence,
-  replaceStrings,
   restoreWorkingDeck,
   type DeckPersistenceStatus,
 } from '@/features/editor/editor-persistence'
 import { createEditorRuntime } from '@/features/editor/editor-runtime'
 
 const storageMocks = vi.hoisted(() => ({
-  clearDeckSlot: vi.fn<() => Promise<undefined>>(),
   clearPowerPointPackages: vi.fn<() => Promise<undefined>>(),
   clearSketchRecords: vi.fn<() => Promise<undefined>>(),
   deletePowerPointPackage: vi.fn<(key: IDBValidKey) => Promise<undefined>>(),
-  deleteMediaBlob: vi.fn<(key: IDBValidKey) => Promise<undefined>>(),
-  listMediaKeys: vi.fn<() => Promise<IDBValidKey[]>>(),
   listPowerPointPackageIds: vi.fn<() => Promise<IDBValidKey[]>>(),
-  readDeckSlot: vi.fn<() => Promise<unknown>>(),
-  readMediaBlob: vi.fn<(key: string) => Promise<unknown>>(),
   readPowerPointPackage: vi.fn<(key: string) => Promise<unknown>>(),
-  writeDeckSlot: vi.fn<(value: unknown) => Promise<IDBValidKey>>(),
-  writeMediaBlob: vi.fn<(key: string, blob: Blob) => Promise<IDBValidKey>>(),
   writePowerPointPackage: vi.fn<(key: string, value: unknown) => Promise<IDBValidKey>>(),
 }))
 
 vi.mock('@/lib/deck-storage', () => storageMocks)
+
+/** The desktop shell's deck store, which is where persistence now lives. */
+const deck = vi.hoisted(() => ({
+  clear: vi.fn<() => Promise<void>>(),
+  collectGarbage: vi.fn<(keep: readonly string[]) => Promise<void>>(),
+  read: vi.fn<() => Promise<unknown>>(),
+  write: vi.fn<(presentation: unknown) => Promise<number>>(),
+  writeAsset: vi.fn<(name: string, bytes: ArrayBuffer) => Promise<string>>(),
+}))
 
 const presentation: PresentationState = {
   title: 'Persistence fixture',
@@ -53,13 +53,18 @@ const drainMicrotasks = async () => {
 beforeEach(() => {
   vi.useFakeTimers()
   vi.resetAllMocks()
-  storageMocks.listMediaKeys.mockResolvedValue([])
   storageMocks.listPowerPointPackageIds.mockResolvedValue([])
-  storageMocks.readMediaBlob.mockResolvedValue(undefined)
   storageMocks.readPowerPointPackage.mockResolvedValue(undefined)
-  storageMocks.writeDeckSlot.mockResolvedValue('working-deck')
-  const windowTarget = new EventTarget() as EventTarget & { onbeforeunload: null | (() => boolean | undefined) }
+  deck.read.mockResolvedValue(null)
+  deck.write.mockResolvedValue(1_700_000_000_000)
+  deck.collectGarbage.mockResolvedValue(undefined)
+  deck.clear.mockResolvedValue(undefined)
+  const windowTarget = new EventTarget() as EventTarget & {
+    mona?: unknown
+    onbeforeunload: null | (() => boolean | undefined)
+  }
   windowTarget.onbeforeunload = null
+  windowTarget.mona = { deck }
   const documentTarget = new EventTarget() as EventTarget & { visibilityState: DocumentVisibilityState }
   documentTarget.visibilityState = 'visible'
   vi.stubGlobal('window', windowTarget)
@@ -72,136 +77,54 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('collectBlobUrls', () => {
-  test('finds blob urls at any depth and ignores everything else', () => {
-    const deck = {
-      slides: [
-        {
-          elements: [
-            { type: 'image', src: 'blob:http://localhost/abc' },
-            { type: 'video', src: 'https://example.com/movie.mp4', poster: 'blob:http://localhost/def' },
-            { type: 'text', content: '<p>not a url</p>' },
-          ],
-          background: { image: { src: 'blob:http://localhost/abc' } },
-        },
-      ],
-    }
-    expect([...collectBlobUrls(deck)].sort()).toEqual([
-      'blob:http://localhost/abc',
-      'blob:http://localhost/def',
-    ])
-    expect(collectBlobUrls(null).size).toBe(0)
-    expect(collectBlobUrls('blob:x').size).toBe(1)
-  })
-})
-
-describe('replaceStrings', () => {
-  test('rewrites exact string matches while preserving structure', () => {
-    const replacements = new Map([['blob:old', 'blob:new']])
-    const input = {
-      a: 'blob:old',
-      b: ['blob:old', 'keep', { c: 'blob:old', d: 42 }],
-      e: 'prefix blob:old suffix',
-    }
-    expect(replaceStrings(input, replacements)).toEqual({
-      a: 'blob:new',
-      b: ['blob:new', 'keep', { c: 'blob:new', d: 42 }],
-      e: 'prefix blob:old suffix',
-    })
-  })
-
-  test('returns the original reference when there is nothing to replace', () => {
-    const input = { a: ['x'] }
-    expect(replaceStrings(input, new Map())).toBe(input)
-  })
-})
-
 describe('restoreWorkingDeck', () => {
-  test('migrates a version 1 working copy without inventing page metadata', async () => {
-    storageMocks.readDeckSlot.mockResolvedValue({
-      presentation,
-      savedAt: 1,
-      version: 1,
-    })
+  test('restores a deck written by this build', async () => {
+    deck.read.mockResolvedValue({ presentation, savedAt: 3, version: 5 })
 
-    const restored = await restoreWorkingDeck()
-
-    expect(restored).toEqual(presentation)
-    expect(restored?.slides[0]).not.toHaveProperty('title')
-    expect(storageMocks.clearDeckSlot).not.toHaveBeenCalled()
+    await expect(restoreWorkingDeck()).resolves.toEqual(presentation)
   })
 
-  test('migrates version 2 page metadata without changing its values', async () => {
-    const storedPresentation: PresentationState = {
-      ...presentation,
-      slides: [{
-        id: 'slide-1',
-        durationMs: 12_500,
-        elements: [],
-        hidden: true,
-        title: 'Stored page',
-        turningMode: 'fade',
-      }],
-    }
-    storageMocks.readDeckSlot.mockResolvedValue({
-      presentation: storedPresentation,
-      savedAt: 2,
-      version: 2,
-    })
+  test('refuses a deck from before assets were files, and clears it', async () => {
+    // Those versions kept binary in IndexedDB under `blob:` keys this build cannot
+    // resolve, so restoring one would produce a deck with every image blank and
+    // nothing to explain why. Re-importing gives a deck that works.
+    deck.read.mockResolvedValue({ presentation, savedAt: 3, version: 4 })
 
-    await expect(restoreWorkingDeck()).resolves.toEqual(storedPresentation)
+    await expect(restoreWorkingDeck()).resolves.toBeNull()
+    expect(deck.clear).toHaveBeenCalled()
   })
 
-  test('removes legacy order-based PowerPoint provenance instead of treating it as exact', async () => {
-    const storedPresentation = {
-      ...presentation,
-      sourcePackages: [{
-        byteLength: 100,
-        fileName: 'legacy-source.pptx',
-        kind: 'pptx',
-        packageId: 'pptx:legacy',
-        slides: [{ slidePart: 'ppt/slides/slide1.xml' }],
-      }],
-      slides: [{
-        id: 'slide-1',
-        elements: [{
-          fixedRatio: true,
-          height: 100,
-          id: 'image-1',
-          left: 0,
-          rotate: 0,
-          source: {
-            kind: 'pptx',
-            packageId: 'pptx:legacy',
-            slidePart: 'ppt/slides/slide1.xml',
-            sourceLayer: 'slide',
-            sourceOrder: 42,
-            sourcePart: 'ppt/slides/slide1.xml',
-          },
-          src: 'data:image/png;base64,',
-          top: 0,
-          type: 'image',
-          width: 100,
-        }],
-      }],
-    } as unknown as PresentationState
-    storageMocks.readDeckSlot.mockResolvedValue({
-      presentation: storedPresentation,
+  test('drops a record of the wrong shape rather than wedging boot', async () => {
+    deck.read.mockResolvedValue({ nonsense: true })
+
+    await expect(restoreWorkingDeck()).resolves.toBeNull()
+    expect(deck.clear).toHaveBeenCalled()
+  })
+
+  test('returns nothing when there is no deck on disk', async () => {
+    deck.read.mockResolvedValue(null)
+
+    await expect(restoreWorkingDeck()).resolves.toBeNull()
+    // Nothing to clear: absent is not corrupt.
+    expect(deck.clear).not.toHaveBeenCalled()
+  })
+
+  test('clamps a slide index that points past the end', async () => {
+    deck.read.mockResolvedValue({
+      presentation: { ...presentation, slideIndex: 9 },
       savedAt: 3,
-      version: 2,
+      version: 5,
     })
 
-    const restored = await restoreWorkingDeck()
-
-    expect(restored?.slides[0]?.elements[0]?.source).toBeUndefined()
+    await expect(restoreWorkingDeck()).resolves.toMatchObject({ slideIndex: 0 })
   })
 })
 
 describe('initDeckPersistence', () => {
   test('publishes pending, saving, and saved states around a serialized save', async () => {
     let releaseWrite: (() => void) | undefined
-    storageMocks.writeDeckSlot.mockImplementation(() => new Promise(resolve => {
-      releaseWrite = () => resolve('working-deck')
+    deck.write.mockImplementation(() => new Promise(resolve => {
+      releaseWrite = () => resolve(1_700_000_000_000)
     }))
     const runtime = createEditorRuntime(presentation)
     const persistence = initDeckPersistence(runtime)
@@ -235,7 +158,7 @@ describe('initDeckPersistence', () => {
   })
 
   test('retains dirty state on failure and exposes a working retry', async () => {
-    storageMocks.writeDeckSlot.mockRejectedValueOnce(new Error('IndexedDB quota exceeded'))
+    deck.write.mockRejectedValueOnce(new Error('IndexedDB quota exceeded'))
     const runtime = createEditorRuntime(presentation)
     const persistence = initDeckPersistence(runtime)
 
@@ -253,7 +176,7 @@ describe('initDeckPersistence', () => {
       status: 'error',
     })
 
-    storageMocks.writeDeckSlot.mockResolvedValueOnce('working-deck')
+    deck.write.mockResolvedValueOnce(1_700_000_000_000)
     await persistence.retry()
     expect(persistence.getSnapshot()).toMatchObject({
       dirty: false,
@@ -264,7 +187,7 @@ describe('initDeckPersistence', () => {
     persistence.stop()
   })
 
-  test('writes page metadata in the current versioned storage envelope', async () => {
+  test('writes page metadata through to the deck on disk', async () => {
     const runtime = createEditorRuntime(presentation)
     const persistence = initDeckPersistence(runtime)
     runtime.commit('Update page metadata', [{
@@ -280,16 +203,15 @@ describe('initDeckPersistence', () => {
 
     await persistence.flush()
 
-    expect(storageMocks.writeDeckSlot).toHaveBeenCalledWith(expect.objectContaining({
-      presentation: expect.objectContaining({
-        slides: [expect.objectContaining({
-          durationMs: 7000,
-          hidden: true,
-          title: 'Timed page',
-          turningMode: 'slideX',
-        })],
-      }),
-      version: 4,
+    // The presentation itself, not an envelope: the version and timestamp belong
+    // to the file the shell writes, not to anything the renderer assembles.
+    expect(deck.write).toHaveBeenCalledWith(expect.objectContaining({
+      slides: [expect.objectContaining({
+        durationMs: 7000,
+        hidden: true,
+        title: 'Timed page',
+        turningMode: 'slideX',
+      })],
     }))
     persistence.stop()
   })

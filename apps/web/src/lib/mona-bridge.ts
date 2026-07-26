@@ -38,6 +38,13 @@ export interface MonaBridge {
     send: (prompt: { effort?: string; model?: string; text: string }) => void
   }
   browseMedia: <Result>(kind: 'images' | 'videos', query: unknown) => Promise<Result>
+  deck: {
+    clear: () => Promise<void>
+    collectGarbage: (keep: readonly string[]) => Promise<void>
+    read: () => Promise<{ presentation: unknown; savedAt: number; version: number } | null>
+    write: (presentation: unknown) => Promise<number>
+    writeAsset: (name: string, bytes: ArrayBuffer) => Promise<string>
+  }
   models: () => Promise<MonaModel[]>
 }
 

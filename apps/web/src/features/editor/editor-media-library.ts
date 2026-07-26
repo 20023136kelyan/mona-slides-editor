@@ -86,10 +86,3 @@ export const deleteMediaLibraryItem = (id: string): Promise<void> =>
   database.items.delete(id).then(() => undefined)
 
 export const mediaLibraryDatabase = database
-
-export const blobToDataUrl = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader()
-  reader.onload = () => resolve(String(reader.result))
-  reader.onerror = () => reject(reader.error ?? new Error('Failed to read media blob'))
-  reader.readAsDataURL(blob)
-})

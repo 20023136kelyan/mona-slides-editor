@@ -61,7 +61,16 @@ const runtimeFor = (state: PresentationState, ok = true) => {
 describe('buildDeckSnapshot', () => {
   it('describes assets without carrying them', async () => {
     const blob = new Blob([Uint8Array.from(atob(PNG), char => char.charCodeAt(0))], { type: 'image/png' })
-    const url = URL.createObjectURL(blob)
+    // The deck refers to a file; `fetch` resolves it through the shell's own
+    // protocol handler in the real application, and through this stub here.
+    const url = 'mona://asset/fixture.png'
+    const realFetch = window.fetch
+    window.fetch = (async (input: RequestInfo | URL) => {
+      const requested = input instanceof Request ? input.url : String(input)
+      return requested === url
+        ? new Response(blob, { headers: { 'content-type': 'image/png' } })
+        : realFetch(input)
+    }) as typeof window.fetch
     try {
       const snapshot = await buildDeckSnapshot(presentation([{
         elements: [{ ...textElement('i1', ''), src: url, type: 'image' }] as unknown as Slide['elements'],
@@ -77,7 +86,7 @@ describe('buildDeckSnapshot', () => {
       expect(await readAssetBytes(url)).toEqual({ base64: PNG, mediaType: 'image/png' })
     }
     finally {
-      URL.revokeObjectURL(url)
+      window.fetch = realFetch
     }
   })
 
@@ -138,20 +147,31 @@ describe('applyAgentWorkspace', () => {
 
   it('ingests an asset the agent created and points the deck at it', async () => {
     const { commits, runtime } = runtimeFor(base)
+    // The shared fake returns a loadable URL so images render in tests; here the
+    // shape is the point, so it answers the way the real shell does.
+    const shell = window.mona!
+    window.mona = {
+      ...shell,
+      deck: { ...shell.deck, writeAsset: async name => `mona://asset/${name}` },
+    }
+    try {
+      await applyAgentWorkspace({
+        addedAssets: { 'assets/chart.png': { base64: PNG, mediaType: 'image/png' } },
+        expectedRevision: getAgentDocumentRevision(base),
+        slides: [{
+          elements: [{ ...textElement('i1', ''), src: 'assets/chart.png', type: 'image' }],
+          id: 'slide-1',
+        }] as unknown as Slide[],
+      }, runtime)
 
-    await applyAgentWorkspace({
-      addedAssets: { 'assets/chart.png': { base64: PNG, mediaType: 'image/png' } },
-      expectedRevision: getAgentDocumentRevision(base),
-      slides: [{
-        elements: [{ ...textElement('i1', ''), src: 'assets/chart.png', type: 'image' }],
-        id: 'slide-1',
-      }] as unknown as Slide[],
-    }, runtime)
-
-    const committed = JSON.stringify(commits[0]?.transaction)
-    // The workspace path is gone; a real object URL took its place.
-    expect(committed).not.toContain('assets/chart.png')
-    expect(committed).toContain('blob:')
+      const committed = JSON.stringify(commits[0]?.transaction)
+      // The workspace path is gone; the file the shell wrote took its place.
+      expect(committed).not.toContain('assets/chart.png')
+      expect(committed).toContain('mona://asset/')
+    }
+    finally {
+      window.mona = shell
+    }
   })
 
   it('names the fix when the agent references a web image', async () => {
@@ -270,36 +290,33 @@ describe('the blank-label footgun, at the new boundary', () => {
   })
 })
 
-describe('a deck whose assets are stored inline', () => {
-  it('re-homes them so the snapshot stays small', async () => {
-    // The measured failure: 193 MB of slide JSON, because a data: URL is its own
-    // bytes and the slides go on the wire verbatim. The socket closed before the
-    // agent started, with nothing in any log to explain it.
-    const inline = `data:image/png;base64,${PNG}`
+describe('what reaches the agent', () => {
+  it('carries no bytes, because no path puts bytes in the model', async () => {
+    // This used to re-home inline `data:` payloads before sending, because a deck
+    // carrying its own bytes came to 193 MB of slide JSON and closed the socket
+    // before the agent had started. Nothing produces them now - every image is a
+    // file the deck names - so the snapshot is small by construction rather than
+    // by being repaired on the way out.
     const snapshot = await buildDeckSnapshot(presentation([{
-      elements: [{ ...textElement('i1', ''), src: inline, type: 'image' }] as unknown as Slide['elements'],
+      elements: [{ ...textElement('i1', ''), src: 'mona://asset/fixture.png', type: 'image' }] as unknown as Slide['elements'],
       id: 'slide-1',
     }]))
 
     const wire = JSON.stringify(snapshot)
-    expect(wire).not.toContain('data:image/png')
-    expect(wire).not.toContain(PNG)
-    // Pointing at the same bytes, by a short reference the agent can still fetch.
-    const [handle] = Object.keys(snapshot.assets)
-    expect(handle?.startsWith('blob:')).toBe(true)
-    expect(JSON.stringify(snapshot.slides)).toContain(handle)
-    expect(await readAssetBytes(handle ?? '')).toEqual({ base64: PNG, mediaType: 'image/png' })
+    expect(wire).not.toContain('data:image')
+    expect(wire).not.toContain('base64')
+    expect(JSON.stringify(snapshot.slides)).toContain('mona://asset/fixture.png')
   })
 
-  it('reports the revision of the deck as it stands, not as it was re-homed', async () => {
-    // Re-homing changes nothing the user can see, so it must not read as the deck
-    // having moved - that would make every apply refuse itself as stale.
-    const state = presentation([{
+  it('ignores an inline reference rather than shipping it', async () => {
+    // Belt and braces: if one ever appeared - a fixture, a paste path nobody has
+    // migrated - it is not treated as a deck asset, so it is never fetched or
+    // described. It would still render; it just does not reach the agent's manifest.
+    const snapshot = await buildDeckSnapshot(presentation([{
       elements: [{ ...textElement('i1', ''), src: `data:image/png;base64,${PNG}`, type: 'image' }] as unknown as Slide['elements'],
       id: 'slide-1',
-    }])
-    const snapshot = await buildDeckSnapshot(state)
+    }]))
 
-    expect(snapshot.revision).toBe(getAgentDocumentRevision(state))
+    expect(snapshot.assets).toEqual({})
   })
 })

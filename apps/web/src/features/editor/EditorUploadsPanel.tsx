@@ -11,6 +11,7 @@ import {
   UserRound,
 } from 'lucide-react'
 
+import { storeDeckAsset } from '@/features/editor/editor-deck-assets'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
@@ -27,7 +28,6 @@ import {
 } from '@/features/editor/panel/EditorPanelPrimitives'
 import {
   addMediaLibraryFile,
-  blobToDataUrl,
   searchMediaLibraryItems,
   type MediaLibraryItem,
   type MediaLibraryKind,
@@ -106,11 +106,14 @@ export function EditorUploadsPanel({
 
   const insertItem = (item: MediaLibraryItem) => {
     void (async () => {
+      // Every kind takes the same path now. Images used to be inserted as a data
+      // URL, which put the whole picture into the deck as base64 - the same thing
+      // that made one imported deck persist at 193 MB.
+      const src = await storeDeckAsset(item.blob)
       if (item.kind === 'image') {
-        onInsertImageSource(await blobToDataUrl(item.blob))
+        onInsertImageSource(src)
         return
       }
-      const src = URL.createObjectURL(item.blob)
       const ext = item.name.includes('.') ? item.name.split('.').pop()?.toLowerCase() : undefined
       if (item.kind === 'video') onInsertVideo({ ...(ext ? { ext } : {}), src })
       else onInsertAudio({ ...(ext ? { ext } : {}), src })

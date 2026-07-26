@@ -15,6 +15,7 @@ import { initializeI18n, setLocale } from '@/i18n'
 /** Swapped per test; `window.mona` delegates here so the stub survives re-renders. */
 const defaultBrowseMedia = window.mona!.browseMedia
 let browseMedia = defaultBrowseMedia
+let restoreFetch: (() => void) | undefined
 window.mona = { ...window.mona!, browseMedia: (kind, query) => browseMedia(kind, query) }
 
 const samplePhotos = [
@@ -50,6 +51,17 @@ beforeEach(async () => {
   // The panel reaches its host through the desktop bridge rather than fetch, so
   // the stub goes there. `browser-setup` installs a default one; this replaces the
   // media call for the length of the test.
+  // The panel downloads a chosen photo before inserting it, so the fixture URLs
+  // have to resolve to something.
+  const realFetch = window.fetch
+  window.fetch = (async (input: RequestInfo | URL) => {
+    const requested = input instanceof Request ? input.url : String(input)
+    return requested.startsWith('https://images.pexels.com/')
+      ? new Response(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }))
+      : realFetch(input)
+  }) as typeof window.fetch
+  restoreFetch = () => { window.fetch = realFetch }
+
   browseMedia = async (_kind, query) => {
     const asked = (query as { query?: string }).query || 'trending'
     return {
@@ -62,6 +74,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await onlinePhotosDatabase.recent.clear()
   browseMedia = defaultBrowseMedia
+  restoreFetch?.()
 })
 
 test('keeps photos discovery and see-all navigation inside the panel', async () => {

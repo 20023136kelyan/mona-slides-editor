@@ -1,8 +1,8 @@
 import type { PresentationState, Slide, SlideTheme } from '@mona/presentation-core'
 
 import { validateAgentSlides } from '@/features/editor/agent/agent-deck-validator'
+import { isDeckAssetUrl, storeDeckAsset } from '@/features/editor/editor-deck-assets'
 import { getAgentDocumentRevision } from '@/features/editor/agent/agent-revision'
-import { replaceStrings } from '@/features/editor/editor-persistence'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 /** Bytes on the wire, because the agent's side of this has no object URLs. */
@@ -54,7 +54,7 @@ export interface AgentApplyOutput {
  */
 const collectAssetUrls = (value: unknown, found = new Set<string>()): Set<string> => {
   if (typeof value === 'string') {
-    if (value.startsWith('blob:') || value.startsWith('data:')) found.add(value)
+    if (isDeckAssetUrl(value)) found.add(value)
   }
   else if (Array.isArray(value)) {
     for (const entry of value) collectAssetUrls(entry, found)
@@ -84,6 +84,19 @@ export const blobToBase64 = (blob: Blob): Promise<string> => new Promise((resolv
   reader.readAsDataURL(blob)
 })
 
+/** Swaps workspace paths for the deck URLs they were written to. */
+const replaceReferences = <Value>(value: Value, replacements: ReadonlyMap<string, string>): Value => {
+  if (!replacements.size) return value
+  if (typeof value === 'string') return (replacements.get(value) ?? value) as Value
+  if (Array.isArray(value)) return value.map(entry => replaceReferences(entry, replacements)) as Value
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, replaceReferences(entry, replacements)]),
+    ) as Value
+  }
+  return value
+}
+
 const base64ToBlob = (asset: AgentAsset): Blob => {
   const binary = atob(asset.base64)
   const bytes = new Uint8Array(binary.length)
@@ -102,35 +115,19 @@ const base64ToBlob = (asset: AgentAsset): Blob => {
  */
 export const buildDeckSnapshot = async (presentation: PresentationState): Promise<AgentSnapshotOutput> => {
   const assets: Record<string, AgentAssetInfo> = {}
-  // A `data:` URL *is* its own bytes, so slides carrying them put the whole deck
-  // on the wire however carefully the manifest is built - measured at 193 MB for
-  // one real deck, which closed the socket before the agent started. Re-homing
-  // each one as an object URL makes the reference short while pointing at the same
-  // bytes, and is the same move the importer makes for a freshly opened file.
-  const rehomed = new Map<string, string>()
+  // Nothing is re-homed and nothing is copied. Every asset is already a file the
+  // deck names by path, so the manifest is a description of what is on disk. This
+  // used to re-mint inline `data:` payloads as object URLs first, because slides
+  // carrying their own bytes put 193 MB of one real deck on the wire.
   for (const url of collectAssetUrls(presentation.slides)) {
-    try {
-      const blob = await fetch(url).then(response => response.blob())
-      const handle = url.startsWith('data:') ? URL.createObjectURL(blob) : url
-      if (handle !== url) rehomed.set(url, handle)
-      assets[handle] = { byteLength: blob.size, mediaType: blob.type }
-    }
-    catch {
-      // A revoked object URL: skip it. The reference survives into the workspace
-      // with no file behind it, which the agent can see and report.
-    }
+    const blob = await fetch(url).then(response => response.blob()).catch(() => undefined)
+    if (blob) assets[url] = { byteLength: blob.size, mediaType: blob.type }
   }
-  // Not revoked on the way out: the agent may still ask for these bytes, and an
-  // applied deck keeps referencing them. They are one short URL per asset and the
-  // page reload clears them.
-  const slides = replaceStrings(presentation.slides, rehomed)
   return {
     assets,
-    // Against the deck as it stands, not as it was re-homed: this is what the
-    // staleness check compares, and re-homing changed nothing the user can see.
     revision: getAgentDocumentRevision(presentation),
     slideIndex: presentation.slideIndex,
-    slides,
+    slides: presentation.slides,
     theme: presentation.theme,
     title: presentation.title,
     viewportRatio: presentation.viewportRatio,
@@ -179,13 +176,13 @@ export const applyAgentWorkspace = async (
     )
   }
 
+  // Written to disk before the deck names them, so a commit never refers to bytes
+  // that are not yet stored.
   const urlByPath = new Map<string, string>()
   for (const [path, asset] of Object.entries(input.addedAssets ?? {})) {
-    urlByPath.set(path, URL.createObjectURL(base64ToBlob(asset)))
+    urlByPath.set(path, await storeDeckAsset(base64ToBlob(asset)))
   }
-  // Object URLs alone: the bytes are captured into the media store by the save
-  // that this commit triggers, the same path every other asset in the app takes.
-  const slides = replaceStrings(input.slides, urlByPath)
+  const slides = replaceReferences(input.slides, urlByPath)
 
   const explanation = (input.explanation ?? 'Mona agent edit').trim().slice(0, 160) || 'Mona agent edit'
   let transaction
@@ -197,16 +194,12 @@ export const applyAgentWorkspace = async (
     })
   }
   catch (error) {
-    // Nothing was committed, so the URLs just minted have no owner.
-    for (const url of urlByPath.values()) URL.revokeObjectURL(url)
+    // The files stay; the next successful save collects any the deck does not name.
     throw error
   }
   transaction.label = explanation
 
   const applied = runtime.commitTransaction(transaction, { historyKey: 'mona-agent-run' })
-  if (!applied.ok) {
-    for (const url of urlByPath.values()) URL.revokeObjectURL(url)
-    throw new Error(`The deck was rejected: ${applied.reason}`)
-  }
+  if (!applied.ok) throw new Error(`The deck was rejected: ${applied.reason}`)
   return { applied: true, explanation, slideCount: slides.length }
 }

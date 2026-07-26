@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { storeDeckAsset } from '@/features/editor/editor-deck-assets'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEditorPanelSearch } from '@/features/editor/panel/editor-panel-search'
 import {
@@ -251,7 +252,17 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
   const insertPhoto = async (item: PhotoSearchItem) => {
     try {
       await rememberOnlinePhoto(item)
-      onInsertImageSource(item.src)
+      // Downloaded rather than referenced: a deck that points at a remote host
+      // renders only while that host is up, leaks the reader's IP to it, and
+      // breaks offline. It also keeps one rule for every image in a deck.
+      void fetch(item.src)
+        .then(response => response.blob())
+        .then(blob => storeDeckAsset(blob))
+        .then(src => onInsertImageSource(src))
+        .catch(() => notifications.notify({
+          text: t('foundation.editor.photos.insertFailed'),
+          type: 'error',
+        }))
     }
     catch {
       notifications.notify({ text: t('foundation.editor.photos.insertFailed'), type: 'error' })

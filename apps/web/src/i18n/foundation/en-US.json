@@ -721,7 +721,7 @@
       "retry": "Try again",
       "enterKeyword": "Enter a search keyword",
       "insertPhoto": "Insert photo",
-      "insertFailed": "Could not insert that photo.",
+      "insertFailed": "That photo could not be added.",
       "providerNote": "Photos from Pexels",
       "categories": {
         "trending": "Trending",

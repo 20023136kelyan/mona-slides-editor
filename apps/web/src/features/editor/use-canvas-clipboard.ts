@@ -5,6 +5,7 @@ import { createPresentationId, type PresentationState } from '@mona/presentation
 import type { PPTElement } from '@mona/presentation-core/model'
 
 import { parseCustomEditorClipboard } from '@/features/editor/editor-clipboard'
+import { storeDeckAsset } from '@/features/editor/editor-deck-assets'
 import { MONA_CLIPBOARD_MIME, type EditorRuntime } from '@/features/editor/editor-runtime'
 
 // Clipboard and drag-drop insertion for the slide canvas: native payloads,
@@ -141,8 +142,10 @@ export function useCanvasClipboard({ presentation, runtime, shiftPressedRef }: {
     catch { /* An unreadable image paste is intentionally a no-op. */ }
   }
 
-  const createMediaFromClipboard = (file: File) => {
-    const src = URL.createObjectURL(file)
+  const createMediaFromClipboard = async (file: File) => {
+    // Written to the deck's own assets directory rather than held as an object
+    // URL, so a pasted video is still there after a restart.
+    const src = await storeDeckAsset(file)
     const ext = MEDIA_EXTENSION_BY_MIME[file.type]
     if (file.type.includes('video')) {
       commitPastedElement('Paste video', {
@@ -192,7 +195,7 @@ export function useCanvasClipboard({ presentation, runtime, shiftPressedRef }: {
       }
       else if (item.type.includes('video') || item.type.includes('audio')) {
         handledFile = true
-        createMediaFromClipboard(file)
+        void createMediaFromClipboard(file)
       }
     }
     if (handledFile) return
@@ -236,7 +239,7 @@ export function useCanvasClipboard({ presentation, runtime, shiftPressedRef }: {
       }
       else if (item.type.includes('video') || item.type.includes('audio')) {
         handledFile = true
-        createMediaFromClipboard(file)
+        void createMediaFromClipboard(file)
       }
     }
     if (handledFile) return

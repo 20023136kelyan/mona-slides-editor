@@ -721,7 +721,7 @@
       "retry": "重试",
       "enterKeyword": "请输入搜索关键词",
       "insertPhoto": "插入照片",
-      "insertFailed": "无法插入该照片。",
+      "insertFailed": "无法添加该照片。",
       "providerNote": "照片来自 Pexels",
       "categories": {
         "trending": "热门",

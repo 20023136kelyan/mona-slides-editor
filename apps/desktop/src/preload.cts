@@ -51,6 +51,16 @@ contextBridge.exposeInMainWorld('mona', {
     },
   },
 
+  /** The deck and its binary, on disk. */
+  deck: {
+    clear: () => ipcRenderer.invoke('mona:deck:clear'),
+    collectGarbage: (keep: readonly string[]) => ipcRenderer.invoke('mona:deck:collect-garbage', keep),
+    read: () => ipcRenderer.invoke('mona:deck:read'),
+    write: (presentation: unknown) => ipcRenderer.invoke('mona:deck:write', presentation),
+    /** Returns the `mona://asset/...` URL the deck should refer to it by. */
+    writeAsset: (name: string, bytes: ArrayBuffer) => ipcRenderer.invoke('mona:deck:write-asset', name, bytes),
+  },
+
   /** Stock photo and video search, for the media panels. */
   browseMedia: (kind: 'images' | 'videos', query: unknown) => (
     ipcRenderer.invoke('mona:media:browse', kind, query)

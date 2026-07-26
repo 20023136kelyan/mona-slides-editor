@@ -26,6 +26,22 @@ const bridge: MonaBridge = {
     send: () => {},
   },
   browseMedia: async <Result>() => ({ data: [], total: 0, videos: [] }) as Result,
+  deck: {
+    clear: async () => {},
+    collectGarbage: async () => {},
+    // No deck on disk: every test builds the state it needs.
+    read: async () => null,
+    write: async () => Date.now(),
+    /**
+     * Returns something the browser can actually load.
+     *
+     * The real shell answers `mona://asset/…` from its own protocol handler, which
+     * plain Chromium has no idea about — an `<img>` pointed at one simply fails, and
+     * an insert that measures the image before placing it would never place it. A
+     * test that cares about the *shape* of the URL stubs this itself.
+     */
+    writeAsset: async (_name: string, bytes: ArrayBuffer) => URL.createObjectURL(new Blob([bytes])),
+  },
   models: async () => [
     { effortLevels: ['low', 'medium', 'high'], id: 'default', name: 'Default (recommended)' },
     { effortLevels: ['low', 'medium', 'high'], id: 'sonnet', name: 'Sonnet' },

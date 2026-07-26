@@ -2,25 +2,27 @@ import { validateImportedSlides, validatePresentationState, type PresentationSta
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
-import {
-  clearDeckSlot,
-  clearPowerPointPackages,
-  clearSketchRecords,
-  deleteMediaBlob,
-  listMediaKeys,
-  readDeckSlot,
-  readMediaBlob,
-  writeDeckSlot,
-  writeMediaBlob,
-} from '@/lib/deck-storage'
+import { clearPowerPointPackages, clearSketchRecords } from '@/lib/deck-storage'
+import { collectDeckAssetNames } from '@/features/editor/editor-deck-assets'
+import { monaBridge } from '@/lib/mona-bridge'
 
-// Working-copy persistence: the deck autosaves to IndexedDB shortly after
-// every change and is restored on the next boot, so a crash, tab close, or
-// reload can no longer lose work. blob: media URLs die with the document, so
-// their payloads are captured alongside the deck and re-minted on restore.
+/**
+ * Working-copy persistence: the deck autosaves to disk shortly after every change
+ * and is read back on the next launch, so a crash or a quit cannot lose work.
+ *
+ * It used to keep the deck in IndexedDB with binary in a second store keyed by
+ * `blob:` URL, which meant every save had to fetch the bytes back through a handle
+ * and re-mint that handle on restore. Assets are files now and the deck refers to
+ * them by path, so there is nothing to capture, nothing to re-mint, and no way for
+ * the two to fall out of step.
+ */
 
 const SAVE_DEBOUNCE_MS = 800
-const STORAGE_VERSION = 4
+/** 5 is the first version whose assets are files rather than IndexedDB blobs. */
+const STORAGE_VERSION = 5
+
+/** Set by a restore, read once by the banner that offers to start fresh. */
+let restoredWorkingCopy = false
 
 interface StoredDeck {
   presentation: PresentationState
@@ -57,33 +59,6 @@ export const isPersistenceEnabled = (url: URL = new URL(window.location.href)): 
   return true
 }
 
-const BLOB_URL_PATTERN = /^blob:/
-export const collectBlobUrls = (value: unknown, found = new Set<string>()): Set<string> => {
-  if (typeof value === 'string') {
-    if (BLOB_URL_PATTERN.test(value)) found.add(value)
-  }
-  else if (Array.isArray(value)) {
-    for (const entry of value) collectBlobUrls(entry, found)
-  }
-  else if (value && typeof value === 'object') {
-    for (const entry of Object.values(value)) collectBlobUrls(entry, found)
-  }
-  return found
-}
-
-export const replaceStrings = <T>(value: T, replacements: ReadonlyMap<string, string>): T => {
-  if (replacements.size === 0) return value
-  if (typeof value === 'string') return (replacements.get(value) ?? value) as T
-  if (Array.isArray(value)) return value.map(entry => replaceStrings(entry, replacements)) as T
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, replaceStrings(entry, replacements)]),
-    ) as T
-  }
-  return value
-}
-
-let restoredWorkingCopy = false
 export const consumeRestoredDeckFlag = (): boolean => {
   const value = restoredWorkingCopy
   restoredWorkingCopy = false
@@ -93,10 +68,18 @@ export const consumeRestoredDeckFlag = (): boolean => {
 const isStoredDeck = (value: unknown): value is StoredDeck => {
   if (!value || typeof value !== 'object') return false
   const record = value as Partial<StoredDeck>
-  return (record.version === 1 || record.version === 2 || record.version === 3 || record.version === STORAGE_VERSION)
+  return record.version === STORAGE_VERSION
     && !!record.presentation && typeof record.presentation === 'object'
 }
 
+/**
+ * Nothing to migrate.
+ *
+ * Earlier versions kept binary in IndexedDB under `blob:` keys, which this build
+ * cannot resolve — the deck would restore with every image blank. Refusing them in
+ * `isStoredDeck` is the honest outcome: the user re-imports and gets a deck that
+ * works, rather than one that looks broken for reasons nothing explains.
+ */
 const migrateStoredDeck = (stored: StoredDeck): StoredDeck => {
   if (stored.version === STORAGE_VERSION) return stored
   // Version 2 added optional page metadata. Version 3 temporarily synthesized
@@ -133,28 +116,22 @@ const migrateStoredDeck = (stored: StoredDeck): StoredDeck => {
 
 export const restoreWorkingDeck = async (): Promise<PresentationState | null> => {
   try {
-    const stored = await readDeckSlot()
-    if (stored === undefined) return null
+    const stored = await monaBridge().deck.read()
+    if (!stored) return null
     if (!isStoredDeck(stored)) {
       // A corrupt or foreign-shaped slot must never wedge boot: drop it.
-      await clearDeckSlot().catch(() => {})
+      await monaBridge().deck.clear().catch(() => {})
       return null
     }
     const migrated = migrateStoredDeck(stored)
     if (!validateImportedSlides(migrated.presentation.slides).valid) {
-      await clearDeckSlot().catch(() => {})
+      await monaBridge().deck.clear().catch(() => {})
       return null
     }
 
-    // Stored blob: URLs are dead in this document; re-mint object URLs from
-    // the captured payloads before the deck reaches the store.
-    const replacements = new Map<string, string>()
-    for (const url of collectBlobUrls(migrated.presentation)) {
-      const blob = await readMediaBlob(url).catch(() => undefined)
-      if (blob instanceof Blob) replacements.set(url, URL.createObjectURL(blob))
-    }
-
-    const restoredPresentation = replaceStrings(migrated.presentation, replacements)
+    // Nothing to re-mint: an asset reference is a path, and it means the same
+    // thing in this launch as it did in the last one.
+    const restoredPresentation = migrated.presentation
     const presentation: PresentationState = {
       ...restoredPresentation,
       slides: sanitizeSlides(restoredPresentation.slides),
@@ -162,7 +139,7 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
       slideIndex: Math.min(Math.max(migrated.presentation.slideIndex, 0), migrated.presentation.slides.length - 1),
     }
     if (!validatePresentationState(presentation).valid) {
-      await clearDeckSlot().catch(() => {})
+      await monaBridge().deck.clear().catch(() => {})
       return null
     }
     restoredWorkingCopy = true
@@ -174,11 +151,9 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
 }
 
 export const discardWorkingDeck = async (): Promise<void> => {
-  await clearDeckSlot().catch(() => {})
+  await monaBridge().deck.clear().catch(() => {})
   await clearPowerPointPackages().catch(() => {})
   await clearSketchRecords().catch(() => {})
-  const keys = await listMediaKeys().catch(() => [] as IDBValidKey[])
-  await Promise.all(keys.map(key => deleteMediaBlob(key).catch(() => {})))
 }
 
 export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => {
@@ -215,52 +190,19 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
       const presentation = runtime.store.getState().presentation
       updateSnapshot({ dirty: true, error: null, status: 'saving' })
       try {
-        const referenced = collectBlobUrls(presentation)
-        // Assets whose bytes we could not get into the store. The deck below is
-        // still written - losing a text edit because one image misbehaved would be
-        // worse - but the save must not then report itself as complete.
-        const unstored: string[] = []
-        for (const url of referenced) {
-          const existing = await readMediaBlob(url).catch(() => undefined)
-          if (existing instanceof Blob) continue
-          // Only reachable for assets minted outside the import path; the importer
-          // stores its own bytes up front, precisely so this fetch is never the
-          // only way back to them.
-          const blob = await fetch(url).then(response => response.blob()).catch(() => undefined)
-          if (!blob) {
-            unstored.push(url)
-            continue
-          }
-          const written = await writeMediaBlob(url, blob).then(() => true).catch(() => false)
-          if (!written) unstored.push(url)
-        }
-        const keys = await listMediaKeys().catch(() => [] as IDBValidKey[])
-        await Promise.all(keys
-          .filter(key => typeof key === 'string' && !referenced.has(key))
-          .map(key => deleteMediaBlob(key).catch(() => {})))
         await runtime.pptxBackingStore.retain(
           (presentation.sourcePackages ?? []).map(source => source.packageId),
         )
 
-        const savedAt = Date.now()
-        const payload: StoredDeck = { presentation, savedAt, version: STORAGE_VERSION }
-        await writeDeckSlot(payload)
+        // The assets are already on disk - they were written before anything
+        // referenced them - so saving the deck is one write and nothing else.
+        const savedAt = await monaBridge().deck.write(presentation)
         lastSaved = presentation
-        if (unstored.length) {
-          // The deck is on disk but incomplete: these references will resolve to
-          // nothing after a reload, and the images they belong to will be blank.
-          // Reported rather than retried - the bytes are already unreachable, so
-          // another attempt fetches the same dead URL - and `dirty` stays false so
-          // this does not spin on every subsequent edit.
-          updateSnapshot({
-            dirty: false,
-            error: `Saved without ${unstored.length} image${unstored.length === 1 ? '' : 's'}. They will be missing when this deck is reopened.`,
-            pendingSince: null,
-            savedAt,
-            status: 'error',
-          })
-        }
-        else if (runtime.store.getState().presentation === presentation) {
+        // Only after the deck naming them is safely stored: an orphan costs disk,
+        // where deleting one still referenced costs a picture.
+        void monaBridge().deck.collectGarbage([...collectDeckAssetNames(presentation)])
+          .catch(() => undefined)
+        if (runtime.store.getState().presentation === presentation) {
           updateSnapshot({
             dirty: false,
             error: null,

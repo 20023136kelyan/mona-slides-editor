@@ -69,17 +69,17 @@ const assertGeometry = (element: PPTElement, label: string) => {
 }
 
 /**
- * An image must resolve without the network.
+ * Every image in a deck is a file the deck owns.
  *
- * `blob:` is an asset in Mona's own media store; `data:` is bytes inline. Anything
- * else - an `https://` URL the model found on the web - renders only while that
- * host is up, leaks the reader's IP to it, and breaks the deck offline. The right
- * move for a web image is to download it into `deck/assets/` and reference the
- * file, which arrives here as a blob once ingested.
+ * An `https://` URL the model found on the web renders only while that host is up,
+ * leaks the reader's IP to it, and breaks the deck offline. `data:` puts the bytes
+ * in the model, which is what made one deck persist at 193 MB. Both are refused in
+ * favour of the one thing that survives a restart: a file in `deck/assets/`, which
+ * arrives here as a `mona://asset/` reference once ingested.
  */
 const assertLocalImage = (element: PPTElement, label: string) => {
   if (element.type !== 'image') return
-  if (!element.src.startsWith('blob:') && !element.src.startsWith('data:')) {
+  if (!element.src.startsWith('mona://asset/')) {
     throw new Error(
       `${label} points at "${element.src.slice(0, 60)}". Save the image into deck/assets/ and reference that path instead.`,
     )

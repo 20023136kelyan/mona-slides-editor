@@ -91,7 +91,7 @@ test('keeps record funnel and library insert inside the uploads panel', async ()
   await page.getByRole('button', { name: 'Insert panel-hero.png' }).click()
 
   await expect.poll(() => onInsertImageSource.mock.calls.length).toBe(1)
-  expect(onInsertImageSource.mock.calls[0]![0]).toMatch(/^data:image\/png;base64,/)
+  expect(onInsertImageSource.mock.calls[0]![0]).toMatch(/^blob:/)
   expect(onInsertAudio).not.toHaveBeenCalled()
   expect(onInsertVideo).not.toHaveBeenCalled()
   expect(document.querySelector('[role="dialog"]')).toBeNull()

@@ -1,15 +1,16 @@
-// Minimal promisified IndexedDB layer for the working-copy autosave. Every
-// caller treats failures as "persistence unavailable" (private browsing,
-// storage pressure), never as fatal application errors.
+// A promisified IndexedDB layer for what has not moved to disk yet: the original
+// .pptx archive behind an imported deck, and per-slide sketches. Every caller
+// treats failure as "unavailable", never as a fatal error.
+//
+// The deck and its binary used to live here too. They are files now - the deck was
+// the reason this existed, and the media store is what made images vanish after a
+// restart when a `blob:` key and its bytes fell out of step.
 
 import { LEGACY_DECK_DATABASE_NAME } from '@/lib/legacy-compatibility'
 
 const DATABASE_NAME = 'mona'
-const DECK_STORE = 'decks'
-const MEDIA_STORE = 'media'
 const POWERPOINT_PACKAGE_STORE = 'powerpoint-packages'
 const SKETCH_STORE = 'sketches'
-const WORKING_DECK_KEY = 'working-deck'
 const DATABASE_VERSION = 3
 
 const databasePromises = new Map<string, Promise<IDBDatabase>>()
@@ -23,8 +24,6 @@ const openDatabase = (name: string): Promise<IDBDatabase> => {
   const request = indexedDB.open(name, DATABASE_VERSION)
   request.onupgradeneeded = () => {
     const database = request.result
-    if (!database.objectStoreNames.contains(DECK_STORE)) database.createObjectStore(DECK_STORE)
-    if (!database.objectStoreNames.contains(MEDIA_STORE)) database.createObjectStore(MEDIA_STORE)
     if (!database.objectStoreNames.contains(POWERPOINT_PACKAGE_STORE)) database.createObjectStore(POWERPOINT_PACKAGE_STORE)
     if (!database.objectStoreNames.contains(SKETCH_STORE)) database.createObjectStore(SKETCH_STORE)
   }
@@ -50,59 +49,6 @@ const inStore = async <T>(
 ): Promise<T> => {
   const store = (await database(databaseName)).transaction(storeName, mode).objectStore(storeName)
   return asPromise(run(store))
-}
-
-const readDeckFrom = (databaseName: string): Promise<unknown> =>
-  inStore(databaseName, DECK_STORE, 'readonly', store => store.get(WORKING_DECK_KEY))
-
-const writeDeckTo = (databaseName: string, value: unknown): Promise<IDBValidKey> =>
-  inStore(databaseName, DECK_STORE, 'readwrite', store => store.put(value, WORKING_DECK_KEY))
-
-export const readDeckSlot = async (): Promise<unknown> => {
-  const current = await readDeckFrom(DATABASE_NAME)
-  if (current !== undefined) return current
-  const legacy = await readDeckFrom(LEGACY_DECK_DATABASE_NAME)
-  if (legacy === undefined) return undefined
-  await writeDeckTo(DATABASE_NAME, legacy)
-  return legacy
-}
-
-export const writeDeckSlot = (value: unknown): Promise<IDBValidKey> =>
-  writeDeckTo(DATABASE_NAME, value)
-
-export const clearDeckSlot = async (): Promise<undefined> => {
-  await Promise.all([
-    inStore(DATABASE_NAME, DECK_STORE, 'readwrite', store => store.delete(WORKING_DECK_KEY)),
-    inStore(LEGACY_DECK_DATABASE_NAME, DECK_STORE, 'readwrite', store => store.delete(WORKING_DECK_KEY)),
-  ])
-  return undefined
-}
-
-export const readMediaBlob = async (key: string): Promise<unknown> => {
-  const current = await inStore(DATABASE_NAME, MEDIA_STORE, 'readonly', store => store.get(key))
-  if (current !== undefined) return current
-  const legacy = await inStore(LEGACY_DECK_DATABASE_NAME, MEDIA_STORE, 'readonly', store => store.get(key))
-  if (legacy !== undefined) await inStore(DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.put(legacy, key))
-  return legacy
-}
-
-export const writeMediaBlob = (key: string, blob: Blob): Promise<IDBValidKey> =>
-  inStore(DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.put(blob, key))
-
-export const listMediaKeys = async (): Promise<IDBValidKey[]> => {
-  const [current, legacy] = await Promise.all([
-    inStore(DATABASE_NAME, MEDIA_STORE, 'readonly', store => store.getAllKeys()),
-    inStore(LEGACY_DECK_DATABASE_NAME, MEDIA_STORE, 'readonly', store => store.getAllKeys()),
-  ])
-  return [...new Set([...current, ...legacy])]
-}
-
-export const deleteMediaBlob = async (key: IDBValidKey): Promise<undefined> => {
-  await Promise.all([
-    inStore(DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.delete(key)),
-    inStore(LEGACY_DECK_DATABASE_NAME, MEDIA_STORE, 'readwrite', store => store.delete(key)),
-  ])
-  return undefined
 }
 
 export const readPowerPointPackage = (packageId: string): Promise<unknown> =>

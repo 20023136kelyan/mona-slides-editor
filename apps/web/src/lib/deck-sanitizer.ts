@@ -24,9 +24,11 @@ const urlScheme = (url: string): string | null => {
   return match ? `${match[1]!.toLowerCase()}:` : null
 }
 
-// Media sinks (img/video/audio src, poster, slide backgrounds). data: and
-// blob: are load targets here, never navigation, so both stay allowed.
-const MEDIA_SCHEMES = new Set(['http:', 'https:', 'data:', 'blob:'])
+// Media sinks (img/video/audio src, poster, slide backgrounds). These are load
+// targets, never navigation, so `data:` and `blob:` stay allowed. `mona:` is the
+// deck's own assets on disk, served by the shell from one directory it controls -
+// a URL under it cannot name anything outside that directory.
+const MEDIA_SCHEMES = new Set(['http:', 'https:', 'data:', 'blob:', 'mona:'])
 export const sanitizeMediaUrl = (url: string): string => {
   const scheme = urlScheme(url)
   return scheme === null || MEDIA_SCHEMES.has(scheme) ? url : ''

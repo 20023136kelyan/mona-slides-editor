@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, protocol, shell } from 'electron'
 
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
+import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
 
 /**
  * Mona's desktop shell.
@@ -20,6 +21,10 @@ import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
  * cookie and the WebSocket could all be deleted rather than ported — there is no
  * network surface left for any of them to guard.
  */
+
+// Before anything reads `userData`: without it Electron derives the directory from
+// the package name and decks land in `Application Support/@mona/desktop`.
+app.setName('Mona')
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const RENDERER_ROOT = app.isPackaged
@@ -67,6 +72,10 @@ const mimeFor = (path: string): string => {
  */
 const serveRenderer = () => {
   protocol.handle(SCHEME, async request => {
+    // Two hosts on one scheme: `mona://app/...` is the renderer, `mona://asset/...`
+    // is deck binary served straight off disk.
+    const asset = await handleAssetRequest(request)
+    if (asset) return asset
     const { pathname } = new URL(request.url)
     const target = normalize(join(RENDERER_ROOT, decodeURIComponent(pathname)))
     const inside = target === RENDERER_ROOT || target.startsWith(RENDERER_ROOT + sep)
@@ -123,6 +132,7 @@ const main = async (): Promise<void> => {
   await app.whenReady()
   serveRenderer()
   registerAgentIpc()
+  registerDeckIpc()
   try {
     await createWindow()
   }

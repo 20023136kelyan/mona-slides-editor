@@ -425,10 +425,12 @@ test('inserts library media as an undoable native element from Uploads', async (
   await page.getByRole('button', { name: 'Insert deck-hero.png' }).click()
 
   await expect.poll(() => runtime.store.getState().presentation.slides[0]!.elements.at(-1)?.type).toBe('image')
-  expect(runtime.store.getState().presentation.slides[0]!.elements.at(-1)).toMatchObject({
-    type: 'image',
-    src: expect.stringMatching(/^data:image\/png;base64,/),
-  })
+  // A reference to a file the deck owns, not the picture inlined into the model.
+  // Under the real shell that is `mona://asset/…`; the test shell answers with
+  // something the browser can load, but either way it is a short reference.
+  const inserted = runtime.store.getState().presentation.slides[0]!.elements.at(-1) as { src: string }
+  expect(inserted.src).not.toContain('base64')
+  expect(inserted.src.length).toBeLessThan(120)
   expect(runtime.undo()).toBe(true)
   expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
 })

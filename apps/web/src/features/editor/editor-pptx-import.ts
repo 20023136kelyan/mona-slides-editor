@@ -23,7 +23,7 @@ import {
   type PowerPointPackageManifest,
   type PowerPointPackageReference,
 } from '@mona/presentation-core'
-import { writeMediaBlob } from '@/lib/deck-storage'
+import { plannedAssetName, storeDeckAssetBytes } from '@/features/editor/editor-deck-assets'
 import type {
   ChartOptions,
   ChartType,
@@ -380,18 +380,16 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
  * or already-minted URL survives.
  */
 /**
- * Blobs minted by this module, keyed by the URL that now refers to them.
+ * Assets found while converting, awaiting a write.
  *
- * Minting has to stay synchronous - it happens deep inside a pure conversion from
- * parsed slides to model elements - but the bytes must reach the media store
- * without waiting for a save. Between import and the first save, an object URL is
- * the *only* handle on those bytes, and the save path recovers them by fetching
- * that URL: if it ever fails to resolve, the bytes are gone and the deck keeps a
- * reference to nothing. Holding the blob here lets `persistImportedAssets` write
- * it while we still have it.
+ * Conversion is synchronous - it maps parsed slides to model elements - but writing
+ * a file is not. So the URL is decided here, deterministically from the bytes, and
+ * `persistImportedAssets` writes them before the deck is committed. Nothing ever
+ * refers to an asset that is not yet on disk.
  */
-const mintedAssets = new Map<string, Blob>()
+const pending = new Map<string, ArrayBuffer>()
 
+/** The URL an imported asset will have once written; content-addressed. */
 export const importedAssetUrl = (source: string): string => {
   const match = /^data:([^;,]*);base64,(.*)$/s.exec(source)
   if (!match) return source
@@ -400,10 +398,9 @@ export const importedAssetUrl = (source: string): string => {
     const binary = atob(payload ?? '')
     const bytes = new Uint8Array(binary.length)
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
-    const blob = new Blob([bytes], { type: mime || 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    mintedAssets.set(url, blob)
-    return url
+    const name = plannedAssetName(bytes, mime)
+    pending.set(name, bytes.buffer)
+    return `mona://asset/${name}`
   }
   catch {
     // A payload we cannot decode is better left as it was than dropped.
@@ -412,29 +409,22 @@ export const importedAssetUrl = (source: string): string => {
 }
 
 /**
- * Writes every asset minted since the last call into the media store.
+ * Writes every asset found during the conversion.
  *
- * Called once the conversion is done and before the deck is committed, so no
- * asset is ever referenced by a stored deck without its bytes already being
- * stored too. The save path then skips it - it short-circuits on an existing
- * media record - so the object URL never has to survive to be re-fetched.
- *
- * Returns the URLs it could not write. The caller decides what to say about
- * them; what it must not do is treat the import as complete, because those
- * images will be broken the moment the page reloads.
+ * Called once the slides are built and before they are committed, so the deck never
+ * names a file that does not exist. Returns what it could not write; the caller
+ * decides what to say, but it must not treat the import as complete.
  */
 export const persistImportedAssets = async (): Promise<string[]> => {
-  const pending = [...mintedAssets]
-  // Cleared up front: a failure here is reported, not retried forever, and
-  // holding a deck's worth of blobs alive after the fact is its own problem.
-  mintedAssets.clear()
+  const queued = [...pending]
+  pending.clear()
   const failed: string[] = []
-  for (const [url, blob] of pending) {
+  for (const [name, bytes] of queued) {
     try {
-      await writeMediaBlob(url, blob)
+      await storeDeckAssetBytes(name, bytes)
     }
     catch {
-      failed.push(url)
+      failed.push(name)
     }
   }
   return failed
