@@ -60,12 +60,13 @@ function HorizontalStrip({
   return (
     <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
       {items.map(item => (
-        <button
+        <Button
           aria-label={t('foundation.editor.photos.insertPhoto')}
-          className="w-28 shrink-0 overflow-hidden rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="block h-auto w-28 shrink-0 overflow-hidden rounded-control p-0"
           key={item.id}
           onClick={() => onInsert(item)}
           type="button"
+          variant="ghost"
         >
           <img
             alt=""
@@ -74,7 +75,7 @@ function HorizontalStrip({
             loading="lazy"
             src={item.src}
           />
-        </button>
+        </Button>
       ))}
     </div>
   )
@@ -94,14 +95,15 @@ function PhotoMasonry({
       getKey={item => String(item.id)}
       items={items}
       renderItem={item => (
-        <button
+        <Button
           aria-label={t('foundation.editor.photos.insertPhoto')}
-          className="block w-full overflow-hidden rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="block h-auto w-full overflow-hidden rounded-control p-0"
           onClick={() => onInsert(item)}
           type="button"
+          variant="ghost"
         >
           <PhotoThumb item={item} />
-        </button>
+        </Button>
       )}
     />
   )

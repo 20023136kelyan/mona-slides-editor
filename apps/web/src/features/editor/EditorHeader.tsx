@@ -538,19 +538,22 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
             <TooltipProvider delayDuration={300}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
+                  <Button
                     aria-label={saveLabel}
                     className={cn(
-                      'inline-flex size-7 shrink-0 items-center justify-center rounded-action text-foreground/70 [&_svg]:size-3.5',
-                      persistenceSnapshot.status === 'error' && 'text-destructive',
-                      persistenceSnapshot.status === 'error' && 'hover:bg-foreground/[0.04]',
+                      'text-foreground/70 [&_svg]:size-3.5',
+                      // Only a failed save is pressable; otherwise this is a
+                      // status light that happens to be focusable.
+                      persistenceSnapshot.status === 'error' ? 'text-destructive' : 'hover:bg-transparent',
                     )}
                     onClick={persistenceSnapshot.status === 'error' ? () => void persistence.retry() : undefined}
+                    size="header-icon"
                     type="button"
+                    variant="ghost"
                   >
                     {persistenceSnapshot.status === 'saving' ? <LoaderCircle className="animate-spin" /> : persistenceSnapshot.status === 'error' ? <CircleAlert /> : <Laptop />}
                     <span aria-live="polite" className="sr-only">{saveLabel}</span>
-                  </button>
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={6}>
                   {saveLabel}

@@ -516,7 +516,10 @@
      changing it re-centres every handle automatically. */
   --mona-handle-size: 12px;
   --mona-outline-width: 1px;
-  --mona-border-radius: 9999px;
+  /* The pill role rather than the 9999px it resolves to, and named for the
+     handles like its neighbours: this was `--mona-border-radius`, which read as
+     a generic token and hard-coded a radius the design system already has. */
+  --mona-handle-radius: var(--radius-pill);
   position: absolute;
   z-index: 100;
   box-sizing: border-box;
@@ -1058,7 +1061,7 @@
   width: var(--mona-handle-size);
   height: var(--mona-handle-size);
   border: var(--mona-handle-stroke) solid var(--mona-handle-border);
-  border-radius: var(--mona-border-radius, 1px);
+  border-radius: var(--mona-handle-radius, var(--radius-pill));
   background: #fff;
   box-shadow: 0 1px 3px rgb(16 18 25 / 24%);
   display: flex;

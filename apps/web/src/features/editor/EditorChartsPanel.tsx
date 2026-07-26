@@ -173,10 +173,11 @@ function PresetCard({
 }) {
   const { t } = useTranslation()
   return (
-    <button
-      className="flex w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-control p-1 text-center outline-none hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring"
+    <Button
+      className="flex h-auto w-[4.75rem] shrink-0 flex-col items-center gap-1 rounded-control p-1 text-center"
       onClick={() => onSelect(preset)}
       type="button"
+      variant="ghost"
     >
       <span className="grid size-16 place-items-center rounded-control border border-border/70 bg-background">
         <ChartPreviewGlyph preset={preset} />
@@ -184,7 +185,7 @@ function PresetCard({
       <span className="line-clamp-2 w-full text-tiny leading-tight text-muted-foreground">
         {t(`foundation.editor.charts.presets.${preset.id}`)}
       </span>
-    </button>
+    </Button>
   )
 }
 

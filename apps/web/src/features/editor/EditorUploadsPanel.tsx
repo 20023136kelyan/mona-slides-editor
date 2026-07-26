@@ -267,14 +267,15 @@ export function EditorUploadsPanel({
             getKey={item => item.id}
             items={items}
             renderItem={item => (
-              <button
+              <Button
                 aria-label={t('foundation.editor.uploads.insertItem', { name: item.name })}
-                className="block w-full overflow-hidden rounded-control text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="block h-auto w-full overflow-hidden rounded-control p-0 text-left"
                 onClick={() => insertItem(item)}
                 type="button"
+                variant="ghost"
               >
                 <MediaThumb item={item} />
-              </button>
+              </Button>
             )}
           />
         )}
