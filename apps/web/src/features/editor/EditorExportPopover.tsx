@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Code2, Download, Globe, Info, UserPlus, X } from 'lucide-react'
+import { Download, Info, X } from 'lucide-react'
 
 import { selectPresentation } from '@mona/editor-state'
 import type { Slide } from '@mona/presentation-core/model'
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { EditorFullscreenSpin } from '@/features/editor/EditorFullscreenSpin'
 import { InspectorSelect } from '@/features/editor/EditorInspectorPrimitives'
@@ -22,19 +21,6 @@ import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { SlideRenderer } from '@/features/presentation-renderer/SlideRenderer'
 import { cn } from '@/lib/utils'
-
-type ShareTab = 'embed' | 'export' | 'invite' | 'public'
-
-const SHARE_TABS: Array<{
-  icon: ComponentType<{ className?: string }>
-  id: ShareTab
-  labelKey: string
-}> = [
-  { icon: UserPlus, id: 'invite', labelKey: 'share.invite' },
-  { icon: Globe, id: 'public', labelKey: 'share.public' },
-  { icon: Download, id: 'export', labelKey: 'share.export' },
-  { icon: Code2, id: 'embed', labelKey: 'share.embed' },
-]
 
 function MonaIcon({ className }: { className?: string }) {
   return <img alt="" aria-hidden className={className} src="/favicon.svg" />
@@ -332,26 +318,16 @@ const EXPORT_TARGETS: Array<{
   { icon: JsonIcon, labelKey: 'header.exportJson', options: JsonOptions, type: 'json' },
 ]
 
-function ShareComingSoon({ description, icon: Icon, title }: {
-  description: string
-  icon: ComponentType<{ className?: string }>
-  title: string
-}) {
-  return (
-    <div className="flex flex-col items-center gap-2 rounded-[var(--radius-md)] border border-border bg-muted/40 px-4 py-8 text-center">
-      <span className="flex size-10 items-center justify-center rounded-full bg-background text-foreground/70 shadow-sm">
-        <Icon aria-hidden className="size-5" />
-      </span>
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      <p className="max-w-65 text-xs leading-relaxed text-muted-foreground">{description}</p>
-    </div>
-  )
-}
-
 /**
- * Share dropdown: invite / public link / export / embed. Export is the live
- * path today; the other tabs are staged for the full share model. File-menu
- * entries and Ctrl+P deep-link by preselecting the export file `type`.
+ * Saving a copy of the deck as a file.
+ *
+ * This was one tab of a Share panel, which put "give someone access" and "write
+ * a file to disk" behind the same button and left the surface answering to two
+ * names. It is its own thing now, reached from File, where a document's
+ * export lives in every application that has one.
+ *
+ * The file `type` is chosen before the surface opens — each File-menu entry and
+ * the print shortcut deep-links straight to its own format.
  */
 export function EditorExportPanel({
   actions,
@@ -369,7 +345,6 @@ export function EditorExportPanel({
   type: ExportType
 }) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<ShareTab>('export')
   const [exporting, setExporting] = useState(false)
   const downloadRef = useRef<() => void>(() => {})
   const registerDownload = useCallback((download: () => void) => {
@@ -396,88 +371,40 @@ export function EditorExportPanel({
   }
   return (
     <>
-      <Tabs
-        className="gap-0"
-        onValueChange={value => setTab(value as ShareTab)}
-        value={tab}
-      >
-        <div className="flex items-center justify-between gap-2 px-3 pt-3">
-          <h3 className="text-base font-semibold">{t('share.title')}</h3>
-          <Button aria-label={t('common.close')} className="size-7" onClick={() => onClose?.()} size="icon-sm" type="button" variant="ghost">
-            <X />
-          </Button>
-        </div>
+      <div className="flex items-center justify-between gap-2 px-3 pt-3">
+        <h3 className="text-base font-semibold">{t('header.exportFile')}</h3>
+        <Button aria-label={t('common.close')} className="size-7" onClick={() => onClose?.()} size="icon-sm" type="button" variant="ghost">
+          <X />
+        </Button>
+      </div>
 
-        <div className="px-3 pt-3 pb-3">
-          <TabsList className="h-9 w-full gap-0.5" variant="default">
-            {SHARE_TABS.map(entry => {
-              const Icon = entry.icon
-              return (
-                <TabsTrigger
-                  className="min-w-0 flex-auto gap-1.5 px-2 text-xs font-medium"
-                  key={entry.id}
-                  value={entry.id}
-                >
-                  <Icon aria-hidden className="size-3.5" />
-                  <span className="truncate">{t(entry.labelKey)}</span>
-                </TabsTrigger>
-              )
-            })}
-          </TabsList>
-        </div>
+      <div className="px-3 pt-3 pb-3">
+        <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t('export.tip')}</p>
 
-        <TabsContent className="mt-0 px-3 pb-3 outline-none" value="invite">
-          <ShareComingSoon
-            description={t('share.inviteDescription')}
-            icon={UserPlus}
-            title={t('share.inviteSoon')}
+        <ExportField label={t('export.fileType')}>
+          <InspectorSelect
+            ariaLabel={t('export.fileType')}
+            className="h-10"
+            onChange={onTypeChange}
+            options={typeOptions}
+            renderLabel={renderTypeOption}
+            renderOption={renderTypeOption}
+            value={target.type}
           />
-        </TabsContent>
+        </ExportField>
 
-        <TabsContent className="mt-0 px-3 pb-3 outline-none" value="public">
-          <ShareComingSoon
-            description={t('share.publicDescription')}
-            icon={Globe}
-            title={t('share.publicSoon')}
-          />
-        </TabsContent>
+        <target.options
+          actions={actions}
+          key={target.type}
+          onExporting={onExporting}
+          registerDownload={registerDownload}
+          runtime={runtime}
+        />
 
-        <TabsContent className="mt-0 px-3 pb-3 outline-none" value="export">
-          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t('export.tip')}</p>
-
-          <ExportField label={t('export.fileType')}>
-            <InspectorSelect
-              ariaLabel={t('export.fileType')}
-              className="h-10"
-              onChange={onTypeChange}
-              options={typeOptions}
-              renderLabel={renderTypeOption}
-              renderOption={renderTypeOption}
-              value={target.type}
-            />
-          </ExportField>
-
-          <target.options
-            actions={actions}
-            key={target.type}
-            onExporting={onExporting}
-            registerDownload={registerDownload}
-            runtime={runtime}
-          />
-
-          <Button className="mt-1 w-full" onClick={() => downloadRef.current()} size="editor">
-            <Download /> {t('export.download')}
-          </Button>
-        </TabsContent>
-
-        <TabsContent className="mt-0 px-3 pb-3 outline-none" value="embed">
-          <ShareComingSoon
-            description={t('share.embedDescription')}
-            icon={Code2}
-            title={t('share.embedSoon')}
-          />
-        </TabsContent>
-      </Tabs>
+        <Button className="mt-1 w-full" onClick={() => downloadRef.current()} size="editor">
+          <Download /> {t('export.download')}
+        </Button>
+      </div>
       <EditorFullscreenSpin loading={exporting} tip={t('common.exporting')} />
     </>
   )

@@ -261,7 +261,6 @@
     "title": "Share",
     "invite": "Invite others",
     "public": "Share publicly",
-    "export": "Export",
     "embed": "Embed",
     "inviteSoon": "Invite teammates",
     "inviteDescription": "Send an invite so people can view or edit this presentation with you. Coming soon.",
@@ -271,9 +270,9 @@
     "embedDescription": "Get a snippet to place this presentation on your site. Coming soon."
   },
   "export": {
-    "tip": "Download a static copy of your deck to share with others.",
+    "tip": "Save a copy of this deck as a file.",
     "fileType": "File type",
-    "download": "Download",
+    "download": "Export",
     "range": "Export range:",
     "format": "Export format:",
     "mode": "Export mode:",
@@ -288,14 +287,14 @@
     "ignoreWebFontsHelp": "Web fonts are ignored by default. Turn this off to preserve web-font styling in exported images, but expect the export to take longer.",
     "slidesPerPage": "Slides per page:",
     "pageMargin": "Page margin:",
-    "printTip": "In the print dialog, enable background graphics and use the default margins.",
+    "printTip": "Backgrounds and the page size below are applied for you; the PDF matches the slides as laid out here.",
     "nativeFileTip": ".mona is this application's native file format and can be imported back into the editor.",
-    "jsonTip": "Download the presentation as a JSON file.",
+    "jsonTip": "Save the presentation as a JSON file.",
     "exportNative": "Export Mona file",
     "exportPptx": "Export PPTX",
     "exportImage": "Export images",
     "exportJson": "Export JSON",
-    "exportPdf": "Print / Export PDF"
+    "exportPdf": "Export PDF"
   },
   "canvas": {
     "unlock": "Unlock",

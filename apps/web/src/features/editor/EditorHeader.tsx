@@ -58,6 +58,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverTrigger } from '@/components/ui/popover'
+import { EditorSharePanel } from '@/features/editor/EditorSharePopover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { IMPORT_FILTERS, pickFiles } from '@/features/editor/editor-files'
 import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
@@ -180,7 +181,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   const {
     agentOpen,
     closeAgent,
-    closeExport,
     exportType,
     importFiles,
     importing,
@@ -214,6 +214,7 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   const menuBarRef = useRef<HTMLDivElement>(null)
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null)
   const [editingTitle, setEditingTitle] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const [hotkeysOpen, setHotkeysOpen] = useState(false)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
@@ -643,7 +644,10 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
             title={t('header.generateWithAI')}
             variant="header-pill"
           ><Sparkles className={cn(agentOpen && 'text-editor-selection')} /></Button>
-          <Popover onOpenChange={open => open ? requestExport() : closeExport()} open={exportType !== null}>
+          {/* Sharing only. This button used to open the export panel, so one
+              surface answered to "Share" in its own heading and "Export" in the
+              menu that reached it. Export has its own dialog now, from File. */}
+          <Popover onOpenChange={setShareOpen} open={shareOpen}>
             <PopoverTrigger asChild>
               <Button
                 aria-label={t('header.share')}
@@ -652,11 +656,12 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
                 variant="header-pill"
               ><Share2 /></Button>
             </PopoverTrigger>
-            {exportType ? <Suspense fallback={null}><EditorExportFeature runtime={runtime} /></Suspense> : null}
+            {shareOpen ? <EditorSharePanel onClose={() => setShareOpen(false)} /> : null}
           </Popover>
         </fieldset>
       </div>
       </header>
+      {exportType ? <Suspense fallback={null}><EditorExportFeature runtime={runtime} /></Suspense> : null}
 
       <AlertDialog onOpenChange={open => {
         setResetDialogOpen(open)

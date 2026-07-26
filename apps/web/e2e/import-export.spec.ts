@@ -46,10 +46,10 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   ))).toBe('Lifecycle: Corpus / Text?')
 
   await chooseMenuCommand(app, 'file.export.json')
-  const dialog = page.getByRole('dialog', { name: 'Share' })
+  const dialog = page.getByRole('dialog', { name: 'Export' })
   const jsonPath = join(testInfo.outputDir, 'Lifecycle Corpus Text.json')
   await stubSaveDialog(app, jsonPath)
-  await dialog.getByRole('button', { name: 'Download' }).click()
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click()
   await expect.poll(() => readFile(jsonPath, 'utf8').then(() => true, () => false)).toBe(true)
   const jsonPayload = JSON.parse(await readFile(jsonPath, 'utf8')) as {
     slides: Array<{ elements: unknown[] }>
@@ -62,7 +62,7 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   await chooseMenuCommand(app, 'file.export.native')
   const nativePath = join(testInfo.outputDir, 'Lifecycle Corpus Text.mona')
   await stubSaveDialog(app, nativePath)
-  await dialog.getByRole('button', { name: 'Download' }).click()
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click()
   await expect.poll(() => readFile(nativePath).then(() => true, () => false)).toBe(true)
   await dialog.getByRole('button', { name: 'Close' }).click()
 
@@ -103,10 +103,10 @@ test('exports an editable PPTX that can be imported back into Mona', async ({ ap
   })
 
   await chooseMenuCommand(app, 'file.export.pptx')
-  const dialog = page.getByRole('dialog', { name: 'Share' })
+  const dialog = page.getByRole('dialog', { name: 'Export' })
   const pptxPath = join(testInfo.outputDir, 'Untitled presentation.pptx')
   await stubSaveDialog(app, pptxPath)
-  await dialog.getByRole('button', { name: 'Download' }).click()
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click()
   await expect.poll(() => readFile(pptxPath).then(() => true, () => false), { timeout: 30_000 }).toBe(true)
 
   await dialog.getByRole('button', { name: 'Close' }).click()
