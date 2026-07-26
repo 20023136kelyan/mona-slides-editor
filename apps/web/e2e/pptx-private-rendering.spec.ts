@@ -43,6 +43,9 @@ for (const fixture of fixtures) {
   test.skip(!existsSync(fixturePath), `Private corpus fixture is not present: ${fixture.file}`)
 
   test(`renders retained PowerPoint content without silent loss for ${fixture.file}`, async ({ app, page }, testInfo: TestInfo) => {
+    // Real decks, imported and rendered in full. The heaviest of them already
+    // allows 45s just to import, which the 30s default never let it reach.
+    test.slow()
     const browserProblems: string[] = []
     page.on('console', message => {
       if (message.type() === 'error' || message.type() === 'warning') {
@@ -200,7 +203,27 @@ for (const fixture of fixtures) {
       await expect(structuredRun).toBeVisible()
 
       if (fixture.file === 'real-03-nasa-sewp-corporate.pptx') {
-        const elementId = await structuredRun.evaluate(run => (
+        // This deck overlaps its text boxes, so the first run on the slide can
+        // sit under a neighbour and be unclickable. Editing is only meaningful
+        // for a run a person could actually reach, so pick one that is on top.
+        const reachable = await page.evaluate(() => {
+          for (const run of document.querySelectorAll<HTMLElement>('.mona-editor-slide-canvas [data-ppt-run-id]')) {
+            const rect = run.getBoundingClientRect()
+            if (!rect.width || !rect.height) continue
+            // Not containment: the editor's own hit layer is legitimately on
+            // top of every run. What matters is that the topmost thing at this
+            // point belongs to the same element, rather than to a neighbour
+            // whose box overlaps this one.
+            const atPoint = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+            const owner = run.closest<HTMLElement>('[data-element-id]')?.dataset.elementId
+            const hit = atPoint?.closest<HTMLElement>('[data-element-id]')?.dataset.elementId
+            if (owner && hit && owner === hit) return run.dataset.pptRunId ?? null
+          }
+          return null
+        })
+        expect(reachable).toBeTruthy()
+        const structuredRunTarget = page.locator(`.mona-editor-slide-canvas [data-ppt-run-id="${reachable!}"]`)
+        const elementId = await structuredRunTarget.evaluate(run => (
           run.closest<HTMLElement>('[data-element-id]')?.dataset.elementId
         ))
         expect(elementId).toBeTruthy()
@@ -219,7 +242,11 @@ for (const fixture of fixtures) {
         expect(original.structured).toBe(true)
 
         const editor = page.locator(`[data-element-id="${elementId}"] .ProseMirror`)
-        await editor.click()
+        // Aimed at the run's own text layer. The run is a span inside it and is
+        // not itself the topmost thing at its centre, and the element's whole
+        // box has a neighbour over its middle — this deck overlaps its text.
+        const runBox = (await structuredRunTarget.boundingBox())!
+        await page.mouse.click(runBox.x + runBox.width / 2, runBox.y + runBox.height / 2)
         await editor.press('End')
         await editor.type('MonaEditProbe')
         await expect.poll(() => page.evaluate(id => {

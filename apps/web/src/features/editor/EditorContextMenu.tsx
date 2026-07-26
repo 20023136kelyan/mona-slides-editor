@@ -354,7 +354,7 @@ export function LinkEditor({
               <div className="grid gap-1">
                 <span className="sr-only">{t('foundation.editor.link.slideLabel')}</span>
                 <Select onValueChange={onSlideChange} value={slideId}>
-                  <SelectTrigger aria-label={t('foundation.editor.link.slideLabel')} className="w-full"><SelectValue placeholder={selectedOption?.label ?? slideId} /></SelectTrigger>
+                  <SelectTrigger aria-label={t('foundation.editor.link.slideLabel')} className="mona-link-select w-full"><SelectValue placeholder={selectedOption?.label ?? slideId} /></SelectTrigger>
                   <SelectContent>
                     {slideOptions.map(option => <SelectItem disabled={option.disabled} key={option.id} value={option.id}>{option.label}</SelectItem>)}
                   </SelectContent>
@@ -363,7 +363,7 @@ export function LinkEditor({
               {selectedSlide ? (
                 <div className="mt-3">
                   <div className="text-muted-foreground">{t('foundation.editor.link.preview')}</div>
-                  <div className="mt-1.5 w-fit overflow-hidden rounded-surface border">
+                  <div className="mona-link-slide-preview mt-1.5 w-fit overflow-hidden rounded-surface border">
                     <ScaledSlide
                       fixedWidth={500}
                       slide={selectedSlide}

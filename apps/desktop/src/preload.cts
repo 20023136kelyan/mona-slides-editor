@@ -27,6 +27,12 @@ function on<Payload>(channel: string, listener: (payload: Payload) => void): () 
   return () => { ipcRenderer.off(channel, handler) }
 }
 
+let flushListener: (() => Promise<void>) | null = null
+ipcRenderer.on('mona:deck:flush', (_event, id: number) => {
+  const done = flushListener ? Promise.resolve(flushListener()) : Promise.resolve()
+  void done.catch(() => {}).finally(() => ipcRenderer.send(`mona:deck:flushed:${id}`))
+})
+
 contextBridge.exposeInMainWorld('mona', {
   /** Whether this machine is signed in to Claude, and as whom. */
   account: () => ipcRenderer.invoke('mona:account'),
@@ -55,6 +61,17 @@ contextBridge.exposeInMainWorld('mona', {
   deck: {
     clear: () => ipcRenderer.invoke('mona:deck:clear'),
     collectGarbage: (keep: readonly string[]) => ipcRenderer.invoke('mona:deck:collect-garbage', keep),
+    /**
+     * The shell asking for unsaved work before it closes this window.
+     *
+     * The reply is sent whether or not the renderer is listening: a window with
+     * no deck mounted — a fresh one, an audience view — has nothing to write,
+     * and the shell should not sit waiting out its timeout to learn that.
+     */
+    onFlushRequest: (listener: () => Promise<void>) => {
+      flushListener = listener
+      return () => { flushListener = null }
+    },
     read: () => ipcRenderer.invoke('mona:deck:read'),
     write: (presentation: unknown) => ipcRenderer.invoke('mona:deck:write', presentation),
     /** Returns the `mona://asset/...` URL the deck should refer to it by. */

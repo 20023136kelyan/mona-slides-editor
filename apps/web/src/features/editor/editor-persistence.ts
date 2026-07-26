@@ -4,7 +4,7 @@ import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
 import { clearPowerPointPackages, clearSketchRecords } from '@/lib/deck-storage'
 import { collectDeckAssetNames } from '@/features/editor/editor-deck-assets'
-import { monaBridge } from '@/lib/mona-bridge'
+import { maybeMonaBridge, monaBridge } from '@/lib/mona-bridge'
 
 /**
  * Working-copy persistence: the deck autosaves to disk shortly after every change
@@ -274,13 +274,23 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') void flush()
   }
-  // The prompt only fires while a change is still in flight to IndexedDB —
-  // once persisted, closing the tab is safe and stays silent.
-  const onBeforeUnload = () => (snapshot.dirty ? false : undefined)
+  /**
+   * Closing a window is not leaving a page.
+   *
+   * This used to set `window.onbeforeunload` while a save was in flight, which
+   * is what a web page can do: ask the browser to talk the user out of leaving.
+   * A desktop window has no such conversation — the prompt arrives as a native
+   * modal the application does not control, and there is no tab to abandon.
+   *
+   * The shell holds the window open instead and asks for a flush, so an edit
+   * made a moment before quitting is written rather than argued about.
+   */
+  const stopFlushRequests = maybeMonaBridge()?.deck.onFlushRequest(async () => {
+    await flush()
+  })
 
   window.addEventListener('pagehide', onPageHide)
   document.addEventListener('visibilitychange', onVisibilityChange)
-  window.onbeforeunload = onBeforeUnload
 
   return {
     flush,
@@ -294,7 +304,7 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
       listeners.clear()
       window.removeEventListener('pagehide', onPageHide)
       document.removeEventListener('visibilitychange', onVisibilityChange)
-      if (window.onbeforeunload === onBeforeUnload) window.onbeforeunload = null
+      stopFlushRequests?.()
     },
     subscribe: listener => {
       listeners.add(listener)

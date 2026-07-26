@@ -24,6 +24,9 @@ vi.mock('@/lib/deck-storage', () => storageMocks)
 const deck = vi.hoisted(() => ({
   clear: vi.fn<() => Promise<void>>(),
   collectGarbage: vi.fn<(keep: readonly string[]) => Promise<void>>(),
+  // The shell asking for unsaved work before a window closes; nothing closes
+  // one here, so this only has to exist and hand back an unsubscribe.
+  onFlushRequest: vi.fn<(listener: () => Promise<void>) => () => void>(() => () => {}),
   read: vi.fn<() => Promise<unknown>>(),
   write: vi.fn<(presentation: unknown) => Promise<number>>(),
   writeAsset: vi.fn<(name: string, bytes: ArrayBuffer) => Promise<string>>(),

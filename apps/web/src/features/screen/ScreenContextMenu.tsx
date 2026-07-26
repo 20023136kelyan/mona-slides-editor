@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -65,6 +67,15 @@ export function ScreenContextMenu({
   onDismiss: () => void
   position: { x: number; y: number }
 }) {
+  const contentRef = useRef<HTMLDivElement>(null)
+  // After Radix has taken focus itself, not before: a ref callback runs too
+  // early and its focus is the one that gets overridden.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      contentRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([data-disabled])')?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
   const activate = (item: ScreenContextMenuItem) => {
     if (item.disabled || (item.children && !item.handler)) return
     item.handler?.()
@@ -77,7 +88,21 @@ export function ScreenContextMenu({
       <DropdownMenuTrigger asChild>
         <span aria-hidden="true" className="pointer-events-none fixed" style={{ left: position.x, top: position.y }} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-auto min-w-52" onContextMenu={event => event.preventDefault()} side="bottom" sideOffset={0}>
+      {/* Focus the first item the way a keyboard-opened menu should.
+          Radix moves focus to the content and highlights the first item only
+          when it opened the menu itself, from its own trigger. This one is
+          opened by state — Shift+F10 or the ContextMenu key on the slideshow
+          canvas — so nothing tells Radix a keyboard asked for it, and focus
+          stopped on the container. That cost a keystroke: the first arrow press
+          went to the first item instead of past it. */}
+      <DropdownMenuContent
+        align="start"
+        className="w-auto min-w-52"
+        onContextMenu={event => event.preventDefault()}
+        ref={contentRef}
+        side="bottom"
+        sideOffset={0}
+      >
         {renderScreenItems(items, activate)}
       </DropdownMenuContent>
     </DropdownMenu>

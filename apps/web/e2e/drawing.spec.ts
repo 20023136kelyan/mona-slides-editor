@@ -1,4 +1,4 @@
-import { expect, openApp, test, type Page } from './electron-fixture'
+import { expect, openApp, reloadApp, test, type Page } from './electron-fixture'
 
 interface PersistedSketch {
   scene: {
@@ -46,8 +46,11 @@ const clearSketches = (page: Page) => page.evaluate(async () => {
   })
 })
 
+// Drawing is opened from the header, not the creation rail: it is a canvas
+// mode rather than a category of things to insert, and the rail entry that once
+// held it opened no panel of its own.
 const openDrawing = async (page: Page) => {
-  const draw = page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Tools' })
+  const draw = page.getByRole('button', { exact: true, name: 'Draw' })
   await draw.click()
   await expect(draw).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('region', { name: 'Drawing layer' })).toBeVisible()
@@ -81,10 +84,10 @@ test.beforeEach(async ({ page }) => {
       // Sandboxed agent frames intentionally have an opaque origin.
     }
   })
-  // Drawing persistence needs the normal working-copy loader, while the
-  // agent handoff needs a deterministic provider. Keep those fixtures
-  // independent so this test never depends on a hosted backend.
-  await openApp(page, '?persistTest=1&agentFixture=reference')
+  // The normal working-copy loader, which is what drawing persistence uses.
+  // There is no agent fixture to pair with it any more: the deterministic
+  // provider went with the provider stack.
+  await openApp(page, '?persistTest=1')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   await clearSketches(page)
 })
@@ -100,7 +103,7 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
   })
   page.on('pageerror', error => problems.push(`pageerror: ${error.message}`))
 
-  await page.reload()
+  await reloadApp(page)
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   expect(drawingRequests).toEqual([])
   await openDrawing(page)
@@ -145,7 +148,7 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
   await page.getByRole('radio', { name: 'Reference slide elements' }).click()
   await page.getByRole('button', { name: /^Select shape / }).first().click()
   await expect(page.locator('.mona-editor-status')).toHaveText('1 selected element')
-  await expect(page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { exact: true, name: 'Tools' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { exact: true, name: 'Draw' })).toHaveAttribute('aria-pressed', 'true')
 
   await page.getByRole('button', { name: 'Exit drawing' }).click()
   await expect(page.getByRole('toolbar', { name: 'Drawing tools' })).toHaveCount(0)
@@ -186,18 +189,22 @@ test('hands the sketch to Mona, survives reload, and clears without touching sli
   await expect(page.getByText('Drawing attached')).toBeVisible()
   await expect(page.getByRole('img', { name: 'Preview of the attached drawing' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Message Mona AI' })).toHaveValue('Build this sketch as a polished, fully editable slide.')
-  await page.getByRole('button', { name: 'Send message' }).click()
-  await expect(page.getByRole('button', { name: 'Apply edit' })).toBeVisible()
-  await expect(page.getByText('1 created')).toBeVisible()
-  expect(await page.evaluate(() => window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length)).toBe(elementCount)
-  await page.getByRole('button', { name: 'Apply edit' }).click()
-  expect(await page.evaluate(() => window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length)).toBe(elementCount + 1)
-  await page.locator('#mona-agent-dock').getByRole('button', { name: 'Undo', exact: true }).click()
+  // The handoff is asserted; the turn is not. Sending needs a model, and the
+  // preview-then-apply flow this used to check no longer exists — the agent
+  // applies one transaction itself. Attaching the sketch, with the right
+  // prompt, is the part that belongs to drawing.
   expect(await page.evaluate(() => window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length)).toBe(elementCount)
 
-  await page.reload()
+  // The sketch is written asynchronously, so wait for it to exist before
+  // restarting; otherwise this asserts persistence against something that was
+  // never persisted.
+  await expect.poll(async () => (await readSketches(page)).length).toBe(1)
+  await reloadApp(page)
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Drawing layer' })).toBeVisible()
+  // The layer arrives with the workspace, which is loaded on demand — the test
+  // above exists to prove exactly that. So what survives a restart is the
+  // scene, and it is `openDrawing` (which asserts the layer) plus a clearable
+  // drawing that shows it did.
   await openDrawing(page)
   await expect(page.getByRole('button', { name: 'Clear drawing' })).toBeEnabled()
   await page.getByRole('button', { name: 'Clear drawing' }).click()

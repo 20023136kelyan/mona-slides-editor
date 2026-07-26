@@ -1,4 +1,4 @@
-import { expect, openApp, test, type Locator, type Page } from './electron-fixture'
+import { expect, isMacChrome, openApp, resizeWindow, test, type Locator, type Page } from './electron-fixture'
 
 test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
@@ -44,12 +44,18 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   if (await elementsPanel.isVisible()) await page.keyboard.press('Enter')
   await expect(elementsPanel).toBeHidden()
 
-  const file = page.getByRole('button', { name: 'File', exact: true })
-  await tabTo(page, file)
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('menu')).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(file).toBeFocused()
+  // Only where the menus are in the window. On macOS they are in the system
+  // menu bar, which the operating system makes keyboard-reachable itself and
+  // which nothing in the window can tab to — the walk would spend its whole
+  // step budget looking for a button that is not there.
+  if (!isMacChrome) {
+    const file = page.getByRole('button', { name: 'File', exact: true })
+    await tabTo(page, file)
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(file).toBeFocused()
+  }
 
   // The AI panel is opened from the top bar; it's no longer a tool-rail item.
   const ai = page.getByRole('button', { name: 'Generate presentation with AI' })
@@ -57,15 +63,17 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   await page.keyboard.press('Enter')
   const composer = page.getByRole('textbox', { name: 'Message Mona AI' })
   await expect(composer).toBeFocused()
+  // Typing is asserted; sending is not. A turn needs a model, and the edit it
+  // used to preview behind an "Apply edit" button is not how the agent works
+  // any more — it applies one transaction of its own accord. What this walk is
+  // for is the keyboard contract around the dock, and that is all here.
   await page.keyboard.type('Create an editable summary')
-  await page.keyboard.press('Control+Enter')
-  await expect(page.getByRole('button', { name: 'Apply edit' })).toBeVisible()
+  await expect(composer).toHaveValue('Create an editable summary')
   await page.keyboard.press('Escape')
   await expect(ai).toBeFocused()
 
-  // Export moved into the header's Share popover. A popover is not a modal, so
-  // the contract is: it takes focus on open, and Escape returns it to the
-  // trigger — not that focus is trapped inside.
+  // A popover is not a modal, so the contract is: it takes focus on open, and
+  // Escape returns it to the trigger — not that focus is trapped inside.
   const shareButton = page.getByRole('button', { name: 'Share', exact: true })
   await tabTo(page, shareButton, 20)
   await page.keyboard.press('Enter')
@@ -107,7 +115,7 @@ test('moves keyboard focus through contextual, filmstrip, and grid workspaces', 
 })
 
 test('keeps compact desktop geometry bounded with both editor side surfaces active', async ({ app, page }) => {
-  await page.setViewportSize({ width: 1024, height: 720 })
+  await resizeWindow(app, 1024, 720)
   await openApp(page, '?developmentFixture=slides')
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
@@ -151,7 +159,7 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
 })
 
 test('keeps every page-grid bulk action reachable beside the agent at compact width', async ({ app, page }) => {
-  await page.setViewportSize({ width: 1024, height: 720 })
+  await resizeWindow(app, 1024, 720)
   await openApp(page, '?developmentFixture=slides')
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   await page.getByRole('button', { name: 'Grid view' }).click()
@@ -162,6 +170,10 @@ test('keeps every page-grid bulk action reachable beside the agent at compact wi
     const action = gridActions.getByRole('button', { name, exact: true })
     await action.focus()
     await expect(action).toBeFocused()
+    // The row scrolls horizontally by design; reachable means it can be brought
+    // into view, not that it already is. The page not scrolling is asserted
+    // once, below, which is the thing compact width could actually break.
+    await action.scrollIntoViewIfNeeded()
     await expect(action).toBeInViewport()
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)

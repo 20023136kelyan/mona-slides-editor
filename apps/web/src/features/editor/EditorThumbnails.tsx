@@ -74,7 +74,7 @@ function ThumbnailContextMenu({ menu, onAction, onDismiss }: {
       <DropdownMenuTrigger asChild>
         <span aria-hidden="true" className="pointer-events-none fixed" style={{ left: menu.x, top: menu.y }} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent aria-label={menu.label} align="start" className="w-auto min-w-52" onContextMenu={event => event.preventDefault()} side="bottom" sideOffset={0}>
+      <DropdownMenuContent aria-label={menu.label} align="start" className="mona-thumbnail-context-menu w-auto min-w-52" onContextMenu={event => event.preventDefault()} side="bottom" sideOffset={0}>
         {menu.items.map((item, index) => {
           if (item.divider) return <DropdownMenuSeparator key={`divider-${index}`} />
           const Icon = item.icon

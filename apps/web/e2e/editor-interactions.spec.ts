@@ -138,9 +138,23 @@ test('supports grouped selection, create gestures, context settings, clipboard, 
   })
   const groupBefore = await groupPosition()
   await groupedShape.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Center horizontally' }).click()
+  // "Center horizontally" is a submenu trigger carrying an item of the same
+  // name. The trigger opens on hover and does nothing when clicked, so the
+  // alignment is performed by the leaf inside it.
+  await page.getByRole('menu', { name: 'Element menu' }).getByRole('menuitem', { name: 'Center horizontally' }).first().hover()
+  // Identified by what it contains rather than by being last: earlier steps in
+  // this journey leave their own portaled menus in the document.
+  const alignSubmenu = page.getByRole('menu').filter({ has: page.getByRole('menuitem', { name: 'Align left' }) })
+  // The submenu's trigger is itself a menuitem with the same name, so the leaf
+  // is picked by being an item rather than a trigger.
+  await alignSubmenu
+    .getByRole('menuitem', { exact: true, name: 'Center horizontally' })
+    .and(page.locator('[data-slot="dropdown-menu-item"]'))
+    .click()
+  // Read after the transaction lands, not in the same tick as the click: the
+  // command is applied through the runtime, and a single read raced it.
+  await expect.poll(async () => (await groupPosition()).shape).not.toBe(groupBefore.shape)
   const groupAfter = await groupPosition()
-  expect(groupAfter.shape).not.toBe(groupBefore.shape)
   expect(groupAfter.shape - groupBefore.shape).toBeCloseTo(groupAfter.text - groupBefore.text, 3)
   await page.waitForTimeout(350)
   await canvas.press('Control+z')
@@ -197,11 +211,13 @@ test('supports grouped selection, create gestures, context settings, clipboard, 
   await slide.click({ button: 'right', position: blankCanvasPoint })
   await expect(page.getByRole('menu', { name: 'Canvas menu' })).toBeVisible()
   await page.getByRole('menuitem', { name: 'Grid lines' }).hover()
-  await expect(page.getByRole('menuitem', { name: 'Small' })).toBeVisible()
-  await page.getByRole('menuitem', { name: 'Medium' }).click()
+  // Grid sizes carry a checked state, so they are menuitemcheckbox rather than
+  // menuitem — which is right, and is what the role has to say.
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Small' })).toBeVisible()
+  await page.getByRole('menuitemcheckbox', { name: 'Medium' }).click()
   await expect(page.locator('.mona-editor-grid')).toBeVisible()
   await slide.click({ button: 'right', position: blankCanvasPoint })
-  await page.getByRole('menuitem', { name: 'Ruler' }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Ruler' }).click()
   await expect(page.locator('.mona-editor-ruler.is-horizontal')).toBeVisible()
 })
 

@@ -143,3 +143,43 @@ export const registerDeckIpc = (): void => {
   // disk instead of asking the renderer for base64 one at a time.
   ipcMain.handle('mona:deck:assets-directory', () => assetsRoot())
 }
+
+/**
+ * Lets the renderer finish writing before a window closes.
+ *
+ * The renderer used to guard this with `window.onbeforeunload`, which is a web
+ * page's only move: ask the browser to talk the user out of leaving. A window
+ * is not a tab, that prompt arrives as a native modal the application does not
+ * control, and there is nothing to argue about — the right answer is simply to
+ * wait for the write.
+ *
+ * The wait is bounded. A renderer that is wedged or already gone must not make
+ * a window unclosable, so after `FLUSH_TIMEOUT_MS` the window closes anyway.
+ */
+const FLUSH_TIMEOUT_MS = 2_000
+
+/**
+ * Cancelling a close also cancels a quit, and on macOS destroying the last
+ * window does not resume one — the application simply stays running with
+ * nothing on screen. So a quit that was interrupted to flush is resumed here.
+ */
+let quitting = false
+app.on('before-quit', () => { quitting = true })
+
+export const flushBeforeClose = (window: Electron.BrowserWindow): void => {
+  let closing = false
+  window.on('close', event => {
+    if (closing || window.webContents.isDestroyed()) return
+    event.preventDefault()
+    closing = true
+    const done = new Promise<void>(resolve => {
+      ipcMain.once(`mona:deck:flushed:${window.webContents.id}`, () => resolve())
+      window.webContents.send('mona:deck:flush', window.webContents.id)
+    })
+    const deadline = new Promise<void>(resolve => setTimeout(resolve, FLUSH_TIMEOUT_MS))
+    void Promise.race([done, deadline]).then(() => {
+      window.destroy()
+      if (quitting) app.quit()
+    })
+  })
+}

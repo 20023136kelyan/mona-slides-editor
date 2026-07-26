@@ -1,4 +1,4 @@
-import { expect, openApp, test } from './electron-fixture'
+import { expect, openApp, resizeWindow, test } from './electron-fixture'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -17,7 +17,10 @@ test('loads Mona and changes locale without browser errors', async ({ page }) =>
 
   await openApp(page)
 
-  await expect(page).toHaveTitle('Mona')
+  // The document title gains the deck's name as soon as one loads, so an exact
+  // match races that. What is being asserted is that the window names the
+  // application, which holds before and after.
+  await expect(page).toHaveTitle(/Mona$/)
   await expect(page.getByLabel('Mona presentation editor')).toBeVisible()
   await expect(page.locator('.mona-editor-header-title-input')).toHaveValue('Untitled presentation')
 
@@ -52,8 +55,8 @@ test('renders the complete native fixture and selects a slide read-only', async 
   expect(browserProblems).toEqual([])
 })
 
-test('keeps the canvas, left task panel, and AI dock structurally independent on desktop', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+test('keeps the canvas, left task panel, and AI dock structurally independent on desktop', async ({ app, page }) => {
+  await resizeWindow(app, 1440, 900)
   await openApp(page, '?developmentFixture=slides')
 
   const stage = page.locator('.mona-editor-stage')

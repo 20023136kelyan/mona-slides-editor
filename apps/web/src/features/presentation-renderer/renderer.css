@@ -291,6 +291,13 @@
   top: 0;
   left: 0;
   overflow: visible;
+  /* Decoration, and `aria-hidden` says so: these draw an element's border and
+     nothing more. Without this they take the clicks aimed at whatever is under
+     them, because an SVG `fill="transparent"` is still hit-testable — unlike a
+     transparent CSS background, which is not. The element's own hit target is a
+     separate layer, so selecting is unaffected; what this restores is clicking
+     the text beneath a shape that happens to overlap it. */
+  pointer-events: none;
 }
 
 .mona-image-outline { z-index: 2; }

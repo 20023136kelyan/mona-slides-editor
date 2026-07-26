@@ -41,6 +41,8 @@ const bridge: MonaBridge = {
   deck: {
     clear: async () => {},
     collectGarbage: async () => {},
+    // Nothing closes a test window, so nothing ever asks for a flush.
+    onFlushRequest: () => () => {},
     // No deck on disk: every test builds the state it needs.
     read: async () => null,
     write: async () => Date.now(),

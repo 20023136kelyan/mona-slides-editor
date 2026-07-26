@@ -8,7 +8,7 @@ import { app, BrowserWindow, dialog, protocol } from 'electron'
 import { installApplicationMenu } from './app-menu.js'
 import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
-import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
+import { flushBeforeClose, handleAssetRequest, registerDeckIpc } from './deck-store.js'
 import { PRINT_PATH, printDocument, registerFileIpc } from './file-dialogs.js'
 import { registerPresenterIpc } from './presenter.js'
 import { guardNavigation } from './window-guards.js'
@@ -133,6 +133,7 @@ const createWindow = async (): Promise<void> => {
   attachWindowAgent(window)
 
   guardNavigation(window, rendererUrl)
+  flushBeforeClose(window)
 
   window.once('ready-to-show', () => window.show())
   await window.loadURL(rendererUrl)

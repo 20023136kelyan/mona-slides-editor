@@ -125,5 +125,43 @@ export const importFile = async (
   await chooseMenuCommand(app, `file.import.${kind}`)
 }
 
+/**
+ * Resizes the window, which is the only thing that resizes the page.
+ *
+ * `page.setViewportSize` is a browser-context instruction and does nothing to a
+ * window the shell owns, so a test that used it to reach a compact layout was
+ * quietly still testing the wide one.
+ */
+export const resizeWindow = async (
+  app: ElectronApplication,
+  width: number,
+  height: number,
+): Promise<void> => {
+  await app.evaluate(({ BrowserWindow }, size) => {
+    BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
+  }, { height, width })
+  // Asking is not arriving: `setSize` returns before the renderer has been
+  // resized, laid out, and re-rendered at the new width. Without waiting for
+  // the page to agree, a test asserting a compact layout races the wide one —
+  // which is what made these fail only under parallel load.
+  const page = await app.firstWindow()
+  await page.waitForFunction(target => window.innerWidth <= target, width)
+}
+
+/**
+ * Restarts the renderer at the URL it is already on.
+ *
+ * Not `page.reload()`: a reload runs the unload path, and an unload prompt in a
+ * desktop window is a native dialog the debugging protocol cannot answer —
+ * Playwright fails with "No dialog is showing" rather than dismissing it.
+ * Navigating afresh puts the renderer in the same state without asking.
+ */
+export const reloadApp = async (page: Page): Promise<void> => {
+  const url = page.url()
+  await page.goto('about:blank')
+  await page.goto(url)
+  await page.waitForLoadState('domcontentloaded')
+}
+
 /** Whether this run sees the macOS chrome, which hides the in-window menus. */
 export const isMacChrome = process.platform === 'darwin'

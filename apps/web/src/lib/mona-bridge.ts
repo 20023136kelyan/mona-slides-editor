@@ -64,6 +64,11 @@ export interface MonaBridge {
   deck: {
     clear: () => Promise<void>
     collectGarbage: (keep: readonly string[]) => Promise<void>
+    /**
+     * The shell asking for anything unsaved, before it lets a window close.
+     * Returns an unsubscribe. The shell waits for the listener to settle.
+     */
+    onFlushRequest: (listener: () => Promise<void>) => () => void
     read: () => Promise<{ presentation: unknown; savedAt: number; version: number } | null>
     write: (presentation: unknown) => Promise<number>
     writeAsset: (name: string, bytes: ArrayBuffer) => Promise<string>

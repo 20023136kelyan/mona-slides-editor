@@ -436,7 +436,11 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       return changed
     },
     createSlideFromTemplate: source => {
-      const slide = remapSlides([source])[0]!
+      // Templates used to be bundled assets, so they skipped the sanitizer the
+      // paste and import paths run. They are fetched from a provider's origin
+      // now, which makes their slide HTML content from outside this session —
+      // the same category as a pasted deck, and sanitized on the same terms.
+      const slide = remapSlides(sanitizeSlides([source]))[0]!
       const changed = commit('Create slide from template', [{ type: 'slide.add', slides: slide }], { historyKey: 'slide-handler' })
       if (!changed) return null
       store.dispatch(editorActions.selectionChanged([]))
@@ -517,9 +521,13 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     insertTemplateSlides: (source, theme) => {
       if (!source.length) return []
       const state = store.getState().presentation
+      // Sanitized once, up front, so both branches below are covered: template
+      // payloads now arrive over the network from a provider, which puts their
+      // slide HTML in the same trust category as an imported or pasted deck.
+      const safe = sanitizeSlides([...source])
       const isEmptySlide = state.slides.length === 1 && state.slides[0]?.elements.length === 0
       if (isEmptySlide) {
-        const slides = structuredClone([...source])
+        const slides = structuredClone([...safe])
         for (const slide of slides) {
           delete slide.source
           detachElementTreeSources(slide.elements)
@@ -527,7 +535,7 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
         if (!commit('Replace empty deck with template', [{ type: 'presentation.slides.replace', slides, theme }], { historyKey: 'add-slides-or-elements' })) return []
         return slides.map(slide => slide.id)
       }
-      const slides = remapSlides(source)
+      const slides = remapSlides(safe)
       if (!commit('Insert template slides', [{ type: 'slide.add', slides }], { historyKey: 'add-slides-or-elements' })) return []
       return slides.map(slide => slide.id)
     },

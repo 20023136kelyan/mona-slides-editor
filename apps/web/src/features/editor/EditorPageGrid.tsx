@@ -250,7 +250,7 @@ export const EditorPageGrid = memo(function EditorPageGrid({
           <h2>{t('foundation.editor.statusBar.gridView')}</h2>
           <span>{t('foundation.editor.statusBar.selectedPages', { count: selectedIndexes.length })}</span>
         </div>
-        <div className="flex min-w-0 items-center justify-end gap-1 overflow-x-auto [overscroll-behavior-inline:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mona-page-grid-actions flex min-w-0 items-center justify-end gap-1 overflow-x-auto [overscroll-behavior-inline:contain] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Button onClick={() => runtime.selectAllSlides()} size="sm" type="button" variant="ghost"><ListChecks />{t('foundation.editor.action.selectAll')}</Button>
           <Button onClick={() => runtime.createSlide()} size="sm" type="button" variant="ghost"><Plus />{t('foundation.editor.thumbnails.addSlide')}</Button>
           <Button onClick={() => updateSelected(false)} size="sm" type="button" variant="ghost"><Eye />{t('foundation.editor.statusBar.showPages')}</Button>

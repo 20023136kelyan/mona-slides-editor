@@ -307,7 +307,7 @@ export function ScreenPresenterView({
     setContextMenu({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
   }
   return (
-    <div className="flex size-full">
+    <div className="mona-screen-presenter flex size-full">
       <div className="my-5 h-full w-17.5 border-r bg-background text-xs [&>button+button]:mt-5.5">
         {tool(false, <ListIcon />, t('screen.normalView'), () => setViewMode('base'), normalViewButtonRef)}
         {tool(false, <PeopleIcon />, t('screen.audienceView'), openAudience)}
