@@ -1,43 +1,14 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 
-export interface EncryptedEnvelope {
-  ciphertext: string
-  iv: string
-  tag: string
-  version: 1
-}
-
-export const encryptJson = (value: unknown, key: Buffer): EncryptedEnvelope => {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', key, iv)
-  const ciphertext = Buffer.concat([
-    cipher.update(JSON.stringify(value), 'utf8'),
-    cipher.final(),
-  ])
-  return {
-    ciphertext: ciphertext.toString('base64'),
-    iv: iv.toString('base64'),
-    tag: cipher.getAuthTag().toString('base64'),
-    version: 1,
-  }
-}
-
-export const decryptJson = <Value>(envelope: EncryptedEnvelope, key: Buffer): Value => {
-  if (envelope.version !== 1) throw new Error('Unsupported encrypted credential format')
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(envelope.iv, 'base64'))
-  decipher.setAuthTag(Buffer.from(envelope.tag, 'base64'))
-  const cleartext = Buffer.concat([
-    decipher.update(Buffer.from(envelope.ciphertext, 'base64')),
-    decipher.final(),
-  ])
-  return JSON.parse(cleartext.toString('utf8')) as Value
-}
+/**
+ * Signing for values that cross a trust boundary and come back.
+ *
+ * Only one caller remains: a photo-search result id, which the agent hands back to
+ * the importer. Without a signature that id is a URL the agent chose, and the
+ * importer would fetch whatever it named. The credential encryption that used to
+ * live here went with the vault - there is no stored credential now, because the
+ * Agent SDK authenticates from the machine's own Claude login.
+ */
 
 export const signOpaqueValue = (value: string, key: Buffer): string => (
   createHmac('sha256', key).update(value).digest('base64url')
@@ -62,5 +33,3 @@ export const decodeSignedValue = (signed: string, key: Buffer): string | undefin
   if (supplied.byteLength !== expected.byteLength || !timingSafeEqual(supplied, expected)) return undefined
   return value
 }
-
-export const isSafeIdentifier = (value: string): boolean => /^[A-Za-z0-9_-]{12,160}$/.test(value)

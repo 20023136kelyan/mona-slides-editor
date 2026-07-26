@@ -1,17 +1,7 @@
 
-import type { PresentationCommand } from '@mona/presentation-core'
 import type { PPTElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import type { SerializedDrawingScene } from '@/features/editor/drawing/drawing-store'
-
-/** Every provider the dock can offer. The type is derived so the two cannot drift. */
-export const AGENT_PROVIDER_IDS = [
-  'anthropic-claude',
-  'google-ai-studio',
-  'openai-chatgpt',
-] as const
-
-export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number]
 
 export interface AgentSelectionContext {
   elementIds: string[]
@@ -52,12 +42,6 @@ export interface AgentDocumentContext {
   sketch?: AgentSketchContext
 }
 
-export interface AgentProviderConfiguration {
-  apiKey?: string
-  model?: string
-  providerId: AgentProviderId
-}
-
 export interface AgentAssetSearchResult {
   alt: string
   attribution?: string
@@ -76,22 +60,5 @@ export interface AgentAssetService {
   searchImages: (query: string, signal?: AbortSignal) => Promise<AgentAssetSearchResult[]>
 }
 
-export interface AgentSandboxLog {
-  level: 'info' | 'warn'
-  message: string
-}
 
-export interface AgentSandboxResult {
-  commands: PresentationCommand[]
-  logs: AgentSandboxLog[]
-}
 
-export interface AgentOperationSummary {
-  affectedElementIds: string[]
-  affectedSlideIds: string[]
-  commandCount: number
-  createdElements: number
-  deletedElements: number
-  description: string
-  updatedElements: number
-}

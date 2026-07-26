@@ -4,7 +4,6 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import { AgentSdkSession } from './agent-sdk-session.js'
 import { AgentStreamTranslator } from './agent-sdk-stream.js'
 import { AgentToolBridge, type AgentToolRequest } from './agent-tool-bridge.js'
-import type { SessionManager } from './session.js'
 
 export const AGENT_SOCKET_PATH = '/api/agent/chat/ws'
 
@@ -63,13 +62,11 @@ const parseFrame = (data: unknown): ClientFrame | undefined => {
  */
 class AgentConnection {
   readonly #bridge: AgentToolBridge
-  readonly #setupToken?: string
   readonly #socket: WebSocket
   #session?: AgentSdkSession
   #turn?: Promise<void>
 
-  constructor(socket: WebSocket, setupToken?: string) {
-    this.#setupToken = setupToken
+  constructor(socket: WebSocket) {
     this.#socket = socket
     this.#bridge = new AgentToolBridge({
       send: request => this.#send({ ...request, type: 'tool-request' }),
@@ -116,7 +113,6 @@ class AgentConnection {
       // browser, so a bad value is dropped instead of failing the turn.
       ...(isEffortLevel(effort) ? { effort } : {}),
       modelId: typeof model === 'string' && model ? model : 'claude-sonnet-5',
-      setupToken: this.#setupToken,
     })
     this.#turn = this.#stream(this.#session)
   }
@@ -158,21 +154,17 @@ class AgentConnection {
 /**
  * Attaches the agent socket to the existing HTTP server.
  *
- * `noServer` rather than a second listener, so the socket shares the origin and
- * therefore the session cookie. An upgrade without a valid session is refused
- * outright - the credential lives against a session, so an unauthenticated
- * connection could not run anything.
+ * `noServer` rather than a second listener, so the socket shares the HTTP server's
+ * origin and its Origin check. That check is the whole gate now: there is no session
+ * to authenticate, because there is one user and their credential is the machine's
+ * own Claude login rather than anything this process holds.
  */
 export const attachAgentSocket = ({
   allowedOrigins,
   server,
-  sessions,
-  setupToken,
 }: {
   allowedOrigins: ReadonlySet<string>
   server: Server
-  sessions: SessionManager
-  setupToken?: string
 }): WebSocketServer => {
   const sockets = new WebSocketServer({ maxPayload: MAX_FRAME_BYTES, noServer: true })
 
@@ -197,13 +189,8 @@ export const attachAgentSocket = ({
       socket.destroy()
       return
     }
-    if (!sessions.read(request)) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-      socket.destroy()
-      return
-    }
     sockets.handleUpgrade(request, socket, head, connection => {
-      new AgentConnection(connection, setupToken)
+      new AgentConnection(connection)
     })
   })
 

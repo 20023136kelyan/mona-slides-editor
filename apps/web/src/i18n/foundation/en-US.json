@@ -324,42 +324,8 @@
       "title": "Mona AI",
       "loading": "Loading Mona AI…",
       "scope": "Working with slide {{slide}}",
-      "connectModel": "Connect a model",
-      "chooseProvider": "Choose AI provider",
-      "providerTitle": "AI provider",
-      "providerDescription": "Choose how Mona plans presentation edits. Provider credentials stay separate from the document engine.",
-      "providers": {
-        "openai-chatgpt": {
-          "name": "OpenAI",
-          "description": "Use an eligible ChatGPT subscription through Mona's secure server connection.",
-          "signIn": "Sign in with OpenAI",
-          "signInDescription": "Connect the OpenAI account that owns your eligible ChatGPT plan."
-        },
-        "anthropic-claude": {
-          "name": "Anthropic",
-          "description": "Use an eligible Claude Pro or Max subscription through Mona's secure server connection.",
-          "signIn": "Sign in with Anthropic",
-          "signInDescription": "Connect the Claude account that owns your eligible Pro or Max plan."
-        },
-        "google-ai-studio": {
-          "name": "Google AI Studio",
-          "description": "Use your own Gemini API key for multimodal slide editing."
-        }
-      },
-      "apiKey": "Google AI Studio key",
-      "apiKeyPlaceholder": "Paste API key",
+      "chooseProvider": "Choose a model",
       "model": "Gemini model",
-      "keyMemoryNotice": "The key is held only in this tab's memory and is cleared when you reload or switch providers.",
-      "connected": "Account connected",
-      "subscriptionReady": "Subscription access is ready",
-      "connecting": "Connecting…",
-      "disconnect": "Disconnect",
-      "deviceCodeLabel": "Enter this one-time code on the provider page",
-      "copyDeviceCode": "Copy one-time code",
-      "openSignInPage": "Open sign-in page",
-      "authPromptPlaceholder": "Paste the requested value",
-      "continueSignIn": "Continue sign-in",
-      "oauthSecurityNotice": "OAuth credentials remain encrypted on Mona's server and are never exposed to the editor or generated presentation code.",
       "emptyTitle": "What should we make?",
       "emptyDescription": "Ask Mona to inspect, rewrite, arrange, or create editable presentation elements.",
       "composerLabel": "Message Mona AI",
@@ -383,13 +349,8 @@
         "visualize": "Turn this content into a visual"
       },
       "modelPicker": "Model",
-      "back": "Back",
-      "signInShort": "Sign in",
-      "modelLockedHint": "Sign in to use {{model}}",
-      "signInToProvider": "Sign in to {{provider}}",
       "searchModels": "Search models",
       "noModels": "No models match",
-      "connectProvider": "Connect {{provider}}",
       "slideContext": "Slides in this chat",
       "addCurrentSlide": "Add current slide",
       "removeSlideContext": "Remove {{slide}}",
@@ -447,7 +408,9 @@
       "toolListing": "Listing files",
       "toolSyncing": "Re-reading the deck",
       "toolWebSearching": "Searching the web for {{query}}",
-      "toolWriting": "Writing {{scope}}"
+      "toolWriting": "Writing {{scope}}",
+      "checkingAccount": "Checking your Claude account…",
+      "signedOutHint": "Not signed in to Claude. Run `claude` in a terminal to sign in."
     },
     "drawing": {
       "layer": "Drawing layer",

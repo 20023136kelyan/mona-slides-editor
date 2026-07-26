@@ -1,29 +1,17 @@
-import { ModelsError } from '@earendil-works/pi-ai'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { pathToFileURL } from 'node:url'
 
 import { readLocalClaudeLogin } from './agent-sdk-auth.js'
 import { readAnthropicModels } from './agent-sdk-models.js'
 import { attachAgentSocket } from './agent-socket.js'
-import { ManagedImageAssets } from './assets.js'
+import {
+  browsePexelsImages,
+  browsePexelsVideos,
+  ManagedImageAssets,
+  type BrowseQuery,
+} from './assets.js'
 import { loadAgentServerConfig, type AgentServerConfig } from './config.js'
-import {
-  EncryptedFileCredentialVault,
-  type CredentialVault,
-} from './credential-vault.js'
-import {
-  MONA_AGENT_MODELS,
-} from '@mona/agent-protocol'
-import { browsePexelsImages, browsePexelsVideos, type BrowseQuery } from './assets.js'
 import { searchWeb, webSearchEnabled } from './web-search.js'
-import {
-  createSessionModels,
-  getProviderConfiguration,
-  isExternalProviderId,
-  type ExternalProviderId,
-} from './models.js'
-import { OAuthFlowBusyError, OAuthFlowManager } from './oauth-flows.js'
-import { SessionManager } from './session.js'
 
 const JSON_BODY_LIMIT = 20 * 1024 * 1024
 
@@ -43,7 +31,6 @@ const setApiHeaders = (response: ServerResponse) => {
   response.setHeader('Referrer-Policy', 'no-referrer')
   response.setHeader('X-Content-Type-Options', 'nosniff')
 }
-
 
 const sendJson = (response: ServerResponse, status: number, value: unknown) => {
   if (response.writableEnded) return
@@ -75,6 +62,11 @@ const readJson = async (request: IncomingMessage): Promise<unknown> => {
 
 const methodIsMutation = (method: string | undefined) => !['GET', 'HEAD', 'OPTIONS'].includes(method ?? '')
 
+/**
+ * The server listens on loopback, where any local process can reach it, so an
+ * approved Origin is still the gate on anything that changes state. This goes when
+ * the renderer stops speaking HTTP at all.
+ */
 const assertOrigin = (
   request: IncomingMessage,
   response: ServerResponse,
@@ -99,77 +91,29 @@ const pathSegments = (pathname: string) => pathname.split('/').filter(Boolean).m
   }
 })
 
-const isProviderPath = (
-  segments: string[],
-  offset: number,
-): segments is string[] & { [key: number]: string } => {
-  const provider = segments[offset]
-  return typeof provider === 'string' && isExternalProviderId(provider)
-}
-
 const requestAbortSignal = (request: IncomingMessage): AbortSignal => {
   const controller = new AbortController()
   request.once('aborted', () => controller.abort())
   return controller.signal
 }
 
-const providerStatus = async (
-  vault: CredentialVault,
-  sessionId: string,
-  providerId: ExternalProviderId,
-) => {
-  // Anthropic runs on the Agent SDK, which authenticates from the machine's own
-  // Claude login rather than anything we store. So its status is not a vault
-  // lookup, and the plan it reports is the real one instead of a hardcoded label.
-  if (providerId === 'anthropic-claude') {
-    const login = await readLocalClaudeLogin()
-    return {
-      connected: login.connected,
-      ...(login.connected
-        ? {
-            accountLabel: login.email ?? 'Claude account connected',
-            ...(login.plan ? { planLabel: login.plan } : {}),
-          }
-        : {}),
-    }
-  }
-
-  const models = createSessionModels(vault, sessionId)
-  const configuration = getProviderConfiguration(providerId)
-  const credential = await vault.read(sessionId, configuration.piProviderId)
-  const status = await models.checkAuth(configuration.piProviderId)
-  return {
-    // Google AI Studio authenticates with a key the user supplies; the OAuth
-    // providers with a token. Both are credentials in the same vault, so
-    // "connected" means "the vault holds something this provider can use".
-    connected: credential?.type === 'api_key'
-      ? true
-      : credential?.type === 'oauth' && status?.type === 'oauth',
-    ...(credential?.type === 'oauth'
-      ? {
-          accountLabel: providerId === 'openai-chatgpt'
-            ? 'OpenAI account connected'
-            : 'Anthropic account connected',
-          planLabel: configuration.planLabel,
-        }
-      : {}),
-  }
-}
-
 export interface AgentServerDependencies {
   config: AgentServerConfig
-  vault?: CredentialVault
 }
 
-export const createAgentServer = ({ config, vault: providedVault }: AgentServerDependencies) => {
-  const vault = providedVault ?? new EncryptedFileCredentialVault(config.credentialFile, config.credentialKey)
-  const sessions = new SessionManager(config.sessionSigningKey, config.development)
-  const modelsForSession = (sessionId: string) => createSessionModels(vault, sessionId)
-  const flows = new OAuthFlowManager(modelsForSession)
-  const assets = new ManagedImageAssets(config.assetDirectory, config.sessionSigningKey)
-  // Absent on the desktop, where the Claude Code subprocess inherits the login
-  // the user already made rather than being handed a token.
-  const setupToken = process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || undefined
+/**
+ * The agent host.
+ *
+ * There is one account and it is the machine's own Claude login, read from the
+ * `claude` binary rather than stored here. That removes the entire apparatus this
+ * file used to carry: a credential vault keyed by session, an OAuth flow manager
+ * turning interactive prompts into pollable REST resources, per-session model
+ * instances, and a signed session cookie to tell those sessions apart. All of it
+ * existed to keep one hosted user's credentials away from another's, and there is
+ * only one user now.
+ */
+export const createAgentServer = ({ config }: AgentServerDependencies) => {
+  const assets = new ManagedImageAssets(config.assetDirectory, config.assetSigningKey)
 
   const server = createServer(async (request, response) => {
     setApiHeaders(response)
@@ -178,7 +122,7 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
       if (request.method === 'OPTIONS') {
         response.statusCode = 204
         response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-        response.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         response.end()
         return
       }
@@ -191,147 +135,31 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
         return
       }
 
-      if (
-        request.method === 'GET'
-        && segments[2] === 'providers'
-        && segments[3] === 'mona-managed'
-        && segments[4] === 'status'
-        && segments.length === 5
-      ) {
+      // Whether this machine is signed in to Claude, and as whom. Not a stored
+      // credential: the Agent SDK authenticates from the user's own login, so this
+      // reports a fact about the machine rather than about anything we hold.
+      if (request.method === 'GET' && segments[2] === 'account' && segments.length === 3) {
+        const login = await readLocalClaudeLogin()
         sendJson(response, 200, {
-          available: false,
-          message: 'Mona managed AI is not configured on this deployment',
+          connected: login.connected,
+          ...(login.connected
+            ? {
+                accountLabel: login.email ?? 'Claude account connected',
+                ...(login.plan ? { planLabel: login.plan } : {}),
+              }
+            : {}),
         })
         return
       }
 
-      const sessionId = sessions.getOrCreate(request, response)
-
-      if (
-        request.method === 'GET'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'status'
-        && segments.length === 5
-      ) {
-        sendJson(response, 200, await providerStatus(vault, sessionId, segments[3] as ExternalProviderId))
-        return
-      }
-
-      if (
-        request.method === 'POST'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'start'
-        && segments.length === 5
-      ) {
-        await readJson(request)
-        sendJson(response, 201, await flows.start(sessionId, segments[3] as ExternalProviderId))
-        return
-      }
-
-      if (
-        request.method === 'GET'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'flows'
-        && typeof segments[5] === 'string'
-        && segments.length === 6
-      ) {
-        sendJson(response, 200, flows.get(sessionId, segments[5]))
-        return
-      }
-
-      if (
-        request.method === 'POST'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'flows'
-        && typeof segments[5] === 'string'
-        && segments[6] === 'prompts'
-        && typeof segments[7] === 'string'
-        && segments.length === 8
-      ) {
-        const body = await readJson(request) as { answer?: unknown }
-        sendJson(response, 200, flows.answerPrompt(sessionId, segments[5], segments[7], body.answer))
-        return
-      }
-
-      if (
-        request.method === 'DELETE'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'flows'
-        && typeof segments[5] === 'string'
-        && segments.length === 6
-      ) {
-        flows.cancel(sessionId, segments[5])
-        response.statusCode = 204
-        response.end()
-        return
-      }
-
-      if (
-        request.method === 'DELETE'
-        && segments[2] === 'auth'
-        && isProviderPath(segments, 3)
-        && segments.length === 4
-      ) {
-        const configuration = getProviderConfiguration(segments[3] as ExternalProviderId)
-        await modelsForSession(sessionId).logout(configuration.piProviderId)
-        sendJson(response, 200, { connected: false })
-        return
-      }
-
-      if (
-        request.method === 'POST'
-        && segments[2] === 'providers'
-        && isProviderPath(segments, 3)
-        && segments[4] === 'key'
-        && segments.length === 5
-      ) {
-        // Bring-your-own-key providers store the key in the same encrypted
-        // vault as OAuth tokens, so it never rides with each request and never
-        // sits in the browser.
-        const providerId = segments[3] as ExternalProviderId
-        const body = await readJson(request) as { apiKey?: unknown }
-        const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
-        if (!apiKey) throw new HttpError(400, 'Provide an API key')
-        const configuration = getProviderConfiguration(providerId)
-        await vault.modify(sessionId, configuration.piProviderId, async () => ({ type: 'api_key' as const, key: apiKey }))
-        sendJson(response, 200, await providerStatus(vault, sessionId, providerId))
-        return
-      }
-
-
-      // The browser only needs to know which models it may offer; every
-      // credential and endpoint decision stays here.
+      // The catalog belongs to the signed-in plan, so it can only come from the
+      // SDK, and it carries which reasoning depths each model accepts.
       if (request.method === 'GET' && segments[2] === 'models' && segments.length === 3) {
-        // Anthropic's list comes from the signed-in plan rather than from us, and
-        // carries which reasoning depths each model accepts. The other providers
-        // expose no such catalog, so their entries stay declared here.
-        const anthropic = (await readAnthropicModels(setupToken)).map(model => ({
-          effortLevels: model.effortLevels,
-          id: model.id,
-          name: model.name,
-          providerId: 'anthropic-claude' as const,
-        }))
-        const declared = MONA_AGENT_MODELS.filter(model => (
-          isExternalProviderId(model.providerId) && model.providerId !== 'anthropic-claude'
-        ))
-        sendJson(response, 200, {
-          // Fall back to the declared Anthropic entries only if the plan could
-          // not be reached, so the picker is never empty.
-          models: anthropic.length
-            ? [...declared, ...anthropic]
-            : MONA_AGENT_MODELS.filter(model => isExternalProviderId(model.providerId)),
-        })
+        sendJson(response, 200, { models: await readAnthropicModels() })
         return
       }
 
-
-      // Panel-facing media browse. Lives here rather than in the web app's dev
-      // plugin so the Photos and Videos panels work in production too.
+      // Panel-facing media browse, for the Photos and Videos panels.
       if (
         request.method === 'POST'
         && segments[2] === 'assets'
@@ -395,38 +223,18 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
         return
       }
 
-
       throw new HttpError(404, 'Route not found')
     }
     catch (error) {
-      const status = error instanceof HttpError
-        ? error.status
-        : error instanceof OAuthFlowBusyError
-          ? 409
-        : error instanceof ModelsError && (error.code === 'auth' || error.code === 'oauth')
-          ? 401
-          : 500
-      const message = error instanceof HttpError || error instanceof OAuthFlowBusyError || status === 401
-        ? error instanceof Error ? error.message : 'Request failed'
-        : config.development && error instanceof Error
-          ? error.message
-          : 'The agent service could not complete this request'
-      if (status >= 500) {
-        const safeMessage = error instanceof Error ? error.message.slice(0, 500) : String(error)
-        console.error('[mona-agent-server]', safeMessage)
-      }
+      const status = error instanceof HttpError ? error.status : 500
+      const message = error instanceof HttpError
+        ? error.message
+        : 'The agent server could not complete the request'
       sendJson(response, status, { message })
     }
   })
 
-  // The agent conversation runs over a socket on the same origin, so it shares
-  // the signed session cookie the routes above establish.
-  attachAgentSocket({
-    allowedOrigins: config.allowedOrigins,
-    server,
-    sessions,
-    setupToken,
-  })
+  attachAgentSocket({ allowedOrigins: config.allowedOrigins, server })
 
   return server
 }

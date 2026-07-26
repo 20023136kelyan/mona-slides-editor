@@ -4,14 +4,13 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export interface AgentServerConfig {
+  /** Signs photo-search result ids so an agent cannot redirect the importer. */
+  assetSigningKey: Buffer
   allowedOrigins: ReadonlySet<string>
   assetDirectory: string
-  credentialFile: string
-  credentialKey: Buffer
   development: boolean
   host: string
   port: number
-  sessionSigningKey: Buffer
 }
 
 const appDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -68,11 +67,9 @@ export const loadAgentServerConfig = async (): Promise<AgentServerConfig> => {
   return {
     allowedOrigins: new Set(origins),
     assetDirectory: resolve(stateDirectory, 'assets'),
-    credentialFile: resolve(stateDirectory, 'credentials.enc.json'),
-    credentialKey: await loadSecret('MONA_CREDENTIAL_ENCRYPTION_KEY', 'credential-master.key', development),
+    assetSigningKey: await loadSecret('MONA_ASSET_SIGNING_KEY', 'asset-signing.key', development),
     development,
     host: process.env.MONA_AGENT_HOST ?? '127.0.0.1',
     port,
-    sessionSigningKey: await loadSecret('MONA_SESSION_SIGNING_KEY', 'session-signing.key', development),
   }
 }

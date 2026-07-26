@@ -38,13 +38,12 @@ export const toAgentSdkModel = (info: ModelInfo): AgentSdkModel => ({
 })
 
 export const readAnthropicModels = async (
-  setupToken?: string,
   now = Date.now(),
 ): Promise<AgentSdkModel[]> => {
   if (cached && now - cached.at < CACHE_MS) return cached.models
   const running = query({
     options: {
-      env: monaAgentEnv(setupToken),
+      env: monaAgentEnv(),
       // Nothing should load: this session exists only to be asked a question.
       settingSources: [],
       tools: [],

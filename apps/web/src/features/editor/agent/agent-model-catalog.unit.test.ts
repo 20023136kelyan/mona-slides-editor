@@ -5,7 +5,6 @@ import { effortLevelsFor, type AgentModel } from '@/features/editor/agent/agent-
 const model = (overrides: Partial<AgentModel>): AgentModel => ({
   id: 'sonnet',
   name: 'Sonnet',
-  providerId: 'anthropic-claude',
   ...overrides,
 })
 
@@ -21,10 +20,10 @@ describe('reasoning depth per model', () => {
     expect(effortLevelsFor(model({ effortLevels: [], id: 'haiku', name: 'Haiku' }))).toEqual([])
   })
 
-  it('offers none for a provider that exposes no depth at all', () => {
-    // OpenAI and Google entries are declared rather than fetched and carry no
-    // effort field. Absent is not the same as empty, but neither offers a control.
-    expect(effortLevelsFor(model({ id: 'gpt-5.6-sol', providerId: 'openai-chatgpt' }))).toEqual([])
+  it('offers none for an entry that carries no effort field at all', () => {
+    // The declared fallback, shown before the plan's catalog arrives. Absent is
+    // not the same as empty, but neither offers a control.
+    expect(effortLevelsFor(model({ id: 'default', name: 'Claude' }))).toEqual([])
   })
 
   it('offers none when there is no model yet', () => {

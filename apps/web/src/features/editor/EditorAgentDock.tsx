@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowUp,
@@ -6,28 +6,18 @@ import {
   ChartColumn,
   Check,
   ChevronDown,
-  ChevronLeft,
-  CircleStop,
-  Clipboard,
-  ExternalLink,
   Gauge,
-  KeyRound,
   Lock,
-  LogIn,
   Paperclip,
   PenLine,
   Search,
   Square,
-  Unplug,
   Wand2,
   X,
 } from 'lucide-react'
 import SlideAttachmentIcon from '~icons/fluent/slide-layout-20-regular'
-import { MONA_AGENT_MODELS } from '@mona/agent-protocol'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Popover,
   PopoverContent,
@@ -38,7 +28,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select'
 import {
   Sidebar,
@@ -50,25 +39,11 @@ import { Textarea } from '@/components/ui/textarea'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
 import { useAgentChat } from '@/features/editor/agent/use-agent-chat'
-import {
-  agentProviderStore,
-  useAgentProviderConfiguration,
-} from '@/features/editor/agent/agent-provider-store'
-import { AGENT_PROVIDER_IDS, type AgentProviderId } from '@/features/editor/agent/agent-types'
+import { agentModelStore, useAgentModelSelection } from '@/features/editor/agent/agent-model-store'
 import { AgentProviderIcon } from '@/features/editor/agent/AgentProviderIcon'
 import { effortLevelsFor, useAgentModels, type AgentModel } from '@/features/editor/agent/agent-model-catalog'
 import { buildToolLabel, slideLabelFor } from '@/features/editor/agent/agent-tool-label'
-import {
-  answerAgentAuthPrompt,
-  cancelAgentAuthFlow,
-  connectAgentApiKey,
-  connectAgentProvider,
-  disconnectAgentProvider,
-  refreshAgentAuthStatus,
-  useAgentAuthStatus,
-  type AgentAuthPrompt,
-  type OAuthAgentProviderId,
-} from '@/features/editor/agent/agent-auth-client'
+import { refreshAgentAccount, useAgentAccount } from '@/features/editor/agent/agent-account'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -115,13 +90,6 @@ const LANE_KEYCAP = `h-6.5 text-[11.5px] font-medium ${LANE_FACE}`
 
 const LANE_KEYCAP_HOVER = 'hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground active:shadow-none'
 
-const MODEL_PROVIDER_ORDER: readonly AgentProviderId[] = [
-  'openai-chatgpt',
-  'anthropic-claude',
-  'google-ai-studio',
-]
-
-
 const useObjectUrl = (blob: Blob | null | undefined) => {
   const url = useMemo(() => blob ? URL.createObjectURL(blob) : null, [blob])
   useEffect(() => () => {
@@ -130,208 +98,25 @@ const useObjectUrl = (blob: Blob | null | undefined) => {
   return url
 }
 
-function AgentAuthPromptForm({
-  prompt,
-  providerId,
-}: {
-  prompt: AgentAuthPrompt
-  providerId: OAuthAgentProviderId
-}) {
-  const { t } = useTranslation()
-  const [answer, setAnswer] = useState(() => (
-    prompt.type === 'select' ? prompt.options?.[0]?.id ?? '' : ''
-  ))
-  const answerId = useId()
-
-  return (
-    <form
-      className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-2.25"
-      onSubmit={event => {
-        event.preventDefault()
-        if (!answer.trim()) return
-        void answerAgentAuthPrompt(providerId, prompt.id, answer).catch(() => undefined)
-      }}
-    >
-      <Label className="text-mini leading-[1.35] text-muted-foreground" htmlFor={answerId}>{prompt.message}</Label>
-      {prompt.type === 'select' ? (
-        <Select onValueChange={setAnswer} value={answer}>
-          <SelectTrigger aria-label={prompt.message} className="w-full bg-background text-tiny" id={answerId}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {prompt.options?.map(option => (
-              <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <Input
-          autoComplete="off"
-          id={answerId}
-          onChange={event => setAnswer(event.target.value)}
-          placeholder={prompt.placeholder || t('foundation.editor.agent.authPromptPlaceholder')}
-          type={prompt.type === 'secret' ? 'password' : 'text'}
-          value={answer}
-        />
-      )}
-      <Button disabled={!answer.trim()} size="sm" type="submit">
-        {t('foundation.editor.agent.continueSignIn')}
-      </Button>
-    </form>
-  )
-}
-
-// The sign-in panel for one OAuth provider, reached by clicking a locked
-// model. It subscribes to its own provider's status so both providers' model
-// rows can reflect readiness at once.
-function OAuthAuthPanel({ providerId }: { providerId: OAuthAgentProviderId }) {
-  const { t } = useTranslation()
-  const status = useAgentAuthStatus(providerId)
-  useEffect(() => {
-    void refreshAgentAuthStatus(providerId)
-  }, [providerId])
-
-  if (status.connected) {
-    return (
-      <div className="grid gap-2.25 [&_button]:w-full [&_button_svg]:size-3.25">
-        <div className="flex items-center gap-2">
-          <span className="size-1.75 shrink-0 rounded-pill bg-[var(--success,#16a34a)] opacity-100" />
-          <span className="grid gap-px">
-            <strong className="text-tiny">{status.accountLabel || t('foundation.editor.agent.connected')}</strong>
-            <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{status.planLabel || t('foundation.editor.agent.subscriptionReady')}</small>
-          </span>
-        </div>
-        <Button disabled={status.loading} onClick={() => void disconnectAgentProvider(providerId)} size="sm" type="button" variant="outline">
-          <Unplug />{t('foundation.editor.agent.disconnect')}
-        </Button>
-        <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
-      </div>
-    )
-  }
-  return (
-    <div className="grid gap-2.25 [&_button]:w-full [&_button_svg]:size-3.25">
-      <p className="m-0 text-mini leading-[1.4] text-muted-foreground">{t(`foundation.editor.agent.providers.${providerId}.signInDescription`)}</p>
-      <Button disabled={status.loading} onClick={() => void connectAgentProvider(providerId).catch(() => undefined)} size="sm" type="button">
-        <LogIn />{status.loading
-          ? t('foundation.editor.agent.connecting')
-          : t(`foundation.editor.agent.providers.${providerId}.signIn`)}
-      </Button>
-      {status.flow?.deviceCode ? (
-        <div className="grid gap-1.5 rounded-[var(--radius-md)] border border-border bg-muted p-2.25">
-          <span className="text-mini leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.deviceCodeLabel')}</span>
-          <div className="flex items-center gap-1.5">
-            <code className="flex-1 rounded-[var(--radius-sm)] bg-background px-2 py-1.75 text-center text-control font-bold tracking-[0.12em]">{status.flow.deviceCode.userCode}</code>
-            <Button
-              aria-label={t('foundation.editor.agent.copyDeviceCode')}
-              className="size-7 min-w-7"
-              onClick={() => void navigator.clipboard.writeText(status.flow?.deviceCode?.userCode ?? '')}
-              size="editor-icon"
-              type="button"
-              variant="ghost"
-            >
-              <Clipboard />
-            </Button>
-          </div>
-          <a
-            className="inline-flex items-center justify-center gap-1.25 text-mini font-semibold text-foreground no-underline hover:underline [&_svg]:size-3"
-            href={status.flow.deviceCode.verificationUri}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <ExternalLink />{t('foundation.editor.agent.openSignInPage')}
-          </a>
-        </div>
-      ) : null}
-      {status.flow?.prompt ? (
-        <AgentAuthPromptForm key={status.flow.prompt.id} prompt={status.flow.prompt} providerId={providerId} />
-      ) : null}
-      {status.flow?.message ? <p className="m-0 text-mini leading-[1.4] text-muted-foreground">{status.flow.message}</p> : null}
-      {status.flow?.status === 'pending' ? (
-        <Button onClick={() => void cancelAgentAuthFlow(providerId)} size="sm" type="button" variant="ghost">
-          <CircleStop />{t('common.cancel')}
-        </Button>
-      ) : null}
-      {status.error ? <p className="m-0 text-mini leading-[1.4] text-destructive">{status.error}</p> : null}
-      <small className="m-0 text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.oauthSecurityNotice')}</small>
-    </div>
-  )
-}
-
-// Google's model needs a key rather than an OAuth round trip. The key stays
-// in local state until Connect, so no partial provider switch leaks out.
-function GeminiAuthPanel({ defaultModelId, onConnect }: {
-  defaultModelId: string
-  onConnect: (apiKey: string, modelId: string) => void
-}) {
-  const { t } = useTranslation()
-  const [apiKey, setApiKey] = useState('')
-  const [modelId, setModelId] = useState(defaultModelId)
-  const apiKeyId = useId()
-  const geminiModels = MONA_AGENT_MODELS.filter(model => model.providerId === 'google-ai-studio')
-
-  return (
-    <form
-      className="grid gap-2.5 [&_>div]:grid [&_>div]:gap-1.25 [&_label]:text-tiny"
-      onSubmit={event => {
-        event.preventDefault()
-        if (apiKey.trim()) onConnect(apiKey.trim(), modelId)
-      }}
-    >
-      <div>
-        <Label htmlFor={apiKeyId}>{t('foundation.editor.agent.apiKey')}</Label>
-        <div className="relative">
-          <KeyRound className="pointer-events-none absolute top-1/2 left-2 z-[1] size-3.25 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoComplete="off"
-            className="pl-6.75"
-            id={apiKeyId}
-            onChange={event => setApiKey(event.target.value)}
-            placeholder={t('foundation.editor.agent.apiKeyPlaceholder')}
-            type="password"
-            value={apiKey}
-          />
-        </div>
-      </div>
-      <div>
-        <Label>{t('foundation.editor.agent.model')}</Label>
-        <Select onValueChange={value => value && setModelId(value)} value={modelId}>
-          <SelectTrigger aria-label={t('foundation.editor.agent.model')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            {geminiModels.map(model => <SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <Button disabled={!apiKey.trim()} size="sm" type="submit"><LogIn />{t('foundation.editor.agent.connectModel')}</Button>
-      <p className="mt-[-2px] mr-px mb-0 ml-px text-mini leading-[1.4] text-muted-foreground">{t('foundation.editor.agent.keyMemoryNotice')}</p>
-    </form>
-  )
-}
-
 export function EditorAgentDock({ handoff = null, runtime }: {
   handoff?: SketchAgentHandoff | null
   runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
   const { closeAgent } = useEditorApplication()
-  const configuration = useAgentProviderConfiguration()
+  const selection = useAgentModelSelection()
+  const account = useAgentAccount()
   const [draft, setDraft] = useState(() => (
     handoff ? t('foundation.editor.agent.sketchInstruction') : ''
   ))
   const [attachmentVisible, setAttachmentVisible] = useState(Boolean(handoff))
-  // Undefined leaves the SDK's own default rather than asserting a level.
-  const [effort, setEffort] = useState<string | undefined>(undefined)
-  // The server falls back to the provider's default when no model is chosen.
+  // The host falls back to the plan's default when no model is chosen.
   const chat = useAgentChat({
-    effort,
-    model: configuration.model ?? '',
+    effort: selection.effort,
+    model: selection.model ?? '',
     runtime,
   })
   const [providerOpen, setProviderOpen] = useState(false)
-  // The picker has two views: the model list (authView null) and a single
-  // provider's sign-in panel, reached by clicking a locked model.
-  const [authView, setAuthView] = useState<AgentProviderId | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const [modelQuery, setModelQuery] = useState('')
   const [slashIndex, setSlashIndex] = useState(0)
@@ -348,28 +133,16 @@ export function EditorAgentDock({ handoff = null, runtime }: {
     if (curatedRef.current || !currentSlideId) return
     setContextSlideIds([currentSlideId])
   }, [currentSlideId])
-  const openaiStatus = useAgentAuthStatus('openai-chatgpt')
-  const anthropicStatus = useAgentAuthStatus('anthropic-claude')
-  const googleStatus = useAgentAuthStatus('google-ai-studio')
   const handoffUrl = useObjectUrl(handoff?.preview)
-  // Whether each provider can run right now. A provider that isn't ready
-  // shows its models grayed and routes a click to its sign-in panel.
-  const providerReadiness: Record<AgentProviderId, boolean> = {
-    'anthropic-claude': anthropicStatus.connected,
-    'google-ai-studio': googleStatus.connected,
-    'openai-chatgpt': openaiStatus.connected,
-  }
   const agentModels = useAgentModels()
-  const activeModel = agentModels.find(model => model.providerId === configuration.providerId && model.id === configuration.model)
-    ?? agentModels.find(model => model.providerId === configuration.providerId)
-    ?? agentModels[agentModels.length - 1]!
+  const activeModel = agentModels.find(model => model.id === selection.model) ?? agentModels[0]!
   const effortLevels = effortLevelsFor(activeModel)
-  // A level that the newly chosen model does not accept must not linger, or the
-  // chip would display one thing while the run used another.
+  // A depth the newly chosen model does not accept must not linger, or the chip
+  // would display one thing while the run used another.
   useEffect(() => {
-    if (effort && !effortLevels.includes(effort)) setEffort(undefined)
-  }, [effort, effortLevels])
-  const providerReady = providerReadiness[configuration.providerId]
+    if (selection.effort && !effortLevels.includes(selection.effort)) agentModelStore.setEffort(undefined)
+  }, [selection.effort, effortLevels])
+  const providerReady = account.connected
   // The SDK reports the run: submitted before the first token, streaming after.
   const busy = chat.status === 'streaming' || chat.status === 'submitted'
   const runStartedAt = useMemo(() => busy ? Date.now() : null, [busy])
@@ -382,12 +155,10 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   const slashMatches = matchSlashCommands(draft)
   useEdgeFade(suggestionsRef, 'x', chat.messages.length + Number(Boolean(handoff || busy)))
 
-  // Ask every provider where it stands as soon as the dock opens. Without this
-  // nothing fetches status until a sign-in panel is opened, so every model
-  // renders locked even when the provider is ready - Anthropic in particular,
-  // which authenticates from the machine's own Claude login and needs no panel.
+  // Ask once the dock opens rather than at module load, so a window that never
+  // opens it does not spawn the binary to read a login it will not use.
   useEffect(() => {
-    for (const providerId of AGENT_PROVIDER_IDS) void refreshAgentAuthStatus(providerId)
+    void refreshAgentAccount()
   }, [])
 
   useEffect(() => {
@@ -413,9 +184,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   }, [closeAgent])
 
   const activateModel = (model: AgentModelOption) => {
-    agentProviderStore.setProvider(model.providerId)
-    agentProviderStore.setModel(model.id)
-    setAuthView(null)
+    agentModelStore.setModel(model.id)
     setProviderOpen(false)
   }
 
@@ -439,39 +208,15 @@ export function EditorAgentDock({ handoff = null, runtime }: {
 
   const toolLabel = (name: string, input: unknown) => buildToolLabel(name, input, labelContext)
 
-  const activeAuthStatus = configuration.providerId === 'openai-chatgpt'
-    ? openaiStatus
-    : configuration.providerId === 'anthropic-claude' ? anthropicStatus : null
-  // OAuth providers connect straight from the strip. A bring-your-own-key or
-  // managed provider needs the panel, so the strip opens it rather than
-  // pretending one click is enough.
-  const connectActiveProvider = () => {
-    const providerId = configuration.providerId
-    if (providerId === 'openai-chatgpt' || providerId === 'anthropic-claude') {
-      void connectAgentProvider(providerId).catch(() => undefined)
-      return
-    }
-    setAuthView(providerId)
-    setProviderOpen(true)
-  }
+  const modelFilter = modelQuery.trim().toLocaleLowerCase()
+  const visibleModels = agentModels.filter(model => (
+    !modelFilter || model.name.toLocaleLowerCase().includes(modelFilter)
+  ))
 
-  // Every model is selectable regardless of connection: the composer strip
-  // carries the connect prompt and the send button stays disabled until the
-  // chosen provider is ready. Picking a model is never a dead end.
-  const selectModel = (model: AgentModelOption) => activateModel(model)
-
-  // The key goes to the vault, not into the browser store: Google now runs
-  // through the same server path as every other provider.
-  const connectGemini = (apiKey: string, modelId: string) => {
-    void connectAgentApiKey('google-ai-studio', apiKey)
-      .then(() => {
-        agentProviderStore.setProvider('google-ai-studio')
-        agentProviderStore.setModel(modelId)
-        setAuthView(null)
-        setProviderOpen(false)
-      })
-      .catch(() => undefined)
-  }
+  // There is nothing to connect from here. The account is the machine's own
+  // Claude login, so signing in happens in a terminal with `claude` - the dock
+  // reports the state and says what to do rather than offering a button that
+  // cannot work from inside a renderer.
 
   const runSlashCommand = (command: ParsedSlashCommand): string | null => {
     setDraft('')
@@ -511,7 +256,6 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         onOpenChange={open => {
           setProviderOpen(open)
           if (!open) {
-            setAuthView(null) // always reopen on the model list
             setModelQuery('')
           }
         }}
@@ -532,87 +276,60 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             side="top"
             sideOffset={8}
           >
-            {authView ? (
-              <div className="grid gap-2.5 p-1">
-                <div className="flex items-center gap-1.5">
+            <div className="-mx-1.25 -mt-1.25 mb-1 flex items-center gap-1.5 border-b border-border px-2.75 py-0.75">
+              <Search className="size-3.25 shrink-0 text-muted-foreground" />
+              <input
+                aria-label={t('foundation.editor.agent.searchModels')}
+                className="h-7 w-full border-0 bg-transparent p-0 text-[12.5px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus-visible:shadow-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
+                onChange={event => setModelQuery(event.target.value)}
+                placeholder={t('foundation.editor.agent.searchModels')}
+                type="search"
+                value={modelQuery}
+              />
+            </div>
+            <div className="grid gap-px">
+              {visibleModels.map(model => {
+                const active = activeModel.id === model.id
+                return (
                   <Button
-                    aria-label={t('foundation.editor.agent.back')}
-                    className="size-6.5 [&_svg]:size-3.75"
-                    onClick={() => setAuthView(null)}
-                    size="editor-icon"
+                    aria-label={model.name}
+                    className={cn(
+                      'h-7.5 w-full justify-between gap-2.25 rounded-control px-2 text-left text-[12.5px] text-foreground hover:bg-ink-deep/6 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+                      active && 'bg-ink-deep/8 font-semibold [&_svg]:text-foreground',
+                    )}
+                    key={model.id}
+                    onClick={() => activateModel(model)}
+                    size="editor"
                     type="button"
                     variant="ghost"
-                  ><ChevronLeft /></Button>
-                  <strong className="text-control font-bold">{t(`foundation.editor.agent.providers.${authView}.name`)}</strong>
-                </div>
-                {authView === 'openai-chatgpt' || authView === 'anthropic-claude' ? (
-                  <OAuthAuthPanel providerId={authView} />
-                ) : null}
-                {authView === 'google-ai-studio' ? (
-                  <GeminiAuthPanel defaultModelId="gemini-3.6-flash" onConnect={connectGemini} />
-                ) : null}
-              </div>
-            ) : (
-              <>
-                <div className="-mx-1.25 -mt-1.25 mb-1 flex items-center gap-1.5 border-b border-border px-2.75 py-0.75">
-                  <Search className="size-3.25 shrink-0 text-muted-foreground" />
-                  <input
-                    aria-label={t('foundation.editor.agent.searchModels')}
-                    className="h-7 w-full border-0 bg-transparent p-0 text-[12.5px] text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:shadow-none focus:outline-none focus-visible:shadow-none focus-visible:outline-none [&::-webkit-search-cancel-button]:appearance-none"
-                    onChange={event => setModelQuery(event.target.value)}
-                    placeholder={t('foundation.editor.agent.searchModels')}
-                    type="search"
-                    value={modelQuery}
-                  />
-                </div>
-                <div className="grid gap-px">
-                  {MODEL_PROVIDER_ORDER.map(providerId => {
-                    const query = modelQuery.trim().toLocaleLowerCase()
-                    const models = agentModels.filter(model => (
-                      model.providerId === providerId && (!query || model.name.toLocaleLowerCase().includes(query))
-                    ))
-                    if (!models.length) return null
-                    const ready = providerReadiness[providerId]
-                    return (
-                      <div className="grid gap-px not-first:mt-0.75" key={providerId}>
-                        {/* No sign-in here: any model can be chosen, and the
-                            composer strip handles connecting the one in use. */}
-                        <div className="px-2 pt-1 pb-px text-mini font-semibold tracking-[0.02em] text-muted-foreground uppercase">
-                          {t(`foundation.editor.agent.providers.${providerId}.name`)}
-                        </div>
-                        {models.map(model => {
-                          const active = activeModel.id === model.id && configuration.providerId === model.providerId
-                          return (
-                            <Button
-                              aria-label={ready ? model.name : t('foundation.editor.agent.modelLockedHint', { model: model.name })}
-                              className={cn(
-                                'h-7.5 w-full justify-between gap-2.25 rounded-control px-2 text-left text-[12.5px] text-foreground hover:bg-ink-deep/6 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
-                                active && 'bg-ink-deep/8 font-semibold [&_svg]:text-foreground',
-                                !ready && 'text-muted-foreground',
-                              )}
-                              key={model.id}
-                              onClick={() => selectModel(model)}
-                              size="editor"
-                              type="button"
-                              variant="ghost"
-                            >
-                              <span className="inline-flex min-w-0 items-center gap-1.75 overflow-hidden text-ellipsis whitespace-nowrap">
-                                <AgentProviderIcon className="size-3.5" providerId={model.providerId} />
-                                {model.name}
-                              </span>
-                              {active ? <Check /> : ready ? null : <Lock />}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                  {agentModels.every(model => modelQuery.trim() && !model.name.toLocaleLowerCase().includes(modelQuery.trim().toLocaleLowerCase()))
-                    ? <p className="my-2.5 text-center text-xs text-muted-foreground">{t('foundation.editor.agent.noModels')}</p>
-                    : null}
-                </div>
-              </>
-            )}
+                  >
+                    <span className="inline-flex min-w-0 items-center gap-1.75 overflow-hidden text-ellipsis whitespace-nowrap">
+                      <AgentProviderIcon className="size-3.5" />
+                      {model.name}
+                    </span>
+                    {active ? <Check /> : null}
+                  </Button>
+                )
+              })}
+              {visibleModels.length ? null : (
+                <p className="my-2.5 text-center text-xs text-muted-foreground">{t('foundation.editor.agent.noModels')}</p>
+              )}
+            </div>
+            {/* The account, stated rather than actionable: signing in happens in a
+                terminal with `claude`, so a button here would only mislead. */}
+            <div className="-mx-1.25 -mb-1.25 mt-1 border-t border-border px-2.75 py-1.75">
+              <span className="flex items-center gap-1.75 text-mini text-muted-foreground">
+                <span className={cn(
+                  'size-1.75 shrink-0 rounded-pill',
+                  account.connected ? 'bg-[var(--success,#16a34a)]' : 'bg-muted-foreground/40',
+                )} />
+                <span className="min-w-0 truncate">
+                  {account.connected
+                    ? [account.accountLabel, account.planLabel].filter(Boolean).join(' \u00b7 ')
+                    : t('foundation.editor.agent.signedOutHint')}
+                </span>
+              </span>
+            </div>
           </PopoverContent>
 
       <SidebarContent>
@@ -690,39 +407,25 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             white input card sits inside it. The strip therefore reads as
             context attached to the composer rather than a bar ruled onto it. */}
         <div className="mona-agent-composer rounded-[calc(var(--radius-overlay)+10px)] border border-[color-mix(in_oklab,var(--foreground)_8%,transparent)] bg-ink-deep/[0.045] p-1.5 shadow-[inset_0_1px_0_0_rgb(255_255_255/70%),0_1px_2px_0_rgb(15_23_42/5%)]">
-          {/* One strip, two jobs. Disconnected: the provider prompt, its device
-              code and its spinner live here instead of behind a dialog, so the
-              user never leaves the composer. Connected: the slides this prompt
-              will act on, carried as chips like attachments. */}
+          {/* One strip, two jobs. Signed out: what to do about it, stated in
+              place rather than behind a dialog. Signed in: the slides this
+              prompt will act on, carried as chips like attachments. */}
           <div className="mona-agent-strip flex min-h-8 flex-wrap items-center gap-1.5 px-1.5 pt-0.5 pb-1.5">
             {!providerReady ? (
               <>
                 <span className={cn(LANE_FACE, 'grid size-6.5 shrink-0 place-items-center text-muted-foreground [&_svg]:size-3.25')}>
-                  {activeAuthStatus?.loading ? (
+                  {account.loading ? (
                     <span className="size-3 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none" />
                   ) : <Lock />}
                 </span>
-                {activeAuthStatus?.flow?.deviceCode ? (
-                  <>
-                    <code className={cn(LANE_FACE, 'px-2 py-0.5 font-mono text-tiny tracking-[0.12em] tabular-nums')}>{activeAuthStatus.flow.deviceCode.userCode}</code>
-                    <Button
-                      aria-label={t('foundation.editor.agent.copyDeviceCode')}
-                      className="size-6 shrink-0 [&_svg]:size-3.25"
-                      onClick={() => void navigator.clipboard?.writeText(activeAuthStatus.flow!.deviceCode!.userCode).catch(() => undefined)}
-                      size="editor-icon"
-                      type="button"
-                      variant="ghost"
-                    ><Clipboard /></Button>
-                  </>
-                ) : null}
-                <Button
-                  className={cn(LANE_KEYCAP, LANE_KEYCAP_HOVER, 'ml-auto shrink-0 px-2.5 text-foreground/80')}
-                  disabled={activeAuthStatus?.loading}
-                  onClick={connectActiveProvider}
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                >{t('foundation.editor.agent.connectProvider', { provider: t(`foundation.editor.agent.providers.${configuration.providerId}.name`) })}</Button>
+                {/* No button: the login belongs to the machine, and a renderer
+                    cannot perform it. Saying where it happens beats offering a
+                    control that would do nothing. */}
+                <span className="min-w-0 flex-1 text-mini leading-[1.35] text-muted-foreground">
+                  {account.loading
+                    ? t('foundation.editor.agent.checkingAccount')
+                    : t('foundation.editor.agent.signedOutHint')}
+                </span>
               </>
             ) : (
               <div aria-label={t('foundation.editor.agent.slideContext')} className="flex min-w-0 flex-wrap items-center gap-1.5" role="group">
@@ -813,7 +516,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 type="button"
                 variant="header-pill"
               >
-                <AgentProviderIcon className="size-3.5" providerId={activeModel.providerId} />
+                <AgentProviderIcon className="size-3.5" />
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{activeModel.name}</span>
                 <ChevronDown />
               </Button>
@@ -821,7 +524,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             {/* Reasoning depth, offered only where the model takes one. Haiku
                 reports no levels, and sending it one would be rejected. */}
             {effortLevels.length ? (
-              <Select onValueChange={setEffort} value={effort ?? 'high'}>
+              <Select onValueChange={agentModelStore.setEffort} value={selection.effort ?? 'high'}>
                 <SelectTrigger
                   aria-label={t('foundation.editor.agent.thinkingLevel')}
                   // `size="sm"` rather than an h-7 class: the trigger sets its
@@ -831,7 +534,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                   className="w-auto shrink-0 gap-1 rounded-action border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] px-2 text-[12.5px] font-medium text-foreground/80 shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] hover:text-foreground [&>svg]:size-3 [&_svg]:shrink-0"
                 >
                   <Gauge className="size-3.5" />
-                  <span>{t(`foundation.editor.agent.thinkingLevels.${effort ?? 'high'}`)}</span>
+                  <span>{t(`foundation.editor.agent.thinkingLevels.${selection.effort ?? 'high'}`)}</span>
                 </SelectTrigger>
                 <SelectContent position="popper">
                   {effortLevels.map(level => (

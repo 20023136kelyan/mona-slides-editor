@@ -1,55 +1,38 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
-import { EncryptedFileCredentialVault } from './credential-vault.js'
-import {
-  decodeSignedValue,
-  decryptJson,
-  encodeSignedValue,
-  encryptJson,
-} from './security.js'
+import { decodeSignedValue, encodeSignedValue } from './security.js'
 
-describe('agent server secret handling', () => {
-  it('encrypts credential JSON with authenticated encryption', () => {
+describe('signed values', () => {
+  it('round-trips a value the holder of the key signed', () => {
     const key = randomBytes(32)
-    const source = { token: 'credential-that-must-not-be-cleartext' }
-    const envelope = encryptJson(source, key)
-    expect(JSON.stringify(envelope)).not.toContain(source.token)
-    expect(decryptJson(envelope, key)).toEqual(source)
-    expect(() => decryptJson(envelope, randomBytes(32))).toThrow()
+    const signed = encodeSignedValue('pexels:1234', key)
+
+    expect(signed).not.toBe('pexels:1234')
+    expect(decodeSignedValue(signed, key)).toBe('pexels:1234')
   })
 
-  it('signs opaque browser values and rejects tampering', () => {
-    const key = randomBytes(32)
-    const signed = encodeSignedValue('session-id', key)
-    expect(decodeSignedValue(signed, key)).toBe('session-id')
-    expect(decodeSignedValue(`${signed}x`, key)).toBeUndefined()
+  it('rejects a value signed with a different key', () => {
+    // The point of the signature: an id the agent supplies must be one we issued,
+    // or the importer would fetch whatever URL it names.
+    const signed = encodeSignedValue('pexels:1234', randomBytes(32))
+
+    expect(decodeSignedValue(signed, randomBytes(32))).toBeUndefined()
   })
 
-  it('persists OAuth credentials without cleartext secrets', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'mona-agent-vault-'))
-    const file = join(directory, 'credentials.enc.json')
+  it('rejects a tampered payload', () => {
     const key = randomBytes(32)
-    const vault = new EncryptedFileCredentialVault(file, key)
-    await vault.modify('session', 'openai-codex', async () => ({
-      access: 'secret-access-token',
-      expires: Date.now() + 60_000,
-      refresh: 'secret-refresh-token',
-      type: 'oauth',
-    }))
-    const persisted = await readFile(file, 'utf8')
-    expect(persisted).not.toContain('secret-access-token')
-    expect(persisted).not.toContain('secret-refresh-token')
+    const signed = encodeSignedValue('pexels:1234', key)
+    const [, signature] = signed.split('.')
 
-    const restored = new EncryptedFileCredentialVault(file, key)
-    expect(await restored.read('session', 'openai-codex')).toMatchObject({
-      access: 'secret-access-token',
-      type: 'oauth',
-    })
-    await restored.delete('session', 'openai-codex')
-    expect(await restored.read('session', 'openai-codex')).toBeUndefined()
+    expect(decodeSignedValue(`${Buffer.from('pexels:9999').toString('base64url')}.${signature}`, key))
+      .toBeUndefined()
+  })
+
+  it('rejects malformed input rather than throwing', () => {
+    const key = randomBytes(32)
+    for (const value of ['', 'nodot', 'a.b.c', '...']) {
+      expect(decodeSignedValue(value, key)).toBeUndefined()
+    }
   })
 })

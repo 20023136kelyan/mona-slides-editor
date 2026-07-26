@@ -14,16 +14,14 @@ afterEach(async () => {
 })
 
 const start = async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'mona-agent-server-'))
+  const directory = await mkdtemp(join(tmpdir(), 'mona-agent-http-'))
   const config: AgentServerConfig = {
     allowedOrigins: new Set(['http://127.0.0.1:6174']),
     assetDirectory: join(directory, 'assets'),
-    credentialFile: join(directory, 'credentials.enc.json'),
-    credentialKey: randomBytes(32),
+    assetSigningKey: randomBytes(32),
     development: true,
     host: '127.0.0.1',
     port: 0,
-    sessionSigningKey: randomBytes(32),
   }
   const server = createAgentServer({ config })
   servers.push(server)
@@ -33,43 +31,47 @@ const start = async () => {
   return `http://127.0.0.1:${address.port}`
 }
 
+const ORIGIN = 'http://127.0.0.1:6174'
+
 describe('agent HTTP boundary', () => {
-  it('sets a signed HttpOnly session and returns disconnected provider status', async () => {
+  it('answers health without needing anything established first', async () => {
     const baseUrl = await start()
-    const response = await fetch(`${baseUrl}/api/agent/auth/openai-chatgpt/status`, {
-      headers: { Origin: 'http://127.0.0.1:6174' },
-    })
+    const response = await fetch(`${baseUrl}/api/agent/health`, { headers: { Origin: ORIGIN } })
+
     expect(response.status).toBe(200)
-    expect(response.headers.get('set-cookie')).toContain('HttpOnly')
-    expect(await response.json()).toEqual({ connected: false })
+    expect(await response.json()).toMatchObject({ ok: true })
   })
 
-  it('rejects state-changing requests without an approved Origin', async () => {
+  it('refuses a mutation from an origin we do not serve', async () => {
+    // The server listens on loopback, where any local process can reach it.
     const baseUrl = await start()
-    const response = await fetch(`${baseUrl}/api/agent/auth/openai-chatgpt`, { method: 'DELETE' })
-    expect(response.status).toBe(403)
-    expect(await response.json()).toEqual({ message: 'Request origin is not allowed' })
-  })
-
-  it('does not pretend the Mona-managed provider is configured', async () => {
-    const baseUrl = await start()
-    const status = await fetch(`${baseUrl}/api/agent/providers/mona-managed/status`)
-    expect(status.status).toBe(200)
-    expect(await status.json()).toEqual({
-      available: false,
-      message: 'Mona managed AI is not configured on this deployment',
-    })
-
-    // The retired plan/review endpoints are gone rather than stubbed, so an
-    // unknown route must 404 instead of reporting a configuration problem.
-    const response = await fetch(`${baseUrl}/api/agent/plan`, {
-      body: '{}',
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: 'http://127.0.0.1:6174',
-      },
+    const response = await fetch(`${baseUrl}/api/agent/web/search`, {
+      body: JSON.stringify({ query: 'anything' }),
+      headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
       method: 'POST',
     })
-    expect(response.status).toBe(404)
+
+    expect(response.status).toBe(403)
+  })
+
+  it('sets no cookie, because there is no session to keep', async () => {
+    // One user, and their credential is the machine's own Claude login rather than
+    // anything this process holds.
+    const baseUrl = await start()
+    const response = await fetch(`${baseUrl}/api/agent/health`, { headers: { Origin: ORIGIN } })
+
+    expect(response.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('has no provider, auth or credential routes left', async () => {
+    const baseUrl = await start()
+    for (const path of [
+      '/api/agent/auth/anthropic-claude/status',
+      '/api/agent/providers/anthropic-claude/key',
+      '/api/agent/auth/openai-chatgpt/flows/anything',
+    ]) {
+      const response = await fetch(`${baseUrl}${path}`, { headers: { Origin: ORIGIN } })
+      expect(response.status).toBe(404)
+    }
   })
 })

@@ -1,51 +1,5 @@
 export * from './tools.js'
 
-export const MONA_AGENT_MODELS = [
-  {
-    badge: 'max',
-    id: 'gpt-5.6-sol',
-    name: 'GPT-5.6 Sol',
-    providerId: 'openai-chatgpt',
-  },
-  {
-    id: 'gpt-5.6-terra',
-    name: 'GPT-5.6 Terra',
-    providerId: 'openai-chatgpt',
-  },
-  {
-    badge: 'max',
-    id: 'claude-opus-4-8',
-    name: 'Claude Opus 4.8',
-    providerId: 'anthropic-claude',
-  },
-  {
-    id: 'claude-sonnet-5',
-    name: 'Claude Sonnet 5',
-    providerId: 'anthropic-claude',
-  },
-  {
-    badge: 'max',
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro Preview',
-    providerId: 'google-ai-studio',
-  },
-  {
-    id: 'gemini-3.6-flash',
-    name: 'Gemini 3.6 Flash',
-    providerId: 'google-ai-studio',
-  },
-] as const
-
-export type MonaAgentModel = (typeof MONA_AGENT_MODELS)[number]
-export type MonaAgentProviderId = MonaAgentModel['providerId']
-
-export const getMonaAgentModel = (
-  providerId: MonaAgentProviderId,
-  modelId: string | undefined,
-): MonaAgentModel | undefined => (
-  MONA_AGENT_MODELS.find(model => model.providerId === providerId && model.id === modelId)
-)
-
 export const buildAgentSystemInstruction = (): string => String.raw`
 You are Mona's presentation agent, working alongside someone editing a deck.
 

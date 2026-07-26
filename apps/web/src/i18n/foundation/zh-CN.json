@@ -324,42 +324,8 @@
       "title": "Mona AI",
       "loading": "正在加载 Mona AI…",
       "scope": "正在处理第 {{slide}} 张幻灯片",
-      "connectModel": "连接模型",
-      "chooseProvider": "选择 AI 提供商",
-      "providerTitle": "AI 提供商",
-      "providerDescription": "选择 Mona 规划演示文稿编辑的方式。提供商凭据与文档引擎相互独立。",
-      "providers": {
-        "openai-chatgpt": {
-          "name": "OpenAI",
-          "description": "通过 Mona 的安全服务器连接使用符合条件的 ChatGPT 订阅。",
-          "signIn": "使用 OpenAI 登录",
-          "signInDescription": "连接拥有符合条件 ChatGPT 套餐的 OpenAI 帐户。"
-        },
-        "anthropic-claude": {
-          "name": "Anthropic",
-          "description": "通过 Mona 的安全服务器连接使用符合条件的 Claude Pro 或 Max 订阅。",
-          "signIn": "使用 Anthropic 登录",
-          "signInDescription": "连接拥有符合条件 Pro 或 Max 套餐的 Claude 帐户。"
-        },
-        "google-ai-studio": {
-          "name": "Google AI Studio",
-          "description": "使用您自己的 Gemini API 密钥进行多模态幻灯片编辑。"
-        }
-      },
-      "apiKey": "Google AI Studio 密钥",
-      "apiKeyPlaceholder": "粘贴 API 密钥",
+      "chooseProvider": "选择模型",
       "model": "Gemini 模型",
-      "keyMemoryNotice": "密钥仅保存在此标签页的内存中；重新加载或切换提供商时会被清除。",
-      "connected": "帐户已连接",
-      "subscriptionReady": "订阅访问已就绪",
-      "connecting": "正在连接…",
-      "disconnect": "断开连接",
-      "deviceCodeLabel": "在提供商页面输入此一次性代码",
-      "copyDeviceCode": "复制一次性代码",
-      "openSignInPage": "打开登录页面",
-      "authPromptPlaceholder": "粘贴所需的值",
-      "continueSignIn": "继续登录",
-      "oauthSecurityNotice": "OAuth 凭据在 Mona 服务器上加密保存，绝不会暴露给编辑器或生成的演示文稿代码。",
       "emptyTitle": "你想创作什么？",
       "emptyDescription": "让 Mona 检查、改写、排列或创建可编辑的演示文稿元素。",
       "composerLabel": "给 Mona AI 发消息",
@@ -383,13 +349,8 @@
         "visualize": "将此内容转换为视觉效果"
       },
       "modelPicker": "模型",
-      "back": "返回",
-      "signInShort": "登录",
-      "modelLockedHint": "登录后使用 {{model}}",
-      "signInToProvider": "登录到 {{provider}}",
       "searchModels": "搜索模型",
       "noModels": "没有匹配的模型",
-      "connectProvider": "连接 {{provider}}",
       "slideContext": "本次对话涉及的幻灯片",
       "addCurrentSlide": "添加当前幻灯片",
       "removeSlideContext": "移除 {{slide}}",
@@ -447,7 +408,9 @@
       "toolListing": "列出文件",
       "toolSyncing": "重新读取演示文稿",
       "toolWebSearching": "在网络上搜索 {{query}}",
-      "toolWriting": "写入{{scope}}"
+      "toolWriting": "写入{{scope}}",
+      "checkingAccount": "正在检查你的 Claude 账户…",
+      "signedOutHint": "未登录 Claude。请在终端运行 `claude` 登录。"
     },
     "drawing": {
       "layer": "绘图图层",

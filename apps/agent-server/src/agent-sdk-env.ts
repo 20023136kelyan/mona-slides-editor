@@ -1,15 +1,15 @@
 /**
  * The environment the Claude Code subprocess runs with.
  *
- * `env` replaces the subprocess environment outright rather than merging, and
- * the SDK's own example spreads `process.env` into it. We must not: a Claude
- * credential in this server's environment outranks the token we are trying to
- * use. `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_API_KEY` both sit above
- * `CLAUDE_CODE_OAUTH_TOKEN` in Claude Code's authentication precedence, and the
- * cloud-provider switches sit above all three - so an operator key would
- * silently serve, and bill, every user's turn.
+ * `env` replaces the subprocess environment outright rather than merging, and the
+ * SDK's own example spreads `process.env` into it. We must not: a stray
+ * `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` outranks the user's own
+ * subscription login in Claude Code's authentication precedence, and the
+ * cloud-provider switches outrank all of them. Someone with a key exported in their
+ * shell for unrelated work would find Mona quietly billing it instead of using the
+ * account they signed in with.
  *
- * An allowlist makes that impossible by construction instead of by vigilance.
+ * An allowlist makes that impossible by construction rather than by vigilance.
  */
 
 /** Variables the subprocess genuinely needs from its parent. */
@@ -28,14 +28,14 @@ const FORWARDED = [
 const CLIENT_APP = 'mona-slides/0.1.0'
 
 /**
- * `setupToken` is optional, and omitting it is the local-desktop case: with no
- * token supplied the CLI falls through to the subscription login the user
- * already made, which it reads from `HOME` rather than the environment. That is
- * why `HOME` is forwarded and why stripping the operator's key matters just as
- * much here - a stray `ANTHROPIC_API_KEY` would quietly outrank their own login.
+ * Nothing here authenticates the subprocess.
+ *
+ * The CLI falls through to the subscription login the user already made, which it
+ * reads from `HOME` rather than from the environment. That is why `HOME` is
+ * forwarded, and why the stripping above is what makes it work rather than a
+ * precaution around it.
  */
 export const monaAgentEnv = (
-  setupToken?: string,
   parent: NodeJS.ProcessEnv = process.env,
 ): Record<string, string> => {
   const env: Record<string, string> = {}
@@ -44,6 +44,5 @@ export const monaAgentEnv = (
     if (typeof value === 'string' && value !== '') env[name] = value
   }
   env.CLAUDE_AGENT_SDK_CLIENT_APP = CLIENT_APP
-  if (setupToken) env.CLAUDE_CODE_OAUTH_TOKEN = setupToken
   return env
 }

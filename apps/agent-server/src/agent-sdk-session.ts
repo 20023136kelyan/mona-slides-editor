@@ -137,11 +137,6 @@ export interface AgentSdkSessionOptions {
    */
   effort?: EffortLevel
   modelId: string
-  /**
-   * A long-lived token, for a hosted deployment. Omitted on the desktop, where the
-   * subprocess inherits the Claude login the user already made.
-   */
-  setupToken?: string
 }
 
 /**
@@ -156,15 +151,13 @@ export class AgentSdkSession {
   readonly #effort?: EffortLevel
   readonly #modelId: string
   readonly #queue = new PromptQueue()
-  readonly #setupToken?: string
   #query?: Query
   #workspace?: AgentWorkspace
 
-  constructor({ bridge, effort, modelId, setupToken }: AgentSdkSessionOptions) {
+  constructor({ bridge, effort, modelId }: AgentSdkSessionOptions) {
     this.#bridge = bridge
     this.#effort = effort
     this.#modelId = modelId
-    this.#setupToken = setupToken
   }
 
   /** Start the turn and stream everything the SDK emits. */
@@ -179,7 +172,7 @@ export class AgentSdkSession {
         // Only sent when chosen: a model that supports no levels rejects one, and
         // omitting it keeps the SDK's own default.
         ...(this.#effort ? { effort: this.#effort } : {}),
-        env: monaAgentEnv(this.#setupToken),
+        env: monaAgentEnv(),
         // Thinking is `omitted` by default: the deltas arrive carrying only a
         // token estimate, so a reasoning panel would open on nothing. Measured
         // live - summarized returns ~590 characters where omitted returns zero.

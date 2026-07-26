@@ -1,29 +1,24 @@
 import { useSyncExternalStore } from 'react'
-import { MONA_AGENT_MODELS } from '@mona/agent-protocol'
-
-import type { AgentProviderId } from '@/features/editor/agent/agent-types'
 
 export interface AgentModel {
-  badge?: 'max'
   /**
-   * Reasoning depths this model accepts, in the order to offer them. Absent
-   * means the provider exposes no such control; empty means the model refuses
-   * one, which is not the same thing.
+   * Reasoning depths this model accepts, in the order to offer them. Absent means
+   * no such control exists; empty means the model refuses one, which is not the
+   * same thing.
    */
   effortLevels?: readonly string[]
   id: string
   name: string
-  providerId: AgentProviderId
 }
 
 /**
- * What to show before the server answers, and if it never does.
+ * What to show before the host answers, and if it never does.
  *
- * Anthropic's real catalog belongs to the signed-in plan, so it can only come
- * from the server. Everything else is declared, and this list is also the floor:
- * a failed fetch leaves a usable picker rather than an empty one.
+ * The real catalog belongs to the signed-in plan, so it can only come from the
+ * Agent SDK. This is the floor: a failed read leaves a usable picker rather than an
+ * empty one, and `default` is what the SDK resolves for the plan.
  */
-const DECLARED: readonly AgentModel[] = [...MONA_AGENT_MODELS]
+const DECLARED: readonly AgentModel[] = [{ id: 'default', name: 'Claude' }]
 
 let models: readonly AgentModel[] = DECLARED
 let inflight: Promise<void> | null = null
