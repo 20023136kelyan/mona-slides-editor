@@ -1,17 +1,35 @@
 name: test
 
 on:
+  # `main`, not `master`. This said `master` while the default branch was `main`,
+  # so no push ever matched it and, with no pull requests either, the pipeline
+  # had never run once — `gh run list` was empty on a repository with 36 commits
+  # of migration in it.
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
   # Mona-owned checks: architecture boundaries, typecheck, lint, unit/browser
   # tests, application journeys, and the production build.
+  #
+  # Two runners, because Mona now has two chromes and each hides the other's.
+  # macOS is what ships and carries everything platform-specific — the traffic
+  # lights, the hidden title bar, the system menu bar, and the rail width
+  # measured off them. Linux is where the in-window menu bar lives, which macOS
+  # never renders. A suite run on one of them alone tests half the application:
+  # that is exactly how a menu helper that could only ever work on macOS reached
+  # the default branch unnoticed.
   app:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    strategy:
+      # Both run to completion. A failure on one platform is a fact worth having
+      # about that platform, not a reason to stop learning about the other.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,10 +64,15 @@ jobs:
       - name: Agent server tests
         run: npm run test:agent
 
-      # Electron needs a display. The globalSetup builds the shell bundle, so
-      # there is nothing to add here beyond the frame buffer.
-      - name: App e2e
+      # Electron needs a display, and only Linux has to invent one. The
+      # globalSetup builds the shell bundle, so there is nothing else to add.
+      - name: App e2e (Linux)
+        if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum npm exec -w @mona/web -- playwright test
+
+      - name: App e2e (macOS)
+        if: runner.os == 'macOS'
+        run: npm exec -w @mona/web -- playwright test
 
       - name: Production build
         run: npm run build
@@ -58,6 +81,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: app-e2e-artifacts
+          name: app-e2e-artifacts-${{ matrix.os }}
           path: apps/web/test-results/
           retention-days: 7
