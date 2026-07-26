@@ -179,7 +179,7 @@ test('starting a slideshow closes portaled transients instead of leaving them ov
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 
   // Export dialog (a portaled, lazily loaded modal) gets the same treatment.
-  await chooseMenuCommand(app, 'file.export.pptx')
+  await chooseMenuCommand(app, 'file.export.pptx', page)
   const exportDialog = page.getByRole('dialog', { name: 'Export' })
   await expect(exportDialog).toBeVisible()
   await page.keyboard.press('F5')

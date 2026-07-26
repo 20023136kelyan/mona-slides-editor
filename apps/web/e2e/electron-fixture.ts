@@ -25,6 +25,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const DESKTOP_DIR = join(HERE, '../../desktop')
 const REPO_ROOT = join(HERE, '../../..')
 
+/** Whether this run sees the macOS chrome, which hides the in-window menus. */
+export const isMacChrome = process.platform === 'darwin'
+
 /** Where the renderer is served from while testing: Playwright's own web server. */
 export const RENDERER_URL = 'http://127.0.0.1:6174'
 
@@ -96,16 +99,57 @@ export const stubSaveDialog = async (app: ElectronApplication, filePath: string 
 }
 
 /**
- * Chooses an item from the application menu.
+ * Where a command lives in the editor's own File menu.
  *
- * On macOS the editor has no menus of its own — they are in the system menu bar,
- * which Playwright cannot click. This sends what that menu sends, so the path
- * under test is the one a Mac user actually takes.
+ * Only the ones these journeys use. Export entries are one level deeper, under
+ * a submenu, which is why they carry two labels.
  */
-export const chooseMenuCommand = async (app: ElectronApplication, command: string): Promise<void> => {
-  await app.evaluate(({ BrowserWindow }, name) => {
-    BrowserWindow.getAllWindows()[0]?.webContents.send('mona:menu', name)
-  }, command)
+const IN_WINDOW_MENU: Record<string, readonly string[]> = {
+  'file.export.image': ['Export', 'Image'],
+  'file.export.json': ['Export', 'JSON'],
+  'file.export.native': ['Export', 'Mona'],
+  'file.export.pdf': ['Export', 'PDF'],
+  'file.export.pptx': ['Export', 'PowerPoint'],
+  'file.import.json': ['Import JSON'],
+  'file.import.native': ['Import Mona file'],
+  'file.import.pptx': ['Import PowerPoint'],
+  'file.new': ['New presentation'],
+}
+
+/**
+ * Chooses an item from the application menu, wherever this platform keeps it.
+ *
+ * The two are not interchangeable and cannot be faked into each other. On macOS
+ * the editor has no menus of its own — they are in the system menu bar, which
+ * Playwright cannot click — so the command is sent the way that menu sends it.
+ * Everywhere else the menu is in the window and the system menu bar does not
+ * exist: the renderer registers no command listener at all off darwin, so
+ * sending one would reach nobody and the test would pass by doing nothing.
+ *
+ * Clicking through is therefore not a fallback but the real path on those
+ * platforms, and it is the only e2e coverage the in-window menu has.
+ */
+export const chooseMenuCommand = async (
+  app: ElectronApplication,
+  command: string,
+  page?: Page,
+): Promise<void> => {
+  if (isMacChrome) {
+    await app.evaluate(({ BrowserWindow }, name) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.send('mona:menu', name)
+    }, command)
+    return
+  }
+  const target = page ?? await app.firstWindow()
+  const path = IN_WINDOW_MENU[command]
+  if (!path) throw new Error(`No in-window menu path is known for "${command}".`)
+  await target.getByRole('button', { exact: true, name: 'File' }).click()
+  // A submenu opens on hover and does nothing when clicked; a leaf is clicked.
+  for (const [index, label] of path.entries()) {
+    const item = target.getByRole('menuitem', { exact: true, name: label })
+    if (index < path.length - 1) await item.hover()
+    else await item.click()
+  }
 }
 
 /**
@@ -120,9 +164,10 @@ export const importFile = async (
   app: ElectronApplication,
   kind: 'json' | 'native' | 'pptx',
   filePath: string,
+  page?: Page,
 ): Promise<void> => {
   await stubOpenDialog(app, [filePath])
-  await chooseMenuCommand(app, `file.import.${kind}`)
+  await chooseMenuCommand(app, `file.import.${kind}`, page)
 }
 
 /**
@@ -163,5 +208,3 @@ export const reloadApp = async (page: Page): Promise<void> => {
   await page.waitForLoadState('domcontentloaded')
 }
 
-/** Whether this run sees the macOS chrome, which hides the in-window menus. */
-export const isMacChrome = process.platform === 'darwin'

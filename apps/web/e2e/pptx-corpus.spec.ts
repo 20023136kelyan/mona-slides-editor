@@ -34,7 +34,7 @@ const fixtures = [
 }))
 
 const createNewPresentation = async (app: ElectronApplication, page: Page) => {
-  await chooseMenuCommand(app, 'file.new')
+  await chooseMenuCommand(app, 'file.new', page)
   await page.getByRole('button', { name: 'Create new' }).click()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
@@ -58,7 +58,7 @@ for (const fixture of fixtures) {
     })
     page.on('pageerror', error => browserProblems.push(`pageerror: ${error.message}`))
 
-    await importFile(app, 'pptx', fixture.path)
+    await importFile(app, 'pptx', fixture.path, page)
     await expect.poll(() => page.evaluate(() => (
       window.__MONA_TEST__!.getState().presentation.slides.length
     )), { timeout: 30_000 }).toBe(fixture.baseline.imported.slides)

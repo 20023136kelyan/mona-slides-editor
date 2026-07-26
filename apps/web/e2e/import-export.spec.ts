@@ -12,7 +12,7 @@ const TEXT_CORPUS_PPTX = fileURLToPath(new URL(
 ))
 
 const createNewPresentation = async (app: ElectronApplication, page: Page) => {
-  await chooseMenuCommand(app, 'file.new')
+  await chooseMenuCommand(app, 'file.new', page)
   await page.getByRole('button', { name: 'Create new' }).click()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides.length
@@ -30,7 +30,7 @@ test.beforeEach(async ({ app, page }, testInfo) => {
 
 test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recovers safely from invalid input', async ({ app, page }, testInfo) => {
   await createNewPresentation(app, page)
-  await importFile(app, 'pptx', TEXT_CORPUS_PPTX)
+  await importFile(app, 'pptx', TEXT_CORPUS_PPTX, page)
 
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
@@ -45,7 +45,7 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
     window.__MONA_TEST__!.getState().presentation.title
   ))).toBe('Lifecycle: Corpus / Text?')
 
-  await chooseMenuCommand(app, 'file.export.json')
+  await chooseMenuCommand(app, 'file.export.json', page)
   const dialog = page.getByRole('dialog', { name: 'Export' })
   const jsonPath = join(testInfo.outputDir, 'Lifecycle Corpus Text.json')
   await stubSaveDialog(app, jsonPath)
@@ -59,7 +59,7 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   expect(jsonPayload.slides).toHaveLength(1)
   expect(jsonPayload.slides[0]!.elements).toHaveLength(5)
 
-  await chooseMenuCommand(app, 'file.export.native')
+  await chooseMenuCommand(app, 'file.export.native', page)
   const nativePath = join(testInfo.outputDir, 'Lifecycle Corpus Text.mona')
   await stubSaveDialog(app, nativePath)
   await dialog.getByRole('button', { name: 'Export', exact: true }).click()
@@ -67,7 +67,7 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   await dialog.getByRole('button', { name: 'Close' }).click()
 
   await createNewPresentation(app, page)
-  await importFile(app, 'native', nativePath)
+  await importFile(app, 'native', nativePath, page)
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.title
   ))).toBe('Lifecycle: Corpus / Text?')
@@ -82,7 +82,7 @@ test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recov
   // A real file, because the dialog hands back bytes read off disk.
   const brokenPath = join(testInfo.outputDir, 'broken.json')
   await writeFile(brokenPath, 'not valid JSON')
-  await importFile(app, 'json', brokenPath)
+  await importFile(app, 'json', brokenPath, page)
   await expect(page.getByText('This file could not be read or parsed')).toBeVisible()
   expect(await page.evaluate(() => (
     structuredClone(window.__MONA_TEST__!.getState().presentation)
@@ -102,7 +102,7 @@ test('exports an editable PPTX that can be imported back into Mona', async ({ ap
     }
   })
 
-  await chooseMenuCommand(app, 'file.export.pptx')
+  await chooseMenuCommand(app, 'file.export.pptx', page)
   const dialog = page.getByRole('dialog', { name: 'Export' })
   const pptxPath = join(testInfo.outputDir, 'Untitled presentation.pptx')
   await stubSaveDialog(app, pptxPath)
@@ -111,7 +111,7 @@ test('exports an editable PPTX that can be imported back into Mona', async ({ ap
 
   await dialog.getByRole('button', { name: 'Close' }).click()
   await createNewPresentation(app, page)
-  await importFile(app, 'pptx', pptxPath)
+  await importFile(app, 'pptx', pptxPath, page)
 
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides.length
