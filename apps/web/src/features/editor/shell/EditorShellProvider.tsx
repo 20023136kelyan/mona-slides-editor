@@ -20,6 +20,7 @@ const focusFallbackForRoute = (route: EditorTaskPanelRoute | null) => {
 
 export function EditorShellProvider({ children }: { children: ReactNode }) {
   const [taskPanelRoute, setTaskPanelRoute] = useState<EditorTaskPanelRoute | null>(null)
+  const [railCollapsed, setRailCollapsed] = useState(false)
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const routeRef = useRef<EditorTaskPanelRoute | null>(null)
 
@@ -54,10 +55,12 @@ export function EditorShellProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<EditorShell>(() => ({
     closeTaskPanel,
+    railCollapsed,
+    setRailCollapsed,
     openTaskPanel,
     taskPanelRoute,
     toggleTaskPanel,
-  }), [closeTaskPanel, openTaskPanel, taskPanelRoute, toggleTaskPanel])
+  }), [closeTaskPanel, openTaskPanel, railCollapsed, taskPanelRoute, toggleTaskPanel])
 
   return <EditorShellContext value={value}>{children}</EditorShellContext>
 }

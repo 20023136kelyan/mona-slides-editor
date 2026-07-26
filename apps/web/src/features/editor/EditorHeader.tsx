@@ -17,6 +17,7 @@ import {
   PanelsTopLeft,
   PencilLine,
   Play,
+  PanelLeftOpen,
   Redo2,
   Search,
   Settings,
@@ -175,6 +176,7 @@ export function EditorSkipLink() {
 export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: () => void; runtime: EditorRuntime }) {
   const { i18n, t } = useTranslation()
   const macChrome = isMacChrome()
+  const { railCollapsed, setRailCollapsed } = useEditorShell()
   const {
     agentOpen,
     closeAgent,
@@ -485,6 +487,20 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
             </DropdownMenu>
           </nav>
           <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border @max-[760px]/header:mx-0.5" />
+          {/* The rail's toggle, when the rail has no room for it: collapsed on
+              macOS it is only as wide as the traffic lights need. Mechanically it
+              moves; on screen it stays on the same row, immediately left of undo,
+              so it does not read as having jumped. */}
+          {macChrome && railCollapsed ? (
+            <Button
+              aria-label={t('foundation.editor.rail.expandSidebar')}
+              aria-pressed={true}
+              onClick={() => setRailCollapsed(false)}
+              size="header-icon"
+              title={t('foundation.editor.rail.expandSidebar')}
+              variant="header-pill"
+            ><PanelLeftOpen /></Button>
+          ) : null}
           <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 /></Button>
           <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 /></Button>
           {persistence ? (

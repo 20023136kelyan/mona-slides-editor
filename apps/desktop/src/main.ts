@@ -109,7 +109,7 @@ const createWindow = async (): Promise<void> => {
     // header, which is why the renderer reserves space for them. `hiddenInset`
     // rather than fully frameless: the buttons keep their standard inset and
     // system behaviour, including the green button's window menu.
-    ...(MAC ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } } : {}),
+    ...(MAC ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 16 } } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

@@ -13,6 +13,7 @@ import type { ComponentType } from 'react'
 
 import { CATEGORY_ICONS } from '@/features/editor/icons/category-icons'
 import { isMacChrome } from '@/lib/mona-bridge'
+import { useEditorShell } from '@/features/editor/shell/editor-shell'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -152,7 +153,8 @@ export function EditorRail({
   onPanelChange: (panel: EditorTaskPanelRoute | null, trigger?: HTMLElement | null) => void
 }) {
   const { t } = useTranslation()
-  const [collapsed, setCollapsed] = useState(false)
+  const { railCollapsed: collapsed, setRailCollapsed: setCollapsed } = useEditorShell()
+  const macChrome = isMacChrome()
   const railScrollRef = useRef<HTMLDivElement>(null)
   // The media group falls below the fold on short viewports, and Photos and
   // Charts are wired features hiding down there among the stubs. Fade the
@@ -263,7 +265,13 @@ export function EditorRail({
   return (
     <Sidebar
       aria-label={t('foundation.editor.rail.tools')}
-      className="mona-editor-rail group/rail w-56 shrink-0 border-r border-sidebar-border transition-[width] duration-200 max-snug:w-[3.25rem] data-[collapsed=true]:w-[3.25rem]"
+      className={cn(
+        'mona-editor-rail group/rail w-56 shrink-0 border-r border-sidebar-border transition-[width] duration-200 max-snug:w-[3.25rem] data-[collapsed=true]:w-[3.25rem]',
+        // The traffic lights start 18px in and span 52px, so 18px on the other
+        // side centres them in an 88px rail. Narrower and the border would cut
+        // through the green button.
+        macChrome && 'max-snug:w-[88px] data-[collapsed=true]:w-[88px]',
+      )}
       collapsible="none"
       data-collapsed={collapsed}
       role="navigation"
@@ -275,11 +283,19 @@ export function EditorRail({
           toggle; manually collapsed drops the mark so the toggle (the only way
           back) owns the 52px; below `snug` the rail is forced narrow, so the
           toggle has nothing to offer and the mark keeps the slot. */}
-      {/* macOS puts the traffic lights over this corner, and the rail collapses to
-          about 52px - too narrow to sit beside them. So they get a strip of their
-          own, which doubles as somewhere to grab the window. */}
-      {isMacChrome() ? <div aria-hidden="true" className="mona-editor-rail-titlebar h-9 flex-none" /> : null}
-      <SidebarHeader className={cn('h-11 flex-none flex-row items-center gap-1 px-3', railIconRow)}>
+      {/* On macOS the traffic lights float over this row, so the brand shifts right
+          to sit beside them rather than under them - the toggle stays on the same
+          line as the header's own controls, which is where the eye expects it.
+          Collapsed, the rail is only as wide as the lights need and the toggle
+          moves to the header; the row itself becomes somewhere to grab the window. */}
+      <SidebarHeader
+        className={cn(
+          'h-11 flex-none flex-row items-center gap-1 px-3',
+          railIconRow,
+          macChrome && 'mona-editor-rail-titlebar',
+          macChrome && !collapsed && 'ps-[76px]',
+        )}
+      >
         <div
           aria-label="Mona"
           className={cn(
@@ -291,11 +307,13 @@ export function EditorRail({
           <img alt="" aria-hidden="true" className="size-4 flex-none" src="/favicon.svg" />
           <span className={cn('truncate', railIconHidden)}>Mona</span>
         </div>
+        {/* Hidden here when the rail is collapsed on macOS: the header carries it
+            then, because this row has room for the traffic lights and nothing else. */}
         <Button
           aria-label={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
           aria-pressed={collapsed}
-          className="mona-editor-rail-toggle shrink-0 text-foreground/70 hover:text-foreground max-snug:hidden"
-          onClick={() => setCollapsed(current => !current)}
+          className={cn('mona-editor-rail-toggle shrink-0 text-foreground/70 hover:text-foreground max-snug:hidden', macChrome && collapsed && 'hidden')}
+          onClick={() => setCollapsed(!collapsed)}
           size="icon-xs"
           title={collapsed ? t('foundation.editor.rail.expandSidebar') : t('foundation.editor.rail.collapseSidebar')}
           type="button"
