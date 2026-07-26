@@ -486,21 +486,25 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
               </DropdownMenuContent>
             </DropdownMenu>
           </nav>
-          <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border @max-[760px]/header:mx-0.5" />
           {/* The rail's toggle, when the rail has no room for it: collapsed on
               macOS it is only as wide as the traffic lights need. Mechanically it
               moves; on screen it stays on the same row, immediately left of undo,
               so it does not read as having jumped. */}
+          {/* No `aria-pressed`: this instance exists only while the rail is
+              collapsed, so a pressed toggle could never show its other state -
+              it would read as permanently on to a screen reader, and the
+              variant's pressed styling flattens the keycap it shares with undo
+              and redo either side of it. Here it is simply "expand". */}
           {macChrome && railCollapsed ? (
             <Button
               aria-label={t('foundation.editor.rail.expandSidebar')}
-              aria-pressed={true}
               onClick={() => setRailCollapsed(false)}
               size="header-icon"
               title={t('foundation.editor.rail.expandSidebar')}
               variant="header-pill"
             ><PanelLeftOpen /></Button>
           ) : null}
+          <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border @max-[760px]/header:mx-0.5" />
           <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 /></Button>
           <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 /></Button>
           {persistence ? (

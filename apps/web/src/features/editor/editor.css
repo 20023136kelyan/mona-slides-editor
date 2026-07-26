@@ -2250,4 +2250,29 @@
 .mona-editor-header-mac input,
 .mona-editor-header-mac [role='button'],
 .mona-editor-header-mac a { -webkit-app-region: no-drag; }
+/* The rail's first row doubles as somewhere to grab the window, so its controls
+   have to opt back out — a drag region swallows clicks, which made the collapse
+   toggle and the brand look dead. */
 .mona-editor-rail-titlebar { -webkit-app-region: drag; }
+.mona-editor-rail-titlebar button,
+.mona-editor-rail-titlebar a,
+.mona-editor-rail-titlebar [role='button'] { -webkit-app-region: no-drag; }
+
+/* macOS draws the traffic lights over the rail's top-left. Both numbers live
+   here so the two sides stay symmetric: the shell insets the lights by
+   --mona-traffic-inset, and the collapsed rail is that inset again on the far
+   side of them, plus the border the rail draws on that edge.
+
+   --mona-traffic-span is the one value we do not get to choose. It was measured
+   off a screenshot of the running app rather than taken from the widely quoted
+   12pt buttons at 20pt centres, which would make it 52: the buttons here sit
+   23pt apart, and the 8pt that assumption lost showed up as a visibly tighter
+   gap on the green side. Re-measure it rather than adjust it by eye. */
+:root {
+  --mona-traffic-inset: 18px;
+  --mona-traffic-span: 60px;
+  /* Where the rail's own content may start: past the lights, with the inset
+     mirrored on their right so the group sits centred in what it occupies. */
+  --mona-traffic-clear: calc(var(--mona-traffic-inset) * 2 + var(--mona-traffic-span));
+  --mona-rail-collapsed-mac: calc(var(--mona-traffic-clear) + 1px);
+}

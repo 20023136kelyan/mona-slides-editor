@@ -245,7 +245,9 @@ export function EditorRail({
           onPointerEnter={item.onPointerEnter}
         >
           <div className={cn('flex min-w-0 flex-1 items-center gap-3', railIconRowInner)}>
-            <Icon className="h-4 w-4 shrink-0" />
+            {/* Larger while collapsed on macOS: the rail is 88px there to clear
+                the traffic lights, and a 16px glyph looks lost in it. */}
+            <Icon className={cn('shrink-0', macChrome ? 'size-4 group-data-[collapsed=true]/rail:size-5 max-snug:size-5' : 'size-4')} />
             <span className={cn('truncate', railIconHidden)}>{item.label}</span>
           </div>
           {item.hasPanel ? (
@@ -270,7 +272,7 @@ export function EditorRail({
         // The traffic lights start 18px in and span 52px, so 18px on the other
         // side centres them in an 88px rail. Narrower and the border would cut
         // through the green button.
-        macChrome && 'max-snug:w-[88px] data-[collapsed=true]:w-[88px]',
+        macChrome && 'max-snug:w-(--mona-rail-collapsed-mac) data-[collapsed=true]:w-(--mona-rail-collapsed-mac)',
       )}
       collapsible="none"
       data-collapsed={collapsed}
@@ -293,7 +295,7 @@ export function EditorRail({
           'h-11 flex-none flex-row items-center gap-1 px-3',
           railIconRow,
           macChrome && 'mona-editor-rail-titlebar',
-          macChrome && !collapsed && 'ps-[76px]',
+          macChrome && !collapsed && 'ps-(--mona-traffic-clear)',
         )}
       >
         <div
@@ -305,7 +307,9 @@ export function EditorRail({
           )}
         >
           <img alt="" aria-hidden="true" className="size-4 flex-none" src="/favicon.svg" />
-          <span className={cn('truncate', railIconHidden)}>Mona</span>
+          {/* The mark alone on macOS: the traffic lights already take the left of
+              this row, and the wordmark beside them crowds it. */}
+          {macChrome ? null : <span className={cn('truncate', railIconHidden)}>Mona</span>}
         </div>
         {/* Hidden here when the rail is collapsed on macOS: the header carries it
             then, because this row has room for the traffic lights and nothing else. */}

@@ -105,11 +105,13 @@ const createWindow = async (): Promise<void> => {
     minWidth: 1024,
     show: false,
     title: 'Mona',
-    // On macOS the editor fills the window and the traffic lights float over its
-    // header, which is why the renderer reserves space for them. `hiddenInset`
-    // rather than fully frameless: the buttons keep their standard inset and
-    // system behaviour, including the green button's window menu.
-    ...(MAC ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 16 } } : {}),
+    // On macOS the editor fills the window and the traffic lights float over the
+    // rail's first row, which reserves space for them. `hidden` rather than
+    // `hiddenInset`: the latter applies an inset of its own before
+    // `trafficLightPosition` is considered, so the buttons do not land where the
+    // renderer measured for them. The inset here is the same 18px the stylesheet
+    // uses to size the collapsed rail — change both together.
+    ...(MAC ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 18, y: 16 } } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
