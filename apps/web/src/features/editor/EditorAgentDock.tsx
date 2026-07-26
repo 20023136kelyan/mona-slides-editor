@@ -9,20 +9,20 @@ import {
   ChevronLeft,
   CircleStop,
   Clipboard,
-  Code2,
   ExternalLink,
+  Gauge,
   KeyRound,
   Lock,
   LogIn,
   Paperclip,
   PenLine,
-  RotateCcw,
   Search,
-  Sparkles,
+  Square,
   Unplug,
   Wand2,
   X,
 } from 'lucide-react'
+import SlideAttachmentIcon from '~icons/fluent/slide-layout-20-regular'
 import { MONA_AGENT_MODELS } from '@mona/agent-protocol'
 
 import { Button } from '@/components/ui/button'
@@ -49,20 +49,19 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
-import {
-  applyAgentCandidate,
-  generateAgentCandidate,
-  type AgentProgressStage,
-} from '@/features/editor/agent/agent-service'
+import { useAgentChat } from '@/features/editor/agent/use-agent-chat'
 import {
   agentProviderStore,
   useAgentProviderConfiguration,
 } from '@/features/editor/agent/agent-provider-store'
-import { referenceAgentEnabled } from '@/features/editor/agent/agent-runtime-mode'
-import type { AgentCandidate, AgentProviderId } from '@/features/editor/agent/agent-types'
+import { AGENT_PROVIDER_IDS, type AgentProviderId } from '@/features/editor/agent/agent-types'
+import { AgentProviderIcon } from '@/features/editor/agent/AgentProviderIcon'
+import { effortLevelsFor, useAgentModels, type AgentModel } from '@/features/editor/agent/agent-model-catalog'
+import { buildToolLabel, slideLabelFor } from '@/features/editor/agent/agent-tool-label'
 import {
   answerAgentAuthPrompt,
   cancelAgentAuthFlow,
+  connectAgentApiKey,
   connectAgentProvider,
   disconnectAgentProvider,
   refreshAgentAuthStatus,
@@ -70,17 +69,18 @@ import {
   type AgentAuthPrompt,
   type OAuthAgentProviderId,
 } from '@/features/editor/agent/agent-auth-client'
-import { useManagedAgentStatus } from '@/features/editor/agent/managed-agent-status'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
+import { EditorAgentSlashMenu } from '@/features/editor/EditorAgentSlashMenu'
+import { matchSlashCommands, parseSlashCommand, type ParsedSlashCommand } from '@/features/editor/agent/agent-slash-commands'
+import { EditorAgentActivity, EditorAgentMessage, messageHasLiveBlock } from '@/features/editor/EditorAgentMessage'
 import { cn } from '@/lib/utils'
 
-interface ConversationEntry {
-  id: number
-  role: 'agent' | 'error' | 'user'
-  text: string
-}
+/** A user message's text, for the plain bubble the composer echoes back. */
+const readMessageText = (message: { parts?: Array<{ text?: string; type?: string }> }): string => (
+  (message.parts ?? []).filter(part => part.type === 'text').map(part => part.text ?? '').join('')
+)
 
 const SUGGESTION_ICONS = {
   improve: Wand2,
@@ -88,30 +88,39 @@ const SUGGESTION_ICONS = {
   visualize: ChartColumn,
 } as const
 
-interface AgentModelOption {
-  badge?: 'max'
-  id: string
-  name: string
-  providerId: AgentProviderId
-}
+type AgentModelOption = AgentModel
 
-// Models the picker offers, grouped by the provider that serves them. The
-// name is a brand proper noun (not translated); the provider group label and
-// its lock/sign-in copy come from the catalogs.
-const AGENT_MODELS: readonly AgentModelOption[] = [
-  ...MONA_AGENT_MODELS,
-  ...(referenceAgentEnabled ? [{ id: 'reference', name: 'Reference engine', providerId: 'reference' } satisfies AgentModelOption] : []),
-]
+
+/**
+ * The lane above the composer.
+ *
+ * The same keycap face as the header and composer controls, one size down
+ * because it is secondary to the input beneath it. Shared rather than repeated
+ * so the chip - a span wrapping its own remove button, so it cannot be a
+ * `Button` variant - carries the identical treatment instead of a hand-copied
+ * approximation. Every tone is mixed from `--foreground`/`--background`, so it
+ * inverts in dark; the literal `rgb(15 23 42 / 8%)` these used before could not.
+ */
+const LANE_FACE = 'rounded-action border border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)]'
+
+/**
+ * The face plus the lane's own height and type, for anything text-bearing.
+ *
+ * The size is an explicit length rather than the `text-tiny` token because `cn`
+ * runs tailwind-merge, which does not know our custom sizes: it read `text-tiny`
+ * as a text *colour*, so any colour merged in afterwards silently dropped it and
+ * the chip inherited 16px from the document.
+ */
+const LANE_KEYCAP = `h-6.5 text-[11.5px] font-medium ${LANE_FACE}`
+
+const LANE_KEYCAP_HOVER = 'hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground active:shadow-none'
 
 const MODEL_PROVIDER_ORDER: readonly AgentProviderId[] = [
   'openai-chatgpt',
   'anthropic-claude',
   'google-ai-studio',
-  'mona-managed',
-  ...(referenceAgentEnabled ? ['reference' as const] : []),
 ]
 
-const modelBadgeClass = 'inline-flex items-center rounded-detail border border-border bg-[linear-gradient(90deg,rgb(129_161_193),rgb(125_124_155))] bg-clip-text px-1 text-[8.5px] font-extrabold tracking-[0.04em] text-transparent'
 
 const useObjectUrl = (blob: Blob | null | undefined) => {
   const url = useMemo(() => blob ? URL.createObjectURL(blob) : null, [blob])
@@ -258,7 +267,7 @@ function GeminiAuthPanel({ defaultModelId, onConnect }: {
   const [apiKey, setApiKey] = useState('')
   const [modelId, setModelId] = useState(defaultModelId)
   const apiKeyId = useId()
-  const geminiModels = AGENT_MODELS.filter(model => model.providerId === 'google-ai-studio')
+  const geminiModels = MONA_AGENT_MODELS.filter(model => model.providerId === 'google-ai-studio')
 
   return (
     <form
@@ -311,49 +320,79 @@ export function EditorAgentDock({ handoff = null, runtime }: {
     handoff ? t('foundation.editor.agent.sketchInstruction') : ''
   ))
   const [attachmentVisible, setAttachmentVisible] = useState(Boolean(handoff))
-  const [entries, setEntries] = useState<ConversationEntry[]>([])
-  const [candidate, setCandidate] = useState<AgentCandidate | null>(null)
-  const [appliedCandidate, setAppliedCandidate] = useState<AgentCandidate | null>(null)
-  const [progress, setProgress] = useState<AgentProgressStage | null>(null)
+  // Undefined leaves the SDK's own default rather than asserting a level.
+  const [effort, setEffort] = useState<string | undefined>(undefined)
+  // The server falls back to the provider's default when no model is chosen.
+  const chat = useAgentChat({
+    effort,
+    model: configuration.model ?? '',
+    runtime,
+  })
   const [providerOpen, setProviderOpen] = useState(false)
   // The picker has two views: the model list (authView null) and a single
-  // provider's sign-in panel (authView set), reached by clicking a locked
-  // model or its group's Sign in shortcut.
+  // provider's sign-in panel, reached by clicking a locked model.
   const [authView, setAuthView] = useState<AgentProviderId | null>(null)
-  const [modelQuery, setModelQuery] = useState('')
   const composerRef = useRef<HTMLTextAreaElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
-  const entryIdRef = useRef(0)
+  const [modelQuery, setModelQuery] = useState('')
+  const [slashIndex, setSlashIndex] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
-  const slideTitle = useEditorSelector(runtime.store, state => state.presentation.slides[state.presentation.slideIndex]?.title)
+  const slides = useEditorSelector(runtime.store, state => state.presentation.slides)
+  const currentSlideId = useEditorSelector(runtime.store, state => state.presentation.slides[state.presentation.slideIndex]?.id)
+  // The dock is scoped to slides, so the composer carries them as chips the
+  // way an assistant carries attachments. It follows the current slide until
+  // the user curates the set, then it stays where they put it.
+  const [contextSlideIds, setContextSlideIds] = useState<string[]>(() => currentSlideId ? [currentSlideId] : [])
+  const curatedRef = useRef(false)
+  useEffect(() => {
+    if (curatedRef.current || !currentSlideId) return
+    setContextSlideIds([currentSlideId])
+  }, [currentSlideId])
   const openaiStatus = useAgentAuthStatus('openai-chatgpt')
   const anthropicStatus = useAgentAuthStatus('anthropic-claude')
-  const managedStatus = useManagedAgentStatus()
+  const googleStatus = useAgentAuthStatus('google-ai-studio')
   const handoffUrl = useObjectUrl(handoff?.preview)
-  const beforeUrl = useObjectUrl(candidate?.beforePreview)
-  const afterUrl = useObjectUrl(candidate?.afterPreview)
   // Whether each provider can run right now. A provider that isn't ready
   // shows its models grayed and routes a click to its sign-in panel.
   const providerReadiness: Record<AgentProviderId, boolean> = {
     'anthropic-claude': anthropicStatus.connected,
-    'google-ai-studio': configuration.providerId === 'google-ai-studio' && Boolean(configuration.apiKey?.trim()),
-    'mona-managed': managedStatus.available,
+    'google-ai-studio': googleStatus.connected,
     'openai-chatgpt': openaiStatus.connected,
-    reference: referenceAgentEnabled,
   }
-  const activeModel = AGENT_MODELS.find(model => model.providerId === configuration.providerId && model.id === configuration.model)
-    ?? AGENT_MODELS.find(model => model.providerId === configuration.providerId)
-    ?? AGENT_MODELS[AGENT_MODELS.length - 1]!
+  const agentModels = useAgentModels()
+  const activeModel = agentModels.find(model => model.providerId === configuration.providerId && model.id === configuration.model)
+    ?? agentModels.find(model => model.providerId === configuration.providerId)
+    ?? agentModels[agentModels.length - 1]!
+  const effortLevels = effortLevelsFor(activeModel)
+  // A level that the newly chosen model does not accept must not linger, or the
+  // chip would display one thing while the run used another.
+  useEffect(() => {
+    if (effort && !effortLevels.includes(effort)) setEffort(undefined)
+  }, [effort, effortLevels])
   const providerReady = providerReadiness[configuration.providerId]
-  const busy = progress !== null
-  useEdgeFade(suggestionsRef, 'x', entries.length + Number(Boolean(candidate || handoff || progress)))
+  // The SDK reports the run: submitted before the first token, streaming after.
+  const busy = chat.status === 'streaming' || chat.status === 'submitted'
+  const runStartedAt = useMemo(() => busy ? Date.now() : null, [busy])
+  // True when the newest assistant message already renders a running block, so
+  // the standalone activity line stands down rather than doubling up on it.
+  const lastMessage = chat.messages[chat.messages.length - 1]
+  const liveBlockShowing = busy
+    && lastMessage?.role === 'assistant'
+    && messageHasLiveBlock(lastMessage)
+  const slashMatches = matchSlashCommands(draft)
+  useEdgeFade(suggestionsRef, 'x', chat.messages.length + Number(Boolean(handoff || busy)))
+
+  // Ask every provider where it stands as soon as the dock opens. Without this
+  // nothing fetches status until a sign-in panel is opened, so every model
+  // renders locked even when the provider is ready - Anthropic in particular,
+  // which authenticates from the machine's own Claude login and needs no panel.
+  useEffect(() => {
+    for (const providerId of AGENT_PROVIDER_IDS) void refreshAgentAuthStatus(providerId)
+  }, [])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
-  }, [candidate, entries, progress])
-
-  useEffect(() => () => abortRef.current?.abort(), [])
+  }, [chat.messages, busy])
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => composerRef.current?.focus())
@@ -380,79 +419,91 @@ export function EditorAgentDock({ handoff = null, runtime }: {
     setProviderOpen(false)
   }
 
-  const appendEntry = (role: ConversationEntry['role'], text: string) => {
-    setEntries(current => [...current, { id: ++entryIdRef.current, role, text }])
-  }
+  // Until threads are persisted with their own titles, the chat is named after
+  // what it was opened with — the first prompt.
+  const firstPrompt = chat.messages.find(message => message.role === 'user')
+    ? readMessageText(chat.messages.find(message => message.role === 'user')!).trim()
+    : undefined
+  const chatName = firstPrompt
+    ? firstPrompt.length > 48 ? `${firstPrompt.slice(0, 48)}\u2026` : firstPrompt
+    : t('foundation.editor.agent.newChat')
 
-  const selectModel = (model: AgentModelOption) => {
-    if (providerReadiness[model.providerId]) activateModel(model)
-    else setAuthView(model.providerId) // locked → this provider's sign-in
-  }
+  const labelContext = { currentSlideId, slides, translate: t }
 
-  const connectGemini = (apiKey: string, modelId: string) => {
-    agentProviderStore.setProvider('google-ai-studio')
-    agentProviderStore.setApiKey(apiKey)
-    agentProviderStore.setModel(modelId)
-    setAuthView(null)
-    setProviderOpen(false)
-  }
+  const contextSlides = contextSlideIds
+    .map(id => {
+      const label = slideLabelFor(id, labelContext)
+      return label ? { id, label } : null
+    })
+    .filter((slide): slide is { id: string; label: string } => slide !== null)
 
-  const submit = async () => {
-    const instruction = draft.trim()
-    if (!instruction || busy || !providerReady) return
-    const controller = new AbortController()
-    abortRef.current = controller
-    setCandidate(null)
-    setAppliedCandidate(null)
-    appendEntry('user', instruction)
-    setDraft('')
-    try {
-      const next = await generateAgentCandidate({
-        configuration,
-        handoff: attachmentVisible ? handoff : null,
-        instruction,
-        onProgress: setProgress,
-        runtime,
-        signal: controller.signal,
-      })
-      setCandidate(next)
-      setAttachmentVisible(false)
-    }
-    catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        appendEntry('agent', t('foundation.editor.agent.cancelled'))
-      }
-      else {
-        appendEntry('error', error instanceof Error ? error.message : t('foundation.editor.agent.failed'))
-      }
-    }
-    finally {
-      abortRef.current = null
-      setProgress(null)
-    }
-  }
+  const toolLabel = (name: string, input: unknown) => buildToolLabel(name, input, labelContext)
 
-  const applyCandidate = () => {
-    if (!candidate) return
-    const result = applyAgentCandidate(runtime, candidate)
-    if (!result.ok) {
-      appendEntry('error', result.message)
-      if (result.reason === 'stale') setCandidate(null)
+  const activeAuthStatus = configuration.providerId === 'openai-chatgpt'
+    ? openaiStatus
+    : configuration.providerId === 'anthropic-claude' ? anthropicStatus : null
+  // OAuth providers connect straight from the strip. A bring-your-own-key or
+  // managed provider needs the panel, so the strip opens it rather than
+  // pretending one click is enough.
+  const connectActiveProvider = () => {
+    const providerId = configuration.providerId
+    if (providerId === 'openai-chatgpt' || providerId === 'anthropic-claude') {
+      void connectAgentProvider(providerId).catch(() => undefined)
       return
     }
-    appendEntry('agent', t('foundation.editor.agent.applied'))
-    setAppliedCandidate(candidate)
-    setCandidate(null)
+    setAuthView(providerId)
+    setProviderOpen(true)
   }
 
-  const undoApplied = () => {
-    if (!appliedCandidate || !runtime.undo()) return
-    appendEntry('agent', t('foundation.editor.agent.undone'))
-    setAppliedCandidate(null)
+  // Every model is selectable regardless of connection: the composer strip
+  // carries the connect prompt and the send button stays disabled until the
+  // chosen provider is ready. Picking a model is never a dead end.
+  const selectModel = (model: AgentModelOption) => activateModel(model)
+
+  // The key goes to the vault, not into the browser store: Google now runs
+  // through the same server path as every other provider.
+  const connectGemini = (apiKey: string, modelId: string) => {
+    void connectAgentApiKey('google-ai-studio', apiKey)
+      .then(() => {
+        agentProviderStore.setProvider('google-ai-studio')
+        agentProviderStore.setModel(modelId)
+        setAuthView(null)
+        setProviderOpen(false)
+      })
+      .catch(() => undefined)
   }
+
+  const runSlashCommand = (command: ParsedSlashCommand): string | null => {
+    setDraft('')
+    if (command.name === 'stop') {
+      void chat.stop()
+      return null
+    }
+    if (command.name === 'clear') {
+      chat.setMessages([])
+      return null
+    }
+    // `look` is a shorthand for asking, so it becomes a real prompt.
+    return command.name === 'look' ? 'What is on this slide?' : null
+  }
+
+  const submit = () => {
+    const instruction = draft.trim()
+    if (!instruction || !providerReady) return
+    const command = parseSlashCommand(instruction)
+    const rewritten = command ? runSlashCommand(command) : null
+    if (command && !rewritten) return
+    setDraft('')
+    setSlashIndex(0)
+    // Sending during a run is steering: the SDK queues it onto the same
+    // conversation rather than refusing, so nothing needs disabling.
+    void chat.sendMessage({ text: rewritten ?? instruction })
+  }
+
+
 
   return (
-    <Sidebar aria-labelledby="mona-agent-dock-title" className="mona-agent-dock w-[var(--dock-w)] shrink-0 overflow-hidden border-l border-sidebar-border" collapsible="none" id="mona-agent-dock" role="complementary" side="right">
+    <Sidebar aria-label={t('foundation.editor.agent.title')} className="mona-agent-dock w-[var(--dock-w)] shrink-0 overflow-hidden border-l border-sidebar-border" collapsible="none" id="mona-agent-dock" role="complementary" side="right">
       {/* The provider Popover wraps the whole dock: its content is portaled,
           and the trigger sits inside the composer, the way current assistant
           UIs place their model picker. The root renders no DOM node. */}
@@ -467,9 +518,11 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         open={providerOpen}
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
-      <SidebarHeader className="flex min-h-11.5 flex-row items-center justify-between gap-3 pt-1.5 pr-2 pb-0 pl-4 [&_>button_svg]:size-4">
+      <SidebarHeader className="flex min-h-11.5 flex-row items-center justify-between gap-3 px-4 pt-1.5 pb-0 [&_>button_svg]:size-4">
         {/* No close control: the header's AI button is the single toggle. */}
-        <h2 className="m-0 min-w-0 truncate text-control font-medium" id="mona-agent-dock-title" title={slideTitle || t('foundation.editor.statusBar.untitledPage')}>{slideTitle || t('foundation.editor.statusBar.untitledPage')}</h2>
+        {/* The dock is a chat, so it is named after the thread. Slide scope
+            moved to the composer chips, where the user can change it. */}
+        <h2 className="m-0 min-w-0 truncate text-control font-medium" id="mona-agent-dock-title" title={chatName}>{chatName}</h2>
       </SidebarHeader>
           <PopoverContent
             aria-label={t('foundation.editor.agent.chooseProvider')}
@@ -498,9 +551,6 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 {authView === 'google-ai-studio' ? (
                   <GeminiAuthPanel defaultModelId="gemini-3.6-flash" onConnect={connectGemini} />
                 ) : null}
-                {authView === 'mona-managed' ? (
-                  <p className="m-0 text-tiny leading-[1.45] text-muted-foreground">{t('foundation.editor.agent.managedUnavailable')}</p>
-                ) : null}
               </div>
             ) : (
               <>
@@ -518,25 +568,17 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 <div className="grid gap-px">
                   {MODEL_PROVIDER_ORDER.map(providerId => {
                     const query = modelQuery.trim().toLocaleLowerCase()
-                    const models = AGENT_MODELS.filter(model => (
+                    const models = agentModels.filter(model => (
                       model.providerId === providerId && (!query || model.name.toLocaleLowerCase().includes(query))
                     ))
                     if (!models.length) return null
                     const ready = providerReadiness[providerId]
                     return (
                       <div className="grid gap-px not-first:mt-0.75" key={providerId}>
-                        <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-px text-mini font-semibold tracking-[0.02em] text-muted-foreground uppercase">
-                          <span>{t(`foundation.editor.agent.providers.${providerId}.name`)}</span>
-                          {ready ? null : (
-                            <Button
-                              aria-label={t('foundation.editor.agent.signInToProvider', { provider: t(`foundation.editor.agent.providers.${providerId}.name`) })}
-                              className="h-auto min-h-0 rounded-control px-1.5 py-px text-[10.5px] font-semibold tracking-normal text-foreground normal-case hover:bg-ink-deep/6"
-                              onClick={() => setAuthView(providerId)}
-                              size="sm"
-                              type="button"
-                              variant="ghost"
-                            >{t('foundation.editor.agent.signInShort')}</Button>
-                          )}
+                        {/* No sign-in here: any model can be chosen, and the
+                            composer strip handles connecting the one in use. */}
+                        <div className="px-2 pt-1 pb-px text-mini font-semibold tracking-[0.02em] text-muted-foreground uppercase">
+                          {t(`foundation.editor.agent.providers.${providerId}.name`)}
                         </div>
                         {models.map(model => {
                           const active = activeModel.id === model.id && configuration.providerId === model.providerId
@@ -555,8 +597,8 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                               variant="ghost"
                             >
                               <span className="inline-flex min-w-0 items-center gap-1.75 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <AgentProviderIcon className="size-3.5" providerId={model.providerId} />
                                 {model.name}
-                                {model.badge === 'max' ? <span className={modelBadgeClass}>MAX</span> : null}
                               </span>
                               {active ? <Check /> : ready ? null : <Lock />}
                             </Button>
@@ -565,7 +607,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                       </div>
                     )
                   })}
-                  {AGENT_MODELS.every(model => modelQuery.trim() && !model.name.toLocaleLowerCase().includes(modelQuery.trim().toLocaleLowerCase()))
+                  {agentModels.every(model => modelQuery.trim() && !model.name.toLocaleLowerCase().includes(modelQuery.trim().toLocaleLowerCase()))
                     ? <p className="my-2.5 text-center text-xs text-muted-foreground">{t('foundation.editor.agent.noModels')}</p>
                     : null}
                 </div>
@@ -574,8 +616,8 @@ export function EditorAgentDock({ handoff = null, runtime }: {
           </PopoverContent>
 
       <SidebarContent>
-        <div aria-live="polite" className="flex min-h-full flex-1 flex-col gap-2.5 p-3">
-          {!entries.length && !candidate && !handoff ? (
+        <div aria-live="polite" className="flex min-h-full flex-1 flex-col gap-2.5 px-4 py-3">
+          {!chat.messages.length && !handoff ? (
             <div className="flex min-h-full flex-1 flex-col items-center justify-center px-2.5 py-7 text-center">
               <span className="mb-3.5 flex size-11 items-center justify-center rounded-action bg-ink-deep/6 text-ink/70 [&_svg]:size-5.5"><Bot /></span>
               <h3 className="m-0 text-field font-[750]">{t('foundation.editor.agent.emptyTitle')}</h3>
@@ -598,106 +640,158 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             </div>
           ) : null}
 
-          {entries.map(entry => (
+          {/* The SDK owns the transcript, so it is rendered straight from
+              chat.messages rather than mirrored into local state. */}
+          {chat.messages.map((message, index) => (
             <div
-              className={cn(
-                'flex max-w-full',
-                entry.role === 'user' && 'max-w-[88%] self-end',
-              )}
-              key={entry.id}
+              className={cn('flex max-w-full', message.role === 'user' && 'max-w-[88%] self-end')}
+              key={message.id}
             >
-              <p className={cn(
-                'm-0 text-[12.5px] leading-[1.55] whitespace-pre-wrap',
-                entry.role === 'user' && 'rounded-overlay bg-ink-deep/6 px-3 py-2',
-                entry.role === 'agent' && 'text-ink/88',
-                entry.role === 'error' && 'rounded-overlay bg-[color-mix(in_oklab,var(--destructive)_7%,var(--background))] px-3 py-2 text-destructive',
-              )}>{entry.text}</p>
+              {message.role === 'user' ? (
+                <p className="m-0 rounded-overlay bg-ink-deep/6 px-3 py-2 text-[12.5px] leading-[1.55] whitespace-pre-wrap">
+                  {readMessageText(message)}
+                </p>
+              ) : (
+                <EditorAgentMessage
+                  message={message}
+                  streaming={busy && index === chat.messages.length - 1}
+                  toolLabel={toolLabel}
+                />
+              )}
             </div>
           ))}
 
-          {progress ? (
-            <output className="flex items-center gap-2.5 rounded-overlay bg-ink-deep/4 px-3 py-2.5">
-              <span className="size-3.75 shrink-0 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none motion-reduce:border-muted-foreground" />
-              <div className="grid gap-0.5">
-                <strong className="text-[11.5px]">{t(`foundation.editor.agent.progress.${progress}`)}</strong>
-                <small className="text-[9.5px] leading-[1.35] text-muted-foreground">{t('foundation.editor.agent.progress.detail')}</small>
-              </div>
-            </output>
+          {chat.error ? (
+            <p className="m-0 rounded-overlay bg-[color-mix(in_oklab,var(--destructive)_7%,var(--background))] px-3 py-2 text-[12.5px] text-destructive">
+              {chat.error.message}
+            </p>
           ) : null}
 
-          {candidate && candidate.preview.ok ? (
-            <article className="overflow-hidden rounded-overlay border border-border bg-background shadow-[0_8px_26px_rgb(15_23_42/7%)]">
-              <header className="flex items-start gap-2.25 border-b border-border p-2.75">
-                <span className="grid size-6.25 shrink-0 place-items-center rounded-action bg-muted text-foreground [&_svg]:size-3.5"><Sparkles /></span>
-                <div className="grid min-w-0 gap-0.5">
-                  <strong className="text-xs leading-[1.4]">{candidate.explanation}</strong>
-                  <small className="text-mini text-muted-foreground">{candidate.providerLabel}</small>
-                </div>
-              </header>
-              {beforeUrl || afterUrl ? (
-                <div className="grid grid-cols-2 gap-px bg-border">
-                  {beforeUrl ? (
-                    <figure className="relative m-0 min-w-0 bg-muted">
-                      <img alt={t('foundation.editor.agent.beforePreview')} className="block aspect-video w-full bg-white object-contain" src={beforeUrl} />
-                      <figcaption className="absolute right-1.25 bottom-1.25 rounded-pill bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.before')}</figcaption>
-                    </figure>
-                  ) : null}
-                  {afterUrl ? (
-                    <figure className="relative m-0 min-w-0 bg-muted">
-                      <img alt={t('foundation.editor.agent.afterPreview')} className="block aspect-video w-full bg-white object-contain" src={afterUrl} />
-                      <figcaption className="absolute right-1.25 bottom-1.25 rounded-pill bg-[rgb(24_24_27/78%)] px-1.5 py-0.5 text-[8.5px] text-white backdrop-blur-[5px]">{t('foundation.editor.agent.after')}</figcaption>
-                    </figure>
-                  ) : null}
-                </div>
-              ) : null}
-              <div className="flex flex-wrap gap-1.25 px-2.5 pt-2.25 pb-1">
-                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.created', { count: candidate.summary.createdElements })}</span>
-                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.updated', { count: candidate.summary.updatedElements })}</span>
-                <span className="rounded-pill bg-muted px-1.75 py-0.75 text-micro text-muted-foreground">{t('foundation.editor.agent.summary.removed', { count: candidate.summary.deletedElements })}</span>
-              </div>
-              <details className="mx-2.5 mt-1.25 mb-2.5 rounded-control border border-border">
-                <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.75 text-mini text-muted-foreground [&::-webkit-details-marker]:hidden [&_svg]:size-3"><Code2 />{t('foundation.editor.agent.viewProgram')}</summary>
-                <pre className="m-0 max-h-50 overflow-auto border-t border-border bg-muted p-2.25 text-micro leading-[1.45] whitespace-pre-wrap"><code>{candidate.code}</code></pre>
-              </details>
-              <footer className="flex justify-end gap-1.75 border-t border-border px-2.5 py-2.25 [&_svg]:size-3.25">
-                <Button onClick={() => setCandidate(null)} size="sm" type="button" variant="outline">
-                  {t('foundation.editor.agent.discard')}
-                </Button>
-                <Button onClick={applyCandidate} size="sm" type="button">
-                  <Check />{t('foundation.editor.agent.apply')}
-                </Button>
-              </footer>
-            </article>
-          ) : null}
+          {/* The agent is alive even when nothing is printing: between
+              submitting and the first token, and between turns while the next
+              call is in flight. Suppressed while a block is already showing its
+              own live state, so only one thing is ever running on screen. */}
+          {busy && !liveBlockShowing ? <EditorAgentActivity startedAt={runStartedAt} /> : null}
 
-          {appliedCandidate ? (
-            <div className="flex items-center gap-1.75 rounded-overlay border border-border px-2.25 py-2 text-[10.5px]">
-              <Check className="size-3.5 text-[var(--success,#16a34a)]" />
-              <span className="min-w-0 flex-1">{t('foundation.editor.agent.appliedSummary')}</span>
-              <Button className="[&_svg]:size-3" onClick={undoApplied} size="sm" type="button" variant="outline"><RotateCcw />{t('foundation.editor.agent.undo')}</Button>
-            </div>
-          ) : null}
           <div ref={endRef} />
         </div>
       </SidebarContent>
 
-      <SidebarFooter className="gap-0 px-3 pt-1 pb-2.5">
-        <form
-          className="overflow-hidden rounded-[calc(var(--radius-overlay)+4px)] border border-border bg-card shadow-[0_6px_18px_-6px_rgb(21_30_130/14%),0_2px_5px_-2px_rgb(21_30_130/8%)] focus-within:border-foreground/25"
-          onSubmit={event => {
-            event.preventDefault()
-            void submit()
+      <SidebarFooter className="gap-0 px-4 pt-1 pb-2.5">
+        <EditorAgentSlashMenu
+          commands={slashMatches}
+          onSelect={command => {
+            setDraft(command.argument ? `/${command.name} ` : `/${command.name}`)
+            composerRef.current?.focus()
           }}
-        >
+          selected={slashIndex}
+        />
+        {/* Nested cards: a quiet outer tray carries the status strip, and the
+            white input card sits inside it. The strip therefore reads as
+            context attached to the composer rather than a bar ruled onto it. */}
+        <div className="mona-agent-composer rounded-[calc(var(--radius-overlay)+10px)] border border-[color-mix(in_oklab,var(--foreground)_8%,transparent)] bg-ink-deep/[0.045] p-1.5 shadow-[inset_0_1px_0_0_rgb(255_255_255/70%),0_1px_2px_0_rgb(15_23_42/5%)]">
+          {/* One strip, two jobs. Disconnected: the provider prompt, its device
+              code and its spinner live here instead of behind a dialog, so the
+              user never leaves the composer. Connected: the slides this prompt
+              will act on, carried as chips like attachments. */}
+          <div className="mona-agent-strip flex min-h-8 flex-wrap items-center gap-1.5 px-1.5 pt-0.5 pb-1.5">
+            {!providerReady ? (
+              <>
+                <span className={cn(LANE_FACE, 'grid size-6.5 shrink-0 place-items-center text-muted-foreground [&_svg]:size-3.25')}>
+                  {activeAuthStatus?.loading ? (
+                    <span className="size-3 animate-spin rounded-full border-2 border-border border-t-foreground motion-reduce:animate-none" />
+                  ) : <Lock />}
+                </span>
+                {activeAuthStatus?.flow?.deviceCode ? (
+                  <>
+                    <code className={cn(LANE_FACE, 'px-2 py-0.5 font-mono text-tiny tracking-[0.12em] tabular-nums')}>{activeAuthStatus.flow.deviceCode.userCode}</code>
+                    <Button
+                      aria-label={t('foundation.editor.agent.copyDeviceCode')}
+                      className="size-6 shrink-0 [&_svg]:size-3.25"
+                      onClick={() => void navigator.clipboard?.writeText(activeAuthStatus.flow!.deviceCode!.userCode).catch(() => undefined)}
+                      size="editor-icon"
+                      type="button"
+                      variant="ghost"
+                    ><Clipboard /></Button>
+                  </>
+                ) : null}
+                <Button
+                  className={cn(LANE_KEYCAP, LANE_KEYCAP_HOVER, 'ml-auto shrink-0 px-2.5 text-foreground/80')}
+                  disabled={activeAuthStatus?.loading}
+                  onClick={connectActiveProvider}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >{t('foundation.editor.agent.connectProvider', { provider: t(`foundation.editor.agent.providers.${configuration.providerId}.name`) })}</Button>
+              </>
+            ) : (
+              <div aria-label={t('foundation.editor.agent.slideContext')} className="flex min-w-0 flex-wrap items-center gap-1.5" role="group">
+                {contextSlides.map(slide => (
+                  <span className={cn(LANE_KEYCAP, 'inline-flex max-w-45 items-center gap-1 pr-0.5 pl-1.5 text-foreground/85')} key={slide.id}>
+                    {/* Names what the chip holds. Slides are the only attachment
+                        today; a second kind would pick its own icon here. */}
+                    <SlideAttachmentIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 truncate">{slide.label}</span>
+                    <Button
+                      aria-label={t('foundation.editor.agent.removeSlideContext', { slide: slide.label })}
+                      className="size-5 shrink-0 rounded-detail text-muted-foreground hover:bg-foreground/8 hover:text-foreground [&_svg]:size-2.75"
+                      onClick={() => {
+                        curatedRef.current = true
+                        setContextSlideIds(current => current.filter(id => id !== slide.id))
+                      }}
+                      size="editor-icon"
+                      type="button"
+                      variant="ghost"
+                    ><X /></Button>
+                  </span>
+                ))}
+                {currentSlideId && !contextSlideIds.includes(currentSlideId) ? (
+                  <Button
+                    className={cn(LANE_KEYCAP, LANE_KEYCAP_HOVER, 'shrink-0 gap-1 px-2 text-muted-foreground [&_svg]:size-3')}
+                    onClick={() => {
+                      curatedRef.current = true
+                      setContextSlideIds(current => [...current, currentSlideId])
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >+ {t('foundation.editor.agent.addCurrentSlide')}</Button>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <form
+            className="overflow-hidden rounded-[calc(var(--radius-overlay)+6px)] bg-background shadow-[0_0_0_1px_rgb(15_23_42/4%),0_1px_1px_0_rgb(15_23_42/4%),0_4px_10px_-4px_rgb(15_23_42/10%)]"
+            onSubmit={event => {
+              event.preventDefault()
+              submit()
+            }}
+          >
           <Textarea
             aria-label={t('foundation.editor.agent.composerLabel')}
             className="max-h-55 min-h-12.5 field-sizing-content resize-none overflow-y-auto rounded-none border-0 bg-transparent px-3 pt-3 pb-0.5 text-control leading-normal shadow-none focus-visible:border-0 focus-visible:shadow-none focus-visible:ring-0"
-            disabled={busy}
-            onChange={event => setDraft(event.target.value)}
+            onChange={event => {
+              setDraft(event.target.value)
+              setSlashIndex(0)
+            }}
             onKeyDown={event => {
+              if (slashMatches.length && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+                event.preventDefault()
+                setSlashIndex(current => {
+                  const next = event.key === 'ArrowDown' ? current + 1 : current - 1
+                  return (next + slashMatches.length) % slashMatches.length
+                })
+                return
+              }
+              if (slashMatches.length && event.key === 'Tab') {
+                event.preventDefault()
+                const chosen = slashMatches[slashIndex] ?? slashMatches[0]
+                if (chosen) setDraft(chosen.argument ? `/${chosen.name} ` : `/${chosen.name}`)
+                return
+              }
               if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault()
-                void submit()
+                submit()
               }
             }}
             placeholder={t('foundation.editor.agent.composerPlaceholder')}
@@ -705,26 +799,55 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             rows={2}
             value={draft}
           />
-          <div className="flex min-h-10 items-center gap-1.5 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-3.75">
+          <div className="flex min-h-11 items-center gap-1 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-3.75">
             <PopoverTrigger asChild>
               <Button
                 aria-label={t('foundation.editor.agent.chooseProvider')}
-                className="h-6.5 min-w-0 gap-1.25 rounded-control px-1 text-[12.5px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=open]:bg-transparent data-[state=open]:text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
-                size="sm"
+                // Matches the header's controls: `rounded-action` rather than a
+                // full pill, and the same raised shadow that flattens on press.
+                // Sized to its label rather than stretched - it used to carry
+                // `flex-1` to fill a row that also held the mode and depth
+                // chips, and once those went it had the whole row to itself.
+                className="mr-auto min-w-0 max-w-full text-[12.5px] text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
+                size="header-pill"
                 type="button"
-                variant="ghost"
+                variant="header-pill"
               >
+                <AgentProviderIcon className="size-3.5" providerId={activeModel.providerId} />
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{activeModel.name}</span>
-                {activeModel.badge === 'max' ? <span className={modelBadgeClass}>MAX</span> : null}
                 <ChevronDown />
               </Button>
             </PopoverTrigger>
-            <div className="ml-auto flex items-center gap-1.5">
+            {/* Reasoning depth, offered only where the model takes one. Haiku
+                reports no levels, and sending it one would be rejected. */}
+            {effortLevels.length ? (
+              <Select onValueChange={setEffort} value={effort ?? 'high'}>
+                <SelectTrigger
+                  aria-label={t('foundation.editor.agent.thinkingLevel')}
+                  // `size="sm"` rather than an h-7 class: the trigger sets its
+                  // height through `data-[size=default]:h-8`, which is
+                  // attribute-qualified and so outranks a plain utility.
+                  size="sm"
+                  className="w-auto shrink-0 gap-1 rounded-action border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] px-2 text-[12.5px] font-medium text-foreground/80 shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] hover:text-foreground [&>svg]:size-3 [&_svg]:shrink-0"
+                >
+                  <Gauge className="size-3.5" />
+                  <span>{t(`foundation.editor.agent.thinkingLevels.${effort ?? 'high'}`)}</span>
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {effortLevels.map(level => (
+                    <SelectItem key={level} value={level}>
+                      {t(`foundation.editor.agent.thinkingLevels.${level}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+            <div className="ml-auto flex shrink-0 items-center gap-1">
               <Button
                 aria-label={t('foundation.editor.agent.attach')}
                 disabled={!handoff}
                 onClick={() => setAttachmentVisible(current => !current)}
-                size="editor-icon"
+                size="action-icon"
                 type="button"
                 variant={attachmentVisible ? 'secondary' : 'ghost'}
               >
@@ -733,27 +856,35 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               {busy ? (
                 <Button
                   aria-label={t('foundation.editor.agent.cancel')}
-                  className="size-7.5 shrink-0 rounded-pill border-ink/20 p-0 [&_svg]:stroke-[2.4]"
-                  onClick={() => abortRef.current?.abort()}
-                  size="editor-icon"
+                  onClick={() => {
+                    void chat.stop()
+                  }}
+                  size="action-icon"
                   type="button"
-                  variant="outline"
-                ><CircleStop /></Button>
-              ) : (
+                  variant="stop-pill"
+                >
+                  {/* A filled square rather than a stop glyph: on a red face the
+                      solid shape reads at 10px where an outlined ring does not. */}
+                  <Square className="size-2.5 fill-current stroke-none" />
+                </Button>
+              ) : null}
+              {!busy || draft.trim() ? (
                 <Button
-                  aria-label={t('foundation.editor.agent.send')}
-                  className="size-7.5 shrink-0 rounded-pill p-0 disabled:bg-muted disabled:opacity-100 disabled:[&_svg]:text-muted-foreground [&_svg]:stroke-[2.4]"
+                  aria-label={busy ? t('foundation.editor.agent.steer') : t('foundation.editor.agent.send')}
+                  className="[&_svg]:stroke-[2.4]"
                   disabled={!draft.trim() || !providerReady}
-                  size="editor-icon"
+                  size="action-icon"
                   type="submit"
+                  variant="action-pill"
                 ><ArrowUp /></Button>
-              )}
+              ) : null}
             </div>
           </div>
-        </form>
+          </form>
+        </div>
         {/* Prompt starters live under the input, the way current assistant
             UIs surface them — only while the thread is still empty. */}
-        {!entries.length && !candidate && !handoff && !progress ? (
+        {!chat.messages.length && !handoff ? (
           <div className="mona-agent-suggestions mt-2 flex flex-nowrap items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" ref={suggestionsRef}>
             {(['improve', 'rewrite', 'visualize'] as const).map(suggestion => {
               const SuggestionIcon = SUGGESTION_ICONS[suggestion]
@@ -775,10 +906,13 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               )
             })}
           </div>
-        ) : (
-          <p className="mt-1.75 mr-0.5 mb-0 ml-0.5 text-center text-mini leading-[1.4] text-muted-foreground">{providerReady
-            ? t('foundation.editor.agent.reviewNotice')
-            : t('foundation.editor.agent.connectionRequired')}</p>
+        ) : providerReady ? null : (
+          // Only the connect prompt survives here. The notice that used to sit
+          // opposite it described the old review-and-apply flow, which no longer
+          // exists - the agent edits directly and one undo reverts the run.
+          <p className="mt-1.75 mr-0.5 mb-0 ml-0.5 text-center text-mini leading-[1.4] text-muted-foreground">
+            {t('foundation.editor.agent.connectionRequired')}
+          </p>
         )}
       </SidebarFooter>
       </Popover>

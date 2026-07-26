@@ -60,6 +60,8 @@ describe('agent HTTP boundary', () => {
       message: 'Mona managed AI is not configured on this deployment',
     })
 
+    // The retired plan/review endpoints are gone rather than stubbed, so an
+    // unknown route must 404 instead of reporting a configuration problem.
     const response = await fetch(`${baseUrl}/api/agent/plan`, {
       body: '{}',
       headers: {
@@ -68,6 +70,6 @@ describe('agent HTTP boundary', () => {
       },
       method: 'POST',
     })
-    expect(response.status).toBe(503)
+    expect(response.status).toBe(404)
   })
 })

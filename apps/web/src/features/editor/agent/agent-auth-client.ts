@@ -4,6 +4,24 @@ import type { AgentProviderId } from '@/features/editor/agent/agent-types'
 
 export type OAuthAgentProviderId = Extract<AgentProviderId, 'anthropic-claude' | 'openai-chatgpt'>
 
+/** Every provider reports status; only some of them authenticate by OAuth. */
+export type StatusAgentProviderId = AgentProviderId
+
+/** Stores a bring-your-own key server-side and returns the refreshed status. */
+export const connectAgentApiKey = async (providerId: AgentProviderId, apiKey: string): Promise<void> => {
+  const response = await fetch(`/api/agent/providers/${providerId}/key`, {
+    body: JSON.stringify({ apiKey }),
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+  if (!response.ok) {
+    const failure = await response.json().catch(() => ({})) as { message?: string }
+    throw new Error(failure.message || 'Could not save this API key')
+  }
+  await refreshAgentAuthStatus(providerId)
+}
+
 export interface AgentAuthPrompt {
   id: string
   message: string
@@ -41,12 +59,12 @@ export interface AgentAuthStatus {
 }
 
 const EMPTY_STATUS: AgentAuthStatus = { connected: false, loading: false }
-const statuses = new Map<OAuthAgentProviderId, AgentAuthStatus>()
+const statuses = new Map<StatusAgentProviderId, AgentAuthStatus>()
 const listeners = new Set<() => void>()
-const inflight = new Map<OAuthAgentProviderId, Promise<void>>()
+const inflight = new Map<StatusAgentProviderId, Promise<void>>()
 
 const emit = () => listeners.forEach(listener => listener())
-const setStatus = (providerId: OAuthAgentProviderId, status: AgentAuthStatus) => {
+const setStatus = (providerId: StatusAgentProviderId, status: AgentAuthStatus) => {
   statuses.set(providerId, status)
   emit()
 }
@@ -56,7 +74,7 @@ const readJson = async <Value>(response: Response): Promise<Value> => {
   return payload
 }
 
-export const refreshAgentAuthStatus = (providerId: OAuthAgentProviderId): Promise<void> => {
+export const refreshAgentAuthStatus = (providerId: StatusAgentProviderId): Promise<void> => {
   const current = inflight.get(providerId)
   if (current) return current
   setStatus(providerId, { ...statuses.get(providerId) ?? EMPTY_STATUS, loading: true, error: undefined })
@@ -78,7 +96,7 @@ export const refreshAgentAuthStatus = (providerId: OAuthAgentProviderId): Promis
   return request
 }
 
-const updateFlow = (providerId: OAuthAgentProviderId, flow: AgentAuthFlow) => {
+const updateFlow = (providerId: StatusAgentProviderId, flow: AgentAuthFlow) => {
   setStatus(providerId, {
     ...statuses.get(providerId) ?? EMPTY_STATUS,
     connected: false,
@@ -89,7 +107,7 @@ const updateFlow = (providerId: OAuthAgentProviderId, flow: AgentAuthFlow) => {
 }
 
 const waitForConnection = async (
-  providerId: OAuthAgentProviderId,
+  providerId: StatusAgentProviderId,
   initialFlow: AgentAuthFlow,
   popup: Window | null,
 ) => {
@@ -114,7 +132,7 @@ const waitForConnection = async (
   throw new Error('Provider sign-in timed out')
 }
 
-export const connectAgentProvider = async (providerId: OAuthAgentProviderId): Promise<void> => {
+export const connectAgentProvider = async (providerId: StatusAgentProviderId): Promise<void> => {
   const popup = window.open('about:blank', `mona-${providerId}-auth`, 'popup=yes,width=620,height=760')
   if (!popup) throw new Error('Allow pop-ups to connect this provider')
   popup.document.title = 'Connecting to Mona'
@@ -147,7 +165,7 @@ export const connectAgentProvider = async (providerId: OAuthAgentProviderId): Pr
 }
 
 export const answerAgentAuthPrompt = async (
-  providerId: OAuthAgentProviderId,
+  providerId: StatusAgentProviderId,
   promptId: string,
   answer: string,
 ): Promise<void> => {
@@ -165,7 +183,7 @@ export const answerAgentAuthPrompt = async (
   updateFlow(providerId, await readJson<AgentAuthFlow>(response))
 }
 
-export const cancelAgentAuthFlow = async (providerId: OAuthAgentProviderId): Promise<void> => {
+export const cancelAgentAuthFlow = async (providerId: StatusAgentProviderId): Promise<void> => {
   const flow = statuses.get(providerId)?.flow
   if (!flow || flow.status !== 'pending') return
   await fetch(`/api/agent/auth/${providerId}/flows/${encodeURIComponent(flow.flowId)}`, {
@@ -175,7 +193,7 @@ export const cancelAgentAuthFlow = async (providerId: OAuthAgentProviderId): Pro
   setStatus(providerId, { connected: false, loading: false })
 }
 
-export const disconnectAgentProvider = async (providerId: OAuthAgentProviderId): Promise<void> => {
+export const disconnectAgentProvider = async (providerId: StatusAgentProviderId): Promise<void> => {
   setStatus(providerId, { ...statuses.get(providerId) ?? EMPTY_STATUS, loading: true })
   try {
     const response = await fetch(`/api/agent/auth/${providerId}`, {
@@ -199,7 +217,7 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener)
 }
 
-export const useAgentAuthStatus = (providerId: OAuthAgentProviderId | null): AgentAuthStatus => {
+export const useAgentAuthStatus = (providerId: StatusAgentProviderId | null): AgentAuthStatus => {
   const getSnapshot = () => providerId ? statuses.get(providerId) ?? EMPTY_STATUS : EMPTY_STATUS
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

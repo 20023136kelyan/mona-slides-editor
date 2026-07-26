@@ -1,6 +1,10 @@
 {
   "name": "@mona/agent-server",
   "private": true,
+  "exports": {
+    "./config": "./src/config.ts",
+    "./server": "./src/server.ts"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
@@ -10,12 +14,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.20",
+    "@ai-sdk/google": "^4.0.24",
+    "@ai-sdk/openai": "^4.0.20",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.220",
     "@earendil-works/pi-ai": "0.82.0",
     "@mona/agent-protocol": "0.0.0",
-    "image-size": "1.2.1"
+    "ai": "^7.0.37",
+    "image-size": "1.2.1",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/node": "24.13.2",
+    "@types/ws": "^8.18.1",
     "tsx": "4.23.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

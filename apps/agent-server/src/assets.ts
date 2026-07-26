@@ -8,7 +8,7 @@ import { decodeSignedValue, encodeSignedValue } from './security.js'
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 20_000
-const WIKIMEDIA_HOST = 'upload.wikimedia.org'
+const IMAGE_ASSET_HOSTS = new Set(['images.pexels.com'])
 const MIME_EXTENSION = new Map([
   ['image/gif', '.gif'],
   ['image/jpeg', '.jpg'],
@@ -31,21 +31,12 @@ export interface PublicImageSearchResult {
   previewUrl: string
 }
 
-const stripHtml = (value: unknown): string | undefined => {
-  if (typeof value !== 'string') return undefined
-  const stripped = value
-    .replaceAll(/<[^>]*>/g, ' ')
-    .replaceAll(/&(?:nbsp|#160);/gi, ' ')
-    .replaceAll(/&amp;/gi, '&')
-    .replaceAll(/\s+/g, ' ')
-    .trim()
-  return stripped ? stripped.slice(0, 500) : undefined
-}
-
-const requireWikimediaUrl = (value: string): URL => {
+// Imports are fetched server-side, so the host allowlist is what stops the
+// agent being talked into fetching an arbitrary URL.
+const requireAllowedImageUrl = (value: string): URL => {
   const url = new URL(value)
-  if (url.protocol !== 'https:' || url.hostname !== WIKIMEDIA_HOST) {
-    throw new Error('Only Wikimedia-hosted image assets can be imported')
+  if (url.protocol !== 'https:' || !IMAGE_ASSET_HOSTS.has(url.hostname)) {
+    throw new Error('This image host is not allowed')
   }
   return url
 }
@@ -62,74 +53,41 @@ export class ManagedImageAssets {
   async search(query: string, signal?: AbortSignal): Promise<PublicImageSearchResult[]> {
     const normalized = query.trim().slice(0, 240)
     if (!normalized) return []
-    const url = new URL('https://commons.wikimedia.org/w/api.php')
+    // The same library the Photos panel shows. One source means the agent's
+    // picks and the user's picks are drawn from - and can inform - the same
+    // catalog, instead of the agent browsing somewhere the user never sees.
+    const apiKey = process.env.PEXELS_API_KEY?.trim()
+    if (!apiKey) return []
+    const url = new URL('https://api.pexels.com/v1/search')
     url.search = new URLSearchParams({
-      action: 'query',
-      format: 'json',
-      formatversion: '2',
-      generator: 'search',
-      gsrnamespace: '6',
-      gsrlimit: '20',
-      gsrsearch: `${normalized} filetype:bitmap`,
-      iiprop: 'url|mime|size|extmetadata',
-      iiurlwidth: '1600',
-      origin: '*',
-      prop: 'imageinfo',
+      per_page: '20',
+      query: normalized,
     }).toString()
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'MonaSlides/0.1 (open-source presentation editor)' },
-      signal,
-    })
+    const response = await fetch(url, { headers: { Authorization: apiKey }, signal })
     if (!response.ok) throw new Error(`Image search failed (${response.status})`)
     const payload = await response.json() as {
-      query?: {
-        pages?: Array<{
-          imageinfo?: Array<{
-            extmetadata?: Record<string, { value?: unknown }>
-            mime?: unknown
-            thumburl?: unknown
-            url?: unknown
-          }>
-          pageid?: unknown
-          title?: unknown
-        }>
-      }
+      photos?: Array<{
+        alt?: unknown
+        id?: unknown
+        photographer?: unknown
+        src?: { large2x?: unknown; medium?: unknown; original?: unknown }
+      }>
     }
     const results: PublicImageSearchResult[] = []
-    for (const page of payload.query?.pages ?? []) {
-      const info = page.imageinfo?.[0]
-      if (
-        !info
-        || typeof page.title !== 'string'
-        || typeof info.url !== 'string'
-        || typeof info.thumburl !== 'string'
-        || typeof info.mime !== 'string'
-        || !MIME_EXTENSION.has(info.mime)
-      ) continue
-      try {
-        requireWikimediaUrl(info.url)
-        requireWikimediaUrl(info.thumburl)
-      }
-      catch {
-        continue
-      }
-      const title = page.title.replace(/^File:/i, '').replace(/\.[^.]+$/, '').replaceAll('_', ' ').trim()
-      const artist = stripHtml(info.extmetadata?.Artist?.value)
-      const license = stripHtml(info.extmetadata?.LicenseShortName?.value)
-      const attribution = [artist, license].filter(Boolean).join(' · ') || undefined
-      const signed: SignedSearchResult = {
-        alt: title || normalized,
-        ...(attribution ? { attribution } : {}),
-        mime: info.mime,
-        // Import the API-generated presentation-resolution derivative rather
-        // than an arbitrarily huge camera original.
-        sourceUrl: info.thumburl,
-      }
+    for (const photo of payload.photos ?? []) {
+      const full = photo.src?.large2x ?? photo.src?.original
+      const thumbnail = photo.src?.medium ?? full
+      if (typeof full !== 'string' || typeof thumbnail !== 'string') continue
+      // The id is a signed {alt, mime, sourceUrl}: import re-derives the URL
+      // from it rather than trusting one supplied by the caller, so the agent
+      // cannot point the importer at an arbitrary address.
+      const alt = typeof photo.alt === 'string' && photo.alt.trim() ? photo.alt : normalized
+      const signed: SignedSearchResult = { alt, mime: 'image/jpeg', sourceUrl: full }
       results.push({
-        alt: signed.alt,
-        ...(attribution ? { attribution } : {}),
+        alt,
+        attribution: typeof photo.photographer === 'string' ? `${photo.photographer} / Pexels` : 'Pexels',
         id: encodeSignedValue(JSON.stringify(signed), this.#signingKey),
-        previewUrl: info.thumburl,
+        previewUrl: thumbnail,
       })
     }
     return results
@@ -150,7 +108,7 @@ export class ManagedImageAssets {
     ) {
       throw new Error('Managed image result is invalid')
     }
-    requireWikimediaUrl(signed.sourceUrl)
+    requireAllowedImageUrl(signed.sourceUrl)
     const response = await fetch(signed.sourceUrl, {
       headers: { 'User-Agent': 'MonaSlides/0.1 (open-source presentation editor)' },
       signal,
@@ -206,4 +164,91 @@ export class ManagedImageAssets {
     response.end(data)
     return true
   }
+}
+
+export interface BrowseQuery {
+  orientation?: string
+  page?: number
+  perPage?: number
+  query?: string
+}
+
+/**
+ * Panel-facing media search.
+ *
+ * Distinct from `ManagedImageAssets.search`, which the agent uses: that one
+ * returns signed ids because imports are fetched server-side. The panels insert
+ * a URL straight into the deck, so they get plain source URLs. Both hit the
+ * same Pexels library, so a picture the agent finds is one the user could have.
+ */
+export const browsePexelsImages = async (body: BrowseQuery, signal?: AbortSignal) => {
+  const apiKey = process.env.PEXELS_API_KEY?.trim()
+  if (!apiKey) return { data: [], total: 0 }
+  const params = new URLSearchParams({
+    page: String(Math.max(1, Number(body.page) || 1)),
+    per_page: String(Math.min(80, Math.max(1, Number(body.perPage) || 30))),
+    query: (body.query || 'nature').trim() || 'nature',
+  })
+  if (body.orientation && body.orientation !== 'all') params.set('orientation', body.orientation)
+  const response = await fetch(`https://api.pexels.com/v1/search?${params}`, {
+    headers: { Authorization: apiKey },
+    signal,
+  })
+  if (!response.ok) throw new Error(`Image search failed (${response.status})`)
+  const payload = await response.json() as {
+    photos?: Array<{ height: number; id: number; src?: { large?: string; medium?: string; original?: string }; width: number }>
+    total_results?: number
+  }
+  return {
+    data: (payload.photos ?? [])
+      .map(photo => ({
+        height: photo.height,
+        id: photo.id,
+        src: photo.src?.large || photo.src?.medium || photo.src?.original || '',
+        width: photo.width,
+      }))
+      .filter(photo => photo.src),
+    total: payload.total_results ?? 0,
+  }
+}
+
+/** Videos are linked, never imported, so a clip never lands in the document. */
+export const browsePexelsVideos = async (body: BrowseQuery, signal?: AbortSignal) => {
+  const apiKey = process.env.PEXELS_API_KEY?.trim()
+  if (!apiKey) return { videos: [] }
+  const params = new URLSearchParams({
+    per_page: String(Math.min(80, Math.max(1, Number(body.perPage) || 24))),
+    query: (body.query || 'abstract').trim() || 'abstract',
+  })
+  const response = await fetch(`https://api.pexels.com/videos/search?${params}`, {
+    headers: { Authorization: apiKey },
+    signal,
+  })
+  if (!response.ok) throw new Error(`Video search failed (${response.status})`)
+  const payload = await response.json() as {
+    videos?: Array<{
+      duration?: number
+      id?: number
+      image?: string
+      user?: { name?: string }
+      video_files?: Array<{ height?: number; link?: string; quality?: string; width?: number }>
+    }>
+  }
+  const videos = (payload.videos ?? []).flatMap(video => {
+    // Prefer HD at or below 1080p: the 4K original is a punishing link at slide size.
+    const files = (video.video_files ?? []).filter(file => typeof file.link === 'string')
+    const chosen = files.find(file => file.quality === 'hd' && (file.height ?? 0) <= 1080) ?? files[0]
+    if (!chosen?.link) return []
+    return [{
+      alt: video.user?.name ? `Video by ${video.user.name}` : 'Pexels video',
+      attribution: video.user?.name ? `${video.user.name} / Pexels` : 'Pexels',
+      duration: video.duration ?? 0,
+      height: chosen.height ?? 0,
+      id: String(video.id ?? chosen.link),
+      poster: video.image ?? '',
+      src: chosen.link,
+      width: chosen.width ?? 0,
+    }]
+  })
+  return { videos }
 }

@@ -1,11 +1,10 @@
 import { useSyncExternalStore } from 'react'
 
-import { referenceAgentEnabled } from '@/features/editor/agent/agent-runtime-mode'
 import type { AgentProviderConfiguration, AgentProviderId } from '@/features/editor/agent/agent-types'
 
 const DEFAULT_CONFIGURATION: AgentProviderConfiguration = {
-  providerId: referenceAgentEnabled ? 'reference' : 'mona-managed',
-  model: referenceAgentEnabled ? 'reference' : 'mona-default',
+  providerId: 'openai-chatgpt',
+  model: 'gpt-5.6-sol',
 }
 
 let configuration = DEFAULT_CONFIGURATION

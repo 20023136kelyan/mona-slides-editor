@@ -1,14 +1,17 @@
-import type { PresentationCommand, PresentationState, PresentationTransactionResult } from '@mona/presentation-core'
+
+import type { PresentationCommand } from '@mona/presentation-core'
 import type { PPTElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import type { SerializedDrawingScene } from '@/features/editor/drawing/drawing-store'
 
-export type AgentProviderId =
-  | 'anthropic-claude'
-  | 'google-ai-studio'
-  | 'mona-managed'
-  | 'openai-chatgpt'
-  | 'reference'
+/** Every provider the dock can offer. The type is derived so the two cannot drift. */
+export const AGENT_PROVIDER_IDS = [
+  'anthropic-claude',
+  'google-ai-studio',
+  'openai-chatgpt',
+] as const
+
+export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number]
 
 export interface AgentSelectionContext {
   elementIds: string[]
@@ -55,37 +58,6 @@ export interface AgentProviderConfiguration {
   providerId: AgentProviderId
 }
 
-export interface AgentPlanRequest {
-  context: AgentDocumentContext
-  instruction: string
-  signal?: AbortSignal
-}
-
-export interface AgentGeneratedPlan {
-  code: string
-  explanation: string
-  providerId: AgentProviderId
-  providerLabel: string
-}
-
-export type AgentPlanReview =
-  | { status: 'accept'; explanation?: string }
-  | { status: 'revise'; code: string; explanation: string }
-
-export interface AgentProvider {
-  generatePlan: (request: AgentPlanRequest) => Promise<AgentGeneratedPlan>
-  id: AgentProviderId
-  label: string
-  reviewPlan?: (request: {
-    afterPreview?: Blob
-    context: AgentDocumentContext
-    instruction: string
-    plan: AgentGeneratedPlan
-    signal?: AbortSignal
-    summary: AgentOperationSummary
-  }) => Promise<AgentPlanReview>
-}
-
 export interface AgentAssetSearchResult {
   alt: string
   attribution?: string
@@ -123,22 +95,3 @@ export interface AgentOperationSummary {
   description: string
   updatedElements: number
 }
-
-export interface AgentCandidate {
-  afterPreview?: Blob
-  baseRevision: string
-  beforePreview?: Blob
-  code: string
-  createdAt: number
-  explanation: string
-  id: string
-  logs: AgentSandboxLog[]
-  preview: PresentationTransactionResult
-  providerId: AgentProviderId
-  providerLabel: string
-  summary: AgentOperationSummary
-}
-
-export type AgentCandidateApplyResult =
-  | { ok: true; state: PresentationState }
-  | { ok: false; reason: 'invalid' | 'stale'; message: string }

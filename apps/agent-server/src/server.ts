@@ -2,6 +2,9 @@ import { ModelsError } from '@earendil-works/pi-ai'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { pathToFileURL } from 'node:url'
 
+import { readLocalClaudeLogin } from './agent-sdk-auth.js'
+import { readAnthropicModels } from './agent-sdk-models.js'
+import { attachAgentSocket } from './agent-socket.js'
 import { ManagedImageAssets } from './assets.js'
 import { loadAgentServerConfig, type AgentServerConfig } from './config.js'
 import {
@@ -9,11 +12,14 @@ import {
   type CredentialVault,
 } from './credential-vault.js'
 import {
+  MONA_AGENT_MODELS,
+} from '@mona/agent-protocol'
+import { browsePexelsImages, browsePexelsVideos, type BrowseQuery } from './assets.js'
+import { searchWeb, webSearchEnabled } from './web-search.js'
+import {
   createSessionModels,
-  generateProviderPlan,
   getProviderConfiguration,
   isExternalProviderId,
-  reviewProviderPlan,
   type ExternalProviderId,
 } from './models.js'
 import { OAuthFlowBusyError, OAuthFlowManager } from './oauth-flows.js'
@@ -37,6 +43,7 @@ const setApiHeaders = (response: ServerResponse) => {
   response.setHeader('Referrer-Policy', 'no-referrer')
   response.setHeader('X-Content-Type-Options', 'nosniff')
 }
+
 
 const sendJson = (response: ServerResponse, status: number, value: unknown) => {
   if (response.writableEnded) return
@@ -111,12 +118,33 @@ const providerStatus = async (
   sessionId: string,
   providerId: ExternalProviderId,
 ) => {
+  // Anthropic runs on the Agent SDK, which authenticates from the machine's own
+  // Claude login rather than anything we store. So its status is not a vault
+  // lookup, and the plan it reports is the real one instead of a hardcoded label.
+  if (providerId === 'anthropic-claude') {
+    const login = await readLocalClaudeLogin()
+    return {
+      connected: login.connected,
+      ...(login.connected
+        ? {
+            accountLabel: login.email ?? 'Claude account connected',
+            ...(login.plan ? { planLabel: login.plan } : {}),
+          }
+        : {}),
+    }
+  }
+
   const models = createSessionModels(vault, sessionId)
   const configuration = getProviderConfiguration(providerId)
   const credential = await vault.read(sessionId, configuration.piProviderId)
   const status = await models.checkAuth(configuration.piProviderId)
   return {
-    connected: credential?.type === 'oauth' && status?.type === 'oauth',
+    // Google AI Studio authenticates with a key the user supplies; the OAuth
+    // providers with a token. Both are credentials in the same vault, so
+    // "connected" means "the vault holds something this provider can use".
+    connected: credential?.type === 'api_key'
+      ? true
+      : credential?.type === 'oauth' && status?.type === 'oauth',
     ...(credential?.type === 'oauth'
       ? {
           accountLabel: providerId === 'openai-chatgpt'
@@ -139,8 +167,11 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
   const modelsForSession = (sessionId: string) => createSessionModels(vault, sessionId)
   const flows = new OAuthFlowManager(modelsForSession)
   const assets = new ManagedImageAssets(config.assetDirectory, config.sessionSigningKey)
+  // Absent on the desktop, where the Claude Code subprocess inherits the login
+  // the user already made rather than being handed a token.
+  const setupToken = process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || undefined
 
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
     setApiHeaders(response)
     try {
       assertOrigin(request, response, config)
@@ -256,18 +287,76 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
         request.method === 'POST'
         && segments[2] === 'providers'
         && isProviderPath(segments, 3)
-        && (segments[4] === 'plan' || segments[4] === 'review')
+        && segments[4] === 'key'
         && segments.length === 5
       ) {
+        // Bring-your-own-key providers store the key in the same encrypted
+        // vault as OAuth tokens, so it never rides with each request and never
+        // sits in the browser.
         const providerId = segments[3] as ExternalProviderId
-        const status = await providerStatus(vault, sessionId, providerId)
-        if (!status.connected) throw new HttpError(401, 'Connect this provider before using it')
-        const body = await readJson(request)
-        const models = modelsForSession(sessionId)
-        const result = segments[4] === 'plan'
-          ? await generateProviderPlan(models, providerId, body, requestAbortSignal(request))
-          : await reviewProviderPlan(models, providerId, body, requestAbortSignal(request))
-        sendJson(response, 200, result)
+        const body = await readJson(request) as { apiKey?: unknown }
+        const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
+        if (!apiKey) throw new HttpError(400, 'Provide an API key')
+        const configuration = getProviderConfiguration(providerId)
+        await vault.modify(sessionId, configuration.piProviderId, async () => ({ type: 'api_key' as const, key: apiKey }))
+        sendJson(response, 200, await providerStatus(vault, sessionId, providerId))
+        return
+      }
+
+
+      // The browser only needs to know which models it may offer; every
+      // credential and endpoint decision stays here.
+      if (request.method === 'GET' && segments[2] === 'models' && segments.length === 3) {
+        // Anthropic's list comes from the signed-in plan rather than from us, and
+        // carries which reasoning depths each model accepts. The other providers
+        // expose no such catalog, so their entries stay declared here.
+        const anthropic = (await readAnthropicModels(setupToken)).map(model => ({
+          effortLevels: model.effortLevels,
+          id: model.id,
+          name: model.name,
+          providerId: 'anthropic-claude' as const,
+        }))
+        const declared = MONA_AGENT_MODELS.filter(model => (
+          isExternalProviderId(model.providerId) && model.providerId !== 'anthropic-claude'
+        ))
+        sendJson(response, 200, {
+          // Fall back to the declared Anthropic entries only if the plan could
+          // not be reached, so the picker is never empty.
+          models: anthropic.length
+            ? [...declared, ...anthropic]
+            : MONA_AGENT_MODELS.filter(model => isExternalProviderId(model.providerId)),
+        })
+        return
+      }
+
+
+      // Panel-facing media browse. Lives here rather than in the web app's dev
+      // plugin so the Photos and Videos panels work in production too.
+      if (
+        request.method === 'POST'
+        && segments[2] === 'assets'
+        && (segments[3] === 'images' || segments[3] === 'videos')
+        && segments[4] === 'browse'
+        && segments.length === 5
+      ) {
+        const body = await readJson(request) as BrowseQuery
+        const signal = requestAbortSignal(request)
+        sendJson(response, 200, segments[3] === 'videos'
+          ? await browsePexelsVideos(body, signal)
+          : await browsePexelsImages(body, signal))
+        return
+      }
+
+      if (
+        request.method === 'POST'
+        && segments[2] === 'web'
+        && segments[3] === 'search'
+        && segments.length === 4
+      ) {
+        if (!webSearchEnabled()) throw new HttpError(503, 'Web search is not configured on this deployment')
+        const body = await readJson(request) as { query?: unknown }
+        const query = typeof body.query === 'string' ? body.query : ''
+        sendJson(response, 200, { results: await searchWeb(query, requestAbortSignal(request)) })
         return
       }
 
@@ -306,12 +395,6 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
         return
       }
 
-      if (
-        request.method === 'POST'
-        && ((segments[2] === 'plan' && segments.length === 3) || (segments[2] === 'review' && segments.length === 3))
-      ) {
-        throw new HttpError(503, 'Mona managed AI is not configured on this deployment')
-      }
 
       throw new HttpError(404, 'Route not found')
     }
@@ -335,6 +418,17 @@ export const createAgentServer = ({ config, vault: providedVault }: AgentServerD
       sendJson(response, status, { message })
     }
   })
+
+  // The agent conversation runs over a socket on the same origin, so it shares
+  // the signed session cookie the routes above establish.
+  attachAgentSocket({
+    allowedOrigins: config.allowedOrigins,
+    server,
+    sessions,
+    setupToken,
+  })
+
+  return server
 }
 
 const main = async () => {

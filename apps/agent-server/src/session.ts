@@ -27,10 +27,22 @@ export class SessionManager {
     this.#development = development
   }
 
-  getOrCreate(request: IncomingMessage, response: ServerResponse): string {
+  /**
+   * The session this request already carries, if any.
+   *
+   * Read-only because a WebSocket upgrade has no response to set a cookie on:
+   * an upgrade arriving without a valid session is refused rather than handed a
+   * fresh one, since a brand-new session could hold no credential anyway.
+   */
+  read(request: IncomingMessage): string | undefined {
     const existing = parseCookies(request.headers.cookie).get(COOKIE_NAME)
     const verified = existing ? decodeSignedValue(existing, this.#signingKey) : undefined
-    if (verified && /^[a-f\d]{64}$/.test(verified)) return verified
+    return verified && /^[a-f\d]{64}$/.test(verified) ? verified : undefined
+  }
+
+  getOrCreate(request: IncomingMessage, response: ServerResponse): string {
+    const verified = this.read(request)
+    if (verified) return verified
     const sessionId = randomBytes(32).toString('hex')
     const secure = !this.#development ? '; Secure' : ''
     response.setHeader(
