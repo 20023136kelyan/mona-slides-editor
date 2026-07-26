@@ -74,10 +74,18 @@ type RailItem = {
 }
 
 // The rail drops to icons two ways: automatically below the `snug` breakpoint,
-// and manually via the header toggle. Both have to hide exactly the same parts,
-// so each pairing lives here instead of being spelled out at every element —
-// missing one twin is what leaves a stray label in a 52px rail.
-const railIconRow = 'mona-rail-shift transition-[padding] duration-200 ease-out max-snug:justify-center max-snug:px-0 group-data-[collapsed=true]/rail:justify-center group-data-[collapsed=true]/rail:px-0'
+// and manually via the header toggle. Both have to treat exactly the same parts
+// the same way, so each pairing lives here instead of being spelled out at every
+// element — missing one twin is what leaves a stray label in a 52px rail.
+
+/**
+ * The row a rail item sits in, and where its icon sits inside that row.
+ *
+ * The icon is placed by a padding that interpolates rather than by an
+ * alignment that switches; --mona-rail-icon-inset in editor.css carries the
+ * distance and the reasoning.
+ */
+const railIconRow = 'mona-rail-shift transition-[padding] duration-200 ease-out max-snug:ps-(--mona-rail-icon-inset) max-snug:pe-0 group-data-[collapsed=true]/rail:ps-(--mona-rail-icon-inset) group-data-[collapsed=true]/rail:pe-0'
 const railIconRowInner = 'max-snug:flex-none group-data-[collapsed=true]/rail:flex-none'
 
 /**
@@ -98,6 +106,16 @@ const railIconRowInner = 'max-snug:flex-none group-data-[collapsed=true]/rail:fl
  */
 const railIconLabel = 'mona-rail-shift ms-3 max-w-56 transition-[max-width,margin,opacity] duration-200 ease-out max-snug:ms-0 max-snug:max-w-0 max-snug:opacity-0 group-data-[collapsed=true]/rail:ms-0 group-data-[collapsed=true]/rail:max-w-0 group-data-[collapsed=true]/rail:opacity-0'
 
+/**
+ * How big a rail glyph is. --mona-rail-icon-inset subtracts this same size to
+ * find the icon's centre line, so the two have to agree.
+ *
+ * Larger only while collapsed on macOS, where the rail is as wide as the
+ * traffic lights need and a 16px glyph looks lost in it.
+ */
+const railIconSize = (macChrome: boolean) => (
+  macChrome ? 'size-4 group-data-[collapsed=true]/rail:size-5 max-snug:size-5' : 'size-4'
+)
 /** The same fold for a fixed-size glyph, which has a width to collapse instead. */
 const railIconHidden = 'mona-rail-shift transition-[width,opacity,transform] duration-200 ease-out max-snug:w-0 max-snug:opacity-0 group-data-[collapsed=true]/rail:w-0 group-data-[collapsed=true]/rail:opacity-0'
 
@@ -106,6 +124,7 @@ const railIconHidden = 'mona-rail-shift transition-[width,opacity,transform] dur
 // from the creation items above rather than joining that menu.
 function RailSettingsMenu() {
   const { i18n, t } = useTranslation()
+  const macChrome = isMacChrome()
   const [open, setOpen] = useState(false)
   const resolvedLanguage = i18n.resolvedLanguage ?? ''
   const activeLocale: SupportedLocale = isSupportedLocale(resolvedLanguage) ? resolvedLanguage : 'en-US'
@@ -120,7 +139,7 @@ function RailSettingsMenu() {
           title={t('header.settings')}
         >
           <div className={cn('flex min-w-0 flex-1 items-center', railIconRowInner)}>
-            <CATEGORY_ICONS.settings className="h-4 w-4 shrink-0" />
+            <CATEGORY_ICONS.settings className={cn('mona-rail-shift shrink-0 transition-[width,height] duration-200 ease-out', railIconSize(macChrome))} />
             <span className={cn('truncate', railIconLabel)}>{t('header.settings')}</span>
           </div>
         </SidebarMenuButton>
@@ -267,7 +286,7 @@ export function EditorRail({
           <div className={cn('flex min-w-0 flex-1 items-center', railIconRowInner)}>
             {/* Larger while collapsed on macOS: the rail is 88px there to clear
                 the traffic lights, and a 16px glyph looks lost in it. */}
-            <Icon className={cn('mona-rail-shift shrink-0 transition-[width,height] duration-200 ease-out', macChrome ? 'size-4 group-data-[collapsed=true]/rail:size-5 max-snug:size-5' : 'size-4')} />
+            <Icon className={cn('mona-rail-shift shrink-0 transition-[width,height] duration-200 ease-out', railIconSize(macChrome))} />
             <span className={cn('truncate', railIconLabel)}>{item.label}</span>
           </div>
           {item.hasPanel ? (
@@ -291,7 +310,7 @@ export function EditorRail({
         'mona-editor-rail group/rail w-56 shrink-0 border-r border-sidebar-border transition-[width] duration-200 max-snug:w-[3.25rem] data-[collapsed=true]:w-[3.25rem]',
         // Wide enough to centre the traffic lights in what it occupies; the
         // measurement and the arithmetic are in editor.css, beside the values.
-        macChrome && 'max-snug:w-(--mona-rail-collapsed-mac) data-[collapsed=true]:w-(--mona-rail-collapsed-mac)',
+        macChrome && 'mona-editor-rail-mac max-snug:w-(--mona-rail-collapsed-mac) data-[collapsed=true]:w-(--mona-rail-collapsed-mac)',
       )}
       collapsible="none"
       data-collapsed={collapsed}

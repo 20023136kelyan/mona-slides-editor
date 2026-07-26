@@ -2277,6 +2277,26 @@
   --mona-rail-collapsed-mac: calc(var(--mona-traffic-clear) + 1px);
 }
 
+/* Where a collapsed rail's icon sits, as a distance rather than an alignment.
+   `justify-center` is the obvious way to centre it and the wrong one: it takes
+   effect on the first frame, while the rail is still at full width, so the icon
+   leaps to the middle of a 224px rail and then walks back in as the rail closes.
+   A padding interpolates instead, and it has to interpolate between two fixed
+   lengths — a percentage of the row would be a percentage of something that is
+   itself shrinking, which overshoots by 8px and settles back.
+
+   That fixed length is the price: it has to know the gutter the rail's groups
+   put around their rows. --mona-rail-gutter is that gutter, and it has to stay
+   equal to the `p-2` on SidebarGroup. The check is visible rather than subtle —
+   the icons stop sharing a centre line with the traffic lights above them. */
+.mona-editor-rail {
+  --mona-rail-gutter: 0.5rem;
+  --mona-rail-icon-inset: calc((3.25rem - var(--mona-rail-gutter) * 2 - 1rem) / 2);
+}
+.mona-editor-rail-mac {
+  --mona-rail-icon-inset: calc((var(--mona-rail-collapsed-mac) - var(--mona-rail-gutter) * 2 - 1.25rem) / 2);
+}
+
 /* Collapsing the rail moves six things at once: the rail narrows, its labels
    fold away, its icons grow, its brand fades, its toggle hands over to a keycap
    in the header, and the title recentres in what is left. Done instantly they
