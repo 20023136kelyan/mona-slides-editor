@@ -1,0 +1,56 @@
+# Packaging for the desktop application.
+#
+# Two things here are load-bearing and easy to get wrong.
+#
+# `asarUnpack` keeps the Agent SDK's platform binary as a real file. An asar is
+# a single archive, and a subprocess cannot be exec'd out of one, so the package
+# named here has to stay the same one `claude-binary.ts` looks for.
+#
+# `extraResources` puts the built renderer at `resources/renderer`, which is
+# where `main.ts` serves `mona://app` from once packaged. In development it
+# reads `apps/web/dist` directly instead.
+# electron-builder downloads the platform binaries for one exact release, so it
+# refuses a range. Kept in step with the `electron` devDependency by hand; a
+# mismatch is caught the moment a build runs.
+electronVersion: '43.2.0'
+
+appId: ai.crossand.mona
+productName: Mona
+copyright: Mona contributors
+
+directories:
+  buildResources: build
+  output: ../../.artifacts/desktop
+
+# The bundle is self-contained: esbuild has already inlined every @mona/*
+# workspace package into `dist/main.mjs`, so only real npm dependencies remain
+# to be shipped.
+files:
+  - dist/**/*
+  - package.json
+  - '!**/*.map'
+
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+
+extraResources:
+  - from: ../web/dist
+    to: renderer
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+    - zip
+  # Unsigned on purpose. Signing and notarization need an Apple Developer
+  # identity and are deliberately outside this migration; a build produced here
+  # is for running locally, and macOS will say so on first launch.
+  identity: null
+
+win:
+  target: nsis
+
+linux:
+  category: Office
+  target:
+    - AppImage

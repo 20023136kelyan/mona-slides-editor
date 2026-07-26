@@ -6,6 +6,7 @@ import { AgentSdkSession } from '@mona/agent-server/agent-sdk-session'
 import { AgentStreamTranslator } from '@mona/agent-server/agent-sdk-stream'
 import { AgentToolBridge } from '@mona/agent-server/agent-tool-bridge'
 import { browsePexelsImages, browsePexelsVideos } from '@mona/agent-server/assets'
+import { resolveClaudeExecutable } from './claude-binary.js'
 
 /**
  * The agent, wired straight to the window.
@@ -82,11 +83,15 @@ class WindowAgent {
   }
 
   #start(message: PromptMessage): AgentSdkSession {
+    const claudeExecutable = resolveClaudeExecutable()
     const session = new AgentSdkSession({
       bridge: this.#bridge,
       // Validated against the SDK's own levels rather than trusted from the
       // renderer, so a bad value is dropped instead of failing the turn.
       ...(isEffortLevel(message.effort) ? { effort: message.effort } : {}),
+      // Resolved per turn rather than cached: a build that unpacks the binary
+      // somewhere else should be picked up without a restart.
+      ...(claudeExecutable ? { executablePath: claudeExecutable } : {}),
       modelId: typeof message.model === 'string' && message.model ? message.model : 'default',
     })
     this.#turn = this.#stream(session)

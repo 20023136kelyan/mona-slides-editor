@@ -55,6 +55,21 @@ a packaged build serves the same renderer from `mona://app` instead. There is
 no page to open in a browser — the editor needs the shell's bridge, and a plain
 browser tab has none.
 
+## Packaging
+
+```sh
+npm run package -w @mona/desktop
+```
+
+Builds the renderer, bundles the shell, and writes an installer to
+`.artifacts/desktop/`. The result is unsigned: signing and notarization need an
+Apple Developer identity, so macOS will warn on first launch.
+
+The application is large — around 600 MB — and most of that is the `claude`
+binary the Agent SDK ships as a platform-specific dependency. It is unpacked
+beside the archive rather than inside it, because a subprocess cannot be run out
+of an asar.
+
 ## Verification
 
 ```sh

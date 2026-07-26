@@ -136,6 +136,12 @@ export interface AgentSdkSessionOptions {
    * `high`; a model that reports no supported levels must not be sent one.
    */
   effort?: EffortLevel
+  /**
+   * The `claude` binary to run, when the caller knows better than the SDK's own
+   * search. It does once the application is packaged: the SDK resolves from its
+   * own location, which stops being a real directory inside an archive.
+   */
+  executablePath?: string
   modelId: string
 }
 
@@ -149,14 +155,16 @@ export interface AgentSdkSessionOptions {
 export class AgentSdkSession {
   readonly #bridge: AgentToolBridge
   readonly #effort?: EffortLevel
+  readonly #executablePath?: string
   readonly #modelId: string
   readonly #queue = new PromptQueue()
   #query?: Query
   #workspace?: AgentWorkspace
 
-  constructor({ bridge, effort, modelId }: AgentSdkSessionOptions) {
+  constructor({ bridge, effort, executablePath, modelId }: AgentSdkSessionOptions) {
     this.#bridge = bridge
     this.#effort = effort
+    this.#executablePath = executablePath
     this.#modelId = modelId
   }
 
@@ -179,6 +187,8 @@ export class AgentSdkSession {
         // `summarized` is as much as the SDK offers; there is no raw mode.
         extraArgs: { 'thinking-display': 'summarized' },
         includePartialMessages: true,
+        // Only when the caller resolved one; omitted, the SDK searches itself.
+        ...(this.#executablePath ? { pathToClaudeCodeExecutable: this.#executablePath } : {}),
         maxTurns: MAX_TURNS,
         mcpServers: {
           mona: createSdkMcpServer({
