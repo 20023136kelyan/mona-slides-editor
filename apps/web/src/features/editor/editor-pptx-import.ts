@@ -23,6 +23,7 @@ import {
   type PowerPointPackageManifest,
   type PowerPointPackageReference,
 } from '@mona/presentation-core'
+import { writeMediaBlob } from '@/lib/deck-storage'
 import type {
   ChartOptions,
   ChartType,
@@ -365,9 +366,83 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
   return line
 }
 
+/**
+ * Imported binary becomes an object URL, never inline base64.
+ *
+ * The deck model's convention for binary is a short `blob:` URL with the bytes in
+ * the media store: `collectBlobUrls` finds them anywhere in the tree by shape
+ * rather than by field name, saving captures them, loading re-mints them, and
+ * unreferenced ones are collected. Three import paths bypassed all of it and
+ * inlined the base64 instead, which is why a 23-slide deck persisted as 193 MB of
+ * string - 57 shape fills alone accounted for 191.5 MB.
+ *
+ * Anything that is not a base64 data URL is passed through untouched, so a remote
+ * or already-minted URL survives.
+ */
+/**
+ * Blobs minted by this module, keyed by the URL that now refers to them.
+ *
+ * Minting has to stay synchronous - it happens deep inside a pure conversion from
+ * parsed slides to model elements - but the bytes must reach the media store
+ * without waiting for a save. Between import and the first save, an object URL is
+ * the *only* handle on those bytes, and the save path recovers them by fetching
+ * that URL: if it ever fails to resolve, the bytes are gone and the deck keeps a
+ * reference to nothing. Holding the blob here lets `persistImportedAssets` write
+ * it while we still have it.
+ */
+const mintedAssets = new Map<string, Blob>()
+
+export const importedAssetUrl = (source: string): string => {
+  const match = /^data:([^;,]*);base64,(.*)$/s.exec(source)
+  if (!match) return source
+  const [, mime, payload] = match
+  try {
+    const binary = atob(payload ?? '')
+    const bytes = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+    const blob = new Blob([bytes], { type: mime || 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    mintedAssets.set(url, blob)
+    return url
+  }
+  catch {
+    // A payload we cannot decode is better left as it was than dropped.
+    return source
+  }
+}
+
+/**
+ * Writes every asset minted since the last call into the media store.
+ *
+ * Called once the conversion is done and before the deck is committed, so no
+ * asset is ever referenced by a stored deck without its bytes already being
+ * stored too. The save path then skips it - it short-circuits on an existing
+ * media record - so the object URL never has to survive to be re-fetched.
+ *
+ * Returns the URLs it could not write. The caller decides what to say about
+ * them; what it must not do is treat the import as complete, because those
+ * images will be broken the moment the page reloads.
+ */
+export const persistImportedAssets = async (): Promise<string[]> => {
+  const pending = [...mintedAssets]
+  // Cleared up front: a failure here is reported, not retried forever, and
+  // holding a deck's worth of blobs alive after the fact is its own problem.
+  mintedAssets.clear()
+  const failed: string[] = []
+  for (const [url, blob] of pending) {
+    try {
+      await writeMediaBlob(url, blob)
+    }
+    catch {
+      failed.push(url)
+    }
+  }
+  return failed
+}
+
 const slideBackground = (fill: PptxFill): SlideBackground => {
   const { type, value } = fill
-  if (type === 'image') return { image: { size: 'stretch', src: value.base64 }, type: 'image' }
+  if (type === 'image') return { image: { size: 'stretch', src: importedAssetUrl(value.base64) }, type: 'image' }
   if (type === 'gradient') return { gradient: { colors: value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: value.rot, type: value.path === 'line' ? 'linear' : 'radial' }, type: 'gradient' }
   if (type === 'pattern') {
     return {
@@ -642,7 +717,7 @@ export const convertParsedPptxPresentation = ({
         else if (element.type === 'image') {
           const image: PPTImageElement = {
             fixedRatio: true, flipH: element.isFlipH, flipV: element.isFlipV, height: element.height, id: createPresentationId(10), left: element.left,
-            opacity: element.opacity, rotate: element.rotate, src: element.base64, top: element.top, type: 'image', width: element.width,
+            opacity: element.opacity, rotate: element.rotate, src: importedAssetUrl(element.base64), top: element.top, type: 'image', width: element.width,
           }
           if (element.borderWidth) image.outline = { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) }
           const clipShapes = ['rect', 'snip1Rect', 'snip2DiagRect', 'roundRect', 'ellipse', 'triangle', 'rtTriangle', 'diamond', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'chevron', 'homePlate', 'rightArrow', 'parallelogram', 'trapezoid']
@@ -748,7 +823,7 @@ export const convertParsedPptxPresentation = ({
               left: element.left,
               outline: { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) },
               path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
-              pattern: element.fill?.type === 'image' ? element.fill.value.base64 : undefined,
+              pattern: element.fill?.type === 'image' ? importedAssetUrl(element.fill.value.base64) : undefined,
               // Canva and other web editors paint pictures as shape fills
               // rather than picture elements, so the fill mode decides whether
               // the artwork is stretched to the shape or cropped by it.

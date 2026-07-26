@@ -216,11 +216,23 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
       updateSnapshot({ dirty: true, error: null, status: 'saving' })
       try {
         const referenced = collectBlobUrls(presentation)
+        // Assets whose bytes we could not get into the store. The deck below is
+        // still written - losing a text edit because one image misbehaved would be
+        // worse - but the save must not then report itself as complete.
+        const unstored: string[] = []
         for (const url of referenced) {
           const existing = await readMediaBlob(url).catch(() => undefined)
           if (existing instanceof Blob) continue
+          // Only reachable for assets minted outside the import path; the importer
+          // stores its own bytes up front, precisely so this fetch is never the
+          // only way back to them.
           const blob = await fetch(url).then(response => response.blob()).catch(() => undefined)
-          if (blob) await writeMediaBlob(url, blob).catch(() => {})
+          if (!blob) {
+            unstored.push(url)
+            continue
+          }
+          const written = await writeMediaBlob(url, blob).then(() => true).catch(() => false)
+          if (!written) unstored.push(url)
         }
         const keys = await listMediaKeys().catch(() => [] as IDBValidKey[])
         await Promise.all(keys
@@ -234,7 +246,21 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
         const payload: StoredDeck = { presentation, savedAt, version: STORAGE_VERSION }
         await writeDeckSlot(payload)
         lastSaved = presentation
-        if (runtime.store.getState().presentation === presentation) {
+        if (unstored.length) {
+          // The deck is on disk but incomplete: these references will resolve to
+          // nothing after a reload, and the images they belong to will be blank.
+          // Reported rather than retried - the bytes are already unreachable, so
+          // another attempt fetches the same dead URL - and `dirty` stays false so
+          // this does not spin on every subsequent edit.
+          updateSnapshot({
+            dirty: false,
+            error: `Saved without ${unstored.length} image${unstored.length === 1 ? '' : 's'}. They will be missing when this deck is reopened.`,
+            pendingSince: null,
+            savedAt,
+            status: 'error',
+          })
+        }
+        else if (runtime.store.getState().presentation === presentation) {
           updateSnapshot({
             dirty: false,
             error: null,

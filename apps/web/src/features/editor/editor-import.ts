@@ -121,7 +121,7 @@ const importPptx = async (
   onProgress: (stage: PowerPointImportStage) => void,
   notify: EditorNotificationService['notify'],
 ) => {
-  const [{ convertParsedPptxPresentation }, { parsePowerPointPackage }] = await Promise.all([
+  const [{ convertParsedPptxPresentation, persistImportedAssets }, { parsePowerPointPackage }] = await Promise.all([
     import('@/features/editor/editor-pptx-import'),
     import('@/features/editor/editor-pptx-worker-client'),
   ])
@@ -156,6 +156,17 @@ const importPptx = async (
     sourcePackage: backing.reference,
     theme: importedTheme,
   })
+  // Before anything can reference them: the conversion mints an object URL per
+  // asset, and until the bytes are in the media store that URL is the only handle
+  // on them. A deck saved in that window keeps references it can never resolve
+  // again - which is exactly how images come back broken after a reload.
+  const unstored = await persistImportedAssets()
+  if (unstored.length) {
+    notify({
+      text: t('runtime.importAssetsUnstored', { count: unstored.length }),
+      type: 'warning',
+    })
+  }
   const slides = sanitizeSlides(conversion.slides)
   const sourceReference = {
     ...sanitizePowerPointPackageReference(conversion.sourcePackage ?? backing.reference),
