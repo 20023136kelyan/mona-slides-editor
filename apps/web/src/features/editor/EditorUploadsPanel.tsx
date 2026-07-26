@@ -4,19 +4,18 @@ import { useTranslation } from 'react-i18next'
 import {
   FileAudio,
   FileVideo,
-  Folder,
-  Image,
   Mic,
   Monitor,
-  Search,
   Upload,
-  UserRound,
   Video,
+  UserRound,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { CATEGORY_ICONS } from '@/features/editor/icons/category-icons'
+import { useEditorPanelSearch } from '@/features/editor/panel/editor-panel-search'
 import {
   PanelBackHeader,
   PanelBody,
@@ -24,7 +23,7 @@ import {
   PanelEmptyState,
   PanelHeader,
   PanelMasonry,
-  PanelSearchField,
+  PanelNoResults,
 } from '@/features/editor/panel/EditorPanelPrimitives'
 import {
   addMediaLibraryFile,
@@ -71,10 +70,13 @@ function MediaThumb({ item }: { item: MediaLibraryItem }) {
 }
 
 export function EditorUploadsPanel({
+  initialTab = 'images',
   onInsertAudio,
   onInsertImageSource,
   onInsertVideo,
 }: {
+  /** Videos and Audio are their own rail entries, each opening on its tab. */
+  initialTab?: UploadsTab
   onInsertAudio: (payload: { ext?: string; src: string }) => void
   onInsertImageSource: (src: string) => void
   onInsertVideo: (payload: { ext?: string; src: string }) => void
@@ -83,8 +85,15 @@ export function EditorUploadsPanel({
   const { notifications } = useEditorApplication()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<UploadsView>('main')
-  const [tab, setTab] = useState<UploadsTab>('images')
-  const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<UploadsTab>(initialTab)
+  // Uploads, Videos and Audio are separate rail entries sharing this panel.
+  // Follow the entry the user picked without remounting: a remount would drop
+  // the record view and the in-flight media subscription.
+  useEffect(() => {
+    setTab(initialTab)
+  }, [initialTab])
+  const search = useEditorPanelSearch()
+  const query = search.query
   const [recordNotice, setRecordNotice] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -134,20 +143,14 @@ export function EditorUploadsPanel({
     }
   }
 
-  const EmptyIcon = tab === 'folders'
-    ? Folder
-    : query.trim()
-      ? Search
-      : tab === 'videos'
-        ? FileVideo
-        : tab === 'audio'
-          ? FileAudio
-          : Image
-  const emptyMessage = tab === 'folders'
-    ? t('foundation.editor.uploads.foldersComingSoon')
-    : query.trim()
-      ? t('foundation.editor.uploads.noSearchResults')
-      : t('foundation.editor.uploads.emptyLibrary')
+  // The empty space takes the icon of whatever kind of thing is missing, so an
+  // empty Audio tab does not show a picture frame. A search that found nothing
+  // is a different statement and gets PanelNoResults instead.
+  const EmptyIcon = tab === 'videos'
+    ? CATEGORY_ICONS.videos
+    : tab === 'audio'
+      ? CATEGORY_ICONS.audio
+      : CATEGORY_ICONS.photos
 
   if (view === 'record') {
     const options = [
@@ -166,7 +169,7 @@ export function EditorUploadsPanel({
           }}
           title={t('foundation.editor.uploads.recordYourself')}
         />
-        <PanelBody className="overflow-y-auto">
+        <PanelBody>
           <div className="flex flex-col gap-2">
             {options.map(option => {
               const Icon = option.icon
@@ -210,38 +213,33 @@ export function EditorUploadsPanel({
       />
 
       <PanelHeader>
-        <PanelSearchField
-          actions={(
-            <>
-              <Button
-                aria-label={uploading ? t('foundation.editor.uploads.uploading') : t('foundation.editor.uploads.uploadFiles')}
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-                size="header-icon"
-                type="button"
-                variant="ghost"
-              >
-                <Upload />
-              </Button>
-              <Button
-                aria-label={t('foundation.editor.uploads.recordYourself')}
-                onClick={() => {
-                  setRecordNotice(null)
-                  setView('record')
-                }}
-                size="header-icon"
-                type="button"
-                variant="ghost"
-              >
-                <Video />
-              </Button>
-            </>
-          )}
-          label={t('foundation.editor.uploads.search')}
-          onChange={setQuery}
-          placeholder={t('foundation.editor.uploads.searchPlaceholder')}
-          value={query}
-        />
+        {/* Both actions rode along inside the old search field's trailing slot.
+            With the field hoisted to the drawer they become controls in their
+            own right, which is what they always were. */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            className="h-9 justify-start gap-2 rounded-action"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+            variant="outline"
+          >
+            <Upload className="size-4 shrink-0" />
+            <span className="truncate">{uploading ? t('foundation.editor.uploads.uploading') : t('foundation.editor.uploads.uploadFiles')}</span>
+          </Button>
+          <Button
+            className="h-9 justify-start gap-2 rounded-action"
+            onClick={() => {
+              setRecordNotice(null)
+              setView('record')
+            }}
+            type="button"
+            variant="outline"
+          >
+            <Video className="size-4 shrink-0" />
+            <span className="truncate">{t('foundation.editor.uploads.recordYourself')}</span>
+          </Button>
+        </div>
 
         <Tabs className="shrink-0" onValueChange={value => setTab(value as UploadsTab)} value={tab}>
           <TabsList className="h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0" variant="line">
@@ -263,9 +261,13 @@ export function EditorUploadsPanel({
         </Tabs>
       </PanelHeader>
 
-      <PanelBody className="overflow-x-hidden overflow-y-auto">
-        {tab === 'folders' || !items.length ? (
-          <PanelEmptyState icon={EmptyIcon} message={emptyMessage} />
+      <PanelBody className="overflow-x-hidden">
+        {tab === 'folders' ? (
+          <PanelEmptyState icon={CATEGORY_ICONS.projects} message={t('foundation.editor.uploads.foldersComingSoon')} />
+        ) : !items.length ? (
+          query.trim()
+            ? <PanelNoResults onClear={search.clear} query={query} />
+            : <PanelEmptyState icon={EmptyIcon} message={t('foundation.editor.uploads.emptyLibrary')} />
         ) : (
           <PanelMasonry
             estimateRatio={mediaRatio}

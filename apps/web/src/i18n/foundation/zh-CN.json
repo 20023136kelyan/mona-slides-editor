@@ -31,7 +31,18 @@
       "ai": "AI",
       "elementCategories": "元素类别",
       "collapse": "收起面板",
-      "expand": "展开面板"
+      "expand": "展开面板",
+      "collapseSidebar": "收起侧边栏",
+      "expandSidebar": "展开侧边栏",
+      "videos": "视频",
+      "audio": "音频",
+      "graphics": "图形",
+      "frames": "框架",
+      "grids": "网格",
+      "sheets": "表格数据",
+      "forms": "表单",
+      "threeD": "3D",
+      "mockups": "样机"
     },
     "taskPanels": {
       "design": "模板",
@@ -46,7 +57,9 @@
       "comments": "幻灯片 {{number}} 的批注",
       "search": "查找与替换",
       "layers": "图层（{{selected}}/{{total}}）",
-      "semantics": "幻灯片类型标注"
+      "semantics": "幻灯片类型标注",
+      "videos": "视频",
+      "audio": "音频"
     },
     "statusBar": {
       "notes": "备注",
@@ -137,6 +150,7 @@
       "generate": "生成",
       "search": "搜索",
       "back": "返回模板列表",
+      "visitProvider": "访问 {{provider}}",
       "meta": "演示文稿 · 共 {{count}} 页",
       "applyAll": "应用全部 {{count}} 页",
       "all": "全部",
@@ -327,14 +341,6 @@
           "signIn": "使用 Anthropic 登录",
           "signInDescription": "连接拥有符合条件 Pro 或 Max 套餐的 Claude 帐户。"
         },
-        "reference": {
-          "name": "参考引擎",
-          "description": "在本地验证完整编辑流程，无需调用模型。"
-        },
-        "mona-managed": {
-          "name": "Mona 托管",
-          "description": "使用 Mona 帐户调用 Mona 的托管模型服务。"
-        },
         "google-ai-studio": {
           "name": "Google AI Studio",
           "description": "使用您自己的 Gemini API 密钥进行多模态幻灯片编辑。"
@@ -354,7 +360,6 @@
       "authPromptPlaceholder": "粘贴所需的值",
       "continueSignIn": "继续登录",
       "oauthSecurityNotice": "OAuth 凭据在 Mona 服务器上加密保存，绝不会暴露给编辑器或生成的演示文稿代码。",
-      "managedUnavailable": "此部署尚未配置。",
       "emptyTitle": "你想创作什么？",
       "emptyDescription": "让 Mona 检查、改写、排列或创建可编辑的演示文稿元素。",
       "composerLabel": "给 Mona AI 发消息",
@@ -365,7 +370,6 @@
       "cancelled": "已取消生成。",
       "failed": "Mona 无法生成此编辑。",
       "connectionRequired": "发送前请先连接 AI 提供商。",
-      "reviewNotice": "任何更改之前，Mona 都会预览并验证每项编辑。",
       "resize": "调整 AI 面板大小",
       "sketchInstruction": "将此草图制作成精美且可完全编辑的幻灯片。",
       "sketchAttached": "已附加绘图",
@@ -373,31 +377,6 @@
       "sketchElements_other": "{{count}} 个绘图元素",
       "removeSketch": "移除绘图",
       "sketchPreview": "所附绘图的预览",
-      "progress": {
-        "reading": "正在读取幻灯片",
-        "planning": "正在规划可编辑的更改",
-        "executing": "正在运行演示文稿程序",
-        "validating": "正在验证每项操作",
-        "rendering": "正在渲染建议结果",
-        "reviewing": "正在检查视觉质量",
-        "detail": "应用预览前，演示文稿不会发生改变。"
-      },
-      "before": "之前",
-      "after": "建议结果",
-      "beforePreview": "智能编辑前的当前幻灯片",
-      "afterPreview": "智能编辑后的建议幻灯片",
-      "summary": {
-        "created": "新建 {{count}} 项",
-        "updated": "更新 {{count}} 项",
-        "removed": "移除 {{count}} 项"
-      },
-      "viewProgram": "查看演示文稿程序",
-      "discard": "放弃",
-      "apply": "应用编辑",
-      "applied": "编辑已作为一个可撤销操作应用。",
-      "appliedSummary": "已应用智能编辑",
-      "undo": "撤销",
-      "undone": "已撤销智能编辑。",
       "suggestions": {
         "improve": "改善视觉层次",
         "rewrite": "更清晰地改写此幻灯片",
@@ -409,7 +388,66 @@
       "modelLockedHint": "登录后使用 {{model}}",
       "signInToProvider": "登录到 {{provider}}",
       "searchModels": "搜索模型",
-      "noModels": "没有匹配的模型"
+      "noModels": "没有匹配的模型",
+      "connectProvider": "连接 {{provider}}",
+      "slideContext": "本次对话涉及的幻灯片",
+      "addCurrentSlide": "添加当前幻灯片",
+      "removeSlideContext": "移除 {{slide}}",
+      "newChat": "新对话",
+      "slideNumber": "幻灯片 {{number}}",
+      "thinking": "思考中",
+      "runningTool": "正在运行 {{tool}}",
+      "toolSearching": "搜索 {{query}}",
+      "toolEditing": "编辑{{scope}}",
+      "toolLooking": "查看{{scope}}",
+      "toolReading": "读取{{scope}}",
+      "toolThisSlide": "本张幻灯片",
+      "toolSlides": "{{count}} 张幻灯片",
+      "steer": "发送给正在运行的助手",
+      "working": "处理中",
+      "elapsed": "{{seconds}} 秒",
+      "thought": "已思考",
+      "thoughtFor": "思考了 {{seconds}} 秒",
+      "phaseRetry": "重试中（{{attempt}}/{{of}}）",
+      "phaseCompacting": "正在压缩对话",
+      "phaseSummarising": "正在总结分支",
+      "queued": "{{count}} 条排队",
+      "contextUsage": "上下文 {{percent}}%",
+      "thinkingLevel": "推理深度",
+      "toolPreset": "可用工具",
+      "compactNow": "压缩对话",
+      "compacted": "已压缩对话，节省 {{tokens}} 个 token",
+      "thinkingLevels": {
+        "minimal": "最少",
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "xhigh": "很高",
+        "max": "最高"
+      },
+      "toolPresets": {
+        "read": "仅读取",
+        "edit": "读取与编辑",
+        "all": "全部工具"
+      },
+      "slash": {
+        "compact": "压缩对话",
+        "clear": "开始新对话",
+        "think": "设置推理深度",
+        "tools": "设置可用工具",
+        "look": "查看当前幻灯片",
+        "stop": "停止运行中的助手"
+      },
+      "slashCommands": "命令",
+      "toolApplying": "应用更改",
+      "toolDeckOutline": "读取演示文稿大纲",
+      "toolFetching": "获取 {{host}}",
+      "toolFile": "读取 {{name}}",
+      "toolImage": "查看 {{name}}",
+      "toolListing": "列出文件",
+      "toolSyncing": "重新读取演示文稿",
+      "toolWebSearching": "在网络上搜索 {{query}}",
+      "toolWriting": "写入{{scope}}"
     },
     "drawing": {
       "layer": "绘图图层",
@@ -664,7 +702,13 @@
       "replace": "替换"
     },
     "panel": {
-      "seeAll": "查看全部"
+      "seeAll": "查看全部",
+      "search": "搜索",
+      "searchPlaceholder": "搜索{{category}}",
+      "clearSearch": "清除搜索",
+      "noResults": "无结果",
+      "noResultsFor": "没有与 <1>{{query}}</1> 相关的结果",
+      "empty": "这里还没有内容"
     },
     "charts": {
       "search": "搜索图表",
@@ -709,6 +753,7 @@
       "moreCategories": "更多分类",
       "loading": "加载中…",
       "noResults": "未找到照片，请尝试其他搜索。",
+      "empty": "搜索图片以开始",
       "searchError": "无法加载照片。",
       "retry": "重试",
       "enterKeyword": "请输入搜索关键词",
@@ -1123,8 +1168,17 @@
       "vertical": "垂直",
       "styleLabel": "样式",
       "colorLabel": "颜色"
+    },
+    "videos": {
+      "searchPlaceholder": "搜索视频",
+      "searchFailed": "无法加载视频。",
+      "empty": "未找到视频。",
+      "insert": "插入 {{name}}"
     }
   },
   "restoredWorkingCopy": "已恢复此浏览器中未保存的更改",
-  "startFresh": "重新开始"
+  "startFresh": "重新开始",
+  "runtime": {
+    "importAssetsUnstored": "无法存储 {{count}} 个导入的图片。重新打开此演示文稿时它们将丢失。"
+  }
 }

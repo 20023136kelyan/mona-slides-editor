@@ -1,6 +1,10 @@
 import { createContext, useContext } from 'react'
 
+/** Element pools are individual rail entries, not a nested picker. */
+export type EditorElementCategory = 'equations' | 'lines' | 'shapes' | 'symbols' | 'tables'
+
 export type EditorTaskPanelRoute =
+  | 'audio'
   | 'charts'
   | 'comments'
   | 'design'
@@ -13,6 +17,7 @@ export type EditorTaskPanelRoute =
   | 'speakerNotes'
   | 'text'
   | 'uploads'
+  | 'videos'
 
 export interface CloseTaskPanelOptions {
   restoreFocus?: boolean

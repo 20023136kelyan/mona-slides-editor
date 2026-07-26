@@ -31,7 +31,7 @@ test('supports a keyboard-only editor, panel, agent, and modal walkthrough', asy
   // The rail spans the full height and precedes the header in the DOM, so this
   // walk follows that order: rail first, then the header's controls.
   const elements = page.getByRole('navigation', { name: 'Editor tools' })
-    .getByRole('button', { name: 'Elements', exact: true })
+    .getByRole('button', { name: 'Shape', exact: true })
   await tabTo(page, elements)
   await page.keyboard.press('Enter')
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
@@ -109,7 +109,7 @@ test('moves keyboard focus through contextual, filmstrip, and grid workspaces', 
 test('keeps compact desktop geometry bounded with both editor side surfaces active', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 720 })
   await page.goto('/?developmentFixture=slides')
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   await expect(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
@@ -120,8 +120,11 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
     const drawer = document.querySelector<HTMLElement>('.mona-drawer-region')
     const stage = document.querySelector<HTMLElement>('.mona-editor-stage')?.getBoundingClientRect()
     const agent = document.querySelector<HTMLElement>('.mona-agent-dock')?.getBoundingClientRect()
+    // Checking each element's own `display` is not enough: the header keeps a
+    // hidden alternate menu, and its buttons still compute `inline-flex` inside
+    // a `display: none` parent. Only count controls that actually render.
     const headerTargets = Array.from(document.querySelectorAll<HTMLElement>('.mona-editor-header button'))
-      .filter(element => getComputedStyle(element).display !== 'none')
+      .filter(element => element.getClientRects().length > 0)
       .map(element => {
         const rect = element.getBoundingClientRect()
         return { height: rect.height, width: rect.width }
@@ -139,8 +142,11 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
   expect(geometry.agentWidth).toBeGreaterThanOrEqual(280)
   expect(geometry.agentWidth).toBeLessThanOrEqual(520)
   expect(geometry.headerTargets.length).toBeGreaterThan(0)
-  expect(Math.min(...geometry.headerTargets.map(target => target.height))).toBeGreaterThanOrEqual(40)
-  expect(Math.min(...geometry.headerTargets.map(target => target.width))).toBeGreaterThanOrEqual(40)
+  // The header runs a deliberate 28px control scale, so the bar is WCAG 2.2 AA
+  // target size (24x24) — the same threshold EditorHeader.browser.test.tsx
+  // asserts. The grouped Present control is 26px tall (h-7 less its borders).
+  expect(Math.min(...geometry.headerTargets.map(target => target.height))).toBeGreaterThanOrEqual(24)
+  expect(Math.min(...geometry.headerTargets.map(target => target.width))).toBeGreaterThanOrEqual(24)
   expect(geometry.stageWidth).toBeGreaterThan(300)
 })
 

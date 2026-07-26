@@ -110,7 +110,7 @@ test('keeps title geometry stable across focus, typing, cancel, commit, and undo
     <div style={{ width: 1357 }}>
       <EditorApplicationProvider value={createApplication(null)}>
         <EditorShellProvider>
-          <EditorHeader runtime={runtime} />
+          <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
       </EditorApplicationProvider>
     </div>,
@@ -163,7 +163,7 @@ test('drives save status from persistence and confirms a fully undoable new pres
     <div style={{ width: 1357 }}>
       <EditorApplicationProvider value={createApplication(persistence)}>
         <EditorShellProvider>
-          <EditorHeader runtime={runtime} />
+          <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
       </EditorApplicationProvider>
     </div>,
@@ -223,7 +223,7 @@ test('keeps the default Present action direct and exposes real presenter and aut
     <div style={{ width: 1357 }}>
       <EditorApplicationProvider value={application}>
         <EditorShellProvider>
-          <EditorHeader runtime={runtime} />
+          <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
       </EditorApplicationProvider>
     </div>,
@@ -249,7 +249,7 @@ test('keeps compact desktop header groups separate from the editable title', asy
       <div style={{ width: '100%' }}>
         <EditorApplicationProvider value={createApplication(null)}>
           <EditorShellProvider>
-            <EditorHeader runtime={runtime} />
+            <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
           </EditorShellProvider>
         </EditorApplicationProvider>
       </div>,
@@ -297,7 +297,7 @@ test('names header regions and supports roving focus across document menus', asy
     <div style={{ width: 1357 }}>
       <EditorApplicationProvider value={createApplication(null)}>
         <EditorShellProvider>
-          <EditorHeader runtime={runtime} />
+          <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
       </EditorApplicationProvider>
     </div>,
@@ -333,7 +333,7 @@ test('disables document replacement actions while an import is in flight', async
     <div style={{ width: 1357 }}>
       <EditorApplicationProvider value={application}>
         <EditorShellProvider>
-          <EditorHeader runtime={runtime} />
+          <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
       </EditorApplicationProvider>
     </div>,

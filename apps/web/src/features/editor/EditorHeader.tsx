@@ -15,6 +15,7 @@ import {
   MessageSquare,
   MonitorPlay,
   PanelsTopLeft,
+  PencilLine,
   Play,
   Redo2,
   Search,
@@ -57,6 +58,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { prefetchDrawingWorkspace } from '@/features/editor/drawing/load-drawing-workspace'
 import { EditorHotkeyDrawer } from '@/features/editor/EditorHotkeyDrawer'
 import type { ExportType } from '@/features/editor/EditorExportPopover'
 import type { DeckPersistenceSnapshot } from '@/features/editor/editor-persistence'
@@ -169,7 +171,7 @@ export function EditorSkipLink() {
   )
 }
 
-export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
+export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: () => void; runtime: EditorRuntime }) {
   const { i18n, t } = useTranslation()
   const {
     agentOpen,
@@ -185,6 +187,10 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
     subscribeToPresentationStart,
   } = useEditorApplication()
   const { openTaskPanel, taskPanelRoute, toggleTaskPanel } = useEditorShell()
+  // Drawing lives here rather than in the creation rail: it is a canvas mode,
+  // not a category of things to insert, and the rail entry that held it opened
+  // no panel of its own.
+  const drawingActive = useEditorSelector(runtime.store, state => state.session.drawingMode || state.session.creatingCustomShape)
   const presentationTitle = useEditorSelector(runtime.store, state => state.presentation.title)
   const presentationBackground = useEditorSelector(runtime.store, state => state.presentation.theme.backgroundColor)
   const historySnapshot = useSyncExternalStore(
@@ -494,6 +500,16 @@ export function EditorHeader({ runtime }: { runtime: EditorRuntime }) {
         </div>
 
         <fieldset aria-label={t('header.presentationControls')} className="mona-editor-header-right m-0 flex min-w-0 items-center gap-1 border-0 p-0 justify-self-end @max-[760px]/header:gap-0">
+          <Button
+            aria-label={t('header.draw')}
+            aria-pressed={drawingActive}
+            onClick={onToggleDrawing}
+            onFocus={prefetchDrawingWorkspace}
+            onPointerEnter={prefetchDrawingWorkspace}
+            size="header-icon"
+            title={t('header.draw')}
+            variant="header-pill"
+          ><PencilLine className={cn(drawingActive && 'text-editor-selection')} /></Button>
           <Button
             aria-label={t('header.comments')}
             aria-pressed={taskPanelRoute === 'comments'}

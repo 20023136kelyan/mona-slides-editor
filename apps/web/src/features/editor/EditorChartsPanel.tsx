@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Table2 } from 'lucide-react'
+import { Table2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { useEditorPanelSearch } from '@/features/editor/panel/editor-panel-search'
 import {
   PanelBackHeader,
   PanelBody,
   PanelChrome,
-  PanelEmptyState,
   PanelHeader,
-  PanelSearchField,
+  PanelNoResults,
   PanelSectionHeader,
 } from '@/features/editor/panel/EditorPanelPrimitives'
 import {
@@ -226,8 +226,15 @@ export function EditorChartsPanel({
   onInsertChart: (spec: CreateChartElementOptions & { openDataEditor?: boolean }) => void
 }) {
   const { t } = useTranslation()
-  const [view, setView] = useState<ChartsView>({ kind: 'home' })
-  const [draftQuery, setDraftQuery] = useState('')
+  const [browseView, setBrowseView] = useState<ChartsView>({ kind: 'home' })
+  const search = useEditorPanelSearch()
+
+  // The committed term *is* the search view rather than something copied into
+  // local state after the fact — derive it and the two cannot disagree.
+  const submitted = search.submitted.trim()
+  // useMemo, not a bare ternary: a fresh object every render would defeat the
+  // memoised result lists downstream.
+  const view = useMemo<ChartsView>(() => (submitted ? { kind: 'search', query: submitted } : browseView), [browseView, submitted])
 
   const categoryLabel = (id: ChartCategoryId) => t(`foundation.editor.charts.categories.${id}`)
   const selectPreset = (preset: ChartPreset) => {
@@ -253,16 +260,6 @@ export function EditorChartsPanel({
     return [...byId, ...labeled.filter(preset => !ids.has(preset.id))]
   }, [t, view])
 
-  const runSearch = (query: string) => {
-    const next = query.trim()
-    if (!next) {
-      setView({ kind: 'home' })
-      return
-    }
-    setDraftQuery(next)
-    setView({ kind: 'search', query: next })
-  }
-
   if (view.kind === 'category' || view.kind === 'search') {
     const title = view.kind === 'search'
       ? view.query
@@ -275,14 +272,17 @@ export function EditorChartsPanel({
       <PanelChrome className="mona-charts-panel">
         <PanelBackHeader
           label={t('foundation.editor.charts.back')}
-          onBack={() => setView({ kind: 'home' })}
+          onBack={() => {
+            setBrowseView({ kind: 'home' })
+            search.clear()
+          }}
           title={title}
         />
-        <PanelBody className="overflow-y-auto">
+        <PanelBody>
           {presets.length ? (
             <PresetGrid onSelect={selectPreset} presets={presets} />
           ) : (
-            <PanelEmptyState icon={Search} message={t('foundation.editor.charts.noResults')} />
+            <PanelNoResults onClear={search.clear} query={view.kind === 'search' ? view.query : ''} />
           )}
         </PanelBody>
       </PanelChrome>
@@ -292,13 +292,6 @@ export function EditorChartsPanel({
   return (
     <PanelChrome className="mona-charts-panel">
       <PanelHeader>
-        <PanelSearchField
-          label={t('foundation.editor.charts.search')}
-          onChange={setDraftQuery}
-          onSubmit={() => runSearch(draftQuery)}
-          placeholder={t('foundation.editor.charts.searchPlaceholder')}
-          value={draftQuery}
-        />
         <Button
           className="h-9 w-full justify-start gap-2 rounded-action"
           onClick={() => onInsertChart({ chartType: 'bar', seriesCount: 2, openDataEditor: true })}
@@ -310,11 +303,11 @@ export function EditorChartsPanel({
         </Button>
       </PanelHeader>
 
-      <PanelBody className="space-y-5 overflow-x-hidden overflow-y-auto">
+      <PanelBody className="space-y-5 overflow-x-hidden">
         {CHART_CATEGORIES.map(category => (
           <section className="shrink-0" key={category.id}>
             <PanelSectionHeader
-              onSeeAll={category.presets.length > 3 ? () => setView({ kind: 'category', categoryId: category.id }) : undefined}
+              onSeeAll={category.presets.length > 3 ? () => setBrowseView({ kind: 'category', categoryId: category.id }) : undefined}
               title={categoryLabel(category.id)}
             />
             <PresetStrip onSelect={selectPreset} presets={category.presets} />

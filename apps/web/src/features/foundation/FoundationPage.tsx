@@ -1,5 +1,6 @@
 import { Activity, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import { useLoaderData } from 'react-router'
 
 import type { EditorRootState } from '@mona/editor-state'
@@ -248,8 +249,8 @@ export function FoundationPage() {
                 banner={restoredBanner ? (
                   <output className="absolute bottom-37 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2.5 rounded-overlay border bg-popover py-1.5 pr-2.5 pl-3.5 text-sm text-foreground shadow-lg">
                     <span>{t('foundation.restoredWorkingCopy')}</span>
-                    <Button className="border-foreground hover:bg-foreground hover:text-background" onClick={startFresh} size="sm" type="button" variant="outline">{t('foundation.startFresh')}</Button>
-                    <Button aria-label={t('common.close')} className="text-base text-muted-foreground" onClick={() => setRestoredBanner(false)} size="icon-sm" type="button" variant="ghost">×</Button>
+                    <Button onClick={startFresh} size="header-pill" type="button" variant="header-pill">{t('foundation.startFresh')}</Button>
+                    <Button aria-label={t('common.close')} onClick={() => setRestoredBanner(false)} size="header-icon" type="button" variant="header-pill"><X /></Button>
                   </output>
                 ) : null}
                 presentation={presentation}

@@ -57,13 +57,14 @@ export const searchOnlinePhotos = async (
     signal?: AbortSignal
   } = {},
 ): Promise<PhotoSearchResult> => {
-  const response = await fetch('/api/tools/img_search', {
+  const response = await fetch('/api/agent/assets/images/browse', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       query,
       page: options.page ?? 1,
-      per_page: options.perPage ?? 30,
+      perPage: options.perPage ?? 30,
       orientation: options.orientation ?? 'all',
     }),
     signal: options.signal,

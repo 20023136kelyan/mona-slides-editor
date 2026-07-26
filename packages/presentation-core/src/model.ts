@@ -1155,9 +1155,81 @@ export interface SlideTheme {
   shadow: PPTElementShadow
 }
 
+/**
+ * How a provider's templates are obtained.
+ *
+ * `native` templates ship as a payload we can render and insert directly.
+ * `link` templates are catalogued but not held: the drawer shows what a
+ * provider offers and sends the user to the provider's own page for the file.
+ * That distinction is a licensing one as much as a technical one — several
+ * template libraries permit listing and linking but not redistribution.
+ */
+export type TemplateProviderMode = 'link' | 'native'
+
+/**
+ * Who supplies a group of templates.
+ *
+ * Providers exist so attribution has somewhere to live. Licences like CC BY
+ * make credit mandatory, and credit has to name a specific source, so the
+ * drawer groups templates by provider and labels each group rather than
+ * presenting one anonymous pile.
+ */
+export interface TemplateProvider {
+  /** Attribution line for the group; required by most content licences. */
+  attribution?: string
+  /** Provider's own site, linked from the section header. */
+  homepage?: string
+  id: string
+  /** Default licence for this provider's templates; a template may override. */
+  license?: TemplateLicense
+  mode: TemplateProviderMode
+  name: string
+  /**
+   * Where this provider's payloads live, e.g. `/mocks/` for bundled templates
+   * or a bucket/CDN origin for hosted ones. A template id is appended as
+   * `<base><id>.json`; a template can override the whole URL when the host
+   * does not use predictable filenames.
+   *
+   * Cross-origin bases need CORS on the bucket — the payload is fetched by the
+   * browser, not proxied.
+   */
+  payloadBaseUrl?: string
+  /**
+   * Where this provider's cover images live. Same joining rule as
+   * `payloadBaseUrl`, applied to the template's `cover` value.
+   */
+  coverBaseUrl?: string
+}
+
+export interface TemplateLicense {
+  name: string
+  url?: string
+}
+
 export interface SlideTemplate {
+  /** Overrides the provider's licence — corpora are often mixed. */
+  license?: TemplateLicense
   name: string
   id: string
   cover: string
   origin?: string
+  /** Credit for the individual work, where the licence requires it. */
+  author?: string
+  /**
+   * Full URL to this template's payload, overriding the provider's base. For
+   * hosted catalogues whose filenames are hashed or otherwise unpredictable.
+   */
+  payloadUrl?: string
+  /** Falls back to the built-in provider when absent. */
+  providerId?: string
+  /**
+   * How many slides/pages this template has. Carried in the catalogue so the
+   * count can be shown before the payload is fetched.
+   */
+  slideCount?: number
+  /**
+   * The provider's page for this template. Required for `link` providers,
+   * which open it instead of inserting; optional elsewhere as a credit link.
+   */
+  sourceUrl?: string
 }

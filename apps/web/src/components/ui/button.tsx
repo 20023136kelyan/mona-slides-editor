@@ -27,6 +27,16 @@ const buttonVariants = cva(
         // tone is mixed from --foreground/--background, so it inverts in dark.
         'header-pill':
           'border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] text-foreground/80 shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground active:shadow-none aria-pressed:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] aria-pressed:text-foreground aria-pressed:shadow-none aria-expanded:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] aria-expanded:text-foreground aria-expanded:shadow-none',
+        // The same keycap on the accent face, for the single affirmative action
+        // in a group. A heavier cast than header-pill because the filled face
+        // would otherwise swallow a 12% shadow.
+        'action-pill':
+          'border-transparent bg-primary text-primary-foreground shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_22%,transparent)] hover:bg-primary/90 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
+        // The keycap a run wears while it can be stopped. Same geometry and
+        // raise as the send action it replaces, so only the colour changes and
+        // the control does not appear to move.
+        'stop-pill':
+          'border-transparent bg-destructive text-white shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_22%,transparent)] hover:bg-[color-mix(in_oklab,var(--destructive),black_8%)] active:shadow-none',
       },
       size: {
         default:
@@ -46,6 +56,11 @@ const buttonVariants = cva(
           'h-7 min-w-7 gap-1 rounded-action px-2 text-xs font-medium [&_svg:not([class*=\'size-\'])]:size-3.5',
         'header-icon':
           'size-7 rounded-action [&_svg:not([class*=\'size-\'])]:size-3.5',
+        // Deliberately size-7, matching `header-pill`'s height: send, stop and
+        // attach sit in a row with the model button, and three different heights
+        // there read as misalignment rather than hierarchy.
+        'action-icon':
+          'size-7 rounded-action p-0 [&_svg:not([class*=\'size-\'])]:size-3.5',
         chip: 'h-7 gap-1 rounded-pill px-3 text-xs [&_svg:not([class*=\'size-\'])]:size-3.5',
       },
     },

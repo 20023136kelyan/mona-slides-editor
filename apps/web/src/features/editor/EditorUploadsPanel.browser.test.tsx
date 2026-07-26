@@ -2,6 +2,9 @@ import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
+import { EditorPanelSearchProvider } from '@/features/editor/panel/editor-panel-search'
+import { PanelSearchBar } from '@/features/editor/panel/EditorPanelPrimitives'
+
 import { EditorUploadsPanel } from '@/features/editor/EditorUploadsPanel'
 import { mediaLibraryDatabase } from '@/features/editor/editor-media-library'
 import { EditorApplicationProvider } from '@/features/editor/services/EditorApplicationProvider'
@@ -47,11 +50,14 @@ test('keeps record funnel and library insert inside the uploads panel', async ()
   const screen = await render(
     <div style={{ height: 520, width: 288 }}>
       <EditorApplicationProvider value={application}>
-        <EditorUploadsPanel
-          onInsertAudio={onInsertAudio}
-          onInsertImageSource={onInsertImageSource}
-          onInsertVideo={onInsertVideo}
-        />
+        <EditorPanelSearchProvider route="uploads">
+          <PanelSearchBar label="Search" placeholder="Search uploads" />
+          <EditorUploadsPanel
+            onInsertAudio={onInsertAudio}
+            onInsertImageSource={onInsertImageSource}
+            onInsertVideo={onInsertVideo}
+          />
+        </EditorPanelSearchProvider>
       </EditorApplicationProvider>
     </div>,
   )

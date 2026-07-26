@@ -617,9 +617,21 @@
   line-height: normal;
 }
 /* Same treatment vertically for the panel's scrollable content. */
+/* Drawer panels pin their header and scroll only the body beneath it, so the
+   seam is faded rather than ruled. Attributes come from useEdgeFade, so an
+   edge only fades while content is actually clipped there. */
+.mona-panel-body[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to bottom, transparent, #000 24px); }
+.mona-panel-body[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent); }
+.mona-panel-body[data-fade-start][data-fade-end] { mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .mona-inspector-content[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to bottom, transparent, #000 28px); }
 .mona-inspector-content[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
 .mona-inspector-content[data-fade-start][data-fade-end] { mask-image: linear-gradient(to bottom, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+/* The rail outruns short viewports, and the media group it hides holds wired
+   entries, not just stubs. Fade the clipped edge so the list reads as having
+   more below rather than ending at Audio. */
+.mona-editor-rail-content[data-fade-start]:not([data-fade-end]) { mask-image: linear-gradient(to bottom, transparent, #000 24px); }
+.mona-editor-rail-content[data-fade-end]:not([data-fade-start]) { mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent); }
+.mona-editor-rail-content[data-fade-start][data-fade-end] { mask-image: linear-gradient(to bottom, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 
 .mona-slide-transition-pool {
   display: flex;
@@ -2113,3 +2125,119 @@
    inert; a double-click promotes it to editing and makes it live. */
 .mona-rich-text { pointer-events: none; }
 .mona-rich-text.is-editing { pointer-events: auto; }
+
+/* Reasoning in progress: a slow sweep, not a spinner. */
+.mona-agent-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--foreground) 45%,
+    var(--muted-foreground) 90%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mona-agent-shimmer-sweep 1.9s linear infinite;
+}
+
+@keyframes mona-agent-shimmer-sweep {
+  to { background-position: -220% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mona-agent-shimmer {
+    animation: none;
+  }
+  .mona-agent-shimmer {
+    color: var(--muted-foreground);
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* Assistant markdown. Tight vertical rhythm so a short answer stays compact,
+   and code sits on the same recessed surface the rest of the dock uses. */
+.mona-agent-prose > :first-child { margin-top: 0; }
+.mona-agent-prose > :last-child { margin-bottom: 0; }
+
+.mona-agent-prose p,
+.mona-agent-prose ul,
+.mona-agent-prose ol,
+.mona-agent-prose pre {
+  margin: 0 0 0.5em;
+}
+
+.mona-agent-prose h1,
+.mona-agent-prose h2,
+.mona-agent-prose h3,
+.mona-agent-prose h4 {
+  margin: 0.75em 0 0.3em;
+  font-size: 1em;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.mona-agent-prose ul,
+.mona-agent-prose ol { padding-left: 1.15em; }
+.mona-agent-prose li { margin-bottom: 0.15em; }
+.mona-agent-prose li::marker { color: var(--muted-foreground); }
+
+.mona-agent-prose a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mona-agent-prose code {
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-detail);
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  font-size: 0.9em;
+}
+
+.mona-agent-prose pre {
+  overflow-x: auto;
+  padding: 0.6em 0.7em;
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.mona-agent-prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.mona-agent-prose blockquote {
+  margin: 0 0 0.5em;
+  padding-left: 0.7em;
+  border-left: 2px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.mona-agent-prose table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 0.5em;
+}
+
+.mona-agent-prose th,
+.mona-agent-prose td {
+  padding: 0.25em 0.5em;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+/* The agent is alive: a slow breath, not a spinner. */
+.mona-agent-pulse {
+  animation: mona-agent-pulse-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes mona-agent-pulse-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mona-agent-pulse { animation: none; opacity: 0.8; }
+}

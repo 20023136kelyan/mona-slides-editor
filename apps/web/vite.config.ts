@@ -15,7 +15,6 @@ const excludeDevelopmentFixtures = () => ({
   },
 })
 
-import { monaImageSearchApi } from './src/features/editor/mona-image-search-api.js'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -34,7 +33,6 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     excludeDevelopmentFixtures(),
-    monaImageSearchApi(),
   ],
   resolve: {
     alias: {
@@ -50,6 +48,9 @@ export default defineConfig({
     proxy: {
       '/api/agent': {
         target: process.env.MONA_AGENT_SERVER_URL ?? 'http://127.0.0.1:8788',
+        // The agent conversation is a WebSocket, and a proxy does not forward an
+        // upgrade unless it is told to.
+        ws: true,
       },
     },
   },

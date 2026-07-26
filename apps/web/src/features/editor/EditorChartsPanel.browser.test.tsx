@@ -2,6 +2,9 @@ import { beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
+import { EditorPanelSearchProvider } from '@/features/editor/panel/editor-panel-search'
+import { PanelSearchBar } from '@/features/editor/panel/EditorPanelPrimitives'
+
 import { EditorChartsPanel } from '@/features/editor/EditorChartsPanel'
 import { initializeI18n, setLocale } from '@/i18n'
 
@@ -17,7 +20,10 @@ test('keeps chart catalog browse and see-all inside the panel', async () => {
   const onInsertChart = vi.fn()
   await render(
     <div style={{ height: 640, width: 352 }}>
-      <EditorChartsPanel onInsertChart={onInsertChart} />
+      <EditorPanelSearchProvider mode="submit" route="charts">
+        <PanelSearchBar label="Search" placeholder="Search charts" />
+        <EditorChartsPanel onInsertChart={onInsertChart} />
+      </EditorPanelSearchProvider>
     </div>,
   )
 

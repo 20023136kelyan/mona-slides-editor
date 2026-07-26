@@ -1,10 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Image as ImageIcon, Search } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { useEditorPanelSearch } from '@/features/editor/panel/editor-panel-search'
 import {
   PanelBackHeader,
   PanelBody,
@@ -14,7 +14,7 @@ import {
   PanelHeader,
   PanelLoadingRow,
   PanelMasonry,
-  PanelSearchField,
+  PanelNoResults,
   PanelSectionHeader,
 } from '@/features/editor/panel/EditorPanelPrimitives'
 import { listRecentOnlinePhotos, rememberOnlinePhoto } from '@/features/editor/editor-photos-recent'
@@ -167,6 +167,15 @@ function usePhotoQuery(query: string | null, perPage = 30, refreshKey = 0) {
   return { error, items, loadMore, loading, total }
 }
 
+function PhotoGridEmpty() {
+  const { t } = useTranslation()
+  const search = useEditorPanelSearch()
+  const submitted = search.submitted.trim()
+  return submitted
+    ? <PanelNoResults onClear={search.clear} query={submitted} />
+    : <PanelEmptyState message={t('foundation.editor.photos.empty')} />
+}
+
 function PhotoResults({
   error,
   items,
@@ -184,8 +193,10 @@ function PhotoResults({
 }) {
   const { t } = useTranslation()
 
+  // Two different facts, two different surfaces: a committed query that matched
+  // nothing is a no-results state, while an untouched panel is simply empty.
   if (!loading && !error && !items.length) {
-    return <PanelEmptyState icon={ImageIcon} message={t('foundation.editor.photos.noResults')} />
+    return <PhotoGridEmpty />
   }
 
   return (
@@ -213,12 +224,20 @@ function PhotoResults({
 export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource: (src: string) => void }) {
   const { t } = useTranslation()
   const { notifications } = useEditorApplication()
-  const [view, setView] = useState<PhotosView>({ kind: 'home' })
-  const [draftQuery, setDraftQuery] = useState('')
+  const [browseView, setBrowseView] = useState<PhotosView>({ kind: 'home' })
+  const search = useEditorPanelSearch()
   const [refreshKey, setRefreshKey] = useState(0)
   const recent = useLiveQuery(() => listRecentOnlinePhotos(), [], [] as Awaited<ReturnType<typeof listRecentOnlinePhotos>>)
 
   const categoryLabel = (id: PhotoCategoryId) => t(`foundation.editor.photos.categories.${id}`)
+
+  // The bar is the drawer's, so the committed term *is* the search view rather
+  // than something copied into local state after the fact — derive it and the
+  // two can never disagree. Chips and categories commit through the bar too.
+  const submitted = search.submitted.trim()
+  // useMemo, not a bare ternary: a fresh object every render would defeat the
+  // memoised result lists downstream.
+  const view = useMemo<PhotosView>(() => (submitted ? { kind: 'search', query: submitted } : browseView), [browseView, submitted])
 
   const activeQuery = view.kind === 'search'
     ? view.query
@@ -239,16 +258,6 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
     }
   }
 
-  const runSearch = (query: string) => {
-    const next = query.trim()
-    if (!next) {
-      notifications.notify({ text: t('foundation.editor.photos.enterKeyword'), type: 'warning' })
-      return
-    }
-    setDraftQuery(next)
-    setView({ kind: 'search', query: next })
-  }
-
   if (view.kind === 'search' || view.kind === 'category' || view.kind === 'recent') {
     const title = view.kind === 'search'
       ? view.query
@@ -260,7 +269,10 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
       <PanelChrome className="mona-photos-panel">
         <PanelBackHeader
           label={t('foundation.editor.photos.back')}
-          onBack={() => setView({ kind: 'home' })}
+          onBack={() => {
+            setBrowseView({ kind: 'home' })
+            search.clear()
+          }}
           title={title}
         />
         <PanelBody>
@@ -289,31 +301,12 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
   return (
     <PanelChrome className="mona-photos-panel">
       <PanelHeader>
-        <PanelSearchField
-          actions={(
-            <Button
-              aria-label={t('foundation.editor.photos.search')}
-              onClick={() => runSearch(draftQuery)}
-              size="header-icon"
-              type="button"
-              variant="ghost"
-            >
-              <Search />
-            </Button>
-          )}
-          label={t('foundation.editor.photos.search')}
-          onChange={setDraftQuery}
-          onSubmit={() => runSearch(draftQuery)}
-          placeholder={t('foundation.editor.photos.searchPlaceholder')}
-          value={draftQuery}
-        />
-
         <div className="flex h-7 shrink-0 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PHOTO_CHIPS.map(chip => (
             <Button
               className="shrink-0"
               key={chip.id}
-              onClick={() => runSearch(chip.query)}
+              onClick={() => search.submitQuery(chip.query)}
               size="chip"
               type="button"
               variant="outline"
@@ -324,11 +317,11 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
         </div>
       </PanelHeader>
 
-      <PanelBody className="space-y-5 overflow-x-hidden overflow-y-auto">
+      <PanelBody className="space-y-5 overflow-x-hidden">
         {recent.length ? (
           <section className="shrink-0">
             <PanelSectionHeader
-              onSeeAll={() => setView({ kind: 'recent' })}
+              onSeeAll={() => setBrowseView({ kind: 'recent' })}
               title={t('foundation.editor.photos.recentlyUsed')}
             />
             <HorizontalStrip items={recent.slice(0, 12)} onInsert={item => void insertPhoto(item)} />
@@ -337,7 +330,7 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
 
         <section className="shrink-0">
           <PanelSectionHeader
-            onSeeAll={() => setView({ kind: 'category', category: PHOTO_CATEGORIES[0]! })}
+            onSeeAll={() => setBrowseView({ kind: 'category', category: PHOTO_CATEGORIES[0]! })}
             title={categoryLabel('trending')}
           />
           {trendingQuery.loading && !trendingQuery.items.length ? (
@@ -355,7 +348,7 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
 
         <section className="shrink-0">
           <PanelSectionHeader
-            onSeeAll={() => setView({ kind: 'category', category: PHOTO_CATEGORIES.find(category => category.id === 'nature')! })}
+            onSeeAll={() => setBrowseView({ kind: 'category', category: PHOTO_CATEGORIES.find(category => category.id === 'nature')! })}
             title={categoryLabel('nature')}
           />
           {natureQuery.loading && !natureQuery.items.length ? (
@@ -372,7 +365,7 @@ export function EditorPhotosPanel({ onInsertImageSource }: { onInsertImageSource
               <Button
                 className="shrink-0"
                 key={category.id}
-                onClick={() => setView({ kind: 'category', category })}
+                onClick={() => setBrowseView({ kind: 'category', category })}
                 size="chip"
                 type="button"
                 variant="outline"

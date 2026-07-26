@@ -31,7 +31,18 @@
       "ai": "AI",
       "elementCategories": "Element categories",
       "collapse": "Collapse panel",
-      "expand": "Expand panel"
+      "expand": "Expand panel",
+      "collapseSidebar": "Collapse sidebar",
+      "expandSidebar": "Expand sidebar",
+      "videos": "Videos",
+      "audio": "Audio",
+      "graphics": "Graphics",
+      "frames": "Frames",
+      "grids": "Grids",
+      "sheets": "Sheets",
+      "forms": "Forms",
+      "threeD": "3D",
+      "mockups": "Mockups"
     },
     "taskPanels": {
       "design": "Templates",
@@ -46,7 +57,9 @@
       "comments": "Comments on slide {{number}}",
       "search": "Find and replace",
       "layers": "Layers ({{selected}}/{{total}})",
-      "semantics": "Slide type labels"
+      "semantics": "Slide type labels",
+      "videos": "Videos",
+      "audio": "Audio"
     },
     "statusBar": {
       "notes": "Notes",
@@ -137,6 +150,7 @@
       "generate": "Generate",
       "search": "Search",
       "back": "Back to templates",
+      "visitProvider": "Visit {{provider}}",
       "meta": "Presentation · {{count}} slides",
       "applyAll": "Apply all {{count}} pages",
       "all": "All",
@@ -327,14 +341,6 @@
           "signIn": "Sign in with Anthropic",
           "signInDescription": "Connect the Claude account that owns your eligible Pro or Max plan."
         },
-        "reference": {
-          "name": "Reference engine",
-          "description": "Exercises the complete editing pipeline locally without calling a model."
-        },
-        "mona-managed": {
-          "name": "Mona managed",
-          "description": "Use Mona's hosted model service with your Mona account."
-        },
         "google-ai-studio": {
           "name": "Google AI Studio",
           "description": "Use your own Gemini API key for multimodal slide editing."
@@ -354,7 +360,6 @@
       "authPromptPlaceholder": "Paste the requested value",
       "continueSignIn": "Continue sign-in",
       "oauthSecurityNotice": "OAuth credentials remain encrypted on Mona's server and are never exposed to the editor or generated presentation code.",
-      "managedUnavailable": "Not configured on this deployment.",
       "emptyTitle": "What should we make?",
       "emptyDescription": "Ask Mona to inspect, rewrite, arrange, or create editable presentation elements.",
       "composerLabel": "Message Mona AI",
@@ -365,7 +370,6 @@
       "cancelled": "Generation cancelled.",
       "failed": "Mona could not generate this edit.",
       "connectionRequired": "Connect an AI provider before sending.",
-      "reviewNotice": "Mona previews and validates every edit before anything changes.",
       "resize": "Resize AI panel",
       "sketchInstruction": "Build this sketch as a polished, fully editable slide.",
       "sketchAttached": "Drawing attached",
@@ -373,31 +377,6 @@
       "sketchElements_other": "{{count}} drawn elements",
       "removeSketch": "Remove drawing",
       "sketchPreview": "Preview of the attached drawing",
-      "progress": {
-        "reading": "Reading the slide",
-        "planning": "Planning editable changes",
-        "executing": "Running the presentation program",
-        "validating": "Validating every operation",
-        "rendering": "Rendering the proposed result",
-        "reviewing": "Reviewing visual quality",
-        "detail": "The presentation remains unchanged until you apply the preview."
-      },
-      "before": "Before",
-      "after": "Proposed",
-      "beforePreview": "Current slide before the agent edit",
-      "afterPreview": "Proposed slide after the agent edit",
-      "summary": {
-        "created": "{{count}} created",
-        "updated": "{{count}} updated",
-        "removed": "{{count}} removed"
-      },
-      "viewProgram": "View presentation program",
-      "discard": "Discard",
-      "apply": "Apply edit",
-      "applied": "The edit was applied as one undoable operation.",
-      "appliedSummary": "Agent edit applied",
-      "undo": "Undo",
-      "undone": "The agent edit was undone.",
       "suggestions": {
         "improve": "Improve the visual hierarchy",
         "rewrite": "Rewrite this slide more clearly",
@@ -409,7 +388,66 @@
       "modelLockedHint": "Sign in to use {{model}}",
       "signInToProvider": "Sign in to {{provider}}",
       "searchModels": "Search models",
-      "noModels": "No models match"
+      "noModels": "No models match",
+      "connectProvider": "Connect {{provider}}",
+      "slideContext": "Slides in this chat",
+      "addCurrentSlide": "Add current slide",
+      "removeSlideContext": "Remove {{slide}}",
+      "newChat": "New chat",
+      "slideNumber": "Slide {{number}}",
+      "thinking": "Thinking",
+      "runningTool": "Running {{tool}}",
+      "toolSearching": "Searching for {{query}}",
+      "toolEditing": "Editing {{scope}}",
+      "toolLooking": "Looking at {{scope}}",
+      "toolReading": "Reading {{scope}}",
+      "toolThisSlide": "this slide",
+      "toolSlides": "{{count}} slides",
+      "steer": "Send to the running agent",
+      "working": "Working",
+      "elapsed": "{{seconds}}s",
+      "thought": "Thought",
+      "thoughtFor": "Thought for {{seconds}}s",
+      "phaseRetry": "Retrying ({{attempt}}/{{of}})",
+      "phaseCompacting": "Compacting the conversation",
+      "phaseSummarising": "Summarising the branch",
+      "queued": "{{count}} queued",
+      "contextUsage": "{{percent}}% context",
+      "thinkingLevel": "Reasoning depth",
+      "toolPreset": "Available tools",
+      "compactNow": "Compact the conversation",
+      "compacted": "Compacted the conversation, saving {{tokens}} tokens",
+      "thinkingLevels": {
+        "minimal": "Minimal",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Very high",
+        "max": "Maximum"
+      },
+      "toolPresets": {
+        "read": "Read only",
+        "edit": "Read and edit",
+        "all": "All tools"
+      },
+      "slash": {
+        "compact": "Compact the conversation",
+        "clear": "Start a new conversation",
+        "think": "Set reasoning depth",
+        "tools": "Set which tools are available",
+        "look": "Look at the current slide",
+        "stop": "Stop the running agent"
+      },
+      "slashCommands": "Commands",
+      "toolApplying": "Applying the changes",
+      "toolDeckOutline": "Reading the deck outline",
+      "toolFetching": "Fetching {{host}}",
+      "toolFile": "Reading {{name}}",
+      "toolImage": "Looking at {{name}}",
+      "toolListing": "Listing files",
+      "toolSyncing": "Re-reading the deck",
+      "toolWebSearching": "Searching the web for {{query}}",
+      "toolWriting": "Writing {{scope}}"
     },
     "drawing": {
       "layer": "Drawing layer",
@@ -664,7 +702,13 @@
       "replace": "Replace"
     },
     "panel": {
-      "seeAll": "See all"
+      "seeAll": "See all",
+      "search": "Search",
+      "searchPlaceholder": "Search {{category}}",
+      "clearSearch": "Clear search",
+      "noResults": "No results",
+      "noResultsFor": "No results for <1>{{query}}</1>",
+      "empty": "Nothing here yet"
     },
     "charts": {
       "search": "Search charts",
@@ -709,6 +753,7 @@
       "moreCategories": "More categories",
       "loading": "Loading…",
       "noResults": "No photos found. Try another search.",
+      "empty": "Search for a photo to get started",
       "searchError": "Photos could not be loaded.",
       "retry": "Try again",
       "enterKeyword": "Enter a search keyword",
@@ -1123,8 +1168,17 @@
       "vertical": "Vertical",
       "styleLabel": "Style",
       "colorLabel": "Color"
+    },
+    "videos": {
+      "searchPlaceholder": "Search videos",
+      "searchFailed": "Could not load videos.",
+      "empty": "No videos found.",
+      "insert": "Insert {{name}}"
     }
   },
   "restoredWorkingCopy": "Restored your unsaved changes from this browser",
-  "startFresh": "Start fresh"
+  "startFresh": "Start fresh",
+  "runtime": {
+    "importAssetsUnstored": "Could not store {{count}} imported image(s). They will be missing when this deck is reopened."
+  }
 }

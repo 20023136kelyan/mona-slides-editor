@@ -291,9 +291,14 @@ test('routes creation, comments, search, layers, and speaker notes through one e
 
   // Task panels render no visible title or close control; the drawer itself
   // is named after the open panel via its aria-label.
-  await rail.getByRole('button', { name: 'Elements' }).click()
+  await rail.getByRole('button', { name: 'Shape' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
-  expect(document.querySelectorAll('.mona-element-category-tabs button')).toHaveLength(5)
+  // The pools are individual rail entries now, not a picker nested in the panel,
+  // so the rail alone tells the user where each one lives.
+  expect(document.querySelector('.mona-element-category-tabs')).toBeNull()
+  for (const pool of ['Shape', 'Line', 'Table', 'Symbol', 'Equation']) {
+    await expect.element(rail.getByRole('button', { name: pool, exact: true })).toBeVisible()
+  }
 
   await rail.getByRole('button', { name: 'Text' }).click()
   await expect.element(page.getByRole('complementary', { name: 'Text' })).toBeVisible()
@@ -358,8 +363,33 @@ test('filters template catalogs in place instead of exposing a decorative search
   await expect.element(page.getByRole('button', { name: 'Urban Blue' })).toBeVisible()
   expect(document.querySelector('[aria-label="Crimson Landscape"]')).toBeNull()
 
+  // A search that matched nothing gets the drawer's shared no-results surface,
+  // which echoes the term and offers a way out — not a bespoke line of prose.
+  // Scoped to that surface: the search field carries its own clear control, so
+  // the name alone is ambiguous.
   await search.fill('no matching design')
-  await expect.element(page.getByText('No templates match your search.')).toBeVisible()
+  const noResults = page.getByText('No results for').element().closest('.mona-panel-no-results')
+  expect(noResults?.textContent).toContain('no matching design')
+  expect(noResults?.querySelector('button')?.textContent).toBe('Clear search')
+})
+
+test('lists every content type in the rail, with unbuilt ones present but inert', async () => {
+  await render(<div style={{ height: 700, width: 1200 }}><TestEditorDeck presentation={presentation} /></div>)
+  const rail = page.getByRole('navigation', { name: 'Editor tools' })
+
+  // Wired entries open a panel.
+  for (const name of ['Templates', 'Shape', 'Line', 'Table', 'Symbol', 'Equation', 'Text', 'Uploads', 'Videos', 'Audio', 'Photos', 'Charts']) {
+    await expect.element(rail.getByRole('button', { name, exact: true })).toBeVisible()
+  }
+
+  // Placeholders are visible so the rail shows the full map of content types,
+  // but they navigate nowhere yet.
+  for (const name of ['Brand', 'Projects', 'Apps', 'Magic Media', 'Graphics', 'Frames', 'Grids', 'Sheets', 'Forms', '3D', 'Mockups']) {
+    const stub = rail.getByRole('button', { name, exact: true })
+    await expect.element(stub).toBeVisible()
+    await stub.click()
+    expect(document.querySelector('.mona-editor-drawer')).toBeNull()
+  }
 })
 
 test('keeps the uploads record funnel inside the panel without modals', async () => {
@@ -421,13 +451,13 @@ test('opens AI as a structural dock and collapses the left panel on a compact vi
 
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   // The dock is labelled by its slide-scope header (untitled in this fixture).
-  await expect.element(page.getByRole('complementary', { name: 'Untitled page' })).toBeVisible()
+  await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
   expect(document.querySelector('.mona-agent-dialog')).toBeNull()
   // The dock is a real sidebar column, so opening it pushes the canvas.
   expect(stage.getBoundingClientRect().width).toBeLessThan(initialWidth)
 
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
-  await expect.element(page.getByRole('complementary', { name: 'Untitled page' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
+  await expect.element(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
   expect(document.querySelectorAll('.mona-editor-drawer')).toHaveLength(1)
   expect(getComputedStyle(document.querySelector<HTMLElement>('.mona-drawer-region')!).display).toBe('none')
 

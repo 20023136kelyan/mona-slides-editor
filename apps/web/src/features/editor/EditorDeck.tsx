@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { editorActions, selectCurrentSlide, selectPresentation, selectSession } from '@mona/editor-state'
 import type { EditorToolbarState } from '@mona/editor-state'
-import { createPresentationId, type PresentationState } from '@mona/presentation-core'
+import { createPresentationId, DEFAULT_TEMPLATE_CATALOG, DEFAULT_TEMPLATE_PROVIDERS, type PresentationState } from '@mona/presentation-core'
 import type { PPTAudioElement, PPTChartElement, PPTImageElement, PPTLatexElement, PPTLineElement, PPTShapeElement, PPTTableElement, PPTTextElement, PPTVideoElement } from '@mona/presentation-core/model'
 
 
@@ -14,6 +14,9 @@ import { EditorCanvas } from '@/features/editor/EditorCanvas'
 import { EditorContextToolbar } from '@/features/editor/EditorContextToolbar'
 import { EditorHeader, EditorSkipLink } from '@/features/editor/EditorHeader'
 import { EditorPageGrid } from '@/features/editor/EditorPageGrid'
+import { EditorPanelContext, type EditorPanelContextValue } from '@/features/editor/panel/editor-panel-context'
+import { EDITOR_PANEL_REGISTRY } from '@/features/editor/panel/editor-panel-registry'
+import { PanelBody, PanelChrome } from '@/features/editor/panel/EditorPanelPrimitives'
 import { EditorRail } from '@/features/editor/EditorRailNavigation'
 import { EditorStatusBar } from '@/features/editor/EditorStatusBar'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/editor-runtime'
@@ -33,7 +36,7 @@ import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-seria
 import { isPersistenceEnabled } from '@/features/editor/editor-persistence'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { EditorShellProvider } from '@/features/editor/shell/EditorShellProvider'
-import { useEditorShell, type EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
+import { useEditorShell, type EditorElementCategory, type EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
 
 const EditorAgentDock = lazy(async () => {
   const module = await import('@/features/editor/EditorAgentDock')
@@ -143,6 +146,8 @@ function EditorDeckContent({
   const [ownedRuntime] = useState(() => externalRuntime ?? createEditorRuntime(initialPresentation))
   const runtime = externalRuntime ?? ownedRuntime
   const [createTool, setCreateTool] = useState<EditorCreateTool | null>(null)
+  // Owned here because the rail selects the pool and the drawer renders it.
+  const [elementCategory, setElementCategory] = useState<EditorElementCategory>('shapes')
   const [pathEditorOpen, setPathEditorOpen] = useState(false)
   const [editingChartId, setEditingChartId] = useState<string | null>(null)
   const [latexEditorTarget, setLatexEditorTarget] = useState<{ id: string; kind: 'edit' } | { kind: 'create' } | null>(null)
@@ -253,6 +258,9 @@ function EditorDeckContent({
   }, [currentTabs, runtime, session.toolbarState])
 
   const railPanel = taskPanelRoute
+  // Routes whose panel is rendered as `secondaryContent` inside the drawer
+  // rather than by the drawer's own branches.
+  const SECONDARY_PANEL_ROUTES = ['comments', 'layers', 'search', 'semantics', 'speakerNotes'] as const
   const changeRailPanel = useCallback((panel: EditorTaskPanelRoute | null, trigger?: HTMLElement | null) => {
     if (panel) {
       runtime.store.dispatch(editorActions.drawingModeChanged(false))
@@ -297,7 +305,7 @@ function EditorDeckContent({
     const selectionChanged = previous.length !== session.activeElementIds.length
       || previous.some((id, index) => id !== session.activeElementIds[index])
     if (!selectionChanged || !taskPanelRoute) return
-    if (['design', 'elements', 'text', 'uploads', 'photos', 'charts'].includes(taskPanelRoute)) {
+    if (['design', 'elements', 'text', 'uploads', 'videos', 'audio', 'photos', 'charts'].includes(taskPanelRoute)) {
       closeTaskPanel({ restoreFocus: false })
     }
   }, [closeTaskPanel, session.activeElementIds, taskPanelRoute])
@@ -398,7 +406,7 @@ function EditorDeckContent({
     if (spec.openDataEditor) setEditingChartId(element.id)
   }
 
-  const insertVideo = ({ ext, src }: { ext?: string; src: string }) => {
+  const insertVideo = ({ ext, poster, src }: { ext?: string; poster?: string; src: string }) => {
     const element: PPTVideoElement = {
       type: 'video',
       id: createPresentationId(10),
@@ -408,6 +416,7 @@ function EditorDeckContent({
       left: (presentation.viewportSize - 500) / 2,
       top: (presentation.viewportSize * presentation.viewportRatio - 300) / 2,
       src,
+      ...(poster ? { poster } : {}),
       autoplay: false,
       ...(ext ? { ext } : {}),
     }
@@ -498,17 +507,57 @@ function EditorDeckContent({
         total: currentSlide?.elements.length ?? 0,
       })
     : ''
-  const secondaryTaskPanel = (
-    <EditorErrorBoundary key={taskPanelRoute ?? 'closed'}>
-      <Suspense fallback={<div className="mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('common.loading')}</div>}>
-      {taskPanelRoute === 'speakerNotes' ? <EditorRemark runtime={runtime} /> : null}
-      {taskPanelRoute === 'comments' ? <EditorCommentsPanel runtime={runtime} /> : null}
-      {taskPanelRoute === 'search' ? <EditorSearchPanel runtime={runtime} /> : null}
-      {taskPanelRoute === 'layers' ? <EditorLayersPanel runtime={runtime} /> : null}
-      {taskPanelRoute === 'semantics' ? <EditorSemanticsPanel runtime={runtime} /> : null}
-      </Suspense>
-    </EditorErrorBoundary>
-  )
+  // These five predate the panel contract and render bare roots, so the chrome
+  // is applied here rather than editing each one: PanelBody restores the 12px
+  // padding and scrolling they used to inherit from `.mona-inspector-content`,
+  // and text-[13px] the base size they were laid out against.
+  // The one place the drawer's panels are wired to the deck. Registry entries
+  // pull what they need from here, so a new category adds no props anywhere.
+  const panelContext: EditorPanelContextValue = {
+    actions: {
+      createTool: changeCreateTool,
+      drawCustomShape: () => {
+        changeCreateTool(null)
+        runtime.store.dispatch(editorActions.creatingCustomShapeChanged(true))
+      },
+      insertAudio,
+      insertChart,
+      insertImageSource: src => void insertImageSource(src),
+      insertSymbol,
+      insertTable,
+      insertTemplateAll: (slides, theme) => runtime.insertTemplateSlides(slides, theme),
+      insertTemplateOne: slide => runtime.createSlideFromTemplate(slide),
+      insertVideo,
+      openLatexEditor: () => setLatexEditorTarget({ kind: 'create' }),
+      openPathEditor: () => setPathEditorOpen(true),
+    },
+    categoryIcon: taskPanelRoute ? EDITOR_PANEL_REGISTRY[taskPanelRoute]?.icon : undefined,
+    elementCategory,
+    templateProviders: DEFAULT_TEMPLATE_PROVIDERS,
+    // The catalogue is app configuration, not deck content. `presentation`
+    // carries a `templates` array that gets persisted with each saved deck,
+    // which freezes the catalogue at the moment that deck was created — a deck
+    // saved today would never see a provider added tomorrow. Read the live
+    // catalogue instead; the state field remains for the command/state shape.
+    templates: DEFAULT_TEMPLATE_CATALOG,
+    theme: presentation.theme,
+  }
+
+  const secondaryTaskPanel = SECONDARY_PANEL_ROUTES.includes(taskPanelRoute as never) ? (
+    <PanelChrome className="mona-secondary-panel">
+      <PanelBody className="pt-3 text-[13px]">
+        <EditorErrorBoundary key={taskPanelRoute ?? 'closed'}>
+          <Suspense fallback={<div className="mona-agent-loading grid h-full place-items-center text-xs text-muted-foreground" role="status">{t('common.loading')}</div>}>
+          {taskPanelRoute === 'speakerNotes' ? <EditorRemark runtime={runtime} /> : null}
+          {taskPanelRoute === 'comments' ? <EditorCommentsPanel runtime={runtime} /> : null}
+          {taskPanelRoute === 'search' ? <EditorSearchPanel runtime={runtime} /> : null}
+          {taskPanelRoute === 'layers' ? <EditorLayersPanel runtime={runtime} /> : null}
+          {taskPanelRoute === 'semantics' ? <EditorSemanticsPanel runtime={runtime} /> : null}
+          </Suspense>
+        </EditorErrorBoundary>
+      </PanelBody>
+    </PanelChrome>
+  ) : null
 
   return (
     <main
@@ -562,11 +611,10 @@ function EditorDeckContent({
       <EditorRail
         activePanel={railPanel}
         activeTool={createTool}
-        customShapeActive={session.creatingCustomShape}
-        drawingActive={session.drawingMode}
+        elementCategory={elementCategory}
         onCreateToolChange={changeCreateTool}
+        onElementCategoryChange={setElementCategory}
         onPanelChange={changeRailPanel}
-        onToggleDrawing={toggleDrawingMode}
       />
       <CollapsiblePanelRegion className="mona-panel-region mona-drawer-region bg-sidebar" open={drawerOpen}>
       <Suspense fallback={(
@@ -574,6 +622,7 @@ function EditorDeckContent({
           {t('common.loading')}
         </div>
       )}>
+      <EditorPanelContext value={panelContext}>
       <EditorRailDrawer
         activePanel={railPanel === 'properties' ? null : railPanel}
         contextualHeader={(
@@ -587,25 +636,8 @@ function EditorDeckContent({
         )}
         contextualOpen={railPanel === 'properties'}
         onClose={closeDrawer}
-        onCreateToolChange={changeCreateTool}
-        onDrawCustomShape={() => {
-          changeCreateTool(null)
-          runtime.store.dispatch(editorActions.creatingCustomShapeChanged(true))
-        }}
-        onInsertAudio={insertAudio}
-        onInsertChart={insertChart}
-        onInsertImageSource={src => void insertImageSource(src)}
-        onInsertSymbol={insertSymbol}
-        onInsertTable={insertTable}
-        onInsertTemplateAll={(slides, theme) => runtime.insertTemplateSlides(slides, theme)}
-        onInsertTemplateOne={slide => runtime.createSlideFromTemplate(slide)}
-        onInsertVideo={insertVideo}
-        onOpenLatexEditor={() => setLatexEditorTarget({ kind: 'create' })}
-        onOpenPathEditor={() => setPathEditorOpen(true)}
         panelTitle={taskPanelTitle}
         secondaryContent={secondaryTaskPanel}
-        templates={presentation.templates}
-        theme={presentation.theme}
       >
         <SidebarContent className="mona-inspector-content" ref={inspectorScrollRef}>
             {/* A crash in one panel resets when the user switches tab/element. */}
@@ -632,13 +664,14 @@ function EditorDeckContent({
             </EditorErrorBoundary>
         </SidebarContent>
       </EditorRailDrawer>
+      </EditorPanelContext>
       </Suspense>
       </CollapsiblePanelRegion>
       {/* Rail, task drawer, and agent dock all span the full height as siblings.
           The header lives between them and flexes, so opening any side surface
           narrows the header and the canvas together. */}
       <div className="mona-editor-main flex min-w-0 flex-1 flex-col">
-      <EditorHeader runtime={runtime} />
+      <EditorHeader onToggleDrawing={toggleDrawingMode} runtime={runtime} />
       <SidebarInset className="mona-editor-inset bg-transparent!" data-testid="mona-editor-surface" id="mona-editor-surface">
       {session.workspaceMode === 'page-grid' ? (
         <EditorErrorBoundary>

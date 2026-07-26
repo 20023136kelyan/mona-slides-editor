@@ -66,7 +66,7 @@ test('keeps the canvas, left task panel, and AI dock structurally independent on
   // stage shrinks to sit beside it.
   expect((await stage.boundingBox())!.width).toBeLessThan(initialStageWidth)
 
-  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Elements' }).click()
+  await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
 

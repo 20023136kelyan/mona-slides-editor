@@ -2,6 +2,9 @@ import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
+import { EditorPanelSearchProvider } from '@/features/editor/panel/editor-panel-search'
+import { PanelSearchBar } from '@/features/editor/panel/EditorPanelPrimitives'
+
 import { EditorPhotosPanel } from '@/features/editor/EditorPhotosPanel'
 import { onlinePhotosDatabase } from '@/features/editor/editor-photos-recent'
 import { EditorApplicationProvider } from '@/features/editor/services/EditorApplicationProvider'
@@ -59,7 +62,10 @@ test('keeps photos discovery and see-all navigation inside the panel', async () 
   await render(
     <div style={{ height: 640, width: 352 }}>
       <EditorApplicationProvider value={application}>
-        <EditorPhotosPanel onInsertImageSource={onInsertImageSource} />
+        <EditorPanelSearchProvider mode="submit" route="photos">
+          <PanelSearchBar label="Search" placeholder="Search millions of photos" />
+          <EditorPhotosPanel onInsertImageSource={onInsertImageSource} />
+        </EditorPanelSearchProvider>
       </EditorApplicationProvider>
     </div>,
   )
