@@ -1,70 +1,65 @@
-# Mona agent server
+# Mona agent runtime
 
-This service is the trust boundary between the presentation editor and hosted
-model accounts. Generated JavaScript never receives provider credentials,
-cookies, filesystem access, or ambient network access.
+> **The name is stale.** This was a server; it is not one any more. It is the
+> agent runtime, imported as a library by the desktop shell in
+> [`apps/desktop`](../desktop) and running inside that process. Nothing here
+> listens on a port. The directory keeps its old name for now because renaming a
+> workspace package is a change worth making on its own, not as a footnote to
+> the desktop migration.
 
-## Provider paths
+## What it is
 
-- **OpenAI** uses the provider-owned ChatGPT Plus/Pro device-code flow exposed
-  by `@earendil-works/pi-ai`. The browser shows the one-time code while the
-  server polls the provider and stores the resulting OAuth credential.
-- **Anthropic** uses the provider-owned Claude Pro/Max flow. The current
-  provider implementation first attempts a localhost callback and also exposes
-  a manual prompt. On a remote Mona deployment, the user can paste the final
-  redirect URL into that prompt. A deployment with an Anthropic-issued web
-  redirect/client should replace this adapter rather than copying a private
-  client identity.
-- **Google AI Studio** intentionally remains a web adapter. A user-supplied key
-  lives only in the current browser tab and is cleared on reload or provider
-  switch.
+The agent half of Mona: everything between "the user typed a prompt" and "the
+deck changed", with no opinion about who is calling.
 
-Subscription eligibility and provider terms remain provider-controlled. Mona
-does not convert a consumer subscription into a generic API credential.
+| Module | Responsibility |
+| --- | --- |
+| `agent-sdk-auth` | Reads the Claude login already on the machine |
+| `agent-sdk-session` | One conversation: prompts, steering, interruption |
+| `agent-sdk-stream` | SDK events translated into the UI chunk vocabulary |
+| `agent-sdk-models` | The model catalogue the signed-in plan allows |
+| `agent-sdk-env` | The environment the subprocess is allowed to see |
+| `agent-tool-bridge` | Tool calls the renderer must answer, correlated by id |
+| `agent-workspace` | The deck as files the agent reads and edits |
+| `agent-workspace-disk` | That workspace, on a real filesystem |
+| `assets` | Stock photo and video search for the media panels |
 
-## Security and persistence
+It carries no browser and no editor assumptions, which is the property that made
+the move to Electron a shell rather than a rewrite —
+[`doc/PRODUCT_ARCHITECTURE.md`](../../doc/PRODUCT_ARCHITECTURE.md) records that
+this was insured against deliberately.
 
-The server sets a signed, `HttpOnly`, `SameSite=Lax` session cookie. OAuth
-credentials are encrypted at rest with AES-256-GCM and are only decrypted
-inside the server-side provider adapter. Mutations require an approved Origin.
-Provider errors are redacted before they cross the API boundary.
+## What used to be here
 
-Development generates local signing/encryption keys under the gitignored
-`apps/agent-server/var/` directory. Production must provide:
+This package was a hosted HTTP service, and this README described a trust
+boundary between a browser and hosted model accounts: a signed session cookie,
+an origin allowlist, CORS, a WebSocket, an AES-256-GCM credential vault, OAuth
+device flows for three providers, and signing keys production had to supply.
 
-```text
-NODE_ENV=production
-MONA_CREDENTIAL_ENCRYPTION_KEY=<32 bytes encoded as base64 or 64 hex digits>
-MONA_SESSION_SIGNING_KEY=<32 bytes encoded as base64 or 64 hex digits>
-MONA_WEB_ORIGINS=https://slides.example.com
-MONA_AGENT_STATE_DIR=/persistent/mona-agent
-```
+All of it is gone, and none of it was replaced. There is no boundary to guard
+because there are no longer two parties: the renderer and the agent are two
+halves of one application on one person's machine, talking over IPC through a
+sandboxed preload. The vault protected credentials Mona no longer holds — the
+agent uses the `claude` login the user already has. The origin gate guarded a
+port that no longer exists.
 
-`MONA_AGENT_STATE_DIR` must be on encrypted persistent storage for a hosted
-single-instance deployment. `CredentialVault` is deliberately an interface so
-a multi-instance deployment can replace the encrypted file adapter with a
-transactional database or secret-store adapter without changing the provider
-or editor protocols.
+## The boundaries that remain
 
-Until Mona account identity is added, provider credentials are scoped to the
-signed browser session. Clearing the session cookie disconnects that browser;
-the future identity layer should supply a stable Mona user ID to the same
-vault interface.
+Losing the network boundary did not remove every boundary. Two are real, and
+both are about content rather than about callers:
 
-## Managed images
+- **A deck is untrusted input.** It arrives inside `.pptx` files other people
+  made. Slides are sanitised before they reach the renderer, an image must
+  resolve to a file the deck owns rather than to an arbitrary URL, and PDF
+  export renders with scripting disabled.
+- **The agent's environment is an allowlist.** `agent-sdk-env` decides what the
+  subprocess may see. This mattered more when a stray operator key would have
+  silently served, and billed, every user's turn; it is ordinary hygiene now,
+  but the allowlist is still the right shape.
 
-The image service searches Wikimedia Commons, signs every result, imports a
-presentation-resolution derivative through the server, verifies MIME, byte
-size, and pixel dimensions, and serves only content-addressed local assets.
-Generated code cannot request arbitrary URLs.
-
-## Local development
-
-From the repository root:
+## Verification
 
 ```bash
-npm run dev
+npm run test -w @mona/agent-server
+npm run type-check -w @mona/agent-server
 ```
-
-This starts both the web editor and the agent server. The Vite server proxies
-`/api/agent` to `http://127.0.0.1:8788`.

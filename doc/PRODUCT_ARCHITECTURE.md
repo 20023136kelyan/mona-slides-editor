@@ -137,11 +137,22 @@ intended semantics for "share a link", but it should be stated rather than impli
 - Whether collaboration is capability-based (share links only) or eventually
   identity-based, which would require some notion of accounts after all.
 
-## Execution model: client-side agent — **DECIDED**
+## Execution model: the agent runs on the user's machine — **DECIDED**
+<!-- Revised 2026-07-27, when Mona became a desktop application. -->
 
-**Mona runs no agent infrastructure.** Agent calls happen in the user's browser
-under the user's own API keys and provider connections. This is already how the
-editor's agent works, so it is a continuation rather than a new constraint.
+**Mona runs no agent infrastructure.** That has not changed and is now more
+literally true than when it was first written. What changed is where "the user's
+machine" means: this said *in the user's browser, under their own API keys*, and
+it is now *in the user's own copy of the application, under the Claude login
+already on that machine*.
+
+The move was forced rather than chosen. The Claude Agent SDK spawns the `claude`
+binary as a subprocess. A browser cannot spawn anything, so as a website that
+subprocess had to live on Mona's machine — which would have made Mona an agent
+host processing other people's decks, against all three reasons below. The
+escape hatch this document already described became the product: see *The escape
+hatch: a self-hosted worker*, which is what a desktop application is, packaged so
+that an ordinary person does not have to run a container to get it.
 
 The reasoning is threefold:
 
@@ -172,6 +183,12 @@ trusted at scale, at which point long batches start dying in closed tabs.
 
 ### The escape hatch: a self-hosted worker
 
+*Substantially taken, ahead of schedule.* The desktop application is this option
+with the container removed: the agent core runs in Node, in the shell's main
+process, on the user's own machine, against their own files. What remains
+unbuilt is the unattended half — cron, event triggers, work that continues with
+nobody watching.
+
 If that demand appears, the answer is **not** for Mona to operate servers. Being
 open source affords a third option: the user runs the worker.
 
@@ -192,11 +209,13 @@ the codebase needs regardless:
 
 Structured as *core (auth, loop, streaming, tool dispatch) + toolsets acting on a
 document through an interface*, the same core later runs in Node with no rewrite.
-Left welded to `EditorRuntime` and DOM APIs — which is its state today — a
-self-hosted worker would mean rewriting it.
 
-This is why the agent extraction described below is not housekeeping. It is what
-keeps this door open, at no extra cost.
+This has since been collected on rather than merely insured against. The core
+under `apps/agent-server/src` now runs in the desktop shell's main process
+unchanged, and it is the reason the move to Electron took a shell rather than a
+rewrite. Left welded to `EditorRuntime` and DOM APIs, which was the risk this
+paragraph named, it would have meant rewriting the agent to ship a desktop app at
+all.
 
 ## What this implies for the code as it stands
 

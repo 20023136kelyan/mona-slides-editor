@@ -2,9 +2,14 @@
 
 [简体中文](./README_zh.md) | English
 
-Mona is an open-source, browser-based presentation editor. It preserves
+Mona is an open-source desktop presentation editor. It preserves
 PowerPoint-style editable objects—text, images, shapes, lines, tables, charts,
 media, and equations—rather than flattening a deck into generated images.
+
+It runs as an Electron application: a React renderer inside a shell that hosts
+the agent in its own process. Nothing listens on a port and nothing is sent
+anywhere. Decks are files in an application-managed library, and the agent runs
+on your machine under the Claude login already there.
 
 The editor, mobile surfaces, slideshow, presenter tools, import/export flows,
 and English/Chinese interface are implemented in React. The repository now
@@ -15,20 +20,19 @@ framework implementation as a reference runtime.
 
 Mona includes a drawing-first and text-first presentation agent workflow.
 Excalidraw sketches are stored per slide and can be handed to Mona as visual
-intent. The agent receives both the native presentation structure and rendered
-slide pixels, generates a bounded JavaScript presentation program, previews
-the result, validates its commands, and applies the accepted edit as one
-undoable transaction. It creates ordinary editable presentation elements;
-screenshots are inspection evidence, never slide data.
+intent. The agent is given the deck as files in a workspace and edits them with
+ordinary tools; the result is validated once on the way back in and applied as
+one undoable transaction, however many turns it took. It creates ordinary
+editable presentation elements; screenshots are inspection evidence, never
+slide data.
 
-Provider paths currently include OpenAI account sign-in, Anthropic account
-sign-in, a Google AI Studio bring-your-own-key adapter, and a local reference
-engine for testing the complete edit pipeline without a model. OAuth
-credentials stay encrypted in the agent server and never enter the editor or
-generated presentation code.
+The agent runs through the Claude Agent SDK, in the desktop shell's own
+process, using the `claude` login already on the machine. There is no
+credential for Mona to hold and nowhere for a deck to be sent.
 
 ## Technology
 
+- Electron 43, with the renderer served from a custom `mona://` scheme
 - React 19.2, TypeScript 7, Vite 8
 - Tailwind CSS 4 with source-owned shadcn/Radix primitives
 - React Router, i18next/react-i18next, Vitest, and Playwright
@@ -38,17 +42,18 @@ Exact tested versions are pinned in `apps/web/package.json` and the lockfile.
 
 ## Run locally
 
-Node.js 20.19+ or 22.12+ is required.
+Node.js 24.13.1+ and npm 11+ are required, as pinned in `engines`.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open <http://127.0.0.1:5173/>. The root `dev` command starts both the React
-application and the local agent server. See
-[`apps/agent-server/README.md`](./apps/agent-server/README.md) for hosted
-provider and production-secret requirements.
+The application window opens by itself. `dev` starts Vite for the renderer and
+Electron for the shell, and the window loads Vite's URL so hot reload works;
+a packaged build serves the same renderer from `mona://app` instead. There is
+no page to open in a browser — the editor needs the shell's bridge, and a plain
+browser tab has none.
 
 ## Verification
 
@@ -66,7 +71,8 @@ npm run build
 
 ```text
 apps/web/                    React production application
-apps/agent-server/           hosted provider, credential, and managed-asset boundary
+apps/desktop/                Electron shell: windows, menus, files, protocol
+apps/agent-server/           agent runtime: sessions, workspace, tools, streaming
 packages/agent-protocol/     shared agent program and review protocol
 packages/presentation-core/ presentation model and domain behavior
 packages/editor-state/      canonical state, transactions, and selectors

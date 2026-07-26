@@ -2,7 +2,8 @@
 
 Status: authoritative product architecture, updated 2026-07-22.
 
-Mona is an open-source, cloud-hosted presentation editor with a React client.
+Mona is an open-source desktop presentation editor: an Electron shell around a
+React renderer, with no server and nothing on the network.
 Its differentiator is a drawing-first agent workflow: the user can express a
 slide visually, and an AI agent turns that intent into native, editable slide
 elements. Source-project attribution and licensing are recorded in
