@@ -5,6 +5,7 @@ import { dirname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, protocol, shell } from 'electron'
 
+import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
 import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
 
@@ -129,6 +130,7 @@ const createWindow = async (): Promise<void> => {
 }
 
 const main = async (): Promise<void> => {
+  await loadDevelopmentEnvironment()
   await app.whenReady()
   serveRenderer()
   registerAgentIpc()
