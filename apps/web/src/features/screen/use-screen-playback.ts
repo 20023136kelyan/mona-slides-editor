@@ -8,11 +8,11 @@ import {
 } from '@mona/presentation-core'
 
 import {
-  AUDIENCE_SYNC_CHANNEL,
   type ScreenPresentationController,
   type ScreenSyncMessage,
 } from '@/features/screen/screen-types'
 import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
+import { ScreenSyncChannel, type ScreenSyncEvent } from '@/features/screen/screen-sync'
 
 export interface ScreenPlayback {
   animationIndex: number
@@ -59,7 +59,7 @@ export const useScreenPlayback = ({
   const [autoPlayInterval, setAutoPlayIntervalState] = useState(2500)
   const [loopPlay, setLoopPlayState] = useState(false)
   const [laserPen, setLaserPen] = useState(false)
-  const channelRef = useRef<BroadcastChannel | null>(null)
+  const channelRef = useRef<ScreenSyncChannel | null>(null)
   const autoPlayTimerRef = useRef<number | null>(null)
   const touchInfoRef = useRef<{ x: number; y: number } | null>(null)
   const lastWheelAtRef = useRef(0)
@@ -291,9 +291,9 @@ export const useScreenPlayback = ({
 
   useEffect(() => {
     if (audience) return undefined
-    const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
+    const channel = new ScreenSyncChannel()
     channelRef.current = channel
-    channel.onmessage = ({ data }: MessageEvent<ScreenSyncMessage>) => {
+    channel.onmessage = ({ data }: ScreenSyncEvent) => {
       if (data.type !== 'REQUEST_STATE') return
       const state = presentationRef.current
       channel.postMessage({

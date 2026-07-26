@@ -17,10 +17,11 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { InspectorSlider } from '@/features/editor/EditorInspectorPrimitives'
-import { AUDIENCE_SYNC_CHANNEL, type ScreenSyncMessage } from '@/features/screen/screen-types'
+import type { ScreenSyncMessage } from '@/features/screen/screen-types'
 import { ScreenMoveablePanel } from '@/features/screen/ScreenMoveablePanel'
 import { ScreenTooltip } from '@/features/screen/ScreenTooltip'
 import { readWritingBoardImage, writeWritingBoardImage } from '@/features/screen/screen-writing-storage'
+import { ScreenSyncChannel, type ScreenSyncEvent } from '@/features/screen/screen-sync'
 
 
 // `mona-screen-writing-btn` stays as the focus querySelector hook.
@@ -358,7 +359,7 @@ export function ScreenWritingBoard({
   const { t } = useTranslation()
   const canvasRef = useRef<DrawingCanvasHandle | null>(null)
   const boardRef = useRef<HTMLDialogElement>(null)
-  const channelRef = useRef<BroadcastChannel | null>(null)
+  const channelRef = useRef<ScreenSyncChannel | null>(null)
   const blackboardRef = useRef(false)
   const [color, setColor] = useState('#e2534d')
   const [model, setModel] = useState<DrawingModel>('pen')
@@ -385,9 +386,9 @@ export function ScreenWritingBoard({
   }, [onClose])
 
   useEffect(() => {
-    const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
+    const channel = new ScreenSyncChannel()
     channelRef.current = channel
-    channel.onmessage = ({ data }: MessageEvent<ScreenSyncMessage>) => {
+    channel.onmessage = ({ data }: ScreenSyncEvent) => {
       if (data.type === 'REQUEST_WRITING_BOARD') broadcast(canvasRef.current?.getDataURL() || '')
     }
     return () => {

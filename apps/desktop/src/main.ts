@@ -3,13 +3,15 @@ import { stat } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { dirname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, protocol, shell } from 'electron'
+import { app, BrowserWindow, dialog, protocol } from 'electron'
 
 import { installApplicationMenu } from './app-menu.js'
 import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
 import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
 import { PRINT_PATH, printDocument, registerFileIpc } from './file-dialogs.js'
+import { registerPresenterIpc } from './presenter.js'
+import { guardNavigation } from './window-guards.js'
 
 /**
  * Mona's desktop shell.
@@ -130,17 +132,7 @@ const createWindow = async (): Promise<void> => {
 
   attachWindowAgent(window)
 
-  // A deck is untrusted content — it comes out of a .pptx someone else made — so a
-  // link inside one must never be able to replace the application with a web page.
-  const rendererOrigin = new URL(rendererUrl).origin
-  window.webContents.on('will-navigate', (event, url) => {
-    if (new URL(url).origin !== rendererOrigin) event.preventDefault()
-  })
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (new URL(url).origin === rendererOrigin) return { action: 'allow' }
-    void shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  guardNavigation(window, rendererUrl)
 
   window.once('ready-to-show', () => window.show())
   await window.loadURL(rendererUrl)
@@ -154,6 +146,7 @@ const main = async (): Promise<void> => {
   registerAgentIpc()
   registerDeckIpc()
   registerFileIpc()
+  registerPresenterIpc(rendererUrl, resolve(HERE, 'preload.cjs'))
   try {
     await createWindow()
   }

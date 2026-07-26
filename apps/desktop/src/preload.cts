@@ -79,6 +79,20 @@ contextBridge.exposeInMainWorld('mona', {
     ipcRenderer.invoke('mona:media:browse', kind, query)
   ),
 
+  /**
+   * The slideshow, across two windows.
+   *
+   * `sync` and `onSync` are the transport the renderer's own sync protocol runs
+   * over. They replace a `BroadcastChannel`, which cannot reach between two
+   * `BrowserWindow`s because those are two renderer processes.
+   */
+  screen: {
+    closeAudience: () => ipcRenderer.invoke('mona:screen:close-audience'),
+    onSync: (listener: (message: unknown) => void) => on('mona:screen:sync', listener),
+    openAudience: () => ipcRenderer.invoke('mona:screen:open-audience'),
+    sync: (message: unknown) => ipcRenderer.send('mona:screen:sync', message),
+  },
+
   /** The model catalog for the signed-in plan. */
   models: () => ipcRenderer.invoke('mona:models'),
 

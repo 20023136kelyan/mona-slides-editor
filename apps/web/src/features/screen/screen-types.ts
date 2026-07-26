@@ -1,7 +1,5 @@
 import type { PresentationState, Slide } from '@mona/presentation-core'
 
-export const AUDIENCE_SYNC_CHANNEL = 'mona-audience-sync'
-
 export type ScreenViewMode = 'base' | 'presenter'
 
 export type ScreenSyncMessage =

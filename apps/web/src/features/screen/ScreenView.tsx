@@ -10,12 +10,14 @@ import { ScreenSlideList } from '@/features/screen/ScreenSlideList'
 import { ScreenBaseView, ScreenPresenterView } from '@/features/screen/ScreenViews'
 import { SCREEN_LASER_POINTER } from '@/features/screen/screen-assets'
 import { projectPresentationForScreen, resolveSourceSlideIndex } from '@/features/screen/screen-presentation'
-import { AUDIENCE_SYNC_CHANNEL, type ScreenPresentationController, type ScreenSyncMessage, type ScreenViewMode } from '@/features/screen/screen-types'
+import type { ScreenPresentationController, ScreenSyncMessage, ScreenViewMode } from '@/features/screen/screen-types'
 import { useScreenPlayback } from '@/features/screen/use-screen-playback'
 import { useScreenSlideSize } from '@/features/screen/use-screen-slide-size'
 
 import 'animate.css'
 import '@/features/screen/screen.css'
+import { ScreenSyncChannel, type ScreenSyncEvent } from '@/features/screen/screen-sync'
+import { monaBridge } from '@/lib/mona-bridge'
 
 type FullscreenDocument = Document & {
   mozCancelFullScreen?: () => void
@@ -111,9 +113,10 @@ function PresenterScreen({
   const { autoPlay } = playback
   const autoPlayLaunchedRef = useRef(false)
   const fullscreen = useFullscreenLifecycle(onExit)
+  // The shell puts it on the display the audience is looking at, fullscreen.
   const openAudience = () => {
     fullscreen.manualExitFullscreen()
-    window.open(`${location.origin}${location.pathname}?mode=audience`, 'mona-audience', 'popup')
+    void monaBridge().screen.openAudience()
   }
   // Vue's exitScreening leaves browser fullscreen before unmounting the show.
   const exitShow = () => {
@@ -128,7 +131,7 @@ function PresenterScreen({
   }, [autoPlay, initialAutoPlay])
 
   useEffect(() => {
-    const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
+    const channel = new ScreenSyncChannel()
     const keydown = (event: KeyboardEvent) => {
       if (event.key.toUpperCase() !== 'ESCAPE') return
       if (event.defaultPrevented) return
@@ -180,10 +183,10 @@ function AudienceScreen({ initialPresentation }: { initialPresentation: Presenta
 
   const { execNext, execPrev, restoreAnimationState, setAnimationIndex, turnSlideToId, turnSlideToIndex } = playback
   useEffect(() => {
-    const channel = new BroadcastChannel(AUDIENCE_SYNC_CHANNEL)
+    const channel = new ScreenSyncChannel()
     channel.postMessage({ type: 'REQUEST_STATE' } satisfies ScreenSyncMessage)
     channel.postMessage({ type: 'REQUEST_WRITING_BOARD' } satisfies ScreenSyncMessage)
-    channel.onmessage = ({ data }: MessageEvent<ScreenSyncMessage>) => {
+    channel.onmessage = ({ data }: ScreenSyncEvent) => {
       if (data.type === 'EXEC_NEXT') execNext()
       else if (data.type === 'EXEC_PREV') execPrev()
       else if (data.type === 'TURN_TO_INDEX') turnSlideToIndex(data.index)
@@ -203,7 +206,7 @@ function AudienceScreen({ initialPresentation }: { initialPresentation: Presenta
       else if (data.type === 'WRITING_BOARD_CLOSE') setWriting({ blackboard: false, dataURL: '', visible: false })
       else if (data.type === 'LASER_PEN_MOVE') setLaser({ visible: true, x: data.x, y: data.y })
       else if (data.type === 'LASER_PEN_OFF') setLaser(current => ({ ...current, visible: false }))
-      else if (data.type === 'EXIT') window.close()
+      else if (data.type === 'EXIT') void monaBridge().screen.closeAudience()
     }
     return () => channel.close()
   }, [execNext, execPrev, restoreAnimationState, setAnimationIndex, turnSlideToId, turnSlideToIndex])

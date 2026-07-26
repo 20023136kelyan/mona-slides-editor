@@ -69,6 +69,13 @@ export interface MonaBridge {
     writeAsset: (name: string, bytes: ArrayBuffer) => Promise<string>
   }
   models: () => Promise<MonaModel[]>
+  /** The slideshow's second window, and the channel the two talk over. */
+  screen: {
+    closeAudience: () => Promise<void>
+    onSync: (listener: (message: unknown) => void) => () => void
+    openAudience: () => Promise<void>
+    sync: (message: unknown) => void
+  }
   /** Returns an unsubscribe. Only ever fires on macOS, where the menu bar exists. */
   onMenuCommand: (listener: (command: string) => void) => () => void
   platform: NodeJS.Platform
