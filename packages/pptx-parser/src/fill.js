@@ -53,6 +53,12 @@ function getMediaCache(warpObj, cacheKey) {
   return cache
 }
 
+/**
+ * `blob` mode mints an object URL, which is scoped to the context that created it.
+ * The parser runs in a Worker, so a URL made here dies when that Worker is torn
+ * down - the main thread receives a reference that was already dead on arrival.
+ * `base64` carries the bytes instead, and the caller decides where they live.
+ */
 async function loadMedia(filePath, warpObj, cacheKey, mode = 'base64') {
   if (!filePath || (mode !== 'base64' && mode !== 'blob')) return ''
 
@@ -85,14 +91,12 @@ export async function loadImage(imgPath, warpObj, mode = 'base64') {
   return await loadMedia(imgPath, warpObj, 'loadedImages', mode)
 }
 
-export async function loadVideo(videoPath, warpObj, mode = 'blob') {
-  if (mode !== 'blob') return ''
-  return await loadMedia(videoPath, warpObj, 'loadedVideos', 'blob')
+export async function loadVideo(videoPath, warpObj, mode = 'base64') {
+  return await loadMedia(videoPath, warpObj, 'loadedVideos', mode)
 }
 
-export async function loadAudio(audioPath, warpObj, mode = 'blob') {
-  if (mode !== 'blob') return ''
-  return await loadMedia(audioPath, warpObj, 'loadedAudios', 'blob')
+export async function loadAudio(audioPath, warpObj, mode = 'base64') {
+  return await loadMedia(audioPath, warpObj, 'loadedAudios', mode)
 }
 
 function getImageMode(warpObj) {
@@ -103,13 +107,13 @@ function getImageMode(warpObj) {
 
 function getVideoMode(warpObj) {
   const videoMode = getTextByPathList(warpObj, ['options', 'videoMode'])
-  if (videoMode === 'blob') return 'blob'
+  if (videoMode === 'blob' || videoMode === 'base64') return videoMode
   return 'none'
 }
 
 function getAudioMode(warpObj) {
   const audioMode = getTextByPathList(warpObj, ['options', 'audioMode'])
-  if (audioMode === 'blob') return 'blob'
+  if (audioMode === 'blob' || audioMode === 'base64') return audioMode
   return 'none'
 }
 
@@ -132,8 +136,12 @@ export async function getVideoData(videoPath, warpObj) {
   const videoData = createMediaData(videoPath || '')
   if (!videoPath) return videoData
 
-  if (getVideoMode(warpObj) === 'blob') {
-    videoData.blob = await loadVideo(videoPath, warpObj, 'blob')
+  // `blob` keeps the historical field name so callers do not have to branch; what
+  // changes is what it holds. A Worker-minted object URL is dead the moment the
+  // Worker is torn down, so base64 is what actually reaches the main thread intact.
+  const videoMode = getVideoMode(warpObj)
+  if (videoMode !== 'none') {
+    videoData.blob = await loadVideo(videoPath, warpObj, videoMode)
   }
 
   return videoData
@@ -143,8 +151,9 @@ export async function getAudioData(audioPath, warpObj) {
   const audioData = createMediaData(audioPath || '')
   if (!audioPath) return audioData
 
-  if (getAudioMode(warpObj) === 'blob') {
-    audioData.blob = await loadAudio(audioPath, warpObj, 'blob')
+  const audioMode = getAudioMode(warpObj)
+  if (audioMode !== 'none') {
+    audioData.blob = await loadAudio(audioPath, warpObj, audioMode)
   }
 
   return audioData

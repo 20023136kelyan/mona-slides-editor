@@ -20,9 +20,9 @@ workerScope.addEventListener('message', event => {
       const packagePromise = createPowerPointPackageBacking(request.source, request.fileName)
       workerScope.postMessage({ stage: 'parse', type: 'progress' })
       const parsedPromise = parse(request.source, {
-        audioMode: 'blob',
+        audioMode: 'base64',
         imageMode: 'base64',
-        videoMode: 'blob',
+        videoMode: 'base64',
       }) as Promise<ParsedPptxPresentation>
       const [backing, parsed] = await Promise.all([packagePromise, parsedPromise])
       workerScope.postMessage(

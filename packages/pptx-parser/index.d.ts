@@ -642,8 +642,8 @@ export interface Slide {
 
 export interface Options {
   imageMode?: 'base64' | 'blob' | 'both' | 'none'
-  videoMode?: 'blob' | 'none'
-  audioMode?: 'blob' | 'none'
+  videoMode?: 'base64' | 'blob' | 'none'
+  audioMode?: 'base64' | 'blob' | 'none'
 }
 
 export interface EmbeddedFont {

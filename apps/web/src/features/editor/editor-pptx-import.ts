@@ -771,7 +771,7 @@ export const convertParsedPptxPresentation = ({
         else if (element.type === 'audio') {
           const source = element.blob || (/^https?:\/\//.test(element.ref) ? element.ref : '')
           if (source) {
-            pushElement({ autoplay: false, color: slideTheme.themeColors[0] ?? slideTheme.fontColor, fixedRatio: false, height: element.height, id: createPresentationId(10), left: element.left, loop: false, rotate: element.rotate ?? 0, src: source, top: element.top, type: 'audio', width: element.width })
+            pushElement({ autoplay: false, color: slideTheme.themeColors[0] ?? slideTheme.fontColor, fixedRatio: false, height: element.height, id: createPresentationId(10), left: element.left, loop: false, rotate: element.rotate ?? 0, src: importedAssetUrl(source), top: element.top, type: 'audio', width: element.width })
             disposition = 'approximated'
           }
           else {
@@ -782,7 +782,7 @@ export const convertParsedPptxPresentation = ({
         else if (element.type === 'video') {
           const source = element.blob || (/^https?:\/\//.test(element.ref) ? element.ref : '')
           if (source || element.posterBase64) {
-            pushElement({ autoplay: false, height: element.height, id: createPresentationId(10), left: element.left, poster: element.posterBase64, rotate: element.rotate ?? 0, src: source, top: element.top, type: 'video', width: element.width })
+            pushElement({ autoplay: false, height: element.height, id: createPresentationId(10), left: element.left, poster: element.posterBase64 ? importedAssetUrl(element.posterBase64) : undefined, rotate: element.rotate ?? 0, src: importedAssetUrl(source), top: element.top, type: 'video', width: element.width })
             disposition = 'approximated'
           }
           else {

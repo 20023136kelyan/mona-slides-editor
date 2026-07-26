@@ -38,9 +38,9 @@ const parseWithoutWorker = async (
   const packagePromise = createPowerPointPackageBacking(source, fileName)
   options.onProgress?.('parse')
   const parsedPromise = parse(source, {
-    audioMode: 'blob',
+    audioMode: 'base64',
     imageMode: 'base64',
-    videoMode: 'blob',
+    videoMode: 'base64',
   }) as Promise<ParsedPptxPresentation>
   const [backing, parsed] = await Promise.all([packagePromise, parsedPromise])
   if (options.signal?.aborted) throw abortError()
