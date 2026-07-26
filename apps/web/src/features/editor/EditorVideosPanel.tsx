@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { monaBridge } from '@/lib/mona-bridge'
 
 import { Button } from '@/components/ui/button'
 import { useTranslation } from 'react-i18next'
@@ -46,28 +47,21 @@ export function EditorVideosPanel({
   const [status, setStatus] = useState<'error' | 'idle' | 'loading'>('idle')
 
   useEffect(() => {
-    const controller = new AbortController()
+    let cancelled = false
     setStatus('loading')
-    fetch('/api/agent/assets/videos/browse', {
-      body: JSON.stringify({ perPage: 24, query: submitted || 'abstract' }),
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-      signal: controller.signal,
-    })
-      .then(async response => {
-        if (!response.ok) throw new Error('search failed')
-        return await response.json() as { videos?: StockVideo[] }
-      })
+    monaBridge().browseMedia<{ videos?: StockVideo[] }>('videos', { perPage: 24, query: submitted || 'abstract' })
       .then(payload => {
+        if (cancelled) return
         setVideos(payload.videos ?? [])
         setStatus('idle')
       })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setStatus('error')
+      .catch(() => {
+        if (!cancelled) setStatus('error')
       })
-    return () => controller.abort()
+    // A result that outlives its panel is discarded rather than aborted: IPC
+    // carries no signal, and one wasted stock-photo response is cheaper than
+    // threading cancellation through the bridge for it.
+    return () => { cancelled = true }
   }, [submitted])
 
   return (

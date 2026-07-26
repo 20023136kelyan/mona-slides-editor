@@ -2,23 +2,24 @@
   "name": "@mona/agent-server",
   "private": true,
   "exports": {
-    "./config": "./src/config.ts",
-    "./server": "./src/server.ts"
+    "./agent-sdk-auth": "./src/agent-sdk-auth.ts",
+    "./agent-sdk-models": "./src/agent-sdk-models.ts",
+    "./agent-sdk-session": "./src/agent-sdk-session.ts",
+    "./agent-sdk-stream": "./src/agent-sdk-stream.ts",
+    "./agent-tool-bridge": "./src/agent-tool-bridge.ts",
+    "./assets": "./src/assets.ts"
   },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
     "@mona/agent-protocol": "0.0.0",
     "ai": "^7.0.37",
-    "image-size": "1.2.1",
-    "ws": "^8.21.1"
+    "image-size": "1.2.1"
   },
   "devDependencies": {
     "@types/node": "24.13.2",

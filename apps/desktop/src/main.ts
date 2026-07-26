@@ -1,76 +1,88 @@
-import { dirname, resolve } from 'node:path'
+import { createReadStream } from 'node:fs'
+import { stat } from 'node:fs/promises'
+import { Readable } from 'node:stream'
+import { dirname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, dialog, shell } from 'electron'
-import { loadAgentServerConfig } from '@mona/agent-server/config'
-import { createAgentServer } from '@mona/agent-server/server'
+import { app, BrowserWindow, dialog, protocol, shell } from 'electron'
+
+import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
 
 /**
  * Mona's desktop shell.
  *
- * The agent host runs *in this process* rather than as a separate server. That is
- * the whole point of the move: the Claude Agent SDK spawns a subprocess, and as a
- * website that subprocess had to live on Mona's machine, processing other people's
- * decks. Here it runs on the user's own machine under the Claude login they already
- * have, which is what `doc/PRODUCT_ARCHITECTURE.md` always asked for.
+ * The agent host runs *in this process*. That is the point of the move: the Claude
+ * Agent SDK spawns a subprocess, and as a website that subprocess had to live on
+ * Mona's machine, processing other people's decks. Here it runs on the user's own
+ * machine under the Claude login they already have.
  *
- * The renderer is loaded over loopback HTTP rather than `file://` or a custom
- * scheme, and that is deliberate. The editor fetches `/api/agent/…` relative to its
- * own origin and derives its WebSocket URL from `window.location`, so same-origin is
- * what keeps the renderer completely unchanged in this step. Chromium treats
- * `http://127.0.0.1` as potentially trustworthy, so `crypto.subtle` (used for PPTX
- * package identity) and `navigator.clipboard` keep working — verified, not assumed.
+ * Nothing listens on a TCP port. The renderer reaches the host through a sandboxed
+ * preload over IPC, which is why the CORS layer, the Origin gate, the session
+ * cookie and the WebSocket could all be deleted rather than ported — there is no
+ * network surface left for any of them to guard.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+const RENDERER_ROOT = app.isPackaged
+  ? join(process.resourcesPath, 'renderer')
+  : resolve(HERE, '../../web/dist')
 
 /**
- * Fixed, because the origin is the IndexedDB partition key.
+ * A real origin, not `file://`.
  *
- * A port that moved between launches would present the editor with an empty deck
- * store and no explanation. This stops mattering once decks live on disk.
+ * Registered `standard` so the router's History API paths resolve and root-absolute
+ * asset references keep working, and `secure` because the editor needs a secure
+ * context: `crypto.subtle` computes PPTX package identity and `navigator.clipboard`
+ * backs copy and paste. `file://` provides neither.
  */
-const AGENT_PORT = 8788
-const AGENT_ORIGIN = `http://127.0.0.1:${AGENT_PORT}`
+const SCHEME = 'mona'
+const APP_ORIGIN = `${SCHEME}://app`
 
-/** Vite in development; the agent server's own static handler once packaged. */
-const rendererUrl = app.isPackaged
-  ? AGENT_ORIGIN
-  : process.env.MONA_DESKTOP_RENDERER_URL ?? 'http://127.0.0.1:5173'
+protocol.registerSchemesAsPrivileged([{
+  privileges: { secure: true, standard: true, supportFetchAPI: true },
+  scheme: SCHEME,
+}])
 
-/**
- * Everything the agent server reads from the environment, decided here.
- *
- * Its config module resolves state next to its own source, which is wrong for a
- * packaged app, and its origin allowlist is a hard-coded set of dev ports that would
- * reject this window. Both are env-overridable, so the shell configures rather than
- * forks them.
- */
-const configureAgentEnvironment = () => {
-  process.env.MONA_AGENT_STATE_DIR ??= resolve(app.getPath('userData'), 'agent-state')
-  process.env.MONA_AGENT_PORT ??= String(AGENT_PORT)
-  process.env.MONA_AGENT_HOST ??= '127.0.0.1'
-  // The window's origin, plus Vite's in development. Still enforced: the server
-  // listens on loopback, where any other local process can reach it.
-  process.env.MONA_WEB_ORIGINS ??= [...new Set([AGENT_ORIGIN, rendererUrl])].join(',')
-  // The skill ships beside the agent server's source, but this process is a bundle
-  // somewhere else entirely, so the relative resolution there cannot work.
-  process.env.MONA_AGENT_PLUGIN_DIR ??= app.isPackaged
-    ? resolve(process.resourcesPath, 'agent-plugin')
-    : resolve(HERE, '../../agent-server/agent-plugin')
+const MIME = new Map(Object.entries({
+  '.css': 'text/css',
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+}))
+
+const mimeFor = (path: string): string => {
+  const dot = path.lastIndexOf('.')
+  return (dot === -1 ? undefined : MIME.get(path.slice(dot))) ?? 'application/octet-stream'
 }
 
-const startAgentServer = async (): Promise<void> => {
-  // Safe to do after import: the server reads its environment when its config
-  // function is called and when a turn starts, not at module load.
-  configureAgentEnvironment()
-  const config = await loadAgentServerConfig()
-  const server = createAgentServer({ config })
-  await new Promise<void>((ready, failed) => {
-    server.once('error', failed)
-    server.listen(config.port, config.host, ready)
+/**
+ * Serves the built renderer, with an SPA fallback.
+ *
+ * Any path that is not a file on disk returns `index.html`, because the router owns
+ * routing. The containment check matters more than it looks: without it a crafted
+ * URL walks out of the bundle and serves anything the process can read.
+ */
+const serveRenderer = () => {
+  protocol.handle(SCHEME, async request => {
+    const { pathname } = new URL(request.url)
+    const target = normalize(join(RENDERER_ROOT, decodeURIComponent(pathname)))
+    const inside = target === RENDERER_ROOT || target.startsWith(RENDERER_ROOT + sep)
+    const file = inside && await stat(target).then(entry => entry.isFile()).catch(() => false)
+      ? target
+      : join(RENDERER_ROOT, 'index.html')
+    return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, {
+      headers: { 'content-type': mimeFor(file) },
+    })
   })
-  app.once('will-quit', () => server.close())
 }
+
+/** Vite in development, for hot reload; the bundled renderer once packaged. */
+const rendererUrl = app.isPackaged
+  ? `${APP_ORIGIN}/`
+  : process.env.MONA_DESKTOP_RENDERER_URL ?? 'http://127.0.0.1:5173'
 
 const createWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
@@ -89,9 +101,10 @@ const createWindow = async (): Promise<void> => {
     width: 1440,
   })
 
-  // Nothing in the editor should ever navigate the shell. A deck is untrusted
-  // content - it comes out of a .pptx someone else made - so a link inside one must
-  // not be able to replace the application with a web page.
+  attachWindowAgent(window)
+
+  // A deck is untrusted content — it comes out of a .pptx someone else made — so a
+  // link inside one must never be able to replace the application with a web page.
   const rendererOrigin = new URL(rendererUrl).origin
   window.webContents.on('will-navigate', (event, url) => {
     if (new URL(url).origin !== rendererOrigin) event.preventDefault()
@@ -108,21 +121,16 @@ const createWindow = async (): Promise<void> => {
 
 const main = async (): Promise<void> => {
   await app.whenReady()
+  serveRenderer()
+  registerAgentIpc()
   try {
-    await startAgentServer()
+    await createWindow()
   }
   catch (error) {
-    // Without this the window never appears and the only trace is an unhandled
-    // rejection on a console nobody is watching. The port being taken is the
-    // realistic case - a stray dev server, or a second copy of Mona.
-    const detail = (error as { code?: string }).code === 'EADDRINUSE'
-      ? `Something else is already using port ${AGENT_PORT} on this machine. Quit it and open Mona again.`
-      : error instanceof Error ? error.message : String(error)
-    dialog.showErrorBox('Mona could not start', detail)
+    dialog.showErrorBox('Mona could not start', error instanceof Error ? error.message : String(error))
     app.quit()
     return
   }
-  await createWindow()
 
   app.on('activate', () => {
     if (!BrowserWindow.getAllWindows().length) void createWindow()

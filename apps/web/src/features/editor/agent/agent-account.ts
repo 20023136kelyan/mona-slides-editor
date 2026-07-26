@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { monaBridge } from '@/lib/mona-bridge'
+
 /**
  * Whether this machine is signed in to Claude.
  *
@@ -28,10 +30,8 @@ const listeners = new Set<() => void>()
 const emit = () => listeners.forEach(listener => listener())
 
 export const refreshAgentAccount = (): Promise<void> => {
-  inflight ??= fetch('/api/agent/account', { credentials: 'include' })
-    .then(async response => {
-      if (!response.ok) throw new Error('Could not read the Claude account')
-      const payload = await response.json() as Omit<AgentAccount, 'loading'>
+  inflight ??= monaBridge().account()
+    .then(payload => {
       account = { ...payload, loading: false }
     })
     .catch(() => {

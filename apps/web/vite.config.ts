@@ -45,14 +45,6 @@ export default defineConfig({
   },
   server: {
     forwardConsole: true,
-    proxy: {
-      '/api/agent': {
-        target: process.env.MONA_AGENT_SERVER_URL ?? 'http://127.0.0.1:8788',
-        // The agent conversation is a WebSocket, and a proxy does not forward an
-        // upgrade unless it is told to.
-        ws: true,
-      },
-    },
   },
   build: {
     sourcemap: false,

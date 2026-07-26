@@ -1,3 +1,5 @@
+import { monaBridge } from '@/lib/mona-bridge'
+
 export type PhotoOrientation = 'all' | 'landscape' | 'portrait' | 'square'
 
 export interface PhotoSearchItem {
@@ -54,23 +56,16 @@ export const searchOnlinePhotos = async (
     orientation?: PhotoOrientation
     page?: number
     perPage?: number
-    signal?: AbortSignal
   } = {},
 ): Promise<PhotoSearchResult> => {
-  const response = await fetch('/api/agent/assets/images/browse', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      page: options.page ?? 1,
-      perPage: options.perPage ?? 30,
-      orientation: options.orientation ?? 'all',
-    }),
-    signal: options.signal,
+  // No abort signal: IPC carries none, and a stock-photo request that outlives its
+  // panel costs one discarded result rather than a held connection.
+  const payload = await monaBridge().browseMedia<{ data?: PhotoSearchItem[]; total?: number }>('images', {
+    orientation: options.orientation ?? 'all',
+    page: options.page ?? 1,
+    perPage: options.perPage ?? 30,
+    query,
   })
-  if (!response.ok) throw new Error(`Image search failed: ${response.status}`)
-  const payload = await response.json() as { data?: PhotoSearchItem[]; total?: number }
   return {
     data: payload.data || [],
     total: payload.total || 0,

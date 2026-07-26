@@ -1,21 +1,20 @@
 import { useChat } from '@ai-sdk/react'
 import { useEffect, useMemo, useRef } from 'react'
 
-import { AgentSocketTransport } from '@/features/editor/agent/agent-socket-transport'
+import { AgentIpcTransport } from '@/features/editor/agent/agent-ipc-transport'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 
 /**
  * The agent, as the dock consumes it.
  *
- * One harness: the Claude Agent SDK, over a socket. The loop runs in a subprocess
- * on the server and the transport fulfils its tool requests from this tab, which is
- * why there is no `onToolCall` here - the socket answers them itself.
+ * The loop runs in the Electron main process and the transport answers its tool
+ * requests from this window, which is why there is no `onToolCall` here — the
+ * transport handles them itself.
  *
- * There used to be a second path, an AI SDK POST route serving Google and OpenAI.
- * It went when the deck became a directory of files: that design needs a workspace
- * and a subprocess, and a request/response route has neither. Google offers no
- * subscription path for third-party apps, so it was BYOK-only anyway; Codex will
- * arrive as its own adapter over the same file-based workflow.
+ * There used to be two transports and, before that, two harnesses: an AI SDK POST
+ * route for Google and OpenAI, then a WebSocket for the Agent SDK. Both were shapes
+ * a web page needed. On the desktop the agent host is in the same application, so
+ * the conversation is IPC and nothing above this line noticed the change.
  */
 export const useAgentChat = ({
   effort,
@@ -33,9 +32,9 @@ export const useAgentChat = ({
   const effortRef = useRef(effort)
   effortRef.current = effort
 
-  // The transport owns a connection, so it must survive re-renders.
-  const socket = useMemo(
-    () => new AgentSocketTransport({
+  // The transport owns a tool-request subscription, so it must survive re-renders.
+  const transport = useMemo(
+    () => new AgentIpcTransport({
       effort: () => effortRef.current,
       model: () => modelRef.current,
       runtime,
@@ -43,7 +42,7 @@ export const useAgentChat = ({
     [runtime],
   )
 
-  useEffect(() => () => socket.close(), [socket])
+  useEffect(() => () => transport.close(), [transport])
 
-  return useChat({ transport: socket })
+  return useChat({ transport })
 }

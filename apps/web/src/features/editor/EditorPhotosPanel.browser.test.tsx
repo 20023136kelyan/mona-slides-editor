@@ -12,6 +12,11 @@ import type { EditorApplication } from '@/features/editor/services/editor-applic
 import { createEditorNotificationService } from '@/features/editor/services/editor-notifications'
 import { initializeI18n, setLocale } from '@/i18n'
 
+/** Swapped per test; `window.mona` delegates here so the stub survives re-renders. */
+const defaultBrowseMedia = window.mona!.browseMedia
+let browseMedia = defaultBrowseMedia
+window.mona = { ...window.mona!, browseMedia: (kind, query) => browseMedia(kind, query) }
+
 const samplePhotos = [
   { id: 1, width: 800, height: 600, src: 'https://images.pexels.com/photos/1/a.jpeg' },
   { id: 2, width: 600, height: 900, src: 'https://images.pexels.com/photos/2/b.jpeg' },
@@ -42,19 +47,21 @@ beforeAll(async () => {
 beforeEach(async () => {
   await setLocale('en-US')
   await onlinePhotosDatabase.recent.clear()
-  vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-    const body = init?.body ? JSON.parse(String(init.body)) as { query?: string } : {}
-    const query = body.query || 'trending'
-    return new Response(JSON.stringify({
-      data: samplePhotos.map(photo => ({ ...photo, id: `${query}-${photo.id}` })),
+  // The panel reaches its host through the desktop bridge rather than fetch, so
+  // the stub goes there. `browser-setup` installs a default one; this replaces the
+  // media call for the length of the test.
+  browseMedia = async (_kind, query) => {
+    const asked = (query as { query?: string }).query || 'trending'
+    return {
+      data: samplePhotos.map(photo => ({ ...photo, id: `${asked}-${photo.id}` })),
       total: samplePhotos.length,
-    }), { headers: { 'content-type': 'application/json' }, status: 200 })
-  }))
+    } as never
+  }
 })
 
 afterEach(async () => {
   await onlinePhotosDatabase.recent.clear()
-  vi.unstubAllGlobals()
+  browseMedia = defaultBrowseMedia
 })
 
 test('keeps photos discovery and see-all navigation inside the panel', async () => {

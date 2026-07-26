@@ -1,31 +1,24 @@
 import { spawn } from 'node:child_process'
 
-const children = [
-  spawn('npm', ['run', 'dev:agent'], { stdio: 'inherit' }),
-  spawn('npm', ['run', 'dev:web'], { stdio: 'inherit' }),
-]
-
-let stopping = false
-const stop = signal => {
-  if (stopping) return
-  stopping = true
-  for (const child of children) {
-    if (!child.killed) child.kill(signal)
-  }
+/**
+ * Development runs two processes: Vite for the renderer, and Electron for the shell
+ * that hosts the agent. It used to run a standalone agent server as the second one;
+ * that server no longer exists, because the shell *is* the host.
+ *
+ * Vite starts first and Electron waits for it, since the window loads its URL.
+ */
+const run = (name, args) => {
+  const child = spawn('npm', ['run', name, ...args], { shell: false, stdio: 'inherit' })
+  child.on('exit', code => process.exit(code ?? 0))
+  return child
 }
 
-for (const child of children) {
-  child.once('error', error => {
-    console.error(error)
-    stop('SIGTERM')
-    process.exitCode = 1
-  })
-  child.once('exit', (code, signal) => {
-    if (stopping) return
-    stop('SIGTERM')
-    process.exitCode = signal ? 1 : code ?? 1
-  })
-}
+const web = run('dev:web', [])
+const shell = setTimeout(() => run('dev:desktop', []), 2500)
 
-process.once('SIGINT', () => stop('SIGINT'))
-process.once('SIGTERM', () => stop('SIGTERM'))
+const stop = () => {
+  clearTimeout(shell)
+  web.kill('SIGTERM')
+}
+process.once('SIGINT', stop)
+process.once('SIGTERM', stop)

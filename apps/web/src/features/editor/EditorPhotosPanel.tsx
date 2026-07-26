@@ -123,26 +123,26 @@ function usePhotoQuery(query: string | null, perPage = 30, refreshKey = 0) {
       setTotal(0)
       return undefined
     }
-    const controller = new AbortController()
     const sequence = sequenceRef.current + 1
     sequenceRef.current = sequence
     setLoading(true)
     setError(false)
-    void searchOnlinePhotos(query, { page: 1, perPage, signal: controller.signal })
+    void searchOnlinePhotos(query, { page: 1, perPage })
       .then(result => {
         if (sequence !== sequenceRef.current) return
         setItems(result.data)
         setTotal(result.total)
         setPage(1)
       })
-      .catch(errorValue => {
-        if (errorValue instanceof DOMException && errorValue.name === 'AbortError') return
+      .catch(() => {
         if (sequence === sequenceRef.current) setError(true)
       })
       .finally(() => {
         if (sequence === sequenceRef.current) setLoading(false)
       })
-    return () => controller.abort()
+    // The sequence guard above already discards a stale result, which is what the
+    // abort was really for.
+    return undefined
   }, [perPage, query, refreshKey])
 
   const loadMore = async () => {

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
+import { monaBridge } from '@/lib/mona-bridge'
+
 export interface AgentModel {
   /**
    * Reasoning depths this model accepts, in the order to offer them. Absent means
@@ -33,14 +35,11 @@ const subscribe = (listener: () => void) => {
 }
 
 export const loadAgentModels = (): Promise<void> => {
-  inflight ??= fetch('/api/agent/models', { credentials: 'include' })
-    .then(async response => {
-      if (!response.ok) throw new Error('Could not load the model catalog')
-      const payload = await response.json() as { models?: AgentModel[] }
-      if (payload.models?.length) {
-        models = payload.models
-        listeners.forEach(listener => listener())
-      }
+  inflight ??= monaBridge().models()
+    .then(catalog => {
+      if (!catalog.length) return
+      models = catalog
+      listeners.forEach(listener => listener())
     })
     .catch(() => {
       // Allow a later attempt; the declared list carries us until then.
