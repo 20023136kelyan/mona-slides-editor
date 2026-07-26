@@ -46,6 +46,9 @@ export interface MonaBridge {
     writeAsset: (name: string, bytes: ArrayBuffer) => Promise<string>
   }
   models: () => Promise<MonaModel[]>
+  /** Returns an unsubscribe. Only ever fires on macOS, where the menu bar exists. */
+  onMenuCommand: (listener: (command: string) => void) => () => void
+  platform: NodeJS.Platform
 }
 
 declare global {
@@ -69,3 +72,13 @@ export const monaBridge = (): MonaBridge => {
 
 /** For the few places that would rather show nothing than throw. */
 export const maybeMonaBridge = (): MonaBridge | undefined => window.mona
+
+/**
+ * Whether the window's chrome belongs to macOS.
+ *
+ * Decides two things together, and they have to stay together: the menus live in
+ * the system menu bar, and the editor's own header has to keep clear of the traffic
+ * lights floating over its top-left. Split them and you get either two menu bars or
+ * a close button sitting on top of a control.
+ */
+export const isMacChrome = (): boolean => window.mona?.platform === 'darwin'

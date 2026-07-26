@@ -5,6 +5,7 @@ import { dirname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, dialog, protocol, shell } from 'electron'
 
+import { installApplicationMenu } from './app-menu.js'
 import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
 import { handleAssetRequest, registerDeckIpc } from './deck-store.js'
@@ -94,6 +95,8 @@ const rendererUrl = app.isPackaged
   ? `${APP_ORIGIN}/`
   : process.env.MONA_DESKTOP_RENDERER_URL ?? 'http://127.0.0.1:5173'
 
+const MAC = process.platform === 'darwin'
+
 const createWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
     backgroundColor: '#ffffff',
@@ -102,6 +105,11 @@ const createWindow = async (): Promise<void> => {
     minWidth: 1024,
     show: false,
     title: 'Mona',
+    // On macOS the editor fills the window and the traffic lights float over its
+    // header, which is why the renderer reserves space for them. `hiddenInset`
+    // rather than fully frameless: the buttons keep their standard inset and
+    // system behaviour, including the green button's window menu.
+    ...(MAC ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } } : {}),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -132,6 +140,7 @@ const createWindow = async (): Promise<void> => {
 const main = async (): Promise<void> => {
   await loadDevelopmentEnvironment()
   await app.whenReady()
+  installApplicationMenu()
   serveRenderer()
   registerAgentIpc()
   registerDeckIpc()

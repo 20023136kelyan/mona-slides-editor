@@ -68,4 +68,15 @@ contextBridge.exposeInMainWorld('mona', {
 
   /** The model catalog for the signed-in plan. */
   models: () => ipcRenderer.invoke('mona:models'),
+
+  /**
+   * A command chosen from the macOS menu bar.
+   *
+   * The menu items do not act: they name a command and the renderer runs the same
+   * handler its own header uses, so the two cannot drift apart.
+   */
+  onMenuCommand: (listener: (command: string) => void) => on('mona:menu', listener),
+
+  /** Decides where the menus live and whether to clear the traffic lights. */
+  platform: process.platform,
 })

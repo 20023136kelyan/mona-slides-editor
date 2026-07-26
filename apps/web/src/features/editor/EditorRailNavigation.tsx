@@ -12,6 +12,7 @@ import {
 import type { ComponentType } from 'react'
 
 import { CATEGORY_ICONS } from '@/features/editor/icons/category-icons'
+import { isMacChrome } from '@/lib/mona-bridge'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -274,6 +275,10 @@ export function EditorRail({
           toggle; manually collapsed drops the mark so the toggle (the only way
           back) owns the 52px; below `snug` the rail is forced narrow, so the
           toggle has nothing to offer and the mark keeps the slot. */}
+      {/* macOS puts the traffic lights over this corner, and the rail collapses to
+          about 52px - too narrow to sit beside them. So they get a strip of their
+          own, which doubles as somewhere to grab the window. */}
+      {isMacChrome() ? <div aria-hidden="true" className="mona-editor-rail-titlebar h-9 flex-none" /> : null}
       <SidebarHeader className={cn('h-11 flex-none flex-row items-center gap-1 px-3', railIconRow)}>
         <div
           aria-label="Mona"

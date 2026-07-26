@@ -46,6 +46,10 @@ const bridge: MonaBridge = {
     { effortLevels: ['low', 'medium', 'high'], id: 'default', name: 'Default (recommended)' },
     { effortLevels: ['low', 'medium', 'high'], id: 'sonnet', name: 'Sonnet' },
   ],
+  onMenuCommand: () => () => {},
+  // Not darwin: the tests assert the in-window menu bar, which is what Windows
+  // and Linux get. The macOS chrome is verified in the running application.
+  platform: 'linux',
 }
 
 window.mona = bridge

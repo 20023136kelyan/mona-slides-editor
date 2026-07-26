@@ -69,6 +69,7 @@ import { useEditorShell } from '@/features/editor/shell/editor-shell'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { isSupportedLocale, type SupportedLocale } from '@/i18n'
 import { LEGACY_NATIVE_FILE_EXTENSION } from '@/lib/legacy-compatibility'
+import { isMacChrome, monaBridge } from '@/lib/mona-bridge'
 import { cn } from '@/lib/utils'
 
 type OpenPopover = 'file' | 'view' | 'tools' | 'screen' | 'compactMenu' | null
@@ -173,6 +174,7 @@ export function EditorSkipLink() {
 
 export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: () => void; runtime: EditorRuntime }) {
   const { i18n, t } = useTranslation()
+  const macChrome = isMacChrome()
   const {
     agentOpen,
     closeAgent,
@@ -389,6 +391,36 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
     </>
   )
 
+  /**
+   * The macOS menu bar, driving the same handlers the in-window menu uses.
+   *
+   * Deliberately a lookup rather than a second set of implementations: an item that
+   * did its own thing would drift from the menu it replaces, and the two would
+   * disagree about what "Import PowerPoint" means.
+   */
+  useEffect(() => {
+    if (!macChrome) return undefined
+    const commands: Record<string, () => void> = {
+      'file.export.image': () => requestExport('image'),
+      'file.export.json': () => requestExport('json'),
+      'file.export.native': () => requestExport('native'),
+      'file.export.pdf': () => requestExport('pdf'),
+      'file.export.pptx': () => requestExport('pptx'),
+      'file.import.json': () => jsonInputRef.current?.click(),
+      'file.import.native': () => nativeInputRef.current?.click(),
+      'file.import.pptx': () => pptxInputRef.current?.click(),
+      'file.new': () => setResetDialogOpen(true),
+      'tools.find': () => openTaskPanel('search'),
+      'tools.semantics': () => openTaskPanel('semantics'),
+      'tools.shortcuts': () => setHotkeysOpen(true),
+      'view.comments': () => openTaskPanel('comments'),
+      'view.layers': () => openTaskPanel('layers'),
+      'view.present.beginning': () => requestScreen(true),
+      'view.present.current': () => requestScreen(false),
+    }
+    return monaBridge().onMenuCommand(command => commands[command]?.())
+  })
+
   return (
     <>
       {/* The header is a container, not a viewport consumer: it now sits between
@@ -397,14 +429,23 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       <header aria-label={t('header.editorHeader')} className="@container/header" role="banner">
       <div
         aria-label={t('header.menuBar')}
-        className="mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] @max-[1000px]/header:px-2 @max-[760px]/header:grid-cols-[max-content_minmax(0,1fr)_max-content] @max-[560px]/header:px-1"
+        className={cn(
+          'mona-editor-header relative grid h-11 flex-none grid-cols-[minmax(0,1fr)_minmax(12rem,32rem)_minmax(0,1fr)] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:grid-cols-[minmax(0,1fr)_minmax(10rem,24rem)_minmax(0,1fr)] @max-[1000px]/header:px-2 @max-[760px]/header:grid-cols-[max-content_minmax(0,1fr)_max-content] @max-[560px]/header:px-1',
+          // There is no title bar on macOS, so this strip is what the user grabs
+          // to move the window. It needs no inset: the rail owns the top-left
+          // corner where the traffic lights sit, and reserves the space itself.
+          macChrome && 'mona-editor-header-mac',
+        )}
         onKeyDown={moveMenuFocus}
         ref={menuBarRef}
         role="menubar"
         tabIndex={-1}
       >
         <fieldset aria-label={t('header.documentControls')} className="mona-editor-header-left m-0 flex min-w-0 items-center gap-1 border-0 p-0 justify-self-start @max-[760px]/header:gap-0">
-          <nav aria-label={t('header.menuBar')} className="flex min-w-0 items-center gap-px @max-[760px]/header:hidden">
+          {/* Hidden on macOS: these live in the system menu bar there, and two
+              menu bars saying the same thing is worse than either alone. The file
+              inputs stay - the native menu triggers them through the same refs. */}
+          <nav aria-label={t('header.menuBar')} className={cn('min-w-0 items-center gap-px @max-[760px]/header:hidden', macChrome ? 'hidden' : 'flex')}>
             <input accept="application/vnd.openxmlformats-officedocument.presentationml.presentation" aria-hidden="true" hidden onChange={event => requestImport('pptx', event)} ref={pptxInputRef} tabIndex={-1} type="file" />
             <input accept=".json" aria-hidden="true" hidden onChange={event => requestImport('json', event)} ref={jsonInputRef} tabIndex={-1} type="file" />
             <input accept={`.mona,${LEGACY_NATIVE_FILE_EXTENSION}`} aria-hidden="true" hidden onChange={event => requestImport('native', event)} ref={nativeInputRef} tabIndex={-1} type="file" />
@@ -418,8 +459,9 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
               {toolsMenuItems}
             </HeaderMenu>
           </nav>
-          {/* Cramped header: the three menus fold into one icon menu. */}
-          <nav aria-label={t('header.menuBar')} className="hidden min-w-0 items-center @max-[760px]/header:flex">
+          {/* Cramped header: the three menus fold into one icon menu. Not on
+              macOS, where the system menu bar is always there however narrow. */}
+          <nav aria-label={t('header.menuBar')} className={cn('hidden min-w-0 items-center', macChrome ? '' : '@max-[760px]/header:flex')}>
             <DropdownMenu onOpenChange={value => setMenuOpen('compactMenu', value)} open={openPopover === 'compactMenu'}>
               <DropdownMenuTrigger asChild>
                 <Button aria-label={t('header.menuBar')} size="header-icon" title={t('header.menuBar')} variant="header-pill"><Menu /></Button>

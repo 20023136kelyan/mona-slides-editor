@@ -2241,3 +2241,13 @@
 @media (prefers-reduced-motion: reduce) {
   .mona-agent-pulse { animation: none; opacity: 0.8; }
 }
+
+/* macOS gives the window no title bar, so the editor header is what the user
+   grabs to move it — and it has to start clear of the traffic lights floating
+   over its top-left. Controls opt back out, or they would drag instead of click. */
+.mona-editor-header-mac { -webkit-app-region: drag; }
+.mona-editor-header-mac button,
+.mona-editor-header-mac input,
+.mona-editor-header-mac [role='button'],
+.mona-editor-header-mac a { -webkit-app-region: no-drag; }
+.mona-editor-rail-titlebar { -webkit-app-region: drag; }
