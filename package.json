@@ -12,15 +12,16 @@
     "npm": ">=11.0.0"
   },
   "scripts": {
-    "dev": "node scripts/dev.mjs",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
     "dev:web": "npm exec -w @mona/web -- vite --host 127.0.0.1 --port 5173",
     "dev:agent": "npm run dev -w @mona/agent-server",
+    "dev:desktop": "npm run build -w @mona/desktop && npm exec -w @mona/desktop -- electron apps/desktop",
     "dev:react": "npm run dev -w @mona/web -- --host 127.0.0.1 --port 6174",
     "build": "npm run i18n:check && npm run build -w @mona/web",
     "build:react": "npm run build -w @mona/web",
     "build-only": "npm run build -w @mona/web",
     "preview": "npm exec -w @mona/web -- vite preview",
-    "type-check": "npm run type-check -w @mona/web && npm run type-check -w @mona/agent-server && npm run type-check:packages",
+    "type-check": "npm run type-check -w @mona/web && npm run type-check -w @mona/agent-server && npm run type-check -w @mona/desktop && npm run type-check:packages",
     "i18n:check": "node scripts/check-i18n.mjs",
     "measure:build": "node scripts/measure-build.mjs",
     "measure:runtime": "node scripts/measure-runtime.mjs",
