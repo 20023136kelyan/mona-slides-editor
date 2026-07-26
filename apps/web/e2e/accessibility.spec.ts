@@ -162,6 +162,9 @@ test('keeps every page-grid bulk action reachable beside the agent at compact wi
   await resizeWindow(app, 1024, 720)
   await openApp(page, '?developmentFixture=slides')
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
+  // Wait for the dock before opening the grid: it takes width from the grid,
+  // and measuring the row while it is still arriving measures the wrong layout.
+  await expect(page.getByRole('complementary', { name: 'Mona AI' })).toBeVisible()
   await page.getByRole('button', { name: 'Grid view' }).click()
 
   const gridActions = page.locator('.mona-page-grid-actions')
@@ -174,7 +177,17 @@ test('keeps every page-grid bulk action reachable beside the agent at compact wi
     // into view, not that it already is. The page not scrolling is asserted
     // once, below, which is the thing compact width could actually break.
     await action.scrollIntoViewIfNeeded()
-    await expect(action).toBeInViewport()
+    // Geometry rather than `toBeInViewport`. That matcher asks an
+    // IntersectionObserver, which reports nothing at all for a window the
+    // compositor considers occluded — and running these in parallel stacks the
+    // windows, so it failed on buttons measurably inside the window (left 86,
+    // right 182, of 1024). What the test means is that the control fits within
+    // the window at this width, and that is what a rectangle can say.
+    expect(await action.evaluate(el => {
+      const rect = el.getBoundingClientRect()
+      return rect.left >= 0 && rect.top >= 0
+        && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight
+    })).toBe(true)
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
 })
