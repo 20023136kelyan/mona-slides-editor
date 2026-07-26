@@ -9,6 +9,9 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'line',
   expect: { timeout: 15_000 },
+  // CI runners are virtualised and have no GPU; the same journeys that take
+  // seconds on a laptop were being closed mid-click at the 30s default.
+  timeout: process.env.CI ? 90_000 : 30_000,
   use: {
     colorScheme: 'light',
     locale: 'en-US',

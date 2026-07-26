@@ -181,16 +181,32 @@ export const resizeWindow = async (
   app: ElectronApplication,
   width: number,
   height: number,
-): Promise<void> => {
-  await app.evaluate(({ BrowserWindow }, size) => {
-    BrowserWindow.getAllWindows()[0]?.setSize(size.width, size.height)
+): Promise<{ display: string; fits: boolean }> => {
+  const result = await app.evaluate(({ BrowserWindow, screen }, size) => {
+    const window = BrowserWindow.getAllWindows()[0]
+    window?.setSize(size.width, size.height)
+    const [actualWidth = 0, actualHeight = 0] = window?.getSize() ?? []
+    const work = screen.getPrimaryDisplay().workAreaSize
+    return {
+      actualWidth,
+      display: `${work.width}x${work.height}`,
+      fits: actualWidth >= size.width && actualHeight >= size.height,
+    }
   }, { height, width })
+
   // Asking is not arriving: `setSize` returns before the renderer has been
-  // resized, laid out, and re-rendered at the new width. Without waiting for
-  // the page to agree, a test asserting a compact layout races the wide one —
-  // which is what made these fail only under parallel load.
+  // resized, laid out and re-rendered, so a test asserting a compact layout
+  // would race the wide one.
+  //
+  // And asking is not getting, either. A window cannot exceed the display it is
+  // on, so on a small screen `setSize` is clamped and returns as if it worked.
+  // Waiting for `innerWidth <= width` accepted that silently — it is trivially
+  // true when the window was already too small — and the test then measured a
+  // layout nobody asked for. The caller is told instead, and can skip rather
+  // than assert against the wrong one.
   const page = await app.firstWindow()
-  await page.waitForFunction(target => window.innerWidth <= target, width)
+  await page.waitForFunction(target => Math.abs(window.innerWidth - target) <= 2, result.actualWidth)
+  return { display: result.display, fits: result.fits }
 }
 
 /**

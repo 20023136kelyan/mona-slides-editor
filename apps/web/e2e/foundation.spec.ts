@@ -56,7 +56,8 @@ test('renders the complete native fixture and selects a slide read-only', async 
 })
 
 test('keeps the canvas, left task panel, and AI dock structurally independent on desktop', async ({ app, page }) => {
-  await resizeWindow(app, 1440, 900)
+  const viewport = await resizeWindow(app, 1440, 900)
+  test.skip(!viewport.fits, `needs a 1440x900 window; this display is ${viewport.display}`)
   await openApp(page, '?developmentFixture=slides')
 
   const stage = page.locator('.mona-editor-stage')

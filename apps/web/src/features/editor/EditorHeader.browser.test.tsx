@@ -127,29 +127,43 @@ test('keeps title geometry stable across focus, typing, cancel, commit, and undo
     }
   }
   const resting = geometry()
+  /**
+   * Stable to the pixel, not to the sub-pixel.
+   *
+   * The field is centred in what the two header groups leave it, so its
+   * position follows their measured width — which is fractional, and rounds one
+   * way or the other between renders depending on the font stack. That showed
+   * up as 409 against 410 on Linux and never on macOS. A pixel of rounding is
+   * not the field moving, which is what this is here to catch.
+   */
+  const expectStable = (actual: typeof resting) => {
+    for (const key of ['height', 'left', 'top', 'width'] as const) {
+      expect(Math.abs(actual[key] - resting[key])).toBeLessThanOrEqual(1)
+    }
+  }
 
   await title.click()
   expect(element.readOnly).toBe(false)
-  expect(geometry()).toEqual(resting)
+  expectStable(geometry())
   await title.fill('Cancelled title')
-  expect(geometry()).toEqual(resting)
+  expectStable(geometry())
   element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
   await new Promise(resolve => setTimeout(resolve, 0))
   expect(element.value).toBe('Header fixture')
   expect(element.readOnly).toBe(true)
-  expect(geometry()).toEqual(resting)
+  expectStable(geometry())
 
   await title.click()
   await title.fill('Committed title')
   element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
   await new Promise(resolve => setTimeout(resolve, 0))
   expect(runtime.store.getState().presentation.title).toBe('Committed title')
-  expect(geometry()).toEqual(resting)
+  expectStable(geometry())
 
   await new Promise(resolve => setTimeout(resolve, 320))
   expect(runtime.undo()).toBe(true)
   expect(runtime.store.getState().presentation.title).toBe('Header fixture')
-  expect(geometry()).toEqual(resting)
+  expectStable(geometry())
 })
 
 test('drives save status from persistence and confirms a fully undoable new presentation', async () => {

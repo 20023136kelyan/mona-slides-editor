@@ -115,7 +115,8 @@ test('moves keyboard focus through contextual, filmstrip, and grid workspaces', 
 })
 
 test('keeps compact desktop geometry bounded with both editor side surfaces active', async ({ app, page }) => {
-  await resizeWindow(app, 1024, 720)
+  const viewport = await resizeWindow(app, 1024, 720)
+  test.skip(!viewport.fits, `needs a 1024x720 window; this display is ${viewport.display}`)
   await openApp(page, '?developmentFixture=slides')
   await page.getByRole('navigation', { name: 'Editor tools' }).getByRole('button', { name: 'Shape' }).click()
   await expect(page.getByRole('complementary', { name: 'Elements' })).toBeVisible()
@@ -159,7 +160,8 @@ test('keeps compact desktop geometry bounded with both editor side surfaces acti
 })
 
 test('keeps every page-grid bulk action reachable beside the agent at compact width', async ({ app, page }) => {
-  await resizeWindow(app, 1024, 720)
+  const viewport = await resizeWindow(app, 1024, 720)
+  test.skip(!viewport.fits, `needs a 1024x720 window; this display is ${viewport.display}`)
   await openApp(page, '?developmentFixture=slides')
   await page.getByRole('button', { name: 'Generate presentation with AI' }).click()
   // Wait for the dock before opening the grid: it takes width from the grid,
