@@ -55,9 +55,31 @@ interface MonaFixtures {
   page: Page
 }
 
+/**
+ * Launches Electron, retrying a busy binary.
+ *
+ * `spawn ETXTBSY` means the kernel refused to exec a file something still holds
+ * open for writing. On a runner that happens between a test and its retry, or
+ * just after the shell bundle is built, and it has nothing to do with the test
+ * that trips over it — it simply fails whichever one launched at the wrong
+ * moment, which then reads as an unrelated journey breaking.
+ */
+const launchWithRetry = async (options: Parameters<typeof electron.launch>[0]) => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await electron.launch(options)
+    }
+    catch (error) {
+      const busy = (error as Error).message.includes('ETXTBSY')
+      if (!busy || attempt >= 4) throw error
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)))
+    }
+  }
+}
+
 export const test = base.extend<MonaFixtures>({
   app: async ({}, use, testInfo) => {
-    const app = await electron.launch({
+    const app = await launchWithRetry({
       args: [
         DESKTOP_DIR,
         // A deck now lives in `userData`, so tests that share one would see each
