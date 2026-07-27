@@ -15,6 +15,21 @@ import {
  * test stays on the package's public surface.
  */
 type RichTextView = ReturnType<typeof initProsemirrorEditor>
+type RichTextSelection = RichTextView['state']['selection']
+type ResolvedPosition = ReturnType<RichTextView['state']['doc']['resolve']>
+
+/**
+ * Places a collapsed caret at a document position.
+ *
+ * `Selection.near` is a static on the selection class, reached through an
+ * instance so that prosemirror-state does not have to be imported here.
+ */
+const caretAt = (view: RichTextView, position: number) => {
+  const selectionClass = view.state.selection.constructor as unknown as {
+    near: ($position: ResolvedPosition) => RichTextSelection
+  }
+  view.dispatch(view.state.tr.setSelection(selectionClass.near(view.state.doc.resolve(position))))
+}
 
 /**
  * Characterization of the rich-text commands and key bindings, pinned before a
@@ -220,6 +235,35 @@ test('Enter splits at a caret, in a list item, and declines on a full selection'
   expect(pressKey(everything, 'Enter')).toBe(false)
   expect(everything.dom.querySelectorAll('p')).toHaveLength(1)
   expect(everything.dom.textContent).toBe('ab')
+})
+
+/**
+ * Enter keeps the active formatting, in a list exactly as in a paragraph.
+ *
+ * These disagreed until `splitListItemKeepMarks` replaced plain
+ * `splitListItem` in the keymap: the same keystroke dropped bold, colour and
+ * size when the caret was in a list item and kept them when it was in a
+ * paragraph. Imported PowerPoint runs carry all three, so the asymmetry was
+ * most visible on exactly the content Mona exists to edit.
+ *
+ * The two carry marks by different mechanisms — a paragraph inherits them from
+ * the position, a list item receives them as stored marks — so this asserts
+ * what the user experiences, which is the formatting the next typed character
+ * will have, rather than which field it arrived in.
+ */
+test('Enter carries active marks into the next block, in lists and paragraphs alike', () => {
+  const marksForNextCharacter = (content: string) => {
+    const view = mount(content)
+    // The end of the text, which is where a user pressing Enter to start the
+    // next line would be.
+    caretAt(view, view.state.doc.content.size - 2)
+    pressKey(view, 'Enter')
+    const marks = view.state.storedMarks ?? view.state.selection.$from.marks()
+    return marks.map(mark => mark.type.name)
+  }
+
+  expect(marksForNextCharacter('<ul><li><p><strong>ab</strong></p></li></ul>')).toEqual(['strong'])
+  expect(marksForNextCharacter('<p><strong>ab</strong></p>')).toEqual(['strong'])
 })
 
 /**

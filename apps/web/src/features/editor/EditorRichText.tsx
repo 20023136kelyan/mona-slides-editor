@@ -5,6 +5,7 @@ import {
   executeRichTextActions,
   getTextAttrs,
   initProsemirrorEditor,
+  isHistoryTransaction,
 } from '@mona/rich-text'
 import { editorActions } from '@mona/editor-state'
 import type { PPTShapeElement, PPTTextElement } from '@mona/presentation-core/model'
@@ -101,6 +102,11 @@ export function EditorRichText({
           }
         : undefined
     let pendingInput: { historyKey?: string; ignoreHistory: boolean } | null = null
+    // Whether the most recent change to the document came from prosemirror's
+    // own undo/redo. Read at commit time rather than decided at keydown time,
+    // because the keystroke is handled before the command it triggers has
+    // produced a transaction.
+    let lastChangeWasHistory = false
     let structuredBaselineDom: string | null = null
     // Serialized-DOM baseline since mount/last commit. The keydown scheduler
     // also arms on no-op keys (a lone Shift before a multi-select click), and
@@ -148,10 +154,15 @@ export function EditorRichText({
               : {}),
           },
         }
+      // An undo inside the editor must not be recorded as a fresh edit in the
+      // application's own history, or undoing would push what it just undid
+      // back onto the stack.
+      const fromHistory = ignoreHistory || lastChangeWasHistory
+      lastChangeWasHistory = false
       const changed = current.runtime.commit('Edit text', [{
         type: 'element.update',
         payload: { id: liveElement.id, props },
-      }], ignoreHistory
+      }], fromHistory
         ? { recordHistory: false }
         : { historyKey: historyKey ?? `rich-text-${liveElement.id}` })
       if (changed && liveElement.type === 'shape') shapeContentChangedRef.current = true
@@ -200,6 +211,10 @@ export function EditorRichText({
     }
     const initial = hostText(readLatest().element, readLatest().fallbackColor, readLatest().fallbackFontName)
     const view = initProsemirrorEditor(mount, initial.content, {
+      dispatchTransaction: transaction => {
+        if (transaction.docChanged) lastChangeWasHistory = isHistoryTransaction(transaction)
+        view.updateState(view.state.apply(transaction))
+      },
       editable: () => !readLatest().element.lock,
       handleDOMEvents: {
         blur: () => {
@@ -223,10 +238,8 @@ export function EditorRichText({
             readLatest().runtime.store.dispatch(editorActions.editingTextElementChanged(null))
             return true
           }
-          const modifier = event.ctrlKey || event.shiftKey || event.metaKey
-          const key = event.key.toUpperCase()
           armBaseline()
-          scheduleInput(modifier && (key === 'Z' || key === 'Y'))
+          scheduleInput(false)
           scheduleAttrs()
           return false
         },

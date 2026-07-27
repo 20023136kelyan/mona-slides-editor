@@ -12,7 +12,7 @@ import {
 import { redo, undo } from 'prosemirror-history'
 import { undoInputRule } from 'prosemirror-inputrules'
 import type { Schema } from 'prosemirror-model'
-import { liftListItem, sinkListItem, splitListItem } from 'prosemirror-schema-list'
+import { liftListItem, sinkListItem, splitListItemKeepMarks } from 'prosemirror-schema-list'
 import type { Command } from 'prosemirror-state'
 
 export const buildKeymap = (schema: Schema) => {
@@ -33,8 +33,12 @@ export const buildKeymap = (schema: Schema) => {
   bind('Mod-e', toggleMark(schema.marks.code!))
   bind('Mod-;', toggleMark(schema.marks.superscript!))
   bind("Mod-'", toggleMark(schema.marks.subscript!))
+  // Every branch of this chain keeps the active marks. Using plain
+  // `splitListItem` here while the fallback is `splitBlockKeepMarks` made
+  // Enter behave differently inside a list than in a paragraph: the same
+  // keystroke dropped bold, colour and size in one and kept them in the other.
   bind('Enter', chainCommands(
-    splitListItem(schema.nodes.list_item!),
+    splitListItemKeepMarks(schema.nodes.list_item!),
     newlineInCode,
     createParagraphNear,
     liftEmptyBlock,

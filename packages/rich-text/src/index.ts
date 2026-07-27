@@ -37,6 +37,13 @@ export const initProsemirrorEditor = (
   ...props,
 })
 
+/**
+ * Re-exported so the application can tell an undo from an edit without
+ * importing prosemirror-history itself — apps/web declares no prosemirror
+ * dependency and would be resolving it by hoisting.
+ */
+export { isHistoryTransaction } from 'prosemirror-history'
+
 export type { PluginOptions }
 export {
   alignmentCommand,
