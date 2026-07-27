@@ -25,6 +25,25 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const DESKTOP_DIR = join(HERE, '../../desktop')
 const REPO_ROOT = join(HERE, '../../..')
 
+/**
+ * Presents the machine as signed in to Claude.
+ *
+ * A runner has no Claude login, and a signed-out dock replaces its composer with
+ * an invitation to go and sign in — so there is no message to send and no button
+ * to send it with. The account is what decides that, and it is a separate
+ * question from whether a turn can run, which every agent journey stubs anyway.
+ */
+export const stubSignedInAccount = async (app: ElectronApplication): Promise<void> => {
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('mona:account')
+    ipcMain.handle('mona:account', () => ({
+      accountLabel: 'ci@example.com',
+      connected: true,
+      planLabel: 'Claude Max',
+    }))
+  })
+}
+
 /** Whether this run sees the macOS chrome, which hides the in-window menus. */
 export const isMacChrome = process.platform === 'darwin'
 
@@ -143,7 +162,19 @@ export const chooseMenuCommand = async (
   const target = page ?? await app.firstWindow()
   const path = IN_WINDOW_MENU[command]
   if (!path) throw new Error(`No in-window menu path is known for "${command}".`)
-  await target.getByRole('button', { exact: true, name: 'File' }).click()
+
+  // Below 760px of header the three menus fold into one icon, and File becomes
+  // a submenu inside it rather than a button of its own. A narrow window is the
+  // normal case on a CI runner, whose display the window cannot exceed.
+  const file = target.getByRole('button', { exact: true, name: 'File' })
+  if (await file.count() > 0 && await file.isVisible()) {
+    await file.click()
+  }
+  else {
+    await target.getByRole('button', { name: 'Menu bar' }).click()
+    await target.getByRole('menuitem', { exact: true, name: 'File' }).hover()
+  }
+
   // A submenu opens on hover and does nothing when clicked; a leaf is clicked.
   for (const [index, label] of path.entries()) {
     const item = target.getByRole('menuitem', { exact: true, name: label })

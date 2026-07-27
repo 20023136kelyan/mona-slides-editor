@@ -1,6 +1,6 @@
 import type { ElectronApplication } from '@playwright/test'
 
-import { expect, openApp, test } from './electron-fixture'
+import { expect, openApp, stubSignedInAccount, test } from './electron-fixture'
 
 /**
  * The agent journey, without a model.
@@ -109,8 +109,9 @@ const sendPrompt = async (page: import('@playwright/test').Page, text: string) =
   await page.getByRole('button', { name: 'Send message' }).click()
 }
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
+  await stubSignedInAccount(app)
   await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
 })

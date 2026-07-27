@@ -1,7 +1,10 @@
-import { expect, isMacChrome, openApp, resizeWindow, test, type Locator, type Page } from './electron-fixture'
+import { expect, isMacChrome, openApp, resizeWindow, stubSignedInAccount, test, type Locator, type Page } from './electron-fixture'
 
 test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
+  // The dock only shows a composer to a signed-in machine, and a runner has no
+  // Claude login; the keyboard walk goes through that composer.
+  await stubSignedInAccount(app)
 })
 
 const tabTo = async (page: Page, target: Locator, limit = 160, key = 'Tab') => {
