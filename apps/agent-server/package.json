@@ -18,8 +18,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
     "@mona/agent-protocol": "0.0.0",
-    "ai": "^7.0.37",
-    "image-size": "1.2.1"
+    "ai": "^7.0.37"
   },
   "devDependencies": {
     "@types/node": "24.13.2",
