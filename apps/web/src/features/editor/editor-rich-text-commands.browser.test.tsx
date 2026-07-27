@@ -164,8 +164,9 @@ test('nested list structure survives sinking a second item', () => {
  * the difference can actually be observed.
  */
 test('key inventory for a caret in a plain paragraph', () => {
+  // A caret, not a selection — matching what this claims to measure. Selecting
+  // the whole document changes several answers, which is pinned separately.
   const view = mount('<p>text</p>')
-  autoSelectAll(view)
 
   const inventory = [
     ['Mod-b', pressKey(view, 'b', mod)],
@@ -189,6 +190,36 @@ test('key inventory for a caret in a plain paragraph', () => {
      claimed  Enter
      claimed  Escape"
   `)
+})
+
+/**
+ * Enter, across the three selection states it behaves differently in.
+ *
+ * A caret splits the block and a caret in a list splits the item — the two
+ * cases that matter for typing. Selecting the entire document and pressing
+ * Enter does nothing at all: none of the five commands in the chain can apply,
+ * so the keypress falls through.
+ *
+ * That last one changed with the upgrade; previously the chain claimed the
+ * key. Declining is the safer of the two behaviours — the alternative is
+ * silently replacing every word in the box with an empty line — but it is a
+ * real difference in what a user sees, so it is recorded rather than left to
+ * be discovered.
+ */
+test('Enter splits at a caret, in a list item, and declines on a full selection', () => {
+  const caret = mount('<p>ab</p>')
+  expect(pressKey(caret, 'Enter')).toBe(true)
+  expect(caret.dom.querySelectorAll('p')).toHaveLength(2)
+
+  const list = mount('<ul><li><p>ab</p></li></ul>')
+  expect(pressKey(list, 'Enter')).toBe(true)
+  expect(list.dom.querySelectorAll('li')).toHaveLength(2)
+
+  const everything = mount('<p>ab</p>')
+  autoSelectAll(everything)
+  expect(pressKey(everything, 'Enter')).toBe(false)
+  expect(everything.dom.querySelectorAll('p')).toHaveLength(1)
+  expect(everything.dom.textContent).toBe('ab')
 })
 
 /**

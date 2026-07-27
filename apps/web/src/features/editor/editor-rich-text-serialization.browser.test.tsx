@@ -161,7 +161,7 @@ test('DOMSerializer output is unchanged', () => {
     <p style="">plain</p>
 
     ### paragraph-every-attribute
-    <p style="text-align: center;direction: rtl;unicode-bidi: plaintext;padding-left: 24px;text-indent: -12px;line-height: 1.2;margin-top: 6px;margin-bottom: 8px;font-family: Aptos;font-size: 36px;color: rgb(18, 52, 86);font-weight: 700;font-style: italic;text-decoration-line: underline;letter-spacing: 2px;text-transform: uppercase;font-variant-caps: small-caps;" data-ppt-level="1" data-ppt-paragraph-id="s1#2.p0">
+    <p data-ppt-level="1" data-ppt-paragraph-id="s1#2.p0" style="text-align: center; direction: rtl; unicode-bidi: plaintext; padding-left: 24px; text-indent: -12px; line-height: 1.2; margin-top: 6px; margin-bottom: 8px; font-family: Aptos; font-size: 36px; color: rgb(18, 52, 86); font-weight: 700; font-style: italic; text-decoration-line: underline; letter-spacing: 2px; text-transform: uppercase; font-variant-caps: small-caps;">
     <em>
     <strong>
     <span style="font-size: 36px;">
@@ -185,7 +185,7 @@ test('DOMSerializer output is unchanged', () => {
     </p>
 
     ### nested-bullet-list
-    <ul style="list-style-type: &quot;•&quot;;padding-left: 24px;">
+    <ul style="list-style-type: &quot;•&quot;; padding-left: 24px;">
     <li>
     <p style="">one</p>
     <ul style="list-style-type: &quot;◦&quot;;">
@@ -197,7 +197,7 @@ test('DOMSerializer output is unchanged', () => {
     </ul>
 
     ### ordered-list-start
-    <ol style="" start="3">
+    <ol start="3" style="">
     <li>
     <p style="">third</p>
     </li>
@@ -216,7 +216,7 @@ test('DOMSerializer output is unchanged', () => {
     </ol>
 
     ### pre-skip-rule
-    <p style="">two spaces and a newline</p>
+    <p style="">  two  spaces and a newline</p>
 
     ### blockquote
     <blockquote>
@@ -267,7 +267,7 @@ test('the mounted editor renders the same markup it serializes', () => {
     <p style="">plain</p>
 
     ### paragraph-every-attribute
-    <p style="text-align: center;direction: rtl;unicode-bidi: plaintext;padding-left: 24px;text-indent: -12px;line-height: 1.2;margin-top: 6px;margin-bottom: 8px;font-family: Aptos;font-size: 36px;color: rgb(18, 52, 86);font-weight: 700;font-style: italic;text-decoration-line: underline;letter-spacing: 2px;text-transform: uppercase;font-variant-caps: small-caps;" data-ppt-level="1" data-ppt-paragraph-id="s1#2.p0">
+    <p data-ppt-level="1" data-ppt-paragraph-id="s1#2.p0" style="text-align: center; direction: rtl; unicode-bidi: plaintext; padding-left: 24px; text-indent: -12px; line-height: 1.2; margin-top: 6px; margin-bottom: 8px; font-family: Aptos; font-size: 36px; color: rgb(18, 52, 86); font-weight: 700; font-style: italic; text-decoration-line: underline; letter-spacing: 2px; text-transform: uppercase; font-variant-caps: small-caps;">
     <em>
     <strong>
     <span style="font-size: 36px;">
@@ -286,14 +286,14 @@ test('the mounted editor renders the same markup it serializes', () => {
 
     ### ppt-tab
     <p style="">
-    <span data-ppt-run-id="s1#2.p0.r0" data-ppt-run-kind="tab" style="display: inline-block; width: 48px;" contenteditable="false">
+    <span data-ppt-run-id="s1#2.p0.r0" data-ppt-run-kind="tab" contenteditable="false" style="display: inline-block; width: 48px;">
     </span>
     <img class="ProseMirror-separator" alt="">
     <br class="ProseMirror-trailingBreak">
     </p>
 
     ### nested-bullet-list
-    <ul style="list-style-type: &quot;•&quot;;padding-left: 24px;">
+    <ul style="list-style-type: &quot;•&quot;; padding-left: 24px;">
     <li>
     <p style="">one</p>
     <ul style="list-style-type: &quot;◦&quot;;">
@@ -305,7 +305,7 @@ test('the mounted editor renders the same markup it serializes', () => {
     </ul>
 
     ### ordered-list-start
-    <ol style="" start="3">
+    <ol start="3" style="">
     <li>
     <p style="">third</p>
     </li>
@@ -324,7 +324,7 @@ test('the mounted editor renders the same markup it serializes', () => {
     </ol>
 
     ### pre-skip-rule
-    <p style="">two spaces and a newline</p>
+    <p style="">  two  spaces and a newline</p>
 
     ### blockquote
     <blockquote>
@@ -365,9 +365,9 @@ test('the mounted editor renders the same markup it serializes', () => {
 
 test('compiled PowerPoint markup survives a serializer round trip', () => {
   expect(pretty(normalizeRichTextHtml(COMPILED_POWERPOINT))).toMatchInlineSnapshot(`
-    "<ul style="list-style-type: &quot;•&quot;;" data-ppt-level="0">
+    "<ul data-ppt-level="0" style="list-style-type: &quot;•&quot;;">
     <li>
-    <p style="text-align: center;direction: rtl;unicode-bidi: plaintext;padding-left: 24px;text-indent: -12px;line-height: 1.2;margin-top: 6px;margin-bottom: 8px;font-family: Aptos;font-size: 36px;color: rgb(18, 52, 86);font-weight: 700;" data-ppt-level="0" data-ppt-paragraph-id="ppt/slides/slide1.xml#2.p0">
+    <p data-ppt-level="0" data-ppt-paragraph-id="ppt/slides/slide1.xml#2.p0" style="text-align: center; direction: rtl; unicode-bidi: plaintext; padding-left: 24px; text-indent: -12px; line-height: 1.2; margin-top: 6px; margin-bottom: 8px; font-family: Aptos; font-size: 36px; color: rgb(18, 52, 86); font-weight: 700;">
     <strong>
     <span style="font-size: 36px;">
     <span style="font-family: Aptos;">
@@ -389,15 +389,15 @@ test('compiled PowerPoint markup survives a serializer round trip', () => {
 
 test('compiled PowerPoint markup renders in a mounted editor', () => {
   expect(pretty(mountedDom(COMPILED_POWERPOINT))).toMatchInlineSnapshot(`
-    "<ul style="list-style-type: &quot;•&quot;;" data-ppt-level="0">
+    "<ul data-ppt-level="0" style="list-style-type: &quot;•&quot;;">
     <li>
-    <p style="text-align: center;direction: rtl;unicode-bidi: plaintext;padding-left: 24px;text-indent: -12px;line-height: 1.2;margin-top: 6px;margin-bottom: 8px;font-family: Aptos;font-size: 36px;color: rgb(18, 52, 86);font-weight: 700;" data-ppt-level="0" data-ppt-paragraph-id="ppt/slides/slide1.xml#2.p0">
+    <p data-ppt-level="0" data-ppt-paragraph-id="ppt/slides/slide1.xml#2.p0" style="text-align: center; direction: rtl; unicode-bidi: plaintext; padding-left: 24px; text-indent: -12px; line-height: 1.2; margin-top: 6px; margin-bottom: 8px; font-family: Aptos; font-size: 36px; color: rgb(18, 52, 86); font-weight: 700;">
     <strong>
     <span style="font-size: 36px;">
     <span style="font-family: Aptos;">
     <span style="color: rgb(18, 52, 86);">
     <span data-ppt-run-id="ppt/slides/slide1.xml#2.p0.r0">Title</span>
-    <span data-ppt-run-id="ppt/slides/slide1.xml#2.p0.r1" data-ppt-run-kind="tab" style="display: inline-block; width: 48px;" contenteditable="false">
+    <span data-ppt-run-id="ppt/slides/slide1.xml#2.p0.r1" data-ppt-run-kind="tab" contenteditable="false" style="display: inline-block; width: 48px;">
     </span>
     <br data-ppt-run-id="ppt/slides/slide1.xml#2.p0.r2">
     <span data-ppt-field-id="field-1" data-ppt-field-type="slidenum" data-ppt-run-id="ppt/slides/slide1.xml#2.p0.r3">7</span>
@@ -429,6 +429,20 @@ test('compiled PowerPoint markup renders in a mounted editor', () => {
  * If an upgrade turns a `no` into a `yes` in the idempotent column, the
  * corresponding guard has a real chance of being retired — on evidence rather
  * than by intuition.
+ *
+ * One entry currently goes the other way. `pre-skip-rule` was idempotent
+ * before the ProseMirror upgrade and is not now, because prosemirror-model
+ * 1.24.1 made the DOM parser preserve whitespace inside `pre`. The first pass
+ * keeps the authored spacing, and the second collapses it — the content is a
+ * plain paragraph by then, so ordinary HTML rules apply — after which it is
+ * stable. It converges in two passes rather than one.
+ *
+ * Left as-is, deliberately. The compiler never emits `pre`, no corpus baseline
+ * contains one, and the schema's own `{ tag: 'pre', skip: true }` rule exists
+ * for pasted content rather than authored content. The reachable consequence
+ * is that pasting preformatted text could produce one extra commit as the
+ * spacing settles, which is a better failure than the alternative of silently
+ * discarding the author's spacing on the way in.
  */
 test('round-trip ledger: verbatim and idempotent per fixture', () => {
   const ledger = FIXTURES.map(fixture => {
@@ -446,7 +460,7 @@ test('round-trip ledger: verbatim and idempotent per fixture', () => {
     verbatim: no  idempotent:yes  nested-bullet-list
     verbatim: no  idempotent:yes  ordered-list-start
     verbatim: no  idempotent:yes  adjacent-ul-and-ol
-    verbatim: no  idempotent:yes  pre-skip-rule
+    verbatim: no  idempotent: no  pre-skip-rule
     verbatim: no  idempotent:yes  blockquote
     verbatim: no  idempotent:yes  link
     verbatim: no  idempotent:yes  basic-marks
