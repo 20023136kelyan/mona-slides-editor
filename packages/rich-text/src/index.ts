@@ -2,6 +2,7 @@ import { Schema, DOMParser, DOMSerializer } from 'prosemirror-model'
 import { EditorState } from 'prosemirror-state'
 import { type DirectEditorProps, EditorView } from 'prosemirror-view'
 
+import { cleanPastedSlice } from './clipboard'
 import { buildPlugins, type PluginOptions } from './plugins'
 import { schemaMarks, schemaNodes } from './schema'
 
@@ -24,15 +25,26 @@ export const normalizeRichTextHtml = (content: string) => {
   return container.innerHTML
 }
 
+export interface EditorOptions extends PluginOptions {
+  /** Applied to every pasted `href`. Defaults to leaving it alone. */
+  sanitizeHref?: (href: string) => string
+}
+
 export const initProsemirrorEditor = (
   dom: Element,
   content: string,
   props: Omit<DirectEditorProps, 'state'>,
-  pluginOptions?: PluginOptions,
+  options?: EditorOptions,
 ) => new EditorView(dom, {
   state: EditorState.create({
     doc: createDocument(content),
-    plugins: buildPlugins(richTextSchema, pluginOptions),
+    plugins: buildPlugins(richTextSchema, options),
+  }),
+  // Ahead of the caller's props, so a host that wants its own paste handling
+  // can still replace this.
+  transformPasted: (slice, _view, plainText) => cleanPastedSlice(slice, plainText, {
+    sanitizeHref: options?.sanitizeHref,
+    schema: richTextSchema,
   }),
   ...props,
 })

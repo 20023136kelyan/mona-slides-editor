@@ -379,6 +379,74 @@ test('alignment writes text-align, and left is omitted as the default', () => {
   expect(view.dom.querySelector<HTMLElement>('p')?.style.textAlign).toBe('')
 })
 
+/**
+ * What a paste is allowed to bring with it.
+ *
+ * Driven through `view.pasteHTML`, which is the same path a real paste takes
+ * once the clipboard has been read, so `transformPasted` runs exactly as it
+ * would for a user.
+ */
+test('pasted content keeps its formatting but loses the source run identity', () => {
+  const view = mount('<p>here</p>')
+
+  view.pasteHTML(
+    '<p data-ppt-paragraph-id="s1#2.p0" data-ppt-level="2">'
+    + '<span data-ppt-run-id="s1#2.p0.r0" style="color:#ff0000"><strong>copied</strong></span>'
+    + '</p>',
+  )
+
+  const html = view.dom.innerHTML
+  expect(view.dom.textContent).toContain('copied')
+  // Formatting survives — this is a paste, not a plain-text paste.
+  expect(html).toContain('<strong>')
+  expect(html).toContain('rgb(255, 0, 0)')
+  // Identity does not. It belongs to the element it was copied from, and a
+  // duplicate inside this body would be read as the same run.
+  expect(html).not.toContain('data-ppt-run-id')
+  expect(html).not.toContain('data-ppt-paragraph-id')
+  expect(html).not.toContain('data-ppt-level')
+})
+
+test('a plain-text paste adopts the destination formatting', () => {
+  const view = mount('<p>here</p>')
+
+  // `pasteText` is what fires when the clipboard holds no HTML, and what a
+  // paste-without-formatting command routes through. Before transformPasted
+  // existed there was no way to strip formatting on the way in at all.
+  view.pasteText('plain')
+
+  expect(view.dom.textContent).toContain('plain')
+  expect(view.dom.innerHTML).not.toContain('<strong>')
+  expect(view.dom.innerHTML).not.toContain('<em>')
+})
+
+test('a javascript: link is neutralised on paste', () => {
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  mounts.push(host)
+  const view = initProsemirrorEditor(host, '<p>here</p>', { editable: () => true }, {
+    sanitizeHref: (href: string) => (/^(https?|mailto):/.test(href) ? href : ''),
+  })
+
+  view.pasteHTML('<p><a href="javascript:alert(1)">click</a></p>')
+
+  expect(view.dom.textContent).toContain('click')
+  expect(view.dom.innerHTML).not.toContain('javascript:')
+})
+
+test('an ordinary link survives paste intact', () => {
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  mounts.push(host)
+  const view = initProsemirrorEditor(host, '<p>here</p>', { editable: () => true }, {
+    sanitizeHref: (href: string) => (/^(https?|mailto):/.test(href) ? href : ''),
+  })
+
+  view.pasteHTML('<p><a href="https://example.com">click</a></p>')
+
+  expect(view.dom.querySelector('a')?.getAttribute('href')).toBe('https://example.com')
+})
+
 test('a link applies to the whole element and can be removed again', () => {
   const view = mount('<p>linked</p>')
 

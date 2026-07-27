@@ -12,6 +12,7 @@ import type { PPTShapeElement, PPTTextElement } from '@mona/presentation-core/mo
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
+import { sanitizeNavigationUrl } from '@/lib/deck-sanitizer'
 import { i18n } from '@/i18n'
 
 const normalizedEditorHtml = (value: string) => value.replace(/ style=""/g, '')
@@ -243,6 +244,23 @@ export function EditorRichText({
           scheduleAttrs()
           return false
         },
+        // Paste and drop produce no keydown, so without these a context-menu
+        // paste followed by clicking away was simply lost: nothing armed the
+        // baseline, nothing scheduled a commit, and blur does not commit.
+        // Keyboard paste only survived incidentally, because Cmd+V is a
+        // keydown.
+        paste: () => {
+          armBaseline()
+          scheduleInput(false)
+          scheduleAttrs()
+          return false
+        },
+        drop: () => {
+          armBaseline()
+          scheduleInput(false)
+          scheduleAttrs()
+          return false
+        },
         click: () => {
           scheduleAttrs()
           return false
@@ -256,6 +274,11 @@ export function EditorRichText({
           return false
         },
       },
+    }, {
+      // `href` is the one thing a paste can carry that the schema's allowlist
+      // does not already neutralise, since `a[href]` has a parse rule. The
+      // policy is the deck sanitizer's, not a second copy of it.
+      sanitizeHref: sanitizeNavigationUrl,
     })
     editorRef.current = view
     structuredBaselineDom = view.dom.innerHTML
