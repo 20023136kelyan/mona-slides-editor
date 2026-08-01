@@ -142,9 +142,20 @@ export class AgentWorkspace {
     }
 
     await load('deck/deck.json')
-    const index = cache.get('deck/deck.json') as { slides?: { file?: string }[] } | undefined
+    const index = cache.get('deck/deck.json') as {
+      powerPointSharedLayers?: string
+      slides?: { file?: string }[]
+    } | undefined
     for (const entry of index?.slides ?? []) {
       if (entry?.file) await load(`deck/${entry.file}`)
+    }
+    if (index?.powerPointSharedLayers) {
+      const path = 'deck/powerpoint/shared-layers.json'
+      if (index.powerPointSharedLayers !== 'powerpoint/shared-layers.json') {
+        invalid.push('deck/deck.json')
+      }
+      await load(path)
+      if (cache.get(path) === undefined && !invalid.includes(path)) invalid.push(path)
     }
 
     return {

@@ -11,6 +11,7 @@ The deck is a directory, laid out the way a PPTX package is:
 deck/deck.json        title, theme, slide order
 deck/slides/01.json   one slide per file, zero-padded so lexical order is deck order
 deck/assets/          images; slides reference them as "assets/image-1.png"
+deck/powerpoint/shared-layers.json  explicit imported PPTX masters/layouts, when present
 ```
 
 Edit with `Read`, `Edit`, `Write`, `Grep`, `Glob` and `Bash`. Nothing you write
@@ -45,6 +46,14 @@ ordinary editable JSON in the workspace, but Mona treats an edit as a
 slide-local copy-on-write override; it never mutates every slide that shares
 the source layout. Removing an entry hides that inherited object only on this
 slide. Keep its `source` and `id` while editing it.
+
+`powerpoint/shared-layers.json` is a separate, deliberate deck-wide surface.
+Edit it only when the user asks for a master/layout change that should affect
+every slide using that layer. It contains exact `masters` and `layouts`, grouped
+by retained package. Keep package ids, part paths, layer identity fields, existing
+element ids, and every `source` object unchanged. You may edit/delete existing
+source-backed elements or add normal source-free Mona elements to a layer. Never
+copy a slide's `powerPointInheritedElements` into this file.
 
 ```jsonc
 // text — the copy lives in `content`, as HTML
@@ -102,6 +111,15 @@ clone origin, keeps its layout/master hierarchy, and gives mutable linked parts
 such as notes, charts, and embedded workbooks independent package identities at
 PowerPoint export. You may edit `powerPointInheritedElements` in the new slide
 during the same run; those changes become slide-local overrides.
+
+Imported PowerPoint slides and explicit shared layers also accept new source-free
+Mona elements. Text, shapes (including gradients and picture fills), images,
+native connectors, charts with embedded workbooks, tables, groups, equations,
+audio, and video are serialized into the retained `.pptx`; they are not flattened
+to a slide image. Put new media in `deck/assets/` first. Changing an existing
+image's `src` replaces its native picture payload, and an image background may
+reference an asset path the same way. Opaque objects remain the sole exception:
+they can only exist when backed by retained native XML.
 
 ## When the deck moves underneath you
 

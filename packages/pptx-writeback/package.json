@@ -14,7 +14,9 @@
     "@mona/presentation-core": "0.0.0",
     "@mona/pptx-ingestion": "0.0.0",
     "fast-xml-parser": "5.10.1",
-    "jszip": "3.10.1"
+    "jszip": "3.10.1",
+    "pptxgenjs": "4.0.1",
+    "svg-pathdata": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "24.13.2",

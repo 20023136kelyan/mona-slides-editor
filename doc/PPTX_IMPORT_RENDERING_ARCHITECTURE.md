@@ -438,7 +438,7 @@ structured model directly. It is not the PowerPoint source of truth.
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
 | G01 | Provenance-aware editing | Done for the editing boundary | Stable identities, immutable provenance, exact object/part routing, and property/owner-part journaling cover direct commands and full-deck JSON replacement; unsupported mutations fail before write | Editing an imported object does not detach unrelated source data |
-| G02 | Inherited-object editing | Done for slide-local overrides; shared-layer authoring pending | Human selection and agent JSON edits materialize copy-on-write slide overrides or slide-local hide intent without mutating the retained master/layout tree. Native writeback derives a private layout/master pair for that slide. A future explicit shared-layer mode may edit the master/layout itself | A slide-local change does not mutate every slide sharing a master |
+| G02 | Inherited-object editing | Done | Human selection and agent slide JSON materialize copy-on-write slide overrides or slide-local hide intent. Explicit deck-wide master/layout edits live separately in `deck/powerpoint/shared-layers.json`, record authored part paths, and patch those retained shared parts directly | A slide-local change does not mutate every slide sharing a master; an explicit shared edit does |
 | G03 | Agent JSON surface | Done | The filesystem agent reads and edits complete semantic slide JSON with stable IDs. Apply validates immutable package provenance, consumes the virtual inherited layer, sanitizes the deck, journals exact changes, and commits the full run as one transaction | Agent JSON edits use the same semantic state as direct UI editing and remain one-step undoable |
 | G04 | Unsupported-object protection | Done for retained native copies | Existing opaque/native objects remain transformable and deletable. Element/slide duplication retains a copy-on-write pointer to the original native payload; forged or payload-free opaque JSON is rejected. Export clones the exact native drawing or slide subtree, gives it independent drawing/part identities, and refuses edits to unaddressable descendants instead of guessing | Moving or copying an opaque object retains its source payload without aliasing the original |
 | G05 | Undo/history boundaries | Done | Package bytes and immutable hierarchy parts remain outside history; semantic commands and compact dirty references undo without archive cloning | Undo does not clone archives and restores the exact previous semantic state |
@@ -454,14 +454,19 @@ duplication keeps the retained hierarchy and records a native slide clone origin
 instead of flattening shared content into local elements.
 
 The native writer now serializes retained object copies, inherited overrides,
-slide-local inherited hides, and copied slides. It allocates collision-free
+slide-local inherited hides, copied slides, source-free semantic elements and
+explicit shared master/layout changes. It allocates collision-free
 drawing IDs, slide/layout/master/relationship IDs, relationship parts, and
 content-type overrides. Slide-owned mutable dependencies — notes, comments,
 charts, embedded workbooks, SmartArt data, OLE payloads and chart user shapes —
 are recursively cloned, while immutable layouts/themes and media bytes remain
-shared. The remaining intentional boundaries are an explicit shared
-master/layout authoring mode and serialization of objects or media created from
-scratch without a retained native payload.
+shared. Generated text, shapes, picture fills, images, native connectors,
+charts/workbooks, tables, groups, formulas and audio/video are built in a small
+standards-compliant donor package and transplanted into the retained package;
+image replacement and image backgrounds use the same document-owned asset
+resolver. Mona formula paths export as editable vector picture objects rather
+than native OMML equations; native equation authoring remains a separate
+boundary. Opaque objects still require retained native payloads.
 
 ## Export architecture after import and rendering
 
@@ -482,9 +487,9 @@ Mona therefore needs two export paths:
 | --- | --- | --- | --- | --- |
 | X01 | Hybrid export coordinator | Partial | Full-deck, single-source standard export uses retained-package writeback; Mona-native and partial/raster exports use generation | Export path is explicit and testable |
 | X02 | Package patch writer | Partial | Exact no-ops return the retained archive; dirty slide XML is patched by source identity and every untouched package part remains byte-identical | Untouched parts remain byte-identical |
-| X03 | Semantic serializers | Partial | Implemented: slide-local solid/gradient/pattern backgrounds; transforms/deletions; retained native object and slide cloning; private hierarchy overrides/hides; straight/bent/curved connectors and attachments; rich text/text-body/text warp; external run hyperlinks; shape fills/outlines/preset adjustments; picture crop/filters/outline/shadow; accessibility; full current table model; chart caches/options/colors plus embedded ranges; existing and cloned notes/comment payloads. Remaining: from-scratch assets/objects, explicit shared theme/master/layout edits, timing, and advanced effects | Each completed import/model slice gains an inverse serializer |
+| X03 | Semantic serializers | Partial | Implemented: solid/gradient/pattern and image backgrounds; transforms/deletions; retained native object and slide cloning; private hierarchy overrides/hides; explicit master/layout drawing authoring; source-free text/shapes/picture fills/images/connectors/charts/tables/groups/vector-formula pictures/audio/video; image replacement; rich text/text body; hyperlinks; picture crop/filters/outline/shadow; accessibility; tables; chart caches/workbooks; existing and cloned notes/comments. Remaining: native OMML equation authoring, theme authoring, timing playback authoring, new notes/comment structures, and advanced effects | Each completed import/model slice gains an inverse serializer |
 | X04 | PptxGenJS upgrade and adapter | Complete | Mona-native generation uses PptxGenJS 4.0.1; imported decks never rely on it for source preservation | Existing export fixtures remain valid and new supported features improve |
-| X05 | Relationship/content-type repair | Done for retained native copies; from-scratch media pending | External run hyperlinks allocate collision-free relationship IDs. Copied objects/slides allocate relationship IDs and content types, recursively clone mutable chart/workbook/diagram/OLE/notes/comment dependencies, register slides and private masters, and retarget every internal relationship relative to its new owner part. New media bytes still require an asset resolver and media-part allocator | PowerPoint opens output without repair warnings |
+| X05 | Relationship/content-type repair | Done for current serializers | External run hyperlinks and generated assets allocate collision-free relationship IDs. Copied/generated objects and slides allocate relationships and content types, recursively clone or transplant chart/workbook/diagram/OLE/notes/comment/media dependencies, register slides/private masters, and retarget every internal relationship relative to its new owner part | PowerPoint opens output without repair warnings |
 | X06 | Round-trip harness | Partial | Public/private exact no-op tests and serializer re-import tests cover the supported edit matrix; round-trip artifacts receive ZIP integrity checks and optional LibreOffice reference-open conversion. Add installed Office/LibreOffice visual comparison in CI | No-op export preserves untouched parts and edited output remains stable |
 
 ## Implementation order and release gates
@@ -571,13 +576,20 @@ The August 1, 2026 verification pass establishes the following:
   structure, script-specific fonts, field materialization, and edit detachment.
 - The complete workspace verification runs core, ingestion, writeback, web,
   desktop, agent, project/document packages, the production build, and real
-  Electron journeys. Retained-PowerPoint desktop coverage includes both a human
-  duplicate/edit/export/re-import path and an agent JSON duplicate/edit path.
+  Electron journeys. Retained-PowerPoint desktop coverage includes human and
+  agent JSON duplicate/edit paths plus an agent-created editable object that is
+  exported and re-imported through the production Electron bridge. The packaged
+  `mona://` smoke also generates and re-imports a source-free object, proving the
+  donor runtime is present inside the production application bundle.
 - Source-package round trips now cover native table topology/cell styles,
   chart caches and embedded workbook ranges, chart colors/options, notes,
   comment text, external hyperlink relationship allocation, accessibility,
   picture treatments, complex shape fills, preset geometry, connectors, and
-  slide-local backgrounds.
+  slide-local backgrounds. Generated-object round trips additionally cover
+  text, images, picture-filled shapes, semantic groups/connectors, native
+  tables, charts with independent workbooks, vector formula pictures, audio,
+  video, image replacement, image backgrounds, and explicit master/layout
+  drawing edits.
 - `MONA_WRITE_PPTX_ROUNDTRIP_ARTIFACTS=1` emits deterministic edited decks to
   `.artifacts/pptx-roundtrip/`. `npm run pptx:reference-open` validates their ZIP
   packages and uses LibreOffice for PDF reference-open checks when a working
@@ -590,6 +602,6 @@ that the entire ECMA-376 presentation specification is complete. The remaining
 high-value compatibility work is still explicit in the matrix: deterministic
 PowerPoint text measurement/fitting, advanced text/effect/3D rendering, opaque
 coverage beyond graphic frames, typed header/footer/date field content,
-dependency-aware recalculation, from-scratch media/object insertion, explicit
-shared master/layout editing, full animation playback/editing, internal/action links,
-and installed reference-engine visual comparison.
+dependency-aware recalculation, native OMML equation authoring, theme authoring,
+new notes/comment structures, full animation playback/editing, internal/action
+links, and installed reference-engine visual comparison.

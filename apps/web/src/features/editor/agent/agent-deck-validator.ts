@@ -7,12 +7,17 @@ import {
   retainElementTreeCopyOrigins,
   resolveSlideRenderState,
   type PresentationCommand,
+  type PowerPointPackageReference,
   type PresentationState,
   type PresentationTransaction,
 } from '@mona/presentation-core'
 import type { PPTElement, Slide, SlideTheme } from '@mona/presentation-core/model'
 
-import { sanitizeSlides } from '@/lib/deck-sanitizer'
+import type { AgentPowerPointSharedLayers } from '@/features/editor/agent/agent-workspace-client'
+import {
+  sanitizePowerPointPackageReference,
+  sanitizeSlides,
+} from '@/lib/deck-sanitizer'
 
 const MAX_ELEMENT_EXTENT = 100_000
 /**
@@ -373,13 +378,164 @@ const assertGeometry = (element: PPTElement, label: string) => {
  * favour of the one thing that survives a restart: a file in `deck/assets/`, which
  * arrives here as a `mona://asset/` reference once ingested.
  */
-const assertLocalImage = (element: PPTElement, label: string) => {
-  if (element.type !== 'image') return
-  if (!element.src.startsWith('mona://asset/')) {
+const assertLocalAssetReference = (reference: string | undefined, label: string) => {
+  if (reference && !reference.startsWith('mona://asset/')) {
     throw new Error(
-      `${label} points at "${element.src.slice(0, 60)}". Save the image into deck/assets/ and reference that path instead.`,
+      `${label} points at "${reference.slice(0, 60)}". Save the media into deck/assets/ and reference that path instead.`,
     )
   }
+}
+
+const assertLocalElementAssets = (element: PPTElement, label: string) => {
+  if (element.type === 'image' || element.type === 'audio' || element.type === 'video') {
+    assertLocalAssetReference(element.src, label)
+  }
+  if (element.type === 'video') assertLocalAssetReference(element.poster, `${label} poster`)
+  if (element.type === 'shape') assertLocalAssetReference(element.pattern, `${label} picture fill`)
+  if (element.type === 'latex') assertLocalAssetReference(element.fallbackImage, `${label} fallback`)
+}
+
+const layerPart = (value: unknown): string | undefined => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    && typeof (value as { partPath?: unknown }).partPath === 'string'
+    ? (value as { partPath: string }).partPath
+    : undefined
+)
+
+const immutableLayerShell = (layer: Record<string, unknown>): Record<string, unknown> => {
+  const clone = structuredClone(layer)
+  delete clone.background
+  delete clone.elements
+  return clone
+}
+
+/**
+ * Validate the explicit master/layout workspace and return updated retained
+ * package references. Slide files cannot reach this path, which prevents a
+ * local inherited edit from silently becoming deck-wide.
+ */
+const normalizeSharedLayerAuthoring = (
+  state: PresentationState,
+  input: AgentPowerPointSharedLayers | undefined,
+): PowerPointPackageReference[] | undefined => {
+  if (!input) return undefined
+  if (input.schemaVersion !== 1 || !Array.isArray(input.packages)) {
+    throw new Error('powerpoint/shared-layers.json has an unsupported schema.')
+  }
+  const sourcePackages = structuredClone(state.sourcePackages ?? [])
+  const editablePackages = sourcePackages.filter(source => Boolean(source.hierarchy))
+  const desiredByPackage = new Map(input.packages.map(entry => [entry.packageId, entry]))
+  if (
+    desiredByPackage.size !== input.packages.length
+    || desiredByPackage.size !== editablePackages.length
+    || editablePackages.some(source => !desiredByPackage.has(source.packageId))
+  ) {
+    throw new Error('Keep every PowerPoint package in powerpoint/shared-layers.json exactly once.')
+  }
+
+  const knownByObjectId = new Map<string, PPTElement>()
+  const existingIds = new Set<string>()
+  for (const source of editablePackages) {
+    for (const layer of [
+      ...(source.hierarchy?.masters ?? []),
+      ...(source.hierarchy?.layouts ?? []),
+    ]) {
+      for (const element of flattenElementTree(layer.elements ?? [])) {
+        existingIds.add(element.id)
+        if (element.source?.sourceObjectId) {
+          knownByObjectId.set(element.source.sourceObjectId, element)
+        }
+      }
+    }
+  }
+
+  for (const source of sourcePackages) {
+    if (!source.hierarchy) continue
+    const desiredPackage = desiredByPackage.get(source.packageId)!
+    const baselineLayers = [
+      ...source.hierarchy.masters,
+      ...source.hierarchy.layouts,
+    ] as unknown as Array<Record<string, unknown>>
+    const desiredLayers = [
+      ...desiredPackage.masters,
+      ...desiredPackage.layouts,
+    ] as unknown as Array<Record<string, unknown>>
+    const baselinePartPaths = baselineLayers.map(layerPart)
+    const desiredPartPaths = desiredLayers.map(layerPart)
+    const baselineByPart = new Map(baselineLayers.map((layer, index) => [baselinePartPaths[index]!, layer]))
+    const desiredByPart = new Map(desiredLayers.map((layer, index) => [desiredPartPaths[index]!, layer]))
+    if (
+      baselinePartPaths.some(part => !part)
+      || desiredPartPaths.some(part => !part)
+      || baselineByPart.size !== baselineLayers.length
+      || desiredByPart.size !== desiredLayers.length
+      || baselineByPart.size !== desiredByPart.size
+      || [...baselineByPart.keys()].some(part => !desiredByPart.has(part))
+    ) {
+      throw new Error(`Keep the master/layout part list for ${source.fileName} unchanged.`)
+    }
+
+    const changedParts: string[] = []
+    const authoredIds = new Set<string>()
+    for (const [partPath, baselineLayer] of baselineByPart) {
+      const desiredLayer = desiredByPart.get(partPath)!
+      if (!same(immutableLayerShell(baselineLayer), immutableLayerShell(desiredLayer))) {
+        throw new Error(`Shared layer ${partPath} changed immutable PowerPoint identity fields.`)
+      }
+      const baselineElements = Array.isArray(baselineLayer.elements)
+        ? baselineLayer.elements as PPTElement[]
+        : []
+      const desiredElements = Array.isArray(desiredLayer.elements)
+        ? desiredLayer.elements as PPTElement[]
+        : []
+      const baselineById = new Map(flattenElementTree(baselineElements).map(element => [element.id, element]))
+      for (const element of flattenElementTree(desiredElements)) {
+        if (authoredIds.has(element.id)) {
+          throw new Error(`Shared element id "${element.id}" is repeated in ${source.fileName}.`)
+        }
+        authoredIds.add(element.id)
+        assertGeometry(element, `Shared layer ${partPath}: element ${element.id}`)
+        assertLocalElementAssets(element, `Shared layer ${partPath}: media ${element.id}`)
+        const previous = baselineById.get(element.id)
+        if (previous) {
+          if (!same(previous.source, element.source)) {
+            throw new Error(`Shared element "${element.id}" changed PowerPoint source provenance.`)
+          }
+          continue
+        }
+        if (element.source) {
+          const objectId = nativeOrigin(element)?.sourceObjectId
+          const known = objectId ? knownByObjectId.get(objectId) : undefined
+          if (!known || !same(known.source, element.source)) {
+            throw new Error(`Shared element "${element.id}" has forged PowerPoint source provenance.`)
+          }
+        }
+        else if (element.type === 'opaque') {
+          throw new Error(`Opaque shared element "${element.id}" has no retained native payload.`)
+        }
+        else if (existingIds.has(element.id)) {
+          throw new Error(`New shared element "${element.id}" reuses an existing element id.`)
+        }
+      }
+      if (!same(baselineLayer, desiredLayer)) changedParts.push(partPath)
+    }
+
+    if (changedParts.length) {
+      source.hierarchy = {
+        ...source.hierarchy,
+        layouts: structuredClone(desiredPackage.layouts),
+        masters: structuredClone(desiredPackage.masters),
+      }
+      source.sharedAuthoring = {
+        partPaths: [...new Set([
+          ...(source.sharedAuthoring?.partPaths ?? []),
+          ...changedParts,
+        ])].sort(),
+        revision: (source.sharedAuthoring?.revision ?? 0) + 1,
+      }
+    }
+  }
+  return sourcePackages
 }
 
 /**
@@ -399,7 +555,17 @@ const assertLocalImage = (element: PPTElement, label: string) => {
  */
 export const validateAgentSlides = (
   state: PresentationState,
-  { slides, theme, title }: { slides: readonly AgentWorkspaceSlide[]; theme?: Partial<SlideTheme>; title?: string },
+  {
+    powerPointSharedLayers,
+    slides,
+    theme,
+    title,
+  }: {
+    powerPointSharedLayers?: AgentPowerPointSharedLayers
+    slides: readonly AgentWorkspaceSlide[]
+    theme?: Partial<SlideTheme>
+    title?: string
+  },
 ): PresentationTransaction => {
   if (!slides.length) throw new Error('The deck has no slides. A deck must keep at least one.')
   if (JSON.stringify(slides).length > MAX_SLIDES_BYTES) {
@@ -436,15 +602,20 @@ export const validateAgentSlides = (
     })
     for (const element of flattenElementTree(slide.elements)) {
       assertGeometry(element, `${where}: element ${element.id}`)
-      assertLocalImage(element, `${where}: image ${element.id}`)
+      assertLocalElementAssets(element, `${where}: media ${element.id}`)
     }
+    assertLocalAssetReference(slide.background?.image?.src, `${where}: background`)
   }
 
+  const sourcePackages = normalizeSharedLayerAuthoring(state, powerPointSharedLayers)
   const commands: PresentationCommand[] = [{
     slides: cloned,
     type: 'presentation.slides.replace',
     ...(theme ? { theme } : {}),
   }]
+  if (sourcePackages && !same(sourcePackages, state.sourcePackages ?? [])) {
+    commands.push({ sourcePackages, type: 'presentation.source-packages.replace' })
+  }
   if (typeof title === 'string' && title !== state.title) {
     // `fallbackTitle` is what an emptied title falls back to, so clearing the
     // title keeps the one the deck already has rather than blanking it.
@@ -462,6 +633,11 @@ export const validateAgentSlides = (
   // renderer, whichever route the change arrived by.
   if (sanitizeSlides(preview.state.slides) !== preview.state.slides) {
     throw new Error('The deck contains unsafe markup or URLs.')
+  }
+  if (preview.state.sourcePackages?.some(source => (
+    sanitizePowerPointPackageReference(source) !== source
+  ))) {
+    throw new Error('The shared PowerPoint layers contain unsafe markup or URLs.')
   }
   return transaction
 }

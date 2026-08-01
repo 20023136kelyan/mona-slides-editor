@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -19,6 +19,7 @@ vi.mock('electron', () => ({
 
 const {
   createDocument,
+  documentAssetsRoot,
   readDocument,
   writeDocument,
 } = await import('./document-library.js')
@@ -155,6 +156,45 @@ describe('desktop PowerPoint writeback', () => {
         ? roundTripped.text?.content
         : undefined
     expect(content).toContain('Desktop source-preserving text.')
+  })
+
+  it('resolves a generated image only from the exporting document asset directory', async () => {
+    const fixture = await setup()
+    const presentation = structuredClone(fixture.presentation) as PresentationState
+    const name = 'generated-desktop.png'
+    await mkdir(documentAssetsRoot(fixture.documentId), { recursive: true })
+    await writeFile(
+      join(documentAssetsRoot(fixture.documentId), name),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    )
+    presentation.slides[0]!.elements.push({
+      fixedRatio: true,
+      height: 80,
+      id: 'desktop-generated-image',
+      left: 700,
+      rotate: 0,
+      src: `mona://asset/${encodeURIComponent(fixture.documentId)}/${encodeURIComponent(name)}`,
+      top: 420,
+      type: 'image',
+      width: 80,
+    })
+
+    const result = await exportPowerPointForDocument({
+      documentId: fixture.documentId,
+      presentation,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'desktop-generated-image.pptx',
+      theme: presentation.theme,
+    })
+    expect(reimported.presentation.slides[0]?.elements.some(element => (
+      element.type === 'image'
+      && Math.abs(element.left - 700) < 0.1
+      && Math.abs(element.top - 420) < 0.1
+    ))).toBe(true)
   })
 
   it('exports a straight-line geometry and style edit from the retained package', async () => {

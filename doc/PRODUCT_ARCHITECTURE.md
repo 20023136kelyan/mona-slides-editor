@@ -95,14 +95,17 @@ continue to use the one production React render graph.
 
 `packages/pptx-writeback` is the inverse package boundary. It compares the saved
 import baseline with the desired presentation, resolves edits through immutable
-source identities, refuses unsupported mutations, and patches only the affected
-slide XML. A no-op returns the exact retained archive. The current completed
-slice writes slide-local object transforms/deletions, editable rich text and
-paragraph/run formatting, text-body layout, and solid fills/outlines. New
-objects, slide structure, connected-endpoint reassignment, bent/curved connector
-routes, inherited objects, effects and new
-relationships remain outside that capability. Existing hyperlink relationships
-survive source-run edits, while adding, removing, or retargeting hyperlinks is rejected.
+source identities, refuses unsupported mutations, and patches only affected
+OOXML parts. A no-op returns the exact retained archive. Existing source-backed
+objects use exact in-place serializers or native copy-on-write. Source-free
+text, shapes, images, connectors, charts/workbooks, tables, groups, vector
+formula pictures and media are generated in a small donor package and transplanted with collision-free
+relationships and content types. Image replacement/backgrounds resolve only
+document-owned assets. Slide-local inherited edits remain private; explicit
+master/layout authoring is isolated in `deck/powerpoint/shared-layers.json` and
+records the exact shared parts allowed to change. Native OMML equation authoring,
+theme authoring, new comment/notes structures, timing authoring and some advanced
+effects remain explicit boundaries.
 
 ## Core concepts
 

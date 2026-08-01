@@ -217,6 +217,523 @@ describe('PowerPoint source-package writeback', () => {
     },
   )
 
+  it('serializes a Mona-authored text box into an imported slide as editable native text', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const slide = desired.slides[0]!
+    const template = editableTextElement(desired)
+    const generated = structuredClone(template)
+    delete generated.source
+    generated.id = 'generated-text-box'
+    generated.left += 72
+    generated.top += 24
+    if (generated.type === 'text') {
+      generated.content = '<p><strong>Generated title</strong></p><p>Editable body</p>'
+      delete generated.structuredText
+    }
+    else if (generated.text) {
+      generated.text.content = '<p><strong>Generated title</strong></p><p>Editable body</p>'
+      delete generated.text.structuredText
+    }
+    slide.elements.push(generated)
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      elementId: generated.id,
+      kind: 'insert-element',
+      targetPart: slide.source?.slidePart,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-text-box.pptx',
+      theme,
+    })
+    const generatedText = flattenElementTree(reimported.presentation.slides[0]!.elements).find(element => (
+      (element.type === 'text' && element.content.includes('Generated title'))
+      || (element.type === 'shape' && element.text?.content.includes('Generated title'))
+    ))
+    expect(['shape', 'text']).toContain(generatedText?.type)
+    const content = generatedText?.type === 'text'
+      ? generatedText.content
+      : generatedText?.type === 'shape'
+        ? generatedText.text?.content
+        : undefined
+    expect(content).toContain('Editable body')
+    expect(generatedText?.source?.sourceObjectId).toBeTruthy()
+  })
+
+  it('serializes Mona-authored image bytes into the retained package and relationship graph', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const slide = desired.slides[0]!
+    const assetReference = 'mona-test://generated-pixel.png'
+    const generated: Extract<PPTElement, { type: 'image' }> = {
+      fixedRatio: true,
+      height: 72,
+      id: 'generated-image',
+      left: 40,
+      rotate: 0,
+      src: assetReference,
+      top: 40,
+      type: 'image',
+      width: 72,
+    }
+    slide.elements.push(generated)
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+      resolveAsset: async reference => reference === assetReference
+        ? { bytes: png, mediaType: 'image/png' }
+        : undefined,
+    })
+    const zip = await JSZip.loadAsync(result.bytes)
+    expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.png$/i.test(path))).toBe(true)
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-image.pptx',
+      theme,
+    })
+    const inserted = flattenElementTree(reimported.presentation.slides[0]!.elements).find(element => (
+      element.type === 'image'
+      && Math.abs(element.left - generated.left) < 0.1
+      && Math.abs(element.top - generated.top) < 0.1
+    ))
+    expect(inserted?.type).toBe('image')
+    expect(inserted?.source?.sourceObjectId).toBeTruthy()
+  })
+
+  it('serializes a Mona-authored chart with an independently editable workbook', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-04-chart-table.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'generated-chart-source.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const slide = desired.slides[0]!
+    const generated = structuredClone(editableChartElement(desired))
+    delete generated.source
+    delete generated.chartSource
+    delete generated.chartSpace
+    generated.id = 'generated-chart'
+    generated.left += 56
+    generated.top += 32
+    generated.data = {
+      labels: ['North', 'South', 'West'],
+      legends: ['Plan', 'Actual'],
+      series: [[12, 18, 23], [10, 21, 20]],
+    }
+    generated.options = { legendPosition: 'bottom', showLegend: true }
+    slide.elements.push(generated)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-chart-roundtrip.pptx',
+      theme,
+    })
+    const inserted = flattenElementTree(reimported.presentation.slides[0]!.elements).find(
+      (element): element is Extract<PPTElement, { type: 'chart' }> => (
+        element.type === 'chart'
+        && element.data.legends.includes('Plan')
+        && element.data.legends.includes('Actual')
+      ),
+    )
+    expect(inserted).toBeTruthy()
+    expect(inserted?.chartSource?.partPath).toBeTruthy()
+    expect(inserted?.chartSource?.workbookPart).toBeTruthy()
+    expect(inserted?.data.series).toEqual(generated.data.series)
+  })
+
+  it('authors a generated editable text box directly into an explicit shared master layer', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const sourcePackage = desired.sourcePackages?.[0]
+    const master = sourcePackage?.hierarchy?.masters[0]
+    if (!sourcePackage || !master) throw new Error('Fixture has no retained PowerPoint master.')
+    const generated: Extract<PPTElement, { type: 'text' }> = {
+      content: '<p><strong>Shared master label</strong></p>',
+      defaultColor: '#222222',
+      defaultFontName: 'Arial',
+      height: 28,
+      id: 'generated-master-text',
+      left: 24,
+      rotate: 0,
+      top: 500,
+      type: 'text',
+      width: 220,
+    }
+    master.elements = [...(master.elements ?? []), generated]
+    sourcePackage.sharedAuthoring = {
+      partPaths: [master.partPath],
+      revision: 1,
+    }
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      elementId: generated.id,
+      kind: 'insert-element',
+      targetPart: master.partPath,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-shared-master-text.pptx',
+      theme,
+    })
+    const roundTrippedMaster = reimported.presentation.sourcePackages?.[0]?.hierarchy?.masters.find(
+      candidate => candidate.partPath === master.partPath,
+    )
+    const inserted = flattenElementTree(roundTrippedMaster?.elements ?? []).find(element => (
+      (element.type === 'text' && element.content.includes('Shared master label'))
+      || (element.type === 'shape' && element.text?.content.includes('Shared master label'))
+    ))
+    expect(['shape', 'text']).toContain(inserted?.type)
+    expect(inserted?.source?.sourcePart).toBe(master.partPath)
+  })
+
+  it.skipIf(!PRIVATE_FIXTURES.length)('patches a source-backed object in an explicitly authored real shared layer', async () => {
+    const fileName = PRIVATE_FIXTURES.find(name => name.includes('corporate')) ?? PRIVATE_FIXTURES[0]!
+    const bytes = await readFile(join(PRIVATE_FIXTURE_ROOT, fileName))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName, theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourcePackage = desired.sourcePackages?.[0]
+    const candidate = [
+      ...(sourcePackage?.hierarchy?.layouts ?? []),
+      ...(sourcePackage?.hierarchy?.masters ?? []),
+    ].flatMap(layer => flattenElementTree(layer.elements ?? []).map(element => ({ element, layer })))
+      .find(({ element }) => element.type !== 'line' && Boolean(element.source?.sourceObjectId))
+    if (!sourcePackage || !candidate || candidate.element.type === 'line') {
+      throw new Error('Private fixture has no addressable shared-layer object.')
+    }
+    const objectId = candidate.element.source?.sourceObjectId
+    const nativeShapeId = candidate.element.source?.nativeShapeId
+    candidate.element.left += 14
+    sourcePackage.sharedAuthoring = { partPaths: [candidate.layer.partPath], revision: 1 }
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'transform',
+      objectId,
+      partPath: candidate.layer.partPath,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: `shared-${fileName}`,
+      theme,
+    })
+    const roundTripped = [
+      ...(reimported.presentation.sourcePackages?.[0]?.hierarchy?.layouts ?? []),
+      ...(reimported.presentation.sourcePackages?.[0]?.hierarchy?.masters ?? []),
+    ].flatMap(layer => flattenElementTree(layer.elements ?? []))
+      .find(element => (
+        element.source?.sourcePart === candidate.layer.partPath
+        && element.source?.nativeShapeId === nativeShapeId
+      ))
+    expect(roundTripped?.left).toBeCloseTo(candidate.element.left, 2)
+  }, 15_000)
+
+  it('serializes generated native tables and semantic connector groups', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-04-chart-table.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'generated-objects-source.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const slide = desired.slides[0]!
+    const table: Extract<PPTElement, { type: 'table' }> = {
+      cellMinHeight: 28,
+      colWidths: [0.5, 0.5],
+      data: [[
+        { colspan: 1, id: 'table-a1', rowspan: 1, style: { backcolor: '#E5E7EB', bold: true }, text: 'Metric' },
+        { colspan: 1, id: 'table-b1', rowspan: 1, style: { backcolor: '#E5E7EB', bold: true }, text: 'Value' },
+      ], [
+        { colspan: 1, id: 'table-a2', rowspan: 1, text: 'Growth' },
+        { colspan: 1, id: 'table-b2', rowspan: 1, text: '24%' },
+      ]],
+      height: 120,
+      id: 'generated-table',
+      left: 60,
+      outline: { color: '#9CA3AF', style: 'solid', width: 1 },
+      rotate: 0,
+      top: 40,
+      type: 'table',
+      width: 320,
+    }
+    const group: Extract<PPTElement, { type: 'group' }> = {
+      coordinateHeight: 160,
+      coordinateWidth: 260,
+      elements: [{
+        color: '#C2410C',
+        end: [220, 120],
+        id: 'generated-group-line',
+        left: 10,
+        points: ['', 'arrow'],
+        start: [0, 0],
+        style: 'dashed',
+        top: 10,
+        type: 'line',
+        width: 3,
+      }, {
+        content: '<p>Grouped and editable</p>',
+        defaultColor: '#111827',
+        defaultFontName: 'Arial',
+        height: 36,
+        id: 'generated-group-text',
+        left: 20,
+        rotate: 0,
+        top: 80,
+        type: 'text',
+        width: 190,
+      }],
+      height: 160,
+      id: 'generated-group',
+      left: 500,
+      rotate: 0,
+      top: 220,
+      type: 'group',
+      width: 260,
+    }
+    slide.elements.push(table, group)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-objects-roundtrip.pptx',
+      theme,
+    })
+    const elements = flattenElementTree(reimported.presentation.slides[0]!.elements)
+    expect(elements.some(element => element.type === 'table' && Math.abs(element.left - table.left) < 0.1)).toBe(true)
+    const insertedGroup = reimported.presentation.slides[0]!.elements.find(element => (
+      element.type === 'group' && Math.abs(element.left - group.left) < 0.1
+    ))
+    expect(insertedGroup?.type).toBe('group')
+    if (insertedGroup?.type !== 'group') return
+    expect(flattenElementTree(insertedGroup.elements).some(element => element.type === 'line')).toBe(true)
+    expect(flattenElementTree(insertedGroup.elements).some(element => (
+      (element.type === 'text' && element.content.includes('Grouped and editable'))
+      || (element.type === 'shape' && element.text?.content.includes('Grouped and editable'))
+    ))).toBe(true)
+  })
+
+  it('serializes generated picture-filled shapes, vector formulas, audio, and video dependencies', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const slide = desired.slides[0]!
+    const pictureReference = 'mona-test://shape-fill.png'
+    const videoReference = 'mona-test://clip.mp4'
+    const audioReference = 'mona-test://sound.mp3'
+    const posterReference = 'mona-test://poster.png'
+    const shape: Extract<PPTElement, { type: 'shape' }> = {
+      fill: '#FFFFFF',
+      fixedRatio: false,
+      height: 90,
+      id: 'generated-picture-shape',
+      left: 30,
+      path: 'M 0 0 L 100 0 L 100 100 L 0 100 Z',
+      pattern: pictureReference,
+      patternFit: { mode: 'tile', scaleX: 0.5, scaleY: 0.5 },
+      rotate: 0,
+      top: 30,
+      type: 'shape',
+      viewBox: [100, 100],
+      width: 140,
+    }
+    const formula: Extract<PPTElement, { type: 'latex' }> = {
+      color: '#111827',
+      fixedRatio: true,
+      height: 55,
+      id: 'generated-vector-formula',
+      latex: 'x^2+y^2',
+      left: 200,
+      path: 'M 2 25 L 22 5 M 2 5 L 22 25',
+      rotate: 0,
+      strokeWidth: 2,
+      top: 40,
+      type: 'latex',
+      viewBox: [24, 30],
+      width: 90,
+    }
+    const video: Extract<PPTElement, { type: 'video' }> = {
+      autoplay: false,
+      ext: 'mp4',
+      height: 90,
+      id: 'generated-video',
+      left: 320,
+      poster: posterReference,
+      rotate: 0,
+      src: videoReference,
+      top: 30,
+      type: 'video',
+      width: 160,
+    }
+    const audio: Extract<PPTElement, { type: 'audio' }> = {
+      autoplay: false,
+      color: '#111827',
+      ext: 'mp3',
+      fixedRatio: true,
+      height: 48,
+      id: 'generated-audio',
+      left: 510,
+      loop: false,
+      rotate: 0,
+      src: audioReference,
+      top: 50,
+      type: 'audio',
+      width: 48,
+    }
+    slide.elements.push(shape, formula, video, audio)
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const assets = new Map<string, { bytes: Uint8Array; mediaType: string }>([
+      [pictureReference, { bytes: png, mediaType: 'image/png' }],
+      [posterReference, { bytes: png, mediaType: 'image/png' }],
+      [videoReference, {
+        bytes: Buffer.from('000000186674797069736f6d0000020069736f6d69736f32', 'hex'),
+        mediaType: 'video/mp4',
+      }],
+      [audioReference, { bytes: Buffer.from('49443304000000000000', 'hex'), mediaType: 'audio/mpeg' }],
+    ])
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+      resolveAsset: async reference => assets.get(reference),
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const zip = await JSZip.loadAsync(result.bytes)
+    expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.mp4$/i.test(path))).toBe(true)
+    expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.mp3$/i.test(path))).toBe(true)
+    expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.svg$/i.test(path))).toBe(true)
+
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-rich-media-roundtrip.pptx',
+      theme,
+    })
+    const elements = flattenElementTree(reimported.presentation.slides[0]!.elements)
+    const pictureShape = elements.find(element => (
+      element.type === 'shape'
+      && Math.abs(element.left - shape.left) < 0.1
+      && Boolean(element.pattern)
+    ))
+    expect(pictureShape?.type).toBe('shape')
+    if (pictureShape?.type === 'shape') expect(pictureShape.patternFit?.mode).toBe('tile')
+    expect(elements.some(element => element.type === 'video')).toBe(true)
+    expect(elements.some(element => element.type === 'audio')).toBe(true)
+    expect(elements.some(element => (
+      element.type === 'image'
+      && Math.abs(element.left - formula.left) < 0.1
+      && Math.abs(element.top - formula.top) < 0.1
+    ))).toBe(true)
+  })
+
+  it('replaces retained native image media with document-owned bytes', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-03-media.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'image-replacement-source.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const image = flattenElementTree(desired.slides[0]!.elements).find(
+      (element): element is Extract<PPTElement, { type: 'image' }> => (
+        element.type === 'image' && Boolean(element.source?.sourceObjectId)
+      ),
+    )
+    if (!image) throw new Error('Media fixture has no retained native image.')
+    const reference = 'mona-test://replacement.png'
+    image.src = reference
+    image.clip = { range: [[10, 15], [90, 85]], shape: 'rect' }
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+      resolveAsset: async value => value === reference
+        ? { bytes: png, mediaType: 'image/png' }
+        : undefined,
+    })
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'replace-element',
+      objectId: image.source?.sourceObjectId,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'image-replacement-roundtrip.pptx',
+      theme,
+    })
+    const replacement = flattenElementTree(reimported.presentation.slides[0]!.elements).find(
+      (element): element is Extract<PPTElement, { type: 'image' }> => (
+        element.type === 'image'
+        && Math.abs(element.left - image.left) < 0.1
+        && Math.abs(element.top - image.top) < 0.1
+      ),
+    )
+    expect(replacement?.clip?.range).toEqual(image.clip.range)
+    expect(replacement?.source?.sourceObjectId).toBeTruthy()
+  })
+
+  it('allocates native media and relationships for an authored image background', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const reference = 'mona-test://background.png'
+    desired.slides[0]!.background = {
+      image: { size: 'cover', src: reference },
+      type: 'image',
+    }
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+      resolveAsset: async value => value === reference
+        ? { bytes: png, mediaType: 'image/png' }
+        : undefined,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-background-roundtrip.pptx',
+      theme,
+    })
+    expect(reimported.presentation.slides[0]?.background?.type).toBe('image')
+    expect(reimported.presentation.slides[0]?.background?.image?.src).toBeTruthy()
+  })
+
   if (PRIVATE_FIXTURES.length) {
     it.each(PRIVATE_FIXTURES)(
       'keeps every byte of an unchanged private corpus deck: %s',

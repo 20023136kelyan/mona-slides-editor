@@ -44,11 +44,22 @@ export interface SnapshotSlide {
   [field: string]: unknown
 }
 
+export interface SnapshotPowerPointSharedLayers {
+  packages: Array<{
+    layouts: Array<Record<string, unknown>>
+    masters: Array<Record<string, unknown>>
+    packageId: string
+  }>
+  schemaVersion: 1
+}
+
 export interface DeckSnapshot {
   /** Keyed by the URL the model holds, `blob:…` or a `data:` URL. */
   assets: Record<string, SnapshotAsset>
   slideIndex?: number
   slides: SnapshotSlide[]
+  /** Explicitly editable master/layout records, kept out of per-slide JSON. */
+  powerPointSharedLayers?: SnapshotPowerPointSharedLayers
   theme?: unknown
   title?: string
   viewportRatio?: number
@@ -181,12 +192,22 @@ export const planWorkspace = (snapshot: DeckSnapshot): WorkspacePlan => {
     return slide.title ? { file: path, id: slide.id, title: slide.title } : { file: path, id: slide.id }
   })
 
+  if (snapshot.powerPointSharedLayers !== undefined) {
+    files.push({
+      data: `${JSON.stringify(rewrite(snapshot.powerPointSharedLayers, 'shared-layer'), null, 2)}\n`,
+      path: 'deck/powerpoint/shared-layers.json',
+    })
+  }
+
   files.push({
     // Slide order is this array's order, so reordering the deck is an edit to
     // this file rather than a command only we know how to spell.
     data: `${JSON.stringify({
       slideIndex: snapshot.slideIndex ?? 0,
       slides: index,
+      ...(snapshot.powerPointSharedLayers !== undefined
+        ? { powerPointSharedLayers: 'powerpoint/shared-layers.json' }
+        : {}),
       theme: snapshot.theme ?? {},
       title: snapshot.title ?? '',
       viewport: { ratio: snapshot.viewportRatio ?? 0.5625, size: snapshot.viewportSize ?? 1000 },
@@ -203,6 +224,7 @@ export interface WorkspaceReadback {
   addedAssets: string[]
   slideIndex: number
   slides: SnapshotSlide[]
+  powerPointSharedLayers?: SnapshotPowerPointSharedLayers
   theme: unknown
   title: string
 }
@@ -228,6 +250,7 @@ export const readWorkspace = (
   },
 ): WorkspaceReadback => {
   const deck = (readJson('deck/deck.json') ?? {}) as {
+    powerPointSharedLayers?: string
     slideIndex?: number
     slides?: DeckIndexEntry[]
     theme?: unknown
@@ -267,6 +290,9 @@ export const readWorkspace = (
     addedAssets: [...addedAssets],
     slideIndex: deck.slideIndex ?? 0,
     slides,
+    ...(typeof deck.powerPointSharedLayers === 'string'
+      ? { powerPointSharedLayers: restore(readJson(`deck/${deck.powerPointSharedLayers}`)) as SnapshotPowerPointSharedLayers }
+      : {}),
     theme: deck.theme ?? {},
     title: deck.title ?? '',
   }

@@ -274,12 +274,6 @@ export class ProjectDocumentJobEngine {
         if (source.extension !== '.mona' && source.extension !== '.pptx') {
           throw new Error('Direct agent writeback is available only for Mona and PowerPoint presentations.')
         }
-        if (
-          source.extension === '.pptx'
-          && Object.keys(change.addedAssets).length
-        ) {
-          throw new Error('Adding new media to an imported PowerPoint is not writeback-safe yet.')
-        }
         const picked = await this.#dataSources.readDocument(artifact.reference)
         const revision = sourceRevision(picked.bytes, source.modifiedAt, source.size)
         if (!sameRevision(revision, change.expectedRevision)) {
@@ -354,11 +348,24 @@ export class ProjectDocumentJobEngine {
         fileName: currentSource.name,
         theme: presentation.theme,
       })
+      const sourceAssets = new Map(ingested.assets.map(asset => [asset.url, asset]))
+      const addedAssets = new Map(Object.entries(step.change.addedAssets))
       const result = await writeBackPowerPoint({
         baseline: ingested.presentation,
         bytes: currentPicked.bytes,
         manifest: ingested.backing.manifest,
         presentation,
+        resolveAsset: async reference => {
+          const retained = sourceAssets.get(reference)
+          if (retained) return { bytes: retained.bytes, mediaType: retained.mediaType }
+          const added = addedAssets.get(reference)
+          return added
+            ? {
+                bytes: Buffer.from(added.base64, 'base64'),
+                mediaType: added.mediaType,
+              }
+            : undefined
+        },
       })
       if (result.plan.mode === 'noop') {
         throw new Error(
@@ -431,6 +438,19 @@ const collectAssetUrls = (value: unknown, found = new Set<string>()): Set<string
     for (const entry of Object.values(value)) collectAssetUrls(entry, found)
   }
   return found
+}
+
+const sharedLayerSnapshot = (presentation: PresentationState) => {
+  const packages = (presentation.sourcePackages ?? []).flatMap(source => (
+    source.hierarchy
+      ? [{
+          layouts: structuredClone(source.hierarchy.layouts) as unknown as Array<Record<string, unknown>>,
+          masters: structuredClone(source.hierarchy.masters) as unknown as Array<Record<string, unknown>>,
+          packageId: source.packageId,
+        }]
+      : []
+  ))
+  return packages.length ? { packages, schemaVersion: 1 as const } : undefined
 }
 
 const assetPath = (documentId: string, url: string): string | null => {
@@ -532,6 +552,9 @@ export class ProjectDocumentAgentExecutor implements ProjectAgentExecutor {
                   mediaType: asset.mediaType,
                 },
               ])),
+              ...(sharedLayerSnapshot(ingested.presentation)
+                ? { powerPointSharedLayers: sharedLayerSnapshot(ingested.presentation) }
+                : {}),
               slideIndex: ingested.presentation.slideIndex,
               slides: ingested.presentation.slides as unknown as (
                 NonNullable<ProjectWorkspaceDocument['snapshot']>['slides']
@@ -589,6 +612,9 @@ export class ProjectDocumentAgentExecutor implements ProjectAgentExecutor {
           revision: sourceRevision(picked.bytes, source.modifiedAt, source.size),
           snapshot: {
             assets,
+            ...(sharedLayerSnapshot(stored.presentation)
+              ? { powerPointSharedLayers: sharedLayerSnapshot(stored.presentation) }
+              : {}),
             slideIndex: stored.presentation.slideIndex,
             slides: stored.presentation.slides as unknown as (
               NonNullable<ProjectWorkspaceDocument['snapshot']>['slides']

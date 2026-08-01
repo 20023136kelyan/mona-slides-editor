@@ -107,6 +107,26 @@ describe('planWorkspace', () => {
     const plan = planWorkspace(snapshot())
     expect(text(plan, 'deck/deck.json')).not.toContain('revision')
   })
+
+  it('keeps explicit PowerPoint master/layout authoring in its own workspace file', () => {
+    const original = snapshot({
+      powerPointSharedLayers: {
+        packages: [{
+          layouts: [{ elements: [{ id: 'layout-logo', src: 'blob:http://x/one', type: 'image' }], partPath: 'ppt/slideLayouts/slideLayout1.xml' }],
+          masters: [],
+          packageId: 'pptx:fixture',
+        }],
+        schemaVersion: 1,
+      },
+    })
+    const plan = planWorkspace(original)
+
+    expect(text(plan, 'deck/deck.json')).toContain('powerpoint/shared-layers.json')
+    expect(text(plan, 'deck/powerpoint/shared-layers.json')).toContain('assets/image-1.png')
+    expect(text(plan, 'deck/slides/01.json')).not.toContain('layout-logo')
+    const back = readWorkspace({ assetSources: plan.assetSources, readJson: readerFor(plan) })
+    expect(back.powerPointSharedLayers).toEqual(original.powerPointSharedLayers)
+  })
 })
 
 describe('readWorkspace', () => {

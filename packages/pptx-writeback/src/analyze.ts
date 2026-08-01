@@ -292,6 +292,34 @@ const collectCopyInsertionRoots = (
   return roots
 }
 
+const collectGeneratedInsertionRoots = (
+  slide: Slide,
+  baselineElementIds: ReadonlySet<string>,
+): Array<{ element: PPTElement; index: number; parentObjectId?: string }> => {
+  const roots: Array<{ element: PPTElement; index: number; parentObjectId?: string }> = []
+  const visit = (
+    elements: readonly PPTElement[],
+    parentObjectId?: string,
+    parentIsGenerated = false,
+  ): void => {
+    elements.forEach((element, index) => {
+      const generated = !element.source && !baselineElementIds.has(element.id)
+      if (generated && !parentIsGenerated) {
+        roots.push({ element, index, ...(parentObjectId ? { parentObjectId } : {}) })
+      }
+      if (element.type === 'group') {
+        visit(
+          element.elements,
+          sourceObjectId(element) ?? parentObjectId,
+          parentIsGenerated || generated,
+        )
+      }
+    })
+  }
+  visit(slide.elements)
+  return roots
+}
+
 const transformSnapshot = (
   element: Exclude<PPTElement, { type: 'line' }>,
 ): PowerPointTransformSnapshot => ({
@@ -488,10 +516,161 @@ const unaddressedCopyPayloadIsUnchanged = (
   ))
 }
 
+const layerShell = (layer: Record<string, unknown>): Record<string, unknown> => {
+  const clone = structuredClone(layer)
+  delete clone.background
+  delete clone.elements
+  return clone
+}
+
+const asSlideLocalLayerElements = (
+  elements: readonly PPTElement[],
+  partPath: string,
+): PPTElement[] => structuredClone(elements).map(function rewrite(element): PPTElement {
+  const next = {
+    ...element,
+    ...(element.source
+      ? {
+          source: {
+            ...element.source,
+            slidePart: partPath,
+            sourceLayer: 'slide' as const,
+            sourcePart: partPath,
+          },
+        }
+      : {}),
+  } as PPTElement
+  if (next.type === 'group') next.elements = next.elements.map(rewrite)
+  return next
+})
+
+const sharedLayerAnalysis = (
+  baseline: PresentationState,
+  desired: PresentationState,
+  packageId: string,
+): PowerPointWritebackPlan => {
+  const baselinePackage = baseline.sourcePackages?.find(source => source.packageId === packageId)
+  const desiredPackage = desired.sourcePackages?.find(source => source.packageId === packageId)
+  const operations: PowerPointPatchOperation[] = []
+  const sharedIssues: PowerPointWritebackIssue[] = []
+  if (!baselinePackage?.hierarchy || !desiredPackage?.hierarchy) {
+    if (changed(baselinePackage?.hierarchy, desiredPackage?.hierarchy)) {
+      sharedIssues.push(unsupported(
+        'pptx.writeback.shared-hierarchy',
+        'The retained PowerPoint hierarchy cannot be added or removed during writeback.',
+      ))
+    }
+    return {
+      mode: sharedIssues.length ? 'unsupported' : 'noop',
+      operations,
+      touchedParts: [],
+      unsupported: sharedIssues,
+    }
+  }
+
+  for (const key of ['defaultTextStyle', 'placeholders', 'themes'] as const) {
+    if (changed(baselinePackage.hierarchy[key], desiredPackage.hierarchy[key])) {
+      sharedIssues.push(unsupported(
+        'pptx.writeback.shared-hierarchy-metadata',
+        `The shared hierarchy field "${key}" is retained metadata and cannot be authored through the layer workspace.`,
+      ))
+    }
+  }
+  const baselineLayers = [
+    ...baselinePackage.hierarchy.masters,
+    ...baselinePackage.hierarchy.layouts,
+  ] as unknown as Array<Record<string, unknown>>
+  const desiredLayers = [
+    ...desiredPackage.hierarchy.masters,
+    ...desiredPackage.hierarchy.layouts,
+  ] as unknown as Array<Record<string, unknown>>
+  const baselineByPart = new Map(baselineLayers.flatMap(layer => (
+    typeof layer.partPath === 'string' ? [[layer.partPath, layer] as const] : []
+  )))
+  const desiredByPart = new Map(desiredLayers.flatMap(layer => (
+    typeof layer.partPath === 'string' ? [[layer.partPath, layer] as const] : []
+  )))
+  if (
+    baselineByPart.size !== baselineLayers.length
+    || desiredByPart.size !== desiredLayers.length
+    || baselineByPart.size !== desiredByPart.size
+    || [...baselineByPart.keys()].some(part => !desiredByPart.has(part))
+  ) {
+    sharedIssues.push(unsupported(
+      'pptx.writeback.shared-layer-structure',
+      'Adding, removing, or reassigning PowerPoint master/layout parts is not supported.',
+    ))
+  }
+
+  const explicitlyAuthored = new Set(desiredPackage.sharedAuthoring?.partPaths ?? [])
+  for (const [partPath, baselineLayer] of baselineByPart) {
+    const desiredLayer = desiredByPart.get(partPath)
+    if (!desiredLayer || !changed(baselineLayer, desiredLayer)) continue
+    if (!explicitlyAuthored.has(partPath)) {
+      sharedIssues.push(unsupported(
+        'pptx.writeback.shared-layer-intent',
+        'A master/layout part changed outside the explicit shared-layer authoring surface.',
+        { partPath },
+      ))
+      continue
+    }
+    if (changed(layerShell(baselineLayer), layerShell(desiredLayer))) {
+      sharedIssues.push(unsupported(
+        'pptx.writeback.shared-layer-identity',
+        'PowerPoint master/layout identity fields are immutable; only their background and drawing elements are authorable.',
+        { partPath },
+      ))
+      continue
+    }
+    const baselineElements = Array.isArray(baselineLayer.elements)
+      ? baselineLayer.elements as PPTElement[]
+      : []
+    const desiredElements = Array.isArray(desiredLayer.elements)
+      ? desiredLayer.elements as PPTElement[]
+      : []
+    const shell = baseline.slides[0] ?? { elements: [], id: 'shared-layer-shell' }
+    const baselineSlide: Slide = {
+      ...structuredClone(shell),
+      elements: asSlideLocalLayerElements(baselineElements, partPath),
+      id: `shared:${partPath}`,
+      source: { kind: 'pptx', packageId, slidePart: partPath },
+    }
+    const desiredSlide: Slide = {
+      ...structuredClone(shell),
+      elements: asSlideLocalLayerElements(desiredElements, partPath),
+      id: `shared:${partPath}`,
+      source: { kind: 'pptx', packageId, slidePart: partPath },
+    }
+    if (baselineLayer.background) {
+      baselineSlide.background = structuredClone(baselineLayer.background) as Slide['background']
+    }
+    else delete baselineSlide.background
+    if (desiredLayer.background) {
+      desiredSlide.background = structuredClone(desiredLayer.background) as Slide['background']
+    }
+    else delete desiredSlide.background
+    const synthetic = analyzePowerPointWriteback(
+      { ...baseline, slides: [baselineSlide] },
+      { ...baseline, slides: [desiredSlide] },
+      packageId,
+      false,
+    )
+    operations.push(...synthetic.operations)
+    sharedIssues.push(...synthetic.unsupported)
+  }
+  return {
+    mode: sharedIssues.length ? 'unsupported' : operations.length ? 'patch' : 'noop',
+    operations,
+    touchedParts: [],
+    unsupported: sharedIssues,
+  }
+}
+
 export const analyzePowerPointWriteback = (
   baseline: PresentationState,
   presentation: PresentationState,
   packageId: string,
+  includeSharedLayers = true,
 ): PowerPointWritebackPlan => {
   const operations: PowerPointPatchOperation[] = []
   const issues = comparePresentationShell(baseline, presentation)
@@ -555,16 +734,6 @@ export const analyzePowerPointWriteback = (
       continue
     }
     issues.push(...compareSlideShell(sourceSlide, slide))
-    if (
-      changed(sourceSlide.background, slide.background)
-      && slide.background?.type === 'image'
-    ) {
-      issues.push(unsupported(
-        'pptx.writeback.background-image',
-        'Replacing the copied slide background with a new image requires package media allocation.',
-        { partPath: sourcePart, slideId: slide.id },
-      ))
-    }
     if (changed(sourceSlide.notes ?? [], slide.notes ?? [])) {
       issues.push(unsupported(
         'pptx.writeback.slide-copy-comments',
@@ -583,6 +752,7 @@ export const analyzePowerPointWriteback = (
           && JSON.stringify(unaddressedCopySnapshot(sourceElement))
             === JSON.stringify(unaddressedCopySnapshot(element))
         ) continue
+        if (!element.source && element.type !== 'opaque') continue
         issues.push(unsupported(
           'pptx.writeback.slide-copy-element-added',
           'Every object on a copied native slide must retain an exact native copy origin.',
@@ -647,22 +817,13 @@ export const analyzePowerPointWriteback = (
       }
     }
     if (changed(baselineSlide.background, desiredSlide.background)) {
-      if (desiredSlide.background?.type === 'image') {
-        issues.push(unsupported(
-          'pptx.writeback.background-image',
-          'Replacing a slide background image requires package asset and relationship allocation.',
-          { partPath, slideId: baselineSlide.id },
-        ))
-      }
-      else {
-        operations.push({
-          ...(desiredSlide.background ? { after: structuredClone(desiredSlide.background) } : {}),
-          ...(baselineSlide.background ? { before: structuredClone(baselineSlide.background) } : {}),
-          kind: 'background',
-          partPath,
-          slideId: baselineSlide.id,
-        })
-      }
+      operations.push({
+        ...(desiredSlide.background ? { after: structuredClone(desiredSlide.background) } : {}),
+        ...(baselineSlide.background ? { before: structuredClone(baselineSlide.background) } : {}),
+        kind: 'background',
+        partPath,
+        slideId: baselineSlide.id,
+      })
     }
     if ((baselineSlide.remark ?? '') !== (desiredSlide.remark ?? '')) {
       const notesPart = sourcePackage?.slides.find(slide => slide.slidePart === partPath)?.notesPart
@@ -770,6 +931,15 @@ export const analyzePowerPointWriteback = (
         flattenElementTree([entry.element]).map(element => element.id)
       )),
     )
+    const generatedInsertionRootById = new Map(
+      collectGeneratedInsertionRoots(desiredSlide, new Set(baselineById.keys()))
+        .map(entry => [entry.element.id, entry]),
+    )
+    const generatedInsertionTreeIds = new Set(
+      [...generatedInsertionRootById.values()].flatMap(entry => (
+        flattenElementTree([entry.element]).map(element => element.id)
+      )),
+    )
 
     for (const desiredEntry of desiredTree.entries) {
       const source = desiredEntry.element.source
@@ -845,15 +1015,33 @@ export const analyzePowerPointWriteback = (
         ) {
           continue
         }
-        issues.push(unsupported(
-          baselineEntry
-            ? 'pptx.writeback.unaddressable-object'
-            : 'pptx.writeback.element-added',
-          baselineEntry
-            ? 'This imported object has no exact OOXML identity, so its edits cannot be written back safely.'
-            : 'A Mona-created element cannot yet be inserted into an imported PowerPoint package.',
-          { elementId: desiredEntry.element.id, slideId: desiredSlide.id },
-        ))
+        const generatedRoot = generatedInsertionRootById.get(desiredEntry.element.id)
+        if (generatedRoot && partPath && desiredEntry.element.type !== 'opaque') {
+          operations.push({
+            after: structuredClone(desiredEntry.element),
+            elementId: desiredEntry.element.id,
+            index: generatedRoot.index,
+            kind: 'insert-element',
+            ...(generatedRoot.parentObjectId
+              ? { parentObjectId: generatedRoot.parentObjectId }
+              : {}),
+            slideId: desiredSlide.id,
+            targetPart: partPath,
+          })
+        }
+        else if (!generatedInsertionTreeIds.has(desiredEntry.element.id)) {
+          issues.push(unsupported(
+            baselineEntry
+              ? 'pptx.writeback.unaddressable-object'
+              : 'pptx.writeback.element-added',
+            baselineEntry
+              ? 'This imported object has no exact OOXML identity, so its edits cannot be written back safely.'
+              : desiredEntry.element.type === 'opaque'
+                ? 'An opaque object cannot be created without one retained native payload.'
+                : 'The Mona-created element is not rooted in an addressable PowerPoint shape tree.',
+            { elementId: desiredEntry.element.id, slideId: desiredSlide.id },
+          ))
+        }
         continue
       }
       if (source.packageId !== packageId || !source.sourceObjectId) {
@@ -1251,16 +1439,15 @@ export const analyzePowerPointWriteback = (
         const beforeImage = imageSnapshot(beforeElement)
         const afterImage = imageSnapshot(afterElement)
         if (changed(beforeImage.src, afterImage.src)) {
-          issues.push(unsupported(
-            'pptx.writeback.image-replacement',
-            'Replacing native picture media requires allocating a package media part and relationship.',
-            {
-              elementId: afterElement.id,
-              objectId,
-              partPath: source.sourcePart,
-              slideId: baselineSlide.id,
-            },
-          ))
+          operations.push({
+            after: structuredClone(afterElement),
+            elementId: afterElement.id,
+            kind: 'replace-element',
+            objectId,
+            slideId: baselineSlide.id,
+            targetPart: source.sourcePart!,
+          })
+          continue
         }
         if (changed(beforeImage.powerPointImage, afterImage.powerPointImage)) {
           issues.push(unsupported(
@@ -1499,6 +1686,11 @@ export const analyzePowerPointWriteback = (
     }
   }
 
+  if (includeSharedLayers) {
+    const shared = sharedLayerAnalysis(baseline, presentation, packageId)
+    operations.push(...shared.operations)
+    issues.push(...shared.unsupported)
+  }
   const dedupedIssues = [...new Map(issues.map(issue => [
     JSON.stringify(issue),
     issue,
@@ -1513,6 +1705,10 @@ export const analyzePowerPointWriteback = (
             relationshipPartPath(operation.sourcePart),
             relationshipPartPath(operation.targetPart),
           ]
+        : operation.kind === 'insert-element'
+          ? [operation.targetPart, relationshipPartPath(operation.targetPart)]
+        : operation.kind === 'replace-element'
+          ? [operation.targetPart, relationshipPartPath(operation.targetPart)]
         : operation.kind === 'inherited-visibility'
           ? [
               operation.partPath,

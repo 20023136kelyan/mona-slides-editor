@@ -482,6 +482,29 @@ export const validatePresentationState = (
           severity: 'error',
         })
       }
+      const sharedAuthoring = source.sharedAuthoring
+      if (sharedAuthoring !== undefined) {
+        const record = sharedAuthoring && typeof sharedAuthoring === 'object' && !Array.isArray(sharedAuthoring)
+          ? sharedAuthoring as Record<string, unknown>
+          : undefined
+        const partPaths = record?.partPaths
+        const validPartPaths = Array.isArray(partPaths)
+          && partPaths.every(part => typeof part === 'string' && part.length > 0)
+          && new Set(partPaths).size === partPaths.length
+        if (
+          !record
+          || !validPartPaths
+          || !Number.isSafeInteger(record.revision)
+          || Number(record.revision) <= 0
+        ) {
+          issues.push({
+            code: 'presentation.source-package.shared-authoring',
+            message: 'Shared authoring must contain unique part paths and a positive revision',
+            path: `${path}.sharedAuthoring`,
+            severity: 'error',
+          })
+        }
+      }
       const hierarchy = source.hierarchy
       if (hierarchy !== undefined) {
         if (!hierarchy || typeof hierarchy !== 'object' || Array.isArray(hierarchy)) {

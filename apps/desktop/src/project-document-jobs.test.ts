@@ -191,8 +191,24 @@ describe('project document jobs', () => {
       textTarget.text!.content = '<p>Project agent rewrote this text.</p>'
       delete textTarget.text!.structuredText
     }
+    presentation.slides[0]!.elements.push({
+      fixedRatio: true,
+      height: 64,
+      id: 'project-generated-image',
+      left: 720,
+      rotate: 0,
+      src: 'assets/project-generated.png',
+      top: 420,
+      type: 'image',
+      width: 64,
+    })
     const job = await executor.apply('Move one PowerPoint element and rewrite text', [{
-      addedAssets: {},
+      addedAssets: {
+        'assets/project-generated.png': {
+          base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+          mediaType: 'image/png',
+        },
+      },
       artifactId: prepared!.artifactId,
       expectedRevision: prepared!.revision!,
       presentation,
@@ -225,6 +241,11 @@ describe('project document jobs', () => {
         ? roundTrippedText.text?.content
         : undefined
     expect(content).toContain('Project agent rewrote this text.')
+    expect(reimported.presentation.slides[0]?.elements.some(element => (
+      element.type === 'image'
+      && Math.abs(element.left - 720) < 0.1
+      && Math.abs(element.top - 420) < 0.1
+    ))).toBe(true)
     await dataSources.removeSource(source.id)
   })
 

@@ -199,6 +199,19 @@ describe('buildDeckSnapshot', () => {
     ])
     expect(imported.slides[0]?.elements).toHaveLength(1)
   })
+
+  it('exposes masters and layouts through a separate explicit authoring document', async () => {
+    const snapshot = await buildDeckSnapshot(importedPresentation())
+
+    expect(snapshot.powerPointSharedLayers).toMatchObject({
+      packages: [{
+        layouts: [{ partPath: 'ppt/slideLayouts/slideLayout1.xml' }],
+        packageId: 'pptx:agent',
+      }],
+      schemaVersion: 1,
+    })
+    expect(snapshot.slides[0]).not.toHaveProperty('powerPointSharedLayers')
+  })
 })
 
 describe('applyAgentWorkspace', () => {
@@ -268,7 +281,7 @@ describe('applyAgentWorkspace', () => {
         elements: [{ ...textElement('i1', ''), src: 'https://example.com/photo.png', type: 'image' }],
         id: 'slide-1',
       }] as unknown as Slide[],
-    }, runtime)).rejects.toThrow(/Save the image into deck\/assets\//)
+    }, runtime)).rejects.toThrow(/Save the media into deck\/assets\//)
   })
 })
 
@@ -477,6 +490,47 @@ describe('validateAgentSlides', () => {
       }],
       id: 'slide-1',
     }] })).toThrow(/no retained native payload/)
+  })
+
+  it('records an explicit shared-layout edit as a source-package transaction', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    const layout = snapshot.powerPointSharedLayers!.packages[0]!.layouts[0]!
+    layout.elements![0]!.left += 32
+    layout.elements!.push(textElement('shared-new-label', 'Every slide'))
+
+    const transaction = validateAgentSlides(imported, {
+      powerPointSharedLayers: snapshot.powerPointSharedLayers,
+      slides: snapshot.slides,
+    })
+    expect(transaction.commands.map(command => command.type)).toEqual([
+      'presentation.slides.replace',
+      'presentation.source-packages.replace',
+    ])
+    const command = transaction.commands[1] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.source-packages.replace' }
+    >
+    expect(command.sourcePackages[0]?.sharedAuthoring).toEqual({
+      partPaths: ['ppt/slideLayouts/slideLayout1.xml'],
+      revision: 1,
+    })
+    expect(command.sourcePackages[0]?.hierarchy?.layouts[0]?.elements).toEqual([
+      expect.objectContaining({ id: 'layout-title', left: 42 }),
+      expect.objectContaining({ id: 'shared-new-label' }),
+    ])
+    expect(command.sourcePackages[0]?.hierarchy?.layouts[0]?.elements?.[1]?.source).toBeUndefined()
+  })
+
+  it('rejects shared-layer mutations that change retained part identity', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    snapshot.powerPointSharedLayers!.packages[0]!.layouts[0]!.partPath = 'ppt/slideLayouts/forged.xml'
+
+    expect(() => validateAgentSlides(imported, {
+      powerPointSharedLayers: snapshot.powerPointSharedLayers,
+      slides: snapshot.slides,
+    })).toThrow(/Keep the master\/layout part list/)
   })
 })
 

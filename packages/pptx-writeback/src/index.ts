@@ -22,10 +22,11 @@ export const writeBackPowerPoint = async (
   if (plan.unsupported.length) throw new PowerPointWritebackError(plan.unsupported)
   return {
     bytes: await patchPowerPointPackage({
-      bytes: input.bytes,
-      manifest: input.manifest,
-      operations: plan.operations,
-    }),
+    bytes: input.bytes,
+    manifest: input.manifest,
+    operations: plan.operations,
+    resolveAsset: input.resolveAsset,
+  }),
     plan,
   }
 }

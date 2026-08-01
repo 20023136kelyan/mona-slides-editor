@@ -332,6 +332,7 @@ export class AgentSdkSession {
             addedAssets,
             expectedRevision: workspace.revision,
             explanation: args.explanation,
+            powerPointSharedLayers: deck.powerPointSharedLayers,
             slides: deck.slides,
             theme: deck.theme,
             title: deck.title,

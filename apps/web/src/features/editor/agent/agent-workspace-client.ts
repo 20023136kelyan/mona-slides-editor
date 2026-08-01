@@ -1,6 +1,8 @@
 import {
   resolveSlideRenderState,
   type PPTElement,
+  type PowerPointSlideLayout,
+  type PowerPointSlideMaster,
   type PresentationState,
   type Slide,
   type SlideTheme,
@@ -28,10 +30,20 @@ export interface AgentSnapshotOutput {
   revision: string
   slideIndex: number
   slides: AgentWorkspaceSlide[]
+  powerPointSharedLayers?: AgentPowerPointSharedLayers
   theme: SlideTheme
   title: string
   viewportRatio: number
   viewportSize: number
+}
+
+export interface AgentPowerPointSharedLayers {
+  packages: Array<{
+    layouts: PowerPointSlideLayout[]
+    masters: PowerPointSlideMaster[]
+    packageId: string
+  }>
+  schemaVersion: 1
 }
 
 /**
@@ -49,6 +61,7 @@ export interface AgentApplyInput {
   /** The revision the workspace was taken at. */
   expectedRevision: string
   explanation?: string
+  powerPointSharedLayers?: AgentPowerPointSharedLayers
   slides: AgentWorkspaceSlide[]
   theme?: Partial<SlideTheme>
   title?: string
@@ -140,17 +153,30 @@ export const buildDeckSnapshot = async (presentation: PresentationState): Promis
     }
   })
   const assets: Record<string, AgentAssetInfo> = {}
+  const sharedPackages = (presentation.sourcePackages ?? []).flatMap(sourcePackage => (
+    sourcePackage.hierarchy
+      ? [{
+          layouts: structuredClone(sourcePackage.hierarchy.layouts),
+          masters: structuredClone(sourcePackage.hierarchy.masters),
+          packageId: sourcePackage.packageId,
+        }]
+      : []
+  ))
+  const powerPointSharedLayers: AgentPowerPointSharedLayers | undefined = sharedPackages.length
+    ? { packages: sharedPackages, schemaVersion: 1 }
+    : undefined
   // Nothing is re-homed and nothing is copied. Every asset is already a file the
   // deck names by path, so the manifest is a description of what is on disk. This
   // used to re-mint inline `data:` payloads as object URLs first, because slides
   // carrying their own bytes put 193 MB of one real deck on the wire.
-  for (const url of collectAssetUrls(slides)) {
+  for (const url of collectAssetUrls({ powerPointSharedLayers, slides })) {
     const blob = await fetch(url).then(response => response.blob()).catch(() => undefined)
     if (blob) assets[url] = { byteLength: blob.size, mediaType: blob.type }
   }
   return {
     assets,
     revision: getAgentDocumentRevision(presentation),
+    ...(powerPointSharedLayers ? { powerPointSharedLayers } : {}),
     slideIndex: presentation.slideIndex,
     slides,
     theme: presentation.theme,
@@ -208,11 +234,15 @@ export const applyAgentWorkspace = async (
     urlByPath.set(path, await storeDeckAsset(base64ToBlob(asset)))
   }
   const slides = replaceReferences(input.slides, urlByPath)
+  const powerPointSharedLayers = input.powerPointSharedLayers
+    ? replaceReferences(input.powerPointSharedLayers, urlByPath)
+    : undefined
 
   const explanation = (input.explanation ?? 'Mona agent edit').trim().slice(0, 160) || 'Mona agent edit'
   // If validation fails the files stay; the next successful save collects any
   // that the deck does not name.
   const transaction = validateAgentSlides(state.presentation, {
+    ...(powerPointSharedLayers ? { powerPointSharedLayers } : {}),
     slides,
     ...(input.theme ? { theme: input.theme } : {}),
     ...(typeof input.title === 'string' ? { title: input.title } : {}),

@@ -83,13 +83,77 @@ const documentRoot = (root: string, artifactId: string): string => (
 const mergeReadback = (
   base: Record<string, unknown>,
   readback: WorkspaceReadback,
-): Record<string, unknown> => ({
-  ...structuredClone(base),
-  slideIndex: readback.slideIndex,
-  slides: readback.slides,
-  theme: readback.theme,
-  title: readback.title,
-})
+): Record<string, unknown> => {
+  const merged: Record<string, unknown> = {
+    ...structuredClone(base),
+    slideIndex: readback.slideIndex,
+    slides: readback.slides,
+    theme: readback.theme,
+    title: readback.title,
+  }
+  if (!readback.powerPointSharedLayers) return merged
+  if (readback.powerPointSharedLayers.schemaVersion !== 1) {
+    throw new Error('powerpoint/shared-layers.json has an unsupported schema.')
+  }
+  const desiredByPackage = new Map(readback.powerPointSharedLayers.packages.map(entry => [
+    entry.packageId,
+    entry,
+  ]))
+  const sourcePackages = Array.isArray(merged.sourcePackages)
+    ? merged.sourcePackages as Array<Record<string, unknown>>
+    : []
+  const editablePackageIds = sourcePackages.flatMap(sourcePackage => (
+    sourcePackage.hierarchy && typeof sourcePackage.packageId === 'string'
+      ? [sourcePackage.packageId]
+      : []
+  ))
+  if (
+    desiredByPackage.size !== readback.powerPointSharedLayers.packages.length
+    || desiredByPackage.size !== editablePackageIds.length
+    || editablePackageIds.some(packageId => !desiredByPackage.has(packageId))
+  ) {
+    throw new Error('Keep every PowerPoint package in powerpoint/shared-layers.json exactly once.')
+  }
+  merged.sourcePackages = sourcePackages.map(sourcePackage => {
+    const packageId = typeof sourcePackage.packageId === 'string' ? sourcePackage.packageId : ''
+    const desired = desiredByPackage.get(packageId)
+    const hierarchy = sourcePackage.hierarchy
+    if (!desired || !hierarchy || typeof hierarchy !== 'object' || Array.isArray(hierarchy)) {
+      return sourcePackage
+    }
+    const baselineHierarchy = hierarchy as Record<string, unknown>
+    const baselineLayers = [
+      ...(Array.isArray(baselineHierarchy.masters) ? baselineHierarchy.masters : []),
+      ...(Array.isArray(baselineHierarchy.layouts) ? baselineHierarchy.layouts : []),
+    ] as Array<Record<string, unknown>>
+    const desiredLayers = [...desired.masters, ...desired.layouts]
+    const desiredByPart = new Map(desiredLayers.flatMap(layer => (
+      typeof layer.partPath === 'string' ? [[layer.partPath, layer] as const] : []
+    )))
+    const changedParts = baselineLayers.flatMap(layer => {
+      const partPath = typeof layer.partPath === 'string' ? layer.partPath : ''
+      const next = desiredByPart.get(partPath)
+      return next && JSON.stringify(next) !== JSON.stringify(layer) ? [partPath] : []
+    })
+    return {
+      ...sourcePackage,
+      hierarchy: {
+        ...baselineHierarchy,
+        layouts: desired.layouts,
+        masters: desired.masters,
+      },
+      ...(changedParts.length
+        ? {
+            sharedAuthoring: {
+              partPaths: [...new Set(changedParts)].sort(),
+              revision: Number((sourcePackage.sharedAuthoring as { revision?: unknown } | undefined)?.revision ?? 0) + 1,
+            },
+          }
+        : {}),
+    }
+  })
+  return merged
+}
 
 export class ProjectAgentWorkspace {
   readonly root: string
@@ -211,9 +275,20 @@ export class ProjectAgentWorkspace {
       }
     }
     await load('deck/deck.json')
-    const index = cache.get('deck/deck.json') as { slides?: { file?: string }[] } | undefined
+    const index = cache.get('deck/deck.json') as {
+      powerPointSharedLayers?: string
+      slides?: { file?: string }[]
+    } | undefined
     for (const entry of index?.slides ?? []) {
       if (entry.file) await load(`deck/${entry.file}`)
+    }
+    if (index?.powerPointSharedLayers) {
+      const path = 'deck/powerpoint/shared-layers.json'
+      if (index.powerPointSharedLayers !== 'powerpoint/shared-layers.json') {
+        invalid.push('deck/deck.json')
+      }
+      await load(path)
+      if (cache.get(path) === undefined && !invalid.includes(path)) invalid.push(path)
     }
     if (invalid.length) {
       throw new Error(

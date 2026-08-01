@@ -113,16 +113,20 @@ unknown.
 
 ## Supported capability
 
-Direct project-agent writeback supports native `.mona` presentations and a
-bounded source-preserving `.pptx` slice. External PowerPoint presentations are
+Direct project-agent writeback supports native `.mona` presentations and
+source-preserving `.pptx` editing. External PowerPoint presentations are
 ingested through the reusable desktop package and materialized in the agent
 workspace as semantic slide JSON plus extracted media. The agent may move,
 resize, rotate, flip, delete, rewrite rich text, adjust text-body layout, and
-change simple solid fills/outlines on an existing slide-local non-line object.
-The writer resolves the exact OOXML identity, patches the retained package, and
-refuses additions, added/removed/retargeted hyperlinks, fields, complex fill/effect
-authoring, connector relationship/route authoring, inherited objects, slide structure, source reassignment,
-and every other unsupported mutation.
+change supported object semantics on existing source-backed objects. It may also
+add source-free editable objects and media from that document's `deck/assets/`,
+replace native image payloads, author image backgrounds, and explicitly edit
+master/layout drawings through `deck/powerpoint/shared-layers.json`. The writer
+resolves exact OOXML identities, transplants generated dependencies, and checks
+the provider revision immediately before write. It still refuses forged source
+metadata, payload-free opaque objects, unsupported slide structure, theme/timing
+authoring, new notes/comment structures, and unsupported advanced effects rather
+than flattening or guessing.
 
 ## Observable UI
 
@@ -139,8 +143,9 @@ Automated coverage locks:
 - framework-free contract validation and progress calculation;
 - native and bounded PowerPoint provider writeback without payload persistence;
 - exact no-op, object/straight-line geometry, connector style, rich-text,
-  text-body, and solid-style PowerPoint round
-  trips with untouched package parts preserved;
+  text-body, solid-style, generated object/media, image replacement, and
+  explicit shared-layer PowerPoint round trips with untouched package parts
+  preserved;
 - stale-source rejection and partial outcomes;
 - cancellation between document writes;
 - interruption recovery without replay;

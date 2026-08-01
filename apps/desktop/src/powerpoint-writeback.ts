@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { basename, extname, normalize, resolve, sep } from 'node:path'
 
 import {
   validatePresentationState,
@@ -12,7 +14,11 @@ import {
 } from '@mona/pptx-writeback'
 
 import { readPowerPointPackageRecord } from './document-data.js'
-import { isDocumentId, readDocument } from './document-library.js'
+import {
+  documentAssetsRoot,
+  isDocumentId,
+  readDocument,
+} from './document-library.js'
 
 interface StoredPowerPointPackage {
   baselinePresentation?: PresentationState
@@ -48,6 +54,43 @@ const isStoredPackage = (value: unknown): value is StoredPowerPointPackage => {
 const packageIdFor = (bytes: Uint8Array): string => (
   `pptx:${createHash('sha256').update(bytes).digest('hex')}`
 )
+
+const MEDIA_TYPES = new Map([
+  ['.gif', 'image/gif'],
+  ['.jpeg', 'image/jpeg'],
+  ['.jpg', 'image/jpeg'],
+  ['.mp3', 'audio/mpeg'],
+  ['.mp4', 'video/mp4'],
+  ['.png', 'image/png'],
+  ['.svg', 'image/svg+xml'],
+  ['.webm', 'video/webm'],
+  ['.webp', 'image/webp'],
+])
+
+/** Resolve only assets owned by the document currently being exported. */
+const documentAssetResolver = (documentId: string) => async (reference: string) => {
+  try {
+    const url = new URL(reference)
+    if (url.protocol !== 'mona:' || url.hostname !== 'asset') return undefined
+    const [encodedOwner, ...encodedNames] = url.pathname.replace(/^\//, '').split('/')
+    if (!encodedOwner || encodedNames.length !== 1) return undefined
+    if (decodeURIComponent(encodedOwner) !== documentId) return undefined
+    const name = decodeURIComponent(encodedNames[0] ?? '')
+    if (!name || name.startsWith('.') || basename(normalize(name)) !== name) return undefined
+    const root = resolve(documentAssetsRoot(documentId))
+    const target = resolve(root, name)
+    if (!target.startsWith(root + sep)) return undefined
+    const bytes = await readFile(target)
+    return {
+      bytes,
+      mediaType: MEDIA_TYPES.get(extname(target).toLocaleLowerCase())
+        ?? 'application/octet-stream',
+    }
+  }
+  catch {
+    return undefined
+  }
+}
 
 const assertPresentation = (value: unknown): PresentationState => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -123,6 +166,7 @@ export const exportPowerPointForDocument = async ({
     ) as ArrayBuffer,
     manifest: stored.manifest,
     presentation,
+    resolveAsset: documentAssetResolver(documentId),
   })
   return {
     bytes: result.bytes,

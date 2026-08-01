@@ -109,6 +109,29 @@ export interface PowerPointBackgroundPatch {
   slideId: string
 }
 
+/** Insert one Mona-authored semantic element without a retained native payload. */
+export interface PowerPointElementInsertPatch {
+  after: PPTElement
+  elementId: string
+  /** Sibling position in the target shape tree. */
+  index: number
+  kind: 'insert-element'
+  /** Existing native group which receives the element; absent means part root. */
+  parentObjectId?: string
+  slideId: string
+  targetPart: string
+}
+
+/** Replace one retained drawing object with a newly serialized semantic object. */
+export interface PowerPointElementReplacePatch {
+  after: PPTElement
+  elementId: string
+  kind: 'replace-element'
+  objectId: string
+  slideId: string
+  targetPart: string
+}
+
 export interface PowerPointNotesPatch {
   after: string
   before: string
@@ -302,6 +325,8 @@ export type PowerPointPatchOperation =
   | PowerPointCommentsPatch
   | PowerPointConnectorPatch
   | PowerPointDeletePatch
+  | PowerPointElementInsertPatch
+  | PowerPointElementReplacePatch
   | PowerPointImagePatch
   | PowerPointInheritedVisibilityPatch
   | PowerPointObjectInsertPatch
@@ -321,11 +346,22 @@ export interface PowerPointWritebackPlan {
 }
 
 export interface PowerPointWritebackInput {
+  /** Resolve a document-owned URL or agent workspace path to durable bytes. */
+  resolveAsset?: PowerPointAssetResolver
   baseline: PresentationState
   bytes: ArrayBuffer
   manifest: PowerPointPackageManifest
   presentation: PresentationState
 }
+
+export interface PowerPointAssetPayload {
+  bytes: ArrayBuffer | Uint8Array
+  mediaType: string
+}
+
+export type PowerPointAssetResolver = (
+  reference: string,
+) => Promise<PowerPointAssetPayload | undefined>
 
 export interface PowerPointWritebackResult {
   bytes: ArrayBuffer

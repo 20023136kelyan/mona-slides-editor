@@ -180,11 +180,39 @@ test('the packaged application loads its own renderer and completes native deskt
       textTarget.text!.content = '<p>Packaged source-preserving text.</p>'
       delete textTarget.text!.structuredText
     }
+    edited.slides[0]!.elements.push({
+      content: '<p>Packaged generated text.</p>',
+      defaultColor: '#222222',
+      defaultFontName: 'Arial',
+      height: 48,
+      id: 'packaged-generated-text',
+      left: 120,
+      lineHeight: 1.2,
+      rotate: 0,
+      top: 420,
+      type: 'text',
+      width: 320,
+    })
     const editedWriteback = await window.mona.documents.exportPowerPoint(
       id,
       edited,
       result.sourcePackage.packageId,
     )
+    const editedRoundTrip = await window.mona.documents.ingestPowerPoint(
+      id,
+      editedWriteback.bytes,
+      {
+        fileName: 'packaged-generated-object-round-trip.pptx',
+        operationId: crypto.randomUUID(),
+        theme: presentation?.theme as never,
+      },
+    )
+    const generatedText = editedRoundTrip.presentation.slides
+      .flatMap(slide => slide.elements)
+      .find(element => (
+        (element.type === 'text' && element.content.includes('Packaged generated text.'))
+        || (element.type === 'shape' && element.text?.content.includes('Packaged generated text.'))
+      ))
     const lineBinary = atob(lineBase64)
     const lineBytes = new Uint8Array(lineBinary.length)
     for (let index = 0; index < lineBinary.length; index += 1) {
@@ -251,6 +279,7 @@ test('the packaged application loads its own renderer and completes native deskt
     return {
       editedWritebackBytes: editedWriteback.bytes.byteLength,
       editedWritebackMode: editedWriteback.plan.mode,
+      generatedObjectSourceId: generatedText?.source?.sourceObjectId,
       packageId: result.sourcePackage.packageId,
       lineRoundTrip: roundTrippedLine?.type === 'line'
         ? {
@@ -283,6 +312,7 @@ test('the packaged application loads its own renderer and completes native deskt
   expect(ingestion.writebackMode).toBe('noop')
   expect(ingestion.editedWritebackBytes).toBeGreaterThan(0)
   expect(ingestion.editedWritebackMode).toBe('patch')
+  expect(ingestion.generatedObjectSourceId).toBeTruthy()
   expect(ingestion.lineWritebackMode).toBe('patch')
   expect(ingestion.lineRoundTrip).toMatchObject({
     color: '#13579b',

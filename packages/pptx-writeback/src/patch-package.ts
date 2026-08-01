@@ -13,6 +13,8 @@ import type {
   PowerPointBackgroundPatch,
   PowerPointConnectorPatch,
   PowerPointCommentsPatch,
+  PowerPointElementInsertPatch,
+  PowerPointElementReplacePatch,
   PowerPointImagePatch,
   PowerPointNotesPatch,
   PowerPointObjectInsertPatch,
@@ -24,6 +26,7 @@ import type {
   PowerPointTextPatch,
   PowerPointTransformPatch,
   PowerPointWritebackIssue,
+  PowerPointAssetResolver,
 } from './types'
 import { PowerPointWritebackError } from './types'
 import {
@@ -33,10 +36,14 @@ import {
   type AuthoredTextStyle,
 } from './authored-text'
 import { patchNativeChart } from './chart-writeback'
+import {
+  generateElementDonorPackage,
+  generatedElementMarker,
+} from './generated-object'
 
 type OrderedXmlNode = Record<string, unknown>
 type PowerPointObjectPatchOperation = Exclude<PowerPointPatchOperation, {
-  kind: 'background' | 'comments' | 'inherited-visibility' | 'insert-object' | 'insert-slide' | 'notes'
+  kind: 'background' | 'comments' | 'inherited-visibility' | 'insert-element' | 'insert-object' | 'insert-slide' | 'notes' | 'replace-element'
 }>
 
 interface ConnectorCoordinateContext {
@@ -193,6 +200,13 @@ const xmlNode = (
   [tag]: children,
   ...(attributes && Object.keys(attributes).length ? { ':@': attributes } : {}),
 })
+
+const replaceNodeTag = (node: OrderedXmlNode, tag: string): void => {
+  const children = ownChildren(node)
+  const attributes = { ...nodeAttributes(node) }
+  for (const key of Object.keys(node)) delete node[key]
+  Object.assign(node, xmlNode(tag, children, attributes))
+}
 
 const relationshipPartPath = (partPath: string): string => {
   const slash = partPath.lastIndexOf('/')
@@ -541,6 +555,120 @@ const cloneContentTypeOverride = async (
     zip.file(path, xmlBuilder.build(nodes) as string)
   }
   return []
+}
+
+const copyDonorContentType = async (
+  targetZip: JSZip,
+  donorZip: JSZip,
+  sourcePart: string,
+  targetPart: string,
+): Promise<PowerPointWritebackIssue[]> => {
+  const path = '[Content_Types].xml'
+  const [targetEntry, donorEntry] = [targetZip.file(path), donorZip.file(path)]
+  if (!targetEntry || !donorEntry) {
+    return [{
+      code: 'pptx.writeback.generated-content-types-missing',
+      message: 'A generated object package is missing its content-type manifest.',
+      partPath: path,
+    }]
+  }
+  const targetNodes = parseXml(await targetEntry.async('text'), path)
+  const donorNodes = parseXml(await donorEntry.async('text'), path)
+  const targetTypes = findNode(targetNodes, 'Types')
+  const donorTypes = findNode(donorNodes, 'Types')
+  if (!targetTypes || !donorTypes) {
+    return [{
+      code: 'pptx.writeback.generated-content-types-invalid',
+      message: 'A generated object package has an invalid content-type manifest.',
+      partPath: path,
+    }]
+  }
+  const targetChildren = ownChildren(targetTypes)
+  const donorChildren = ownChildren(donorTypes)
+  const donorOverride = directNodes(donorChildren, 'Override').find(node => (
+    nodeAttributes(node).PartName === `/${sourcePart}`
+  ))
+  if (donorOverride) {
+    if (!directNodes(targetChildren, 'Override').some(node => (
+      nodeAttributes(node).PartName === `/${targetPart}`
+    ))) {
+      const copied = structuredClone(donorOverride)
+      nodeAttributes(copied).PartName = `/${targetPart}`
+      targetChildren.push(copied)
+    }
+  }
+  else {
+    const extension = posix.extname(sourcePart).slice(1).toLowerCase()
+    const donorDefault = directNodes(donorChildren, 'Default').find(node => (
+      (nodeAttributes(node).Extension ?? '').toLowerCase() === extension
+    ))
+    if (!donorDefault) {
+      return [{
+        code: 'pptx.writeback.generated-content-type-missing',
+        message: `The generated object did not declare a content type for ${sourcePart}.`,
+        partPath: path,
+      }]
+    }
+    if (!directNodes(targetChildren, 'Default').some(node => (
+      (nodeAttributes(node).Extension ?? '').toLowerCase() === extension
+    ))) targetChildren.push(structuredClone(donorDefault))
+  }
+  targetZip.file(path, xmlBuilder.build(targetNodes) as string)
+  return []
+}
+
+const allocateDonorPart = (zip: JSZip, donorPart: string): string => (
+  zip.file(donorPart) ? allocateSiblingPart(zip, donorPart) : donorPart
+)
+
+const copyDonorPart = async (
+  targetZip: JSZip,
+  donorZip: JSZip,
+  sourcePart: string,
+  partMap: Map<string, string>,
+): Promise<{ issues: PowerPointWritebackIssue[]; targetPart?: string }> => {
+  const existing = partMap.get(sourcePart)
+  if (existing) return { issues: [], targetPart: existing }
+  const sourceEntry = donorZip.file(sourcePart)
+  if (!sourceEntry) {
+    return { issues: [{
+      code: 'pptx.writeback.generated-dependency-missing',
+      message: 'A generated object references a donor-package dependency that is missing.',
+      partPath: sourcePart,
+    }] }
+  }
+  const targetPart = allocateDonorPart(targetZip, sourcePart)
+  partMap.set(sourcePart, targetPart)
+  targetZip.file(targetPart, await sourceEntry.async('uint8array'))
+  const issues = await copyDonorContentType(targetZip, donorZip, sourcePart, targetPart)
+  if (issues.length) return { issues }
+
+  const sourceRelationshipPath = relationshipPartPath(sourcePart)
+  const relationshipEntry = donorZip.file(sourceRelationshipPath)
+  if (!relationshipEntry) return { issues: [], targetPart }
+  const relationships = relationshipDocument(await relationshipEntry.async('text'), targetPart)
+  for (const relationship of relationships.byId.values()) {
+    const attributes = nodeAttributes(relationship)
+    if (attributes.TargetMode === 'External' || !attributes.Target) continue
+    const dependency = internalRelationshipTarget(sourcePart, attributes.Target)
+    const copied = await copyDonorPart(targetZip, donorZip, dependency, partMap)
+    issues.push(...copied.issues)
+    if (copied.targetPart) {
+      attributes.Target = relativeRelationshipTarget(targetPart, copied.targetPart)
+    }
+  }
+  if (issues.length) return { issues }
+  const relationshipXml = serializeRelationshipDocument(relationships)
+  const validation = XMLValidator.validate(relationshipXml, { allowBooleanAttributes: false })
+  if (validation !== true) {
+    return { issues: [{
+      code: 'pptx.writeback.invalid-generated-relationships',
+      message: `Generated dependency relationships are invalid: ${validation.err.msg}`,
+      partPath: relationships.path,
+    }] }
+  }
+  targetZip.file(relationships.path, relationshipXml)
+  return { issues: [], targetPart }
 }
 
 const clonedRelationshipSuffixes = new Set([
@@ -1212,7 +1340,9 @@ const patchCommentsPart = (
 
 const backgroundFillNode = (
   background: PowerPointBackgroundPatch['after'],
+  imageFill?: OrderedXmlNode,
 ): OrderedXmlNode => {
+  if (background?.type === 'image') return imageFill ?? xmlNode('a:noFill')
   if (background?.type === 'gradient' && background.gradient) {
     return xmlNode('a:gradFill', [
       xmlNode('a:gsLst', background.gradient.colors.map(stop => (
@@ -1247,6 +1377,7 @@ const backgroundFillNode = (
 const patchBackgroundPart = (
   xml: string,
   operation: PowerPointBackgroundPatch,
+  imageFill?: OrderedXmlNode,
 ): { issues: PowerPointWritebackIssue[]; xml: string } => {
   const nodes = parseXml(xml, operation.partPath)
   const commonSlideData = findNode(nodes, 'cSld')
@@ -1265,7 +1396,7 @@ const patchBackgroundPart = (
   removeDirectNodes(children, new Set(['bg']))
   if (operation.after) {
     children.unshift(xmlNode('p:bg', [
-      xmlNode('p:bgPr', [backgroundFillNode(operation.after)], { shadeToTitle: '0' }),
+      xmlNode('p:bgPr', [backgroundFillNode(operation.after, imageFill)], { shadeToTitle: '0' }),
     ]))
   }
   const patchedXml = xmlBuilder.build(nodes) as string
@@ -3330,6 +3461,621 @@ const applyInsertedElementEdits = (
   return issues
 }
 
+const generatedDrawingByMarker = (
+  donorNodes: OrderedXmlNode[],
+  marker: string,
+): DrawingNodeLocation | undefined => collectDrawingNodes(donorNodes).find(location => {
+  const nonVisual = findNode(location.children, 'cNvPr')
+  return nonVisual && nodeAttributes(nonVisual).name === marker
+})
+
+const replaceShapeTextBody = (
+  shape: OrderedXmlNode,
+  textSource: OrderedXmlNode,
+): void => {
+  const shapeChildren = ownChildren(shape)
+  removeDirectNodes(shapeChildren, new Set(['txBody']))
+  const textBody = directNode(ownChildren(textSource), 'txBody')
+    ?? findNode(ownChildren(textSource), 'txBody')
+  if (textBody) shapeChildren.push(structuredClone(textBody))
+}
+
+const generatedGroupNode = (
+  element: Extract<PPTElement, { type: 'group' }>,
+  children: OrderedXmlNode[],
+  scale: number,
+): OrderedXmlNode => {
+  const emuPerCanvasUnit = 12_700 / scale
+  const transformAttributes: Record<string, string> = {}
+  if (element.rotate) transformAttributes.rot = String(Math.round(element.rotate * 60_000))
+  if (element.flipH) transformAttributes.flipH = '1'
+  if (element.flipV) transformAttributes.flipV = '1'
+  return xmlNode('p:grpSp', [
+    xmlNode('p:nvGrpSpPr', [
+      xmlNode('p:cNvPr', [], {
+        id: '0',
+        name: element.name || generatedElementMarker(element.id),
+      }),
+      xmlNode('p:cNvGrpSpPr'),
+      xmlNode('p:nvPr'),
+    ]),
+    xmlNode('p:grpSpPr', [
+      xmlNode('a:xfrm', [
+        xmlNode('a:off', [], {
+          x: String(Math.round(element.left * emuPerCanvasUnit)),
+          y: String(Math.round(element.top * emuPerCanvasUnit)),
+        }),
+        xmlNode('a:ext', [], {
+          cx: String(Math.max(1, Math.round(element.width * emuPerCanvasUnit))),
+          cy: String(Math.max(1, Math.round(element.height * emuPerCanvasUnit))),
+        }),
+        xmlNode('a:chOff', [], { x: '0', y: '0' }),
+        xmlNode('a:chExt', [], {
+          cx: String(Math.max(1, Math.round(element.coordinateWidth * emuPerCanvasUnit))),
+          cy: String(Math.max(1, Math.round(element.coordinateHeight * emuPerCanvasUnit))),
+        }),
+      ], transformAttributes),
+    ]),
+    ...children,
+  ])
+}
+
+const generatedConnectorNode = (
+  element: Extract<PPTElement, { type: 'line' }>,
+  scale: number,
+): OrderedXmlNode => {
+  const start: [number, number] = [element.left + element.start[0], element.top + element.start[1]]
+  const end: [number, number] = [element.left + element.end[0], element.top + element.end[1]]
+  const minX = Math.min(start[0], end[0])
+  const minY = Math.min(start[1], end[1])
+  const width = Math.abs(end[0] - start[0])
+  const height = Math.abs(end[1] - start[1])
+  const flipH = start[0] > end[0]
+  const flipV = start[1] > end[1]
+  const emu = 12_700 / scale
+  const transformAttributes: Record<string, string> = {}
+  if (flipH) transformAttributes.flipH = '1'
+  if (flipV) transformAttributes.flipV = '1'
+  const coordinate = (point: [number, number]): [number, number] => {
+    let x = point[0] - minX
+    let y = point[1] - minY
+    if (flipH) x = width - x
+    if (flipV) y = height - y
+    return [
+      width > 0 ? Math.round(x / width * 100_000) : 0,
+      height > 0 ? Math.round(y / height * 100_000) : 0,
+    ]
+  }
+  const pointNode = (point: [number, number]) => {
+    const [x, y] = coordinate(point)
+    return xmlNode('a:pt', [], { x: String(x), y: String(y) })
+  }
+  const route: OrderedXmlNode[] = [xmlNode('a:moveTo', [pointNode(start)])]
+  if (element.broken) {
+    route.push(xmlNode('a:lnTo', [pointNode([
+      element.left + element.broken[0],
+      element.top + element.broken[1],
+    ])]))
+    route.push(xmlNode('a:lnTo', [pointNode(end)]))
+  }
+  else if (element.broken2) {
+    const control = [
+      element.left + element.broken2[0],
+      element.top + element.broken2[1],
+    ] as [number, number]
+    const horizontal = element.broken2Direction === 'horizontal'
+      || (!element.broken2Direction && width >= height)
+    route.push(xmlNode('a:lnTo', [pointNode(horizontal
+      ? [control[0], start[1]]
+      : [start[0], control[1]])]))
+    route.push(xmlNode('a:lnTo', [pointNode(horizontal
+      ? [control[0], end[1]]
+      : [end[0], control[1]])]))
+    route.push(xmlNode('a:lnTo', [pointNode(end)]))
+  }
+  else if (element.curve) {
+    route.push(xmlNode('a:quadBezTo', [
+      pointNode([element.left + element.curve[0], element.top + element.curve[1]]),
+      pointNode(end),
+    ]))
+  }
+  else if (element.cubic) {
+    route.push(xmlNode('a:cubicBezTo', [
+      pointNode([element.left + element.cubic[0][0], element.top + element.cubic[0][1]]),
+      pointNode([element.left + element.cubic[1][0], element.top + element.cubic[1][1]]),
+      pointNode(end),
+    ]))
+  }
+  const geometry = element.broken || element.broken2 || element.curve || element.cubic
+    ? xmlNode('a:custGeom', [
+        xmlNode('a:avLst'),
+        xmlNode('a:gdLst'),
+        xmlNode('a:ahLst'),
+        xmlNode('a:cxnLst'),
+        xmlNode('a:rect', [], { b: 'b', l: 'l', r: 'r', t: 't' }),
+        xmlNode('a:pathLst', [xmlNode('a:path', route, {
+          extrusionOk: '0', fill: 'none', h: '100000', stroke: '1', w: '100000',
+        })]),
+      ])
+    : xmlNode('a:prstGeom', [xmlNode('a:avLst')], { prst: 'straightConnector1' })
+  const lineColor = normalizeColor(element.color) ?? '000000'
+  const lineChildren: OrderedXmlNode[] = [
+    xmlNode('a:solidFill', [xmlNode('a:srgbClr', [], { val: lineColor })]),
+    xmlNode('a:prstDash', [], {
+      val: element.style === 'dashed' ? 'dash' : element.style === 'dotted' ? 'dot' : 'solid',
+    }),
+  ]
+  if (element.points[0]) {
+    lineChildren.push(xmlNode('a:headEnd', [], {
+      type: element.points[0] === 'dot' ? 'oval' : 'triangle',
+    }))
+  }
+  if (element.points[1]) {
+    lineChildren.push(xmlNode('a:tailEnd', [], {
+      type: element.points[1] === 'dot' ? 'oval' : 'triangle',
+    }))
+  }
+  const connectorRelationships: OrderedXmlNode[] = []
+  if (element.connections?.start) {
+    connectorRelationships.push(xmlNode('a:stCxn', [], {
+      id: element.connections.start.nativeShapeId,
+      idx: element.connections.start.siteIndex,
+    }))
+  }
+  if (element.connections?.end) {
+    connectorRelationships.push(xmlNode('a:endCxn', [], {
+      id: element.connections.end.nativeShapeId,
+      idx: element.connections.end.siteIndex,
+    }))
+  }
+  return xmlNode('p:cxnSp', [
+    xmlNode('p:nvCxnSpPr', [
+      xmlNode('p:cNvPr', [], { id: '0', name: element.name || generatedElementMarker(element.id) }),
+      xmlNode('p:cNvCxnSpPr', connectorRelationships),
+      xmlNode('p:nvPr'),
+    ]),
+    xmlNode('p:spPr', [
+      xmlNode('a:xfrm', [
+        xmlNode('a:off', [], { x: String(Math.round(minX * emu)), y: String(Math.round(minY * emu)) }),
+        xmlNode('a:ext', [], {
+          cx: String(Math.max(1, Math.round(width * emu))),
+          cy: String(Math.max(1, Math.round(height * emu))),
+        }),
+      ], transformAttributes),
+      geometry,
+      xmlNode('a:ln', lineChildren, { w: String(Math.max(1, Math.round(element.width / scale * 12_700))) }),
+    ]),
+  ])
+}
+
+const assembleGeneratedDrawing = (
+  element: PPTElement,
+  donorNodes: OrderedXmlNode[],
+  scale: number,
+): OrderedXmlNode | undefined => {
+  if (element.type === 'group') {
+    const children = element.elements.flatMap(child => {
+      const node = assembleGeneratedDrawing(child, donorNodes, scale)
+      return node ? [node] : []
+    })
+    return children.length === element.elements.length
+      ? generatedGroupNode(element, children, scale)
+      : undefined
+  }
+  if (element.type === 'line') return generatedConnectorNode(element, scale)
+  const location = generatedDrawingByMarker(donorNodes, generatedElementMarker(element.id))
+  if (!location) return undefined
+  const clone = structuredClone(location.node)
+  if (element.type === 'shape' && element.text) {
+    const textLocation = generatedDrawingByMarker(
+      donorNodes,
+      generatedElementMarker(element.id, 'text'),
+    )
+    if (textLocation) replaceShapeTextBody(clone, textLocation.node)
+  }
+  if (element.type === 'shape') {
+    const properties = findNode(ownChildren(clone), 'spPr')
+    if (properties) {
+      const propertyChildren = ownChildren(properties)
+      let authoredFill: OrderedXmlNode | undefined
+      if (element.pattern) {
+        const fillLocation = generatedDrawingByMarker(
+          donorNodes,
+          generatedElementMarker(element.id, 'fill'),
+        )
+        const donorFill = fillLocation
+          ? findNode(ownChildren(fillLocation.node), 'blipFill')
+          : undefined
+        if (donorFill) {
+          const fillChildren = structuredClone(ownChildren(donorFill))
+          removeDirectNodes(fillChildren, new Set(['stretch', 'tile']))
+          if (element.patternFit?.mode === 'tile') {
+            fillChildren.push(xmlNode('a:tile', [], {
+              ...(element.patternFit.alignment ? { algn: element.patternFit.alignment } : {}),
+              ...(element.patternFit.scaleX !== undefined
+                ? { sx: String(Math.round(element.patternFit.scaleX * 100_000)) }
+                : {}),
+              ...(element.patternFit.scaleY !== undefined
+                ? { sy: String(Math.round(element.patternFit.scaleY * 100_000)) }
+                : {}),
+            }))
+          }
+          else {
+            const rect = element.patternFit?.rect
+            fillChildren.push(xmlNode('a:stretch', [xmlNode('a:fillRect', [], {
+              ...(rect?.b !== undefined ? { b: String(Math.round(rect.b * 100_000)) } : {}),
+              ...(rect?.l !== undefined ? { l: String(Math.round(rect.l * 100_000)) } : {}),
+              ...(rect?.r !== undefined ? { r: String(Math.round(rect.r * 100_000)) } : {}),
+              ...(rect?.t !== undefined ? { t: String(Math.round(rect.t * 100_000)) } : {}),
+            })]))
+          }
+          authoredFill = xmlNode('a:blipFill', fillChildren, { ...nodeAttributes(donorFill) })
+        }
+      }
+      else if (element.gradient) {
+        authoredFill = backgroundFillNode({ gradient: element.gradient, type: 'gradient' })
+      }
+      else if (element.powerPointPattern) {
+        authoredFill = backgroundFillNode({ pattern: element.powerPointPattern, type: 'pattern' })
+      }
+      if (authoredFill) {
+        const firstFill = propertyChildren.findIndex(node => (
+          ['blipFill', 'gradFill', 'grpFill', 'noFill', 'pattFill', 'solidFill']
+            .includes(localName(nodeTag(node) ?? ''))
+        ))
+        removeDirectNodes(propertyChildren, new Set([
+          'blipFill', 'gradFill', 'grpFill', 'noFill', 'pattFill', 'solidFill',
+        ]))
+        propertyChildren.splice(firstFill < 0 ? 1 : firstFill, 0, authoredFill)
+      }
+    }
+  }
+  if (element.type === 'image') {
+    patchImage(ownChildren(clone), {
+      after: {
+        ...(element.clip ? { clip: structuredClone(element.clip) } : {}),
+        ...(element.filters ? { filters: structuredClone(element.filters) } : {}),
+        ...(element.opacity !== undefined ? { opacity: element.opacity } : {}),
+        ...(element.outline ? { outline: structuredClone(element.outline) } : {}),
+        ...(element.shadow ? { shadow: structuredClone(element.shadow) } : {}),
+        src: element.src,
+      },
+      before: { src: element.src },
+      elementId: element.id,
+      kind: 'image',
+      objectId: element.id,
+      partPath: 'ppt/slides/slide1.xml',
+      scale,
+      slideId: 'generated-object',
+    })
+  }
+  if (element.type === 'audio') {
+    const mediaFile = findNode(ownChildren(clone), 'videoFile')
+    if (mediaFile) replaceNodeTag(mediaFile, 'a:audioFile')
+  }
+  const nonVisual = findNode(ownChildren(clone), 'cNvPr')
+  if (nonVisual) {
+    const attributes = nodeAttributes(nonVisual)
+    attributes.name = element.name || attributes.name || `Mona ${element.type}`
+  }
+  return clone
+}
+
+const copyGeneratedRelationships = async ({
+  clone,
+  donorZip,
+  targetPart,
+  targetZip,
+}: {
+  clone: OrderedXmlNode
+  donorZip: JSZip
+  targetPart: string
+  targetZip: JSZip
+}): Promise<PowerPointWritebackIssue[]> => {
+  const donorPart = 'ppt/slides/slide1.xml'
+  const donorRelationshipPath = relationshipPartPath(donorPart)
+  const referenced = relationshipIdsInTree([clone])
+  if (!referenced.size) return []
+  const donorEntry = donorZip.file(donorRelationshipPath)
+  if (!donorEntry) {
+    return [{
+      code: 'pptx.writeback.generated-relationships-missing',
+      message: 'The generated object references relationships that are absent from its donor package.',
+      partPath: donorRelationshipPath,
+    }]
+  }
+  const donor = relationshipDocument(await donorEntry.async('text'), donorPart)
+  const targetPath = relationshipPartPath(targetPart)
+  const targetEntry = targetZip.file(targetPath)
+  const target = relationshipDocument(
+    targetEntry ? await targetEntry.async('text') : undefined,
+    targetPart,
+  )
+  const replacements = new Map<string, string>()
+  const partMap = new Map<string, string>()
+  const issues: PowerPointWritebackIssue[] = []
+  for (const donorId of referenced) {
+    const relationship = donor.byId.get(donorId)
+    if (!relationship) {
+      issues.push({
+        code: 'pptx.writeback.generated-relationship-missing',
+        message: `The generated object references missing donor relationship ${donorId}.`,
+        partPath: donorRelationshipPath,
+      })
+      continue
+    }
+    const attributes = nodeAttributes(relationship)
+    if (!attributes.Target) continue
+    const targetId = nextRelationshipId(target)
+    const copiedAttributes: Record<string, string> = { ...attributes, Id: targetId }
+    if (attributes.TargetMode !== 'External') {
+      const dependency = internalRelationshipTarget(donorPart, attributes.Target)
+      const copied = await copyDonorPart(targetZip, donorZip, dependency, partMap)
+      issues.push(...copied.issues)
+      if (copied.targetPart) {
+        copiedAttributes.Target = relativeRelationshipTarget(targetPart, copied.targetPart)
+      }
+    }
+    const copiedRelationship = xmlNode('Relationship', [], copiedAttributes)
+    target.children.push(copiedRelationship)
+    target.byId.set(targetId, copiedRelationship)
+    replacements.set(donorId, targetId)
+  }
+  if (issues.length) return issues
+  replaceRelationshipIds([clone], replacements)
+  const targetXml = serializeRelationshipDocument(target)
+  const validation = XMLValidator.validate(targetXml, { allowBooleanAttributes: false })
+  if (validation !== true) {
+    return [{
+      code: 'pptx.writeback.invalid-generated-target-relationships',
+      message: `Generated object relationships are invalid: ${validation.err.msg}`,
+      partPath: targetPath,
+    }]
+  }
+  targetZip.file(targetPath, targetXml)
+  return []
+}
+
+const generatedBackgroundFill = async (
+  zip: JSZip,
+  manifest: PowerPointPackageManifest,
+  operation: PowerPointBackgroundPatch,
+  resolveAsset: PowerPointAssetResolver | undefined,
+): Promise<{ fill?: OrderedXmlNode; issues: PowerPointWritebackIssue[] }> => {
+  const image = operation.after?.image
+  if (operation.after?.type !== 'image' || !image?.src) return { issues: [] }
+  const scale = manifest.coordinateScale ?? 96 / 72
+  const documentProperties = manifest['document']?.properties
+  const width = documentProperties?.slideWidthEmu
+    ? documentProperties.slideWidthEmu / 12_700 * scale
+    : 960
+  const height = documentProperties?.slideHeightEmu
+    ? documentProperties.slideHeightEmu / 12_700 * scale
+    : 540
+  const element: Extract<PPTElement, { type: 'image' }> = {
+    fixedRatio: false,
+    height,
+    id: `background:${operation.partPath}`,
+    left: 0,
+    rotate: 0,
+    src: image.src,
+    top: 0,
+    type: 'image',
+    width,
+  }
+  let donorBytes: ArrayBuffer
+  try {
+    donorBytes = await generateElementDonorPackage({ element, manifest, resolveAsset })
+  }
+  catch (error) {
+    return { issues: [{
+      code: 'pptx.writeback.background-asset',
+      message: error instanceof Error ? error.message : 'The background image could not be serialized.',
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }] }
+  }
+  const donorZip = await JSZip.loadAsync(donorBytes)
+  const donorSlide = donorZip.file('ppt/slides/slide1.xml')
+  if (!donorSlide) {
+    return { issues: [{
+      code: 'pptx.writeback.background-donor',
+      message: 'The generated background donor package has no slide payload.',
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }] }
+  }
+  const donorNodes = parseXml(await donorSlide.async('text'), 'ppt/slides/slide1.xml')
+  const picture = generatedDrawingByMarker(donorNodes, generatedElementMarker(element.id))
+  const blipFill = picture ? findNode(ownChildren(picture.node), 'blipFill') : undefined
+  if (!blipFill) {
+    return { issues: [{
+      code: 'pptx.writeback.background-fill',
+      message: 'The generated background donor has no image fill.',
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }] }
+  }
+  const fill = xmlNode(
+    'a:blipFill',
+    structuredClone(ownChildren(blipFill)),
+    { ...nodeAttributes(blipFill) },
+  )
+  const issues = await copyGeneratedRelationships({
+    clone: fill,
+    donorZip,
+    targetPart: operation.partPath,
+    targetZip: zip,
+  })
+  return { fill, issues }
+}
+
+const insertDrawingNodeAt = (
+  targetNodes: OrderedXmlNode[],
+  clone: OrderedXmlNode,
+  index: number,
+  parent?: DrawingNodeLocation,
+): boolean => {
+  const siblings = parent ? parent.children : shapeTreeChildren(targetNodes)
+  if (!siblings) return false
+  const drawings = siblings.flatMap((node, siblingIndex) => (
+    drawingObjectTags.has(localName(nodeTag(node) ?? '')) ? [siblingIndex] : []
+  ))
+  const extensionIndex = siblings.findIndex(node => localName(nodeTag(node) ?? '') === 'extLst')
+  const targetIndex = drawings[Math.max(0, Math.min(index, drawings.length - 1))]
+    ?? (extensionIndex < 0 ? siblings.length : extensionIndex)
+  siblings.splice(targetIndex, 0, clone)
+  return true
+}
+
+const patchGeneratedElement = async (
+  zip: JSZip,
+  manifest: PowerPointPackageManifest,
+  operation: PowerPointElementInsertPatch | PowerPointElementReplacePatch,
+  resolveAsset: PowerPointAssetResolver | undefined,
+): Promise<PowerPointWritebackIssue[]> => {
+  const targetEntry = zip.file(operation.targetPart)
+  if (!targetEntry) {
+    return [{
+      code: 'pptx.writeback.generated-target-missing',
+      elementId: operation.elementId,
+      message: 'The target PowerPoint shape-tree part is missing.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  let donorBytes: ArrayBuffer
+  try {
+    donorBytes = await generateElementDonorPackage({
+      element: operation.after,
+      manifest,
+      resolveAsset,
+    })
+  }
+  catch (error) {
+    return [{
+      code: 'pptx.writeback.generated-object',
+      elementId: operation.elementId,
+      message: error instanceof Error ? error.message : 'The generated object could not be serialized.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  const donorZip = await JSZip.loadAsync(donorBytes)
+  const donorSlide = donorZip.file('ppt/slides/slide1.xml')
+  if (!donorSlide) {
+    return [{
+      code: 'pptx.writeback.generated-slide-missing',
+      elementId: operation.elementId,
+      message: 'The generated object donor package has no slide payload.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  const donorNodes = parseXml(await donorSlide.async('text'), 'ppt/slides/slide1.xml')
+  const clone = assembleGeneratedDrawing(
+    operation.after,
+    donorNodes,
+    manifest.coordinateScale ?? 96 / 72,
+  )
+  if (!clone) {
+    return [{
+      code: 'pptx.writeback.generated-object-missing',
+      elementId: operation.elementId,
+      message: 'The generated object donor package did not contain the requested semantic payload.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  const relationshipIssues = await copyGeneratedRelationships({
+    clone,
+    donorZip,
+    targetPart: operation.targetPart,
+    targetZip: zip,
+  })
+  if (relationshipIssues.length) return relationshipIssues.map(issue => ({
+    ...issue,
+    elementId: operation.elementId,
+    slideId: operation.slideId,
+  }))
+  const targetNodes = parseXml(await targetEntry.async('text'), operation.targetPart)
+  if (operation.kind === 'replace-element') {
+    const existing = findDrawingNode(
+      targetNodes,
+      manifest.packageId,
+      operation.targetPart,
+      operation.objectId,
+    )
+    if (!existing) {
+      return [{
+        code: 'pptx.writeback.generated-replacement-missing',
+        elementId: operation.elementId,
+        message: 'The native object selected for media replacement no longer exists.',
+        objectId: operation.objectId,
+        partPath: operation.targetPart,
+        slideId: operation.slideId,
+      }]
+    }
+    allocateDrawingIds(clone, targetNodes)
+    existing.siblings.splice(existing.index, 1, clone)
+    const output = xmlBuilder.build(targetNodes) as string
+    const validation = XMLValidator.validate(output, { allowBooleanAttributes: false })
+    if (validation !== true) {
+      return [{
+        code: 'pptx.writeback.invalid-generated-replacement',
+        elementId: operation.elementId,
+        message: `Generated object replacement produced invalid XML: ${validation.err.msg}`,
+        objectId: operation.objectId,
+        partPath: operation.targetPart,
+        slideId: operation.slideId,
+      }]
+    }
+    zip.file(operation.targetPart, output)
+    return []
+  }
+  const parent = operation.parentObjectId
+    ? findDrawingNode(
+        targetNodes,
+        manifest.packageId,
+        operation.targetPart,
+        operation.parentObjectId,
+      )
+    : undefined
+  if (operation.parentObjectId && !parent) {
+    return [{
+      code: 'pptx.writeback.generated-parent-missing',
+      elementId: operation.elementId,
+      message: 'The native parent group for the generated object no longer exists.',
+      objectId: operation.parentObjectId,
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  allocateDrawingIds(clone, targetNodes)
+  if (!insertDrawingNodeAt(targetNodes, clone, operation.index, parent)) {
+    return [{
+      code: 'pptx.writeback.generated-shape-tree-missing',
+      elementId: operation.elementId,
+      message: 'The target part has no shape tree for the generated object.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  const output = xmlBuilder.build(targetNodes) as string
+  const validation = XMLValidator.validate(output, { allowBooleanAttributes: false })
+  if (validation !== true) {
+    return [{
+      code: 'pptx.writeback.invalid-generated-object',
+      elementId: operation.elementId,
+      message: `Generated object insertion produced invalid XML: ${validation.err.msg}`,
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
+  zip.file(operation.targetPart, output)
+  return []
+}
+
 const patchInsertedObject = async (
   zip: JSZip,
   manifest: PowerPointPackageManifest,
@@ -3553,6 +4299,7 @@ const insertNativeSlide = async (
   zip: JSZip,
   manifest: PowerPointPackageManifest,
   operation: PowerPointSlideInsertPatch,
+  resolveAsset?: PowerPointAssetResolver,
 ): Promise<{ issues: PowerPointWritebackIssue[]; targetPart?: string }> => {
   const sourceEntry = zip.file(operation.sourcePart)
   if (!sourceEntry) {
@@ -3743,13 +4490,26 @@ const insertNativeSlide = async (
   for (const entry of insertionEntries) {
     const origin = entry.element.source?.copyOnWrite
     if (!origin) {
-      issues.push({
-        code: 'pptx.writeback.slide-copy-element-added',
+      const parentObjectId = entry.parent?.source?.copyOnWrite?.sourceObjectId
+        ?? entry.parent?.source?.sourceObjectId
+      issues.push(...await patchGeneratedElement(zip, manifest, {
+        after: entry.element,
         elementId: entry.element.id,
-        message: 'A Mona-created object on a copied native slide has no retained OOXML payload to serialize.',
-        partPath: targetPart,
+        index: entry.parent?.type === 'group'
+          ? entry.parent.elements.indexOf(entry.element)
+          : operation.after.elements.indexOf(entry.element),
+        kind: 'insert-element',
+        ...(parentObjectId ? {
+          parentObjectId: rebaseObjectId(
+            parentObjectId,
+            manifest.packageId,
+            operation.sourcePart,
+            targetPart,
+          ),
+        } : {}),
         slideId: operation.slideId,
-      })
+        targetPart,
+      }, resolveAsset))
       continue
     }
     const before = sourceByObjectId.get(origin.sourceObjectId)
@@ -3828,27 +4588,29 @@ const insertNativeSlide = async (
     })
   }
   if (JSON.stringify(operation.before.background) !== JSON.stringify(operation.after.background)) {
-    if (operation.after.background?.type === 'image') {
-      issues.push({
-        code: 'pptx.writeback.background-image',
-        message: 'Replacing the copied slide background with a new image requires package media allocation.',
-        partPath: targetPart,
-        slideId: operation.slideId,
-      })
+    const backgroundOperation: PowerPointBackgroundPatch = {
+      ...(operation.after.background ? { after: structuredClone(operation.after.background) } : {}),
+      ...(operation.before.background ? { before: structuredClone(operation.before.background) } : {}),
+      kind: 'background',
+      partPath: targetPart,
+      slideId: operation.slideId,
     }
-    else {
-      const targetEntry = zip.file(targetPart)
-      if (!targetEntry) throw new Error(`Copied slide part disappeared: ${targetPart}`)
-      const patched = patchBackgroundPart(await targetEntry.async('text'), {
-        ...(operation.after.background ? { after: structuredClone(operation.after.background) } : {}),
-        ...(operation.before.background ? { before: structuredClone(operation.before.background) } : {}),
-        kind: 'background',
-        partPath: targetPart,
-        slideId: operation.slideId,
-      })
-      issues.push(...patched.issues)
-      if (!patched.issues.length) zip.file(targetPart, patched.xml)
-    }
+    const generated = await generatedBackgroundFill(
+      zip,
+      manifest,
+      backgroundOperation,
+      resolveAsset,
+    )
+    issues.push(...generated.issues)
+    const targetEntry = zip.file(targetPart)
+    if (!targetEntry) throw new Error(`Copied slide part disappeared: ${targetPart}`)
+    const patched = patchBackgroundPart(
+      await targetEntry.async('text'),
+      backgroundOperation,
+      generated.fill,
+    )
+    issues.push(...patched.issues)
+    if (!generated.issues.length && !patched.issues.length) zip.file(targetPart, patched.xml)
   }
   if (issues.length) return { issues }
   issues.push(...await registerSlide(zip, targetPart, operation.index, operation.slideId))
@@ -3986,10 +4748,12 @@ export const patchPowerPointPackage = async ({
   bytes,
   manifest,
   operations,
+  resolveAsset,
 }: {
   bytes: ArrayBuffer
   manifest: PowerPointPackageManifest
   operations: readonly PowerPointPatchOperation[]
+  resolveAsset?: PowerPointAssetResolver
 }): Promise<ArrayBuffer> => {
   if (!operations.length) return bytes.slice(0)
   const knownObjects = new Set(manifest.objects.map(object => object.stableId))
@@ -3998,9 +4762,11 @@ export const patchPowerPointPackage = async ({
       operation.kind !== 'background'
       && operation.kind !== 'comments'
       && operation.kind !== 'inherited-visibility'
+      && operation.kind !== 'insert-element'
       && operation.kind !== 'insert-object'
       && operation.kind !== 'insert-slide'
       && operation.kind !== 'notes'
+      && operation.kind !== 'replace-element'
     ),
   )
   const unknown = objectOperations.filter(operation => !knownObjects.has(operation.objectId))
@@ -4018,8 +4784,14 @@ export const patchPowerPointPackage = async ({
   const issues: PowerPointWritebackIssue[] = []
   for (const operation of operations) {
     if (operation.kind !== 'insert-slide') continue
-    const inserted = await insertNativeSlide(zip, manifest, operation)
+    const inserted = await insertNativeSlide(zip, manifest, operation, resolveAsset)
     issues.push(...inserted.issues)
+  }
+  if (issues.length) throw new PowerPointWritebackError(issues)
+  for (const operation of operations) {
+    if (operation.kind === 'insert-element' || operation.kind === 'replace-element') {
+      issues.push(...await patchGeneratedElement(zip, manifest, operation, resolveAsset))
+    }
   }
   if (issues.length) throw new PowerPointWritebackError(issues)
   const privateHierarchyBySlide = new Map<string, PrivateHierarchyRequest>()
@@ -4089,7 +4861,10 @@ export const patchPowerPointPackage = async ({
         })
         continue
       }
-      const patched = patchBackgroundPart(await entry.async('text'), operation)
+      const generated = await generatedBackgroundFill(zip, manifest, operation, resolveAsset)
+      issues.push(...generated.issues)
+      if (generated.issues.length) continue
+      const patched = patchBackgroundPart(await entry.async('text'), operation, generated.fill)
       issues.push(...patched.issues)
       if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
     }

@@ -474,6 +474,17 @@ export interface PowerPointPackageReference {
   fileName: string
   importReport?: PowerPointImportReport
   hierarchy?: PowerPointHierarchy
+  /**
+   * Parts deliberately opened through Mona's shared-layer authoring surface.
+   *
+   * Ordinary slide editing never populates this record. Keeping the intent
+   * beside the edited hierarchy lets writeback distinguish a requested master
+   * or layout change from accidental mutation of retained source metadata.
+   */
+  sharedAuthoring?: {
+    partPaths: string[]
+    revision: number
+  }
   kind: 'pptx'
   packageId: string
   slides: PowerPointSlideDependency[]

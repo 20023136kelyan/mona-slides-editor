@@ -1,9 +1,22 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { ElectronApplication } from '@playwright/test'
 
-import { chooseMenuCommand, configureLocalSaveFolder, expect, importFile, openApp, stubSignedInAccount, test } from './electron-fixture'
+import { ingestPowerPoint } from '@mona/pptx-ingestion'
+import { flattenElementTree, type SlideTheme } from '@mona/presentation-core'
+
+import {
+  chooseMenuCommand,
+  configureLocalSaveFolder,
+  expect,
+  importFile,
+  openApp,
+  stubSaveDialog,
+  stubSignedInAccount,
+  test,
+} from './electron-fixture'
 
 const TEXT_CORPUS_PPTX = fileURLToPath(new URL(
   '../../../tests/corpus/public/corpus-01-text.pptx',
@@ -204,6 +217,52 @@ test('duplicates and edits an imported native slide through the Electron agent b
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides.length
   ))).toBe(1)
+})
+
+test('creates and exports a new editable object in an imported deck through the Electron agent bridge', async ({ app, page }, testInfo) => {
+  test.setTimeout(90_000)
+  await configureLocalSaveFolder(app, page, join(testInfo.outputDir, 'presentations'))
+  await chooseMenuCommand(app, 'file.new', page)
+  await page.waitForURL(/\/documents\/[^/?]+/)
+  await importFile(app, 'pptx', TEXT_CORPUS_PPTX, page)
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
+  )), { timeout: 30_000 }).toBe(5)
+
+  const theme = await page.evaluate(() => window.__MONA_TEST__!.getState().presentation.theme)
+  await stubAgentTurn(app, {
+    addElement: ADDED_ELEMENT,
+    replyText: 'Added an editable native text box to the imported presentation.',
+  })
+  await sendPrompt(page, 'Add an editable text box to this imported PowerPoint')
+  await expect(page.getByText('Added an editable native text box to the imported presentation.')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.some(
+      element => element.id === 'agent-added-element',
+    )
+  )), { timeout: 20_000 }).toBe(true)
+
+  await chooseMenuCommand(app, 'file.export.pptx', page)
+  const dialog = page.getByRole('dialog', { name: 'Export' })
+  const output = join(testInfo.outputDir, 'agent-generated-native-object.pptx')
+  await stubSaveDialog(app, output)
+  await dialog.getByRole('button', { exact: true, name: 'Export' }).click()
+  await expect.poll(
+    () => readFile(output).then(() => true, () => false),
+    { timeout: 30_000 },
+  ).toBe(true)
+
+  const bytes = await readFile(output)
+  const reimported = await ingestPowerPoint(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    { fileName: 'agent-generated-native-object.pptx', theme: theme as SlideTheme },
+  )
+  const inserted = flattenElementTree(reimported.presentation.slides[0]!.elements).find(element => (
+    (element.type === 'text' && element.content.includes('Added by the agent'))
+    || (element.type === 'shape' && element.text?.content.includes('Added by the agent'))
+  ))
+  expect(['shape', 'text']).toContain(inserted?.type)
+  expect(inserted?.source?.sourceObjectId).toBeTruthy()
 })
 
 test('routes text-inspector AI actions through the same deck-editing agent', async ({ app, page }) => {
