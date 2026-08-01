@@ -61,17 +61,175 @@ export interface PowerPointConnectorRelationships {
 export interface PowerPointSourceObjectIdentity {
   connector?: PowerPointConnectorRelationships
   creationId?: string
+  decorative?: boolean
   description?: string
+  hidden?: boolean
   kind: PowerPointSourceObjectKind
+  locks?: Record<string, boolean>
   name?: string
   nativeId: string
   parentStableId?: string
   partPath: string
   placeholderIndex?: string
   placeholderType?: string
+  relationshipIds?: string[]
   sourceIndex: number
   stableId: string
   title?: string
+  visual?: PowerPointVisualMetadata
+}
+
+export interface PowerPointVisualEffect {
+  attributes: Record<string, string>
+  type: string
+}
+
+export interface PowerPointVisualMetadata {
+  effects: PowerPointVisualEffect[]
+  hasScene3d: boolean
+  hasShape3d: boolean
+}
+
+export interface PowerPointPresentationProperties {
+  firstSlideNumber?: number
+  rightToLeft?: boolean
+  showSpecialPlaceholdersOnTitleSlide?: boolean
+  slideHeightEmu?: number
+  slideWidthEmu?: number
+  strictFirstAndLastChars?: boolean
+}
+
+export interface PowerPointSection {
+  id: string
+  name?: string
+  slideIds: string[]
+}
+
+export interface PowerPointCustomShow {
+  id?: string
+  name: string
+  relationshipIds: string[]
+}
+
+export interface PowerPointNotesTextRun {
+  bold?: boolean
+  fontFamily?: string
+  fontSize?: number
+  italic?: boolean
+  language?: string
+  text: string
+  underline?: string
+}
+
+export interface PowerPointNotesParagraph {
+  alignment?: string
+  level?: number
+  runs: PowerPointNotesTextRun[]
+}
+
+export interface PowerPointNotesPlaceholder {
+  nativeShapeId: string
+  paragraphs: PowerPointNotesParagraph[]
+  placeholderIndex?: string
+  placeholderType?: string
+}
+
+export interface PowerPointNotesMaster {
+  objectIds: string[]
+  partPath: string
+  placeholders: PowerPointNotesPlaceholder[]
+  themePart?: string
+}
+
+export interface PowerPointNotesSlide {
+  masterPart?: string
+  objectIds: string[]
+  partPath: string
+  placeholders: PowerPointNotesPlaceholder[]
+  slidePart: string
+}
+
+export interface PowerPointCommentAuthor {
+  id: string
+  initials?: string
+  lastIndex?: number
+  name?: string
+  providerId?: string
+  userId?: string
+}
+
+export interface PowerPointComment {
+  authorId?: string
+  createdAt?: string
+  id: string
+  parentId?: string
+  partPath: string
+  position?: { x: number; y: number }
+  slidePart?: string
+  status?: string
+  text: string
+}
+
+export const powerPointCommentNoteId = (
+  comment: Pick<PowerPointComment, 'id' | 'partPath'>,
+): string => `pptx-comment:${encodeURIComponent(comment.partPath)}:${encodeURIComponent(comment.id)}`
+
+export interface PowerPointTransitionEffect {
+  attributes: Record<string, string>
+  type: string
+}
+
+export interface PowerPointSlideTransition {
+  advanceAfterMs?: number
+  advanceOnClick?: boolean
+  durationMs?: number
+  effect?: PowerPointTransitionEffect
+  soundRelationshipId?: string
+  speed?: string
+  sourceLayer: 'layout' | 'master' | 'slide'
+}
+
+export interface PowerPointTimingCondition {
+  delay?: string
+  event?: string
+  relationshipId?: string
+  targetObjectId?: string
+  targetShapeId?: string
+}
+
+export interface PowerPointTimingNode {
+  attributes: Record<string, string>
+  children: PowerPointTimingNode[]
+  conditions?: PowerPointTimingCondition[]
+  id?: string
+  nodeType: string
+  targetObjectId?: string
+  targetShapeId?: string
+}
+
+export interface PowerPointBuild {
+  attributes: Record<string, string>
+  kind: string
+  targetObjectId?: string
+  targetShapeId?: string
+}
+
+export interface PowerPointSlideTiming {
+  builds: PowerPointBuild[]
+  roots: PowerPointTimingNode[]
+  slidePart: string
+  transition?: PowerPointSlideTransition
+}
+
+export interface PowerPointDocumentSemantics {
+  commentAuthors: PowerPointCommentAuthor[]
+  comments: PowerPointComment[]
+  customShows: PowerPointCustomShow[]
+  notesMasters: PowerPointNotesMaster[]
+  notesSlides: PowerPointNotesSlide[]
+  properties: PowerPointPresentationProperties
+  sections: PowerPointSection[]
+  timings: PowerPointSlideTiming[]
 }
 
 export interface PowerPointThemeColor {
@@ -90,21 +248,34 @@ export interface PowerPointThemeFont {
   }>
 }
 
+export interface PowerPointThemeStyleEntry {
+  attributes: Record<string, string>
+  childTypes: string[]
+  colors: PowerPointThemeColor[]
+  index: number
+  kind: string
+}
+
 export interface PowerPointColorScheme {
   colors: PowerPointThemeColor[]
   name?: string
 }
 
 export interface PowerPointTheme {
+  backgroundFillStyles?: PowerPointThemeStyleEntry[]
   colorSchemeName?: string
   colors: PowerPointThemeColor[]
   extraColorSchemes?: PowerPointColorScheme[]
+  effectStyles?: PowerPointThemeStyleEntry[]
+  fillStyles?: PowerPointThemeStyleEntry[]
   formatSchemeName?: string
   id: string
   majorFont?: PowerPointThemeFont
   majorLatinFont?: string
   minorFont?: PowerPointThemeFont
   minorLatinFont?: string
+  isOverride?: boolean
+  lineStyles?: PowerPointThemeStyleEntry[]
   name?: string
   packageId: string
   partPath: string
@@ -230,6 +401,7 @@ export interface PowerPointSlideDependency {
   layoutPart?: string
   masterId?: string
   masterPart?: string
+  notesPart?: string
   presentationSlideId?: string
   relationshipId?: string
   slidePart: string
@@ -298,6 +470,7 @@ export interface PowerPointPackageReference {
   /** Mona canvas units per PowerPoint point for this specific import. */
   coordinateScale?: number
   dirty?: PowerPointDirtyPartJournal
+  document?: PowerPointDocumentSemantics
   fileName: string
   importReport?: PowerPointImportReport
   hierarchy?: PowerPointHierarchy
@@ -336,17 +509,24 @@ export type PowerPointElementSourceLayer = 'inherited' | 'layout' | 'master' | '
  */
 export interface PowerPointElementSource {
   connector?: PowerPointConnectorRelationships
+  decorative?: boolean
+  description?: string
+  hidden?: boolean
   kind: 'pptx'
+  locks?: Record<string, boolean>
   nativeShapeId?: string
   packageId: string
   placeholderIndex?: string
   placeholderLayoutObjectId?: string
   placeholderMasterObjectId?: string
   placeholderType?: string
+  relationshipIds?: string[]
   slidePart: string
   stableId: string
   sourceLayer: PowerPointElementSourceLayer
   sourceOrder?: number
   sourceObjectId?: string
   sourcePart?: string
+  title?: string
+  visual?: PowerPointVisualMetadata
 }

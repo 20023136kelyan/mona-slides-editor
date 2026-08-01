@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { applyPresentationCommand } from './commands'
 import { resolveSlideRenderState } from './render-graph'
+import type { PPTChartElement } from './model'
 import type { PresentationState } from './state'
 import type { PowerPointPackageReference } from './source'
 
@@ -190,5 +191,83 @@ describe('PowerPoint source package state', () => {
       partPath: 'ppt/slides/slide1.xml',
       reasons: ['presentation.slides.replace'],
     }))
+  })
+
+  it('journals chart, workbook, notes, and comment parts instead of over-marking the slide', () => {
+    const semanticPackage: PowerPointPackageReference = {
+      ...sourcePackage,
+      document: {
+        commentAuthors: [],
+        comments: [{ id: '1', partPath: 'ppt/comments/comment1.xml', slidePart: 'ppt/slides/slide1.xml', text: 'Review' }],
+        customShows: [],
+        notesMasters: [],
+        notesSlides: [],
+        properties: {},
+        sections: [],
+        timings: [],
+      },
+      slides: [{ ...sourcePackage.slides[0]!, notesPart: 'ppt/notesSlides/notesSlide1.xml' }],
+    }
+    const chart: PPTChartElement = {
+      chartSource: {
+        partPath: 'ppt/charts/chart1.xml',
+        relationshipIds: { chart: 'rIdChart' },
+        workbookPart: 'ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx',
+      },
+      chartType: 'bar',
+      data: { labels: ['A'], legends: ['Series 1'], series: [[1]] },
+      height: 100,
+      id: 'chart-1',
+      left: 0,
+      rotate: 0,
+      source: {
+        kind: 'pptx',
+        nativeShapeId: '9',
+        packageId: sourcePackage.packageId,
+        slidePart: sourcePackage.slides[0]!.slidePart,
+        sourceLayer: 'slide',
+        sourceObjectId: 'pptx:fixture/ppt/slides/slide1.xml#9',
+        sourcePart: sourcePackage.slides[0]!.slidePart,
+        stableId: 'pptx:fixture/ppt/slides/slide1.xml#9',
+      },
+      themeColors: ['#123456'],
+      top: 0,
+      type: 'chart',
+      width: 100,
+    }
+    const initial: PresentationState = {
+      ...presentation(),
+      slides: [{
+        elements: [chart],
+        id: 'slide-1',
+        source: { ...semanticPackage.slides[0]!, kind: 'pptx', packageId: sourcePackage.packageId },
+      }],
+      sourcePackages: [semanticPackage],
+    }
+
+    const chartEdit = applyPresentationCommand(initial, {
+      payload: { id: chart.id, props: { data: { labels: ['B'], legends: ['Series 1'], series: [[2]] } } },
+      type: 'element.update',
+    })
+    expect(chartEdit.state.sourcePackages?.[0]?.dirty?.parts.map(part => part.partPath)).toEqual([
+      'ppt/charts/chart1.xml',
+      'ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx',
+    ])
+
+    const notesEdit = applyPresentationCommand(initial, {
+      props: { remark: '<p>Updated notes</p>' },
+      type: 'slide.update',
+    })
+    expect(notesEdit.state.sourcePackages?.[0]?.dirty?.parts.map(part => part.partPath)).toEqual([
+      'ppt/notesSlides/notesSlide1.xml',
+    ])
+
+    const commentsEdit = applyPresentationCommand(initial, {
+      props: { notes: [{ content: 'Updated', id: '1', time: 0, user: 'Ada' }] },
+      type: 'slide.update',
+    })
+    expect(commentsEdit.state.sourcePackages?.[0]?.dirty?.parts.map(part => part.partPath)).toEqual([
+      'ppt/comments/comment1.xml',
+    ])
   })
 })

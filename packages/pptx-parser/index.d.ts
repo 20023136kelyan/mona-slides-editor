@@ -146,6 +146,10 @@ export interface StructuredTextBody {
     insets?: [number, number, number, number]
     rightToLeftColumns?: boolean
     rotation?: number
+    textWarp?: {
+      adjustments: Record<string, number>
+      preset: string
+    }
     verticalMode?: string
     wrap?: string
   }
@@ -277,6 +281,7 @@ export interface Image extends NativeObjectCarrier {
   width: number
   height: number
   ref: string
+  relationshipId?: string
   base64: string
   blob: string
   rotate: number
@@ -318,11 +323,14 @@ export interface TableCell {
   fontColor?: string
   fontBold?: boolean
   vAlign: string
+  margin?: { b: number; l: number; r: number; t: number }
   borders: {
     top?: Border
     bottom?: Border
     left?: Border
     right?: Border
+    diagonalDown?: Border
+    diagonalUp?: Border
   }
 }
 export interface Table extends NativeObjectCarrier {
@@ -342,6 +350,16 @@ export interface Table extends NativeObjectCarrier {
   rotate?: number
   rowHeights: number[]
   colWidths: number[]
+  tableProperties?: {
+    bandColumn: boolean
+    bandRow: boolean
+    firstColumn: boolean
+    firstRow: boolean
+    lastColumn: boolean
+    lastRow: boolean
+    rightToLeft: boolean
+    styleId?: string
+  }
 }
 
 export type ChartType = 'lineChart' |
@@ -571,6 +589,20 @@ export interface Diagram extends NativeObjectCarrier {
   height: number
   elements: Element[]
   textList: string[]
+  resources?: {
+    colorsPart?: string
+    dataPart?: string
+    drawingPart?: string
+    layoutPart?: string
+    quickStylePart?: string
+    relationshipIds: Record<string, string>
+  }
+  semanticModel?: {
+    colors?: Record<string, unknown>
+    data?: Record<string, unknown>
+    layout?: Record<string, unknown>
+    quickStyle?: Record<string, unknown>
+  }
   order: number
 }
 
@@ -581,6 +613,7 @@ export interface Math extends NativeObjectCarrier {
   width: number
   height: number
   latex: string
+  omml?: Record<string, unknown>
   picRef: string
   picBase64: string
   picBlob: string

@@ -1,5 +1,8 @@
 import type { PPTElement, Slide, SlideTemplate, SlideTheme } from './model'
-import type { PowerPointPackageReference } from './source'
+import type {
+  PowerPointConnectorEndpoint,
+  PowerPointPackageReference,
+} from './source'
 import type { PresentationState } from './state'
 import { cloneSerializable } from './state'
 import {
@@ -38,6 +41,19 @@ export type PresentationCommand =
   | { type: 'element.delete'; elementIds: string | string[]; slideId?: string }
   | { type: 'element.update'; payload: UpdateElementPayload }
   | { type: 'element.properties.remove'; payload: RemovePropertyPayload }
+  | {
+      type: 'connector.endpoint.attach'
+      elementId: string
+      endpoint: 'end' | 'start'
+      relationship: PowerPointConnectorEndpoint
+      slideId?: string
+    }
+  | {
+      type: 'connector.endpoint.detach'
+      elementId: string
+      endpoint: 'end' | 'start'
+      slideId?: string
+    }
 
 export interface PresentationChange {
   commandType: PresentationCommand['type']
@@ -116,27 +132,63 @@ const markPowerPointSlideDirty = (
   if (!source || !state.sourcePackages?.length) return state
   const packageIndex = state.sourcePackages.findIndex(candidate => candidate.packageId === source.packageId)
   if (packageIndex < 0) return state
+  const sourcePackages = state.sourcePackages.slice()
+  const sourcePackage = sourcePackages[packageIndex]!
   const selectedIds = new Set(elementIds)
   const allElements = flattenElementTree(slide.elements)
-  const selectedElements = allElements.filter(element => !elementIds.length || selectedIds.has(element.id))
+  const selectedElements = elementIds.length
+    ? allElements.filter(element => selectedIds.has(element.id))
+    : []
   const changesByPart = new Map<string, Set<string>>()
+  const propertyNames = new Set(properties.map(property => (
+    property.replace(/^removed:/, '').split('.')[0]!
+  )))
+  const addPart = (partPath: string | undefined, objectId?: string): void => {
+    if (!partPath) return
+    const objectIds = changesByPart.get(partPath) ?? new Set<string>()
+    if (objectId) objectIds.add(objectId)
+    changesByPart.set(partPath, objectIds)
+  }
   let hasUnresolvedSlideLocalChange = !elementIds.length
+  if (!elementIds.length && propertyNames.size) {
+    const dependency = sourcePackage.slides.find(candidate => candidate.slidePart === source.slidePart)
+    if ([...propertyNames].every(property => property === 'remark') && dependency?.notesPart) {
+      addPart(dependency.notesPart)
+      hasUnresolvedSlideLocalChange = false
+    }
+    else if ([...propertyNames].every(property => property === 'notes')) {
+      const commentParts = new Set(sourcePackage.document?.comments.filter(comment => (
+        comment.slidePart === source.slidePart
+      )).map(comment => comment.partPath) ?? [])
+      if (commentParts.size) {
+        for (const partPath of commentParts) addPart(partPath)
+        hasUnresolvedSlideLocalChange = false
+      }
+    }
+  }
   for (const element of selectedElements) {
     const elementSource = element.source
     if (!elementSource?.sourceObjectId || !elementSource.sourcePart) {
       hasUnresolvedSlideLocalChange = true
       continue
     }
-    const objectIds = changesByPart.get(elementSource.sourcePart) ?? new Set<string>()
-    objectIds.add(elementSource.sourceObjectId)
-    changesByPart.set(elementSource.sourcePart, objectIds)
+    if (element.type === 'chart' && propertyNames.size) {
+      const chartProperties = new Set(['chartSpace', 'chartType', 'data', 'options', 'themeColors'])
+      const hasChartChange = [...propertyNames].some(property => chartProperties.has(property))
+      const hasSlideChange = [...propertyNames].some(property => !chartProperties.has(property))
+      if (hasChartChange) {
+        addPart(element.chartSource?.partPath)
+        if (propertyNames.has('data')) addPart(element.chartSource?.workbookPart)
+      }
+      if (hasSlideChange) addPart(elementSource.sourcePart, elementSource.sourceObjectId)
+      continue
+    }
+    addPart(elementSource.sourcePart, elementSource.sourceObjectId)
   }
   if (selectedElements.length < elementIds.length) hasUnresolvedSlideLocalChange = true
   if (hasUnresolvedSlideLocalChange || changesByPart.size === 0) {
     if (!changesByPart.has(source.slidePart)) changesByPart.set(source.slidePart, new Set())
   }
-  const sourcePackages = state.sourcePackages.slice()
-  const sourcePackage = sourcePackages[packageIndex]!
   const existingParts = sourcePackage.dirty?.parts ?? []
   const nextParts = new Map(existingParts.map(part => [part.partPath, part]))
   for (const [partPath, objectIds] of changesByPart) {
@@ -485,6 +537,49 @@ export const applyPresentationCommand = (
         command,
         [slide.id],
         [command.payload.id],
+      )
+    }
+    case 'connector.endpoint.attach':
+    case 'connector.endpoint.detach': {
+      const slideIndex = findSlideIndex(state, command.slideId)
+      const currentSlide = state.slides[slideIndex]
+      if (!currentSlide) throw new PresentationCommandError('Target slide not found')
+      const element = findElementById(currentSlide.elements, command.elementId)
+      if (!element) throw new PresentationCommandError(`Element not found: ${command.elementId}`)
+      if (element.type !== 'line') {
+        throw new PresentationCommandError('Connector endpoint commands require a line element')
+      }
+      const previous = element.connections?.[command.endpoint]
+      const next = command.type === 'connector.endpoint.attach'
+        ? cloneSerializable(command.relationship)
+        : undefined
+      if (JSON.stringify(previous) === JSON.stringify(next)) return unchanged(state, command)
+      const connections = {
+        ...(element.connections ?? {}),
+        ...(next ? { [command.endpoint]: next } : {}),
+      }
+      if (!next) delete connections[command.endpoint]
+      const elements = updateElementTreeByIds(
+        currentSlide.elements,
+        new Set([command.elementId]),
+        candidate => candidate.type === 'line'
+          ? { ...candidate, connections }
+          : candidate,
+      )
+      const slide = { ...currentSlide, elements }
+      const slides = state.slides.slice()
+      slides[slideIndex] = slide
+      return changed(
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          currentSlide,
+          command.type,
+          [command.elementId],
+          [`connections.${command.endpoint}`],
+        ),
+        command,
+        [slide.id],
+        [command.elementId],
       )
     }
   }

@@ -192,6 +192,17 @@ const parseBodyProperties = textBodyNode => {
   const rightToLeftColumns = booleanAttribute(values.rtlCol)
   const anchorCenter = booleanAttribute(values.anchorCtr)
   const rotation = numberAttribute(values.rot)
+  const warpNode = first(bodyNode['a:prstTxWarp'])
+  const warpPreset = attributes(warpNode).prst
+  const warpAdjustments = {}
+  const warpGuides = first(warpNode?.['a:avLst'])?.['a:gd']
+  for (const guide of warpGuides ? (Array.isArray(warpGuides) ? warpGuides : [warpGuides]) : []) {
+    const guideValues = attributes(guide)
+    const value = typeof guideValues.fmla === 'string' && guideValues.fmla.startsWith('val ')
+      ? Number(guideValues.fmla.slice(4))
+      : Number.NaN
+    if (guideValues.name && Number.isFinite(value)) warpAdjustments[guideValues.name] = value
+  }
   let autoFit
   if (bodyNode['a:noAutofit']) autoFit = { type: 'none' }
   else if (bodyNode['a:spAutoFit']) autoFit = { type: 'shape' }
@@ -219,6 +230,7 @@ const parseBodyProperties = textBodyNode => {
       : {}),
     ...(rightToLeftColumns !== undefined ? { rightToLeftColumns } : {}),
     ...(rotation !== undefined ? { rotation: rotation / 60_000 } : {}),
+    ...(warpPreset ? { textWarp: { adjustments: warpAdjustments, preset: warpPreset } } : {}),
     ...(values.vert ? { verticalMode: values.vert } : {}),
     ...(values.wrap ? { wrap: values.wrap } : {}),
   }

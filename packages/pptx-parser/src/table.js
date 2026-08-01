@@ -109,6 +109,21 @@ export async function getTableCellParams(tcNode, thisTblStyle, cellSource, warpO
   if (lin_top) borders.top = getBorder(lin_top, undefined, warpObj)
   if (lin_left) borders.left = getBorder(lin_left, undefined, warpObj)
   if (lin_right) borders.right = getBorder(lin_right, undefined, warpObj)
+  const diagonalDown = getTextByPathList(tcNode, ['a:tcPr', 'a:lnTlToBr'])
+  const diagonalUp = getTextByPathList(tcNode, ['a:tcPr', 'a:lnBlToTr'])
+  if (diagonalDown) borders.diagonalDown = getBorder(diagonalDown, undefined, warpObj)
+  if (diagonalUp) borders.diagonalUp = getBorder(diagonalUp, undefined, warpObj)
+
+  const marginValue = (name, fallback) => {
+    const value = getTextByPathList(tcNode, ['a:tcPr', 'attrs', name])
+    return value === undefined ? fallback : parseInt(value) / 12700
+  }
+  const margin = {
+    b: marginValue('marB', 3.6),
+    l: marginValue('marL', 7.2),
+    r: marginValue('marR', 7.2),
+    t: marginValue('marT', 3.6),
+  }
 
   return {
     fillColor,
@@ -120,6 +135,7 @@ export async function getTableCellParams(tcNode, thisTblStyle, cellSource, warpO
     colSpan: colSpan ? +colSpan : undefined,
     vMerge: vMerge ? +vMerge : undefined,
     hMerge: hMerge ? +hMerge : undefined,
+    margin,
   }
 }
 

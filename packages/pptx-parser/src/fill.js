@@ -243,6 +243,16 @@ export function getPicFilters(node) {
 
   const filters = {}
 
+  // Standard DrawingML effects are used by PowerPoint itself and by producers
+  // that do not emit the Office 2010 a14 image-effect extension.
+  const lum = getTextByPathList(aBlipNode, ['a:lum', 'attrs'])
+  if (lum) {
+    if (lum.bright !== undefined) filters.brightness = parseInt(lum.bright) / 100000
+    if (lum.contrast !== undefined) filters.contrast = parseInt(lum.contrast) / 100000
+  }
+  const saturation = getTextByPathList(aBlipNode, ['a:satMod', 'attrs', 'val'])
+  if (saturation !== undefined) filters.saturation = parseInt(saturation) / 100000
+
   // 从a:extLst中获取滤镜效果（Microsoft Office 2010+扩展）
   const extLstNode = aBlipNode['a:extLst']
   if (extLstNode && extLstNode['a:ext']) {

@@ -783,6 +783,7 @@ async function processMathNode(node, warpObj, source) {
     width, 
     height,
     latex,
+    omml: structuredClone(oMath),
     picRef: picFill.ref,
     picBase64: picFill.base64,
     picBlob: picFill.blob,
@@ -1304,6 +1305,7 @@ async function processPicNode(node, warpObj, source) {
     height,
     rotate,
     ref: imageData.ref,
+    relationshipId: rid,
     base64: imageData.base64,
     blob: imageData.blob,
     isFlipV,
@@ -1479,6 +1481,18 @@ async function genTable(node, warpObj) {
     isBandRowAttr: (bandRowAttr && bandRowAttr === '1') ? 1 : 0,
     isBandColAttr: (bandColAttr && bandColAttr === '1') ? 1 : 0,
   }
+  const tableProperties = {
+    bandColumn: tblStylAttrObj.isBandColAttr === 1,
+    bandRow: tblStylAttrObj.isBandRowAttr === 1,
+    firstColumn: tblStylAttrObj.isFrstColAttr === 1,
+    firstRow: tblStylAttrObj.isFrstRowAttr === 1,
+    lastColumn: tblStylAttrObj.isLstColAttr === 1,
+    lastRow: tblStylAttrObj.isLstRowAttr === 1,
+    rightToLeft: getTblPr['attrs']?.rtl === '1',
+    ...(typeof getTblPr['a:tableStyleId'] === 'string'
+      ? { styleId: getTblPr['a:tableStyleId'] }
+      : {}),
+  }
 
   let thisTblStyle
   const tbleStyleId = getTblPr['a:tableStyleId']
@@ -1590,6 +1604,7 @@ async function genTable(node, warpObj) {
         if (cell.fontColor || fontColor) td.fontColor = cell.fontColor || fontColor
         if (cell.fillColor || fillColor || tbl_bgcolor) td.fillColor = cell.fillColor || fillColor || tbl_bgcolor
         if (cell.borders) td.borders = cell.borders
+        if (cell.margin) td.margin = cell.margin
 
         tr.push(td)
       }
@@ -1628,6 +1643,7 @@ async function genTable(node, warpObj) {
       if (cell.fontColor || fontColor) td.fontColor = cell.fontColor || fontColor
       if (cell.fillColor || fillColor || tbl_bgcolor) td.fillColor = cell.fillColor || fillColor || tbl_bgcolor
       if (cell.borders) td.borders = cell.borders
+      if (cell.margin) td.margin = cell.margin
 
       tr.push(td)
     }
@@ -1649,6 +1665,7 @@ async function genTable(node, warpObj) {
     borders,
     rowHeights,
     colWidths,
+    tableProperties,
   }
 }
 
@@ -1780,6 +1797,13 @@ async function genDiagram(node, warpObj, source) {
     height,
     elements,
     textList,
+    resources: diagramWarpObj.diagramResources,
+    semanticModel: {
+      ...(diagramWarpObj.diagramContent.colors ? { colors: structuredClone(diagramWarpObj.diagramContent.colors) } : {}),
+      ...(diagramWarpObj.diagramContent.data ? { data: structuredClone(diagramWarpObj.diagramContent.data) } : {}),
+      ...(diagramWarpObj.diagramContent.layout ? { layout: structuredClone(diagramWarpObj.diagramContent.layout) } : {}),
+      ...(diagramWarpObj.diagramContent.quickStyle ? { quickStyle: structuredClone(diagramWarpObj.diagramContent.quickStyle) } : {}),
+    },
     order,
   }
 }

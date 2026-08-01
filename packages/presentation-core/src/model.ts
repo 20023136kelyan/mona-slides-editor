@@ -1,4 +1,8 @@
-import type { PowerPointElementSource, PowerPointSlideSource } from './source'
+import type {
+  PowerPointConnectorRelationships,
+  PowerPointElementSource,
+  PowerPointSlideSource,
+} from './source'
 
 export const ShapePathFormulasKeys = {
   BULLET: 'bullet',
@@ -146,6 +150,12 @@ export type TextAlignVertical = 'top' | 'middle' | 'bottom'
  * name?: 元素名
  */
 export interface PPTBaseElement {
+  accessibility?: {
+    decorative?: boolean
+    description?: string
+    hidden?: boolean
+    title?: string
+  }
   id: string
   left: number
   top: number
@@ -261,6 +271,10 @@ export interface StructuredTextBodyProperties {
   insets?: TextInset
   rightToLeftColumns?: boolean
   rotation?: number
+  textWarp?: {
+    adjustments: Record<string, number>
+    preset: string
+  }
   verticalMode?: string
   wrap?: string
 }
@@ -438,6 +452,13 @@ export interface PPTImageElement extends PPTBaseElement {
   colorMask?: string
   imageType?: ImageType
   opacity?: number
+  /** Native picture semantics retained beside Mona's crop/filter adapter. */
+  powerPointImage?: {
+    crop?: { b?: number; l?: number; r?: number; t?: number }
+    geometry: string
+    mediaPart?: string
+    relationshipId?: string
+  }
 }
 
 /**
@@ -552,6 +573,11 @@ export interface PPTShapeElement extends PPTBaseElement {
   text?: ShapeText
   pathFormula?: ShapePathFormulasKeys
   keypoints?: number[]
+  /** Preset geometry and its named adjustment values in native units. */
+  powerPointGeometry?: {
+    adjustments: Record<string, number>
+    preset: string
+  }
 }
 
 
@@ -598,6 +624,17 @@ export interface PPTLineElement extends Omit<PPTBaseElement, 'height' | 'rotate'
   broken2Direction?: Broken2LineDirection
   curve?: [number, number]
   cubic?: [[number, number], [number, number]]
+  /**
+   * Current connector attachments. Source provenance stays immutable in
+   * `source.connector`; this value changes only through an explicit edit and
+   * is serialized back to `p:cNvCxnSpPr`.
+   */
+  connections?: PowerPointConnectorRelationships
+  /** Native geometry retained beside Mona's editable route controls. */
+  powerPointGeometry?: {
+    adjustments: Record<string, number>
+    preset: string
+  }
 }
 
 
@@ -621,6 +658,15 @@ export interface ChartOptions {
   showSeriesName?: boolean
   showValue?: boolean
   seriesTypes?: ChartType[]
+  seriesAxisIndexes?: number[]
+  valueAxes?: Array<{
+    id?: string
+    maximumValue?: number
+    minimumValue?: number
+    numberFormat?: string
+    position?: string
+    title?: string
+  }>
   stack?: boolean
   title?: string
   valueAxisTitle?: string
@@ -845,10 +891,16 @@ export interface TableCellStyle {
  * style?: 单元格样式
  */
 export interface TableCell {
-  borders?: Partial<Record<'bottom' | 'left' | 'right' | 'top', PPTElementOutline>>
+  borders?: Partial<Record<
+    'bottom' | 'diagonalDown' | 'diagonalUp' | 'left' | 'right' | 'top',
+    PPTElementOutline
+  >>
   id: string
   colspan: number
   rowspan: number
+  margin?: TextInset
+  /** Original table-grid coordinate used for source-preserving cell edits. */
+  powerPointCell?: { columnIndex: number; rowIndex: number }
   text: string
   /**
    * Imported paragraph/run model for the cell. `text` stays the editing
@@ -902,6 +954,16 @@ export interface PPTTableElement extends PPTBaseElement {
   cellMinHeight: number
   data: TableCell[][]
   rowHeights?: number[]
+  powerPointTable?: {
+    bandColumn: boolean
+    bandRow: boolean
+    firstColumn: boolean
+    firstRow: boolean
+    lastColumn: boolean
+    lastRow: boolean
+    rightToLeft: boolean
+    styleId?: string
+  }
 }
 
 
@@ -931,6 +993,7 @@ export interface PPTLatexElement extends PPTBaseElement {
   viewBox: [number, number]
   fixedRatio: boolean
   fallbackImage?: string
+  powerPointMath?: { omml: Record<string, unknown> }
 }
 
 /**
@@ -996,6 +1059,20 @@ export interface PPTGroupElement extends PPTBaseElement {
   flipH?: boolean
   flipV?: boolean
   semanticType?: 'diagram' | 'group'
+  powerPointDiagram?: {
+    colorsPart?: string
+    dataPart?: string
+    drawingPart?: string
+    layoutPart?: string
+    model?: {
+      colors?: Record<string, unknown>
+      data?: Record<string, unknown>
+      layout?: Record<string, unknown>
+      quickStyle?: Record<string, unknown>
+    }
+    quickStylePart?: string
+    relationshipIds: Record<string, string>
+  }
 }
 
 /**

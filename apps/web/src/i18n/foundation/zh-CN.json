@@ -1127,6 +1127,11 @@
       "auto": "自动",
       "horizontal": "水平",
       "vertical": "垂直",
+      "attachments": "连接：",
+      "detachStart": "断开连接线起点",
+      "detachEnd": "断开连接线终点",
+      "start": "断开起点",
+      "end": "断开终点",
       "styleLabel": "样式",
       "colorLabel": "颜色"
     },

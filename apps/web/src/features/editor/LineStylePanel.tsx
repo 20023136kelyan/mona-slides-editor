@@ -77,6 +77,18 @@ export function LineStylePanel({
     [{ type: 'element.update', payload: { id: element.id, props } }],
     { historyKey },
   )
+  const detach = (endpoint: 'end' | 'start') => runtime.commit(
+    endpoint === 'start' ? 'Detach line start' : 'Detach line end',
+    [{ type: 'connector.endpoint.detach', elementId: element.id, endpoint }],
+  )
+  const reverse = () => update({
+    connections: {
+      ...(element.connections?.end ? { start: element.connections.end } : {}),
+      ...(element.connections?.start ? { end: element.connections.start } : {}),
+    },
+    end: element.start,
+    start: element.end,
+  }, `line-swap-${element.id}`)
   const changeLineType = (item: LineTypeOption) => {
     const midpoint: [number, number] = [(element.start[0] + element.end[0]) / 2, (element.start[1] + element.end[1]) / 2]
     const property: string[] = ['broken', 'broken2', 'curve', 'cubic']
@@ -120,8 +132,19 @@ export function LineStylePanel({
             : update({ broken2Direction: direction })} options={directionOptions} value={element.broken2Direction || 'auto'} />
         </PropertyRow>
       ) : null}
+      {element.connections?.start || element.connections?.end ? (
+        <>
+          <div className={inspectorDividerClass} />
+          <PropertyRow label={t('foundation.editor.line.attachments')}>
+            <div className="flex w-full gap-1">
+              <InspectorButton ariaLabel={t('foundation.editor.line.detachStart')} disabled={!element.connections?.start} onClick={() => detach('start')} style={{ flex: 1 }}>{t('foundation.editor.line.start')}</InspectorButton>
+              <InspectorButton ariaLabel={t('foundation.editor.line.detachEnd')} disabled={!element.connections?.end} onClick={() => detach('end')} style={{ flex: 1 }}>{t('foundation.editor.line.end')}</InspectorButton>
+            </div>
+          </PropertyRow>
+        </>
+      ) : null}
       <div className={inspectorDividerClass} />
-      <InspectorButton ariaLabel={t('foundation.editor.line.swap')} onClick={() => update({ start: element.end, end: element.start }, `line-swap-${element.id}`)} style={{ width: '100%' }}><SwitchIcon /> {t('foundation.editor.line.swap')}</InspectorButton>
+      <InspectorButton ariaLabel={t('foundation.editor.line.swap')} onClick={reverse} style={{ width: '100%' }}><SwitchIcon /> {t('foundation.editor.line.swap')}</InspectorButton>
       <div className={inspectorDividerClass} />
       <ElementShadowControls element={element} presentation={presentation} runtime={runtime} />
     </div>

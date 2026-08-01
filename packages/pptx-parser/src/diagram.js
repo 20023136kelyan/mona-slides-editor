@@ -113,6 +113,19 @@ export async function getDiagramNodeContext(node, warpObj, source = 'slide') {
     digramFileContent,
     diagramResObj,
     diagramContent,
+    diagramResources: {
+      ...(diagramColorsTarget ? { colorsPart: diagramColorsTarget } : {}),
+      ...(diagramDataTarget ? { dataPart: diagramDataTarget } : {}),
+      ...(drawingTarget ? { drawingPart: drawingTarget } : {}),
+      ...(diagramLayoutTarget ? { layoutPart: diagramLayoutTarget } : {}),
+      ...(diagramQuickStyleTarget ? { quickStylePart: diagramQuickStyleTarget } : {}),
+      relationshipIds: Object.fromEntries(Object.entries({
+        colorsPart: relIds['r:cs'],
+        dataPart: relIds['r:dm'],
+        layoutPart: relIds['r:lo'],
+        quickStylePart: relIds['r:qs'],
+      }).filter(([, value]) => Boolean(value))),
+    },
     sourceParts: {
       ...warpObj.sourceParts,
       ...(drawingTarget ? { diagramBg: drawingTarget } : {}),

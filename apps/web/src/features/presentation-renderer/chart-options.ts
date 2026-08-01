@@ -128,6 +128,18 @@ export function getChartOption({
     splitLine,
     type: 'value' as const,
   }
+  const valueAxes = (orientation: 'x' | 'y') => options.valueAxes?.length
+    ? options.valueAxes.map((axis, index) => ({
+        ...valueAxis,
+        max: axis.maximumValue,
+        min: axis.minimumValue,
+        name: axis.title,
+        position: orientation === 'x'
+          ? axis.position === 't' ? 'top' as const : 'bottom' as const
+          : axis.position === 'r' ? 'right' as const : 'left' as const,
+        ...(index > 0 ? { offset: (index - 1) * 48 } : {}),
+      }))
+    : valueAxis
   const categoryAxis = {
     axisLabel,
     axisLine,
@@ -149,7 +161,7 @@ export function getChartOption({
       title,
       tooltip: {},
       xAxis: categoryAxis,
-      yAxis: valueAxis,
+      yAxis: valueAxes('y'),
       series: plottedData.series.map((values, index): BarSeriesOption | LineSeriesOption => {
         const seriesType = seriesTypes[index] ?? type
         if (seriesType === 'line' || seriesType === 'area') {
@@ -161,6 +173,7 @@ export function getChartOption({
             showSymbol: options.marker,
             smooth: options.lineSmooth,
             type: 'line',
+            yAxisIndex: options.seriesAxisIndexes?.[index] ?? 0,
           }
           if (options.stack) series.stack = 'A'
           return series
@@ -172,6 +185,7 @@ export function getChartOption({
           label,
           name: plottedData.legends[index],
           type: 'bar',
+          yAxisIndex: options.seriesAxisIndexes?.[index] ?? 0,
         }
         if (options.stack) series.stack = 'A'
         return series
@@ -187,8 +201,8 @@ export function getChartOption({
       legend,
       title,
       tooltip: {},
-      xAxis: type === 'bar' ? categoryAxis : valueAxis,
-      yAxis: type === 'bar' ? valueAxis : categoryAxis,
+      xAxis: type === 'bar' ? categoryAxis : valueAxes('x'),
+      yAxis: type === 'bar' ? valueAxes('y') : categoryAxis,
       series: plottedData.series.map((values, index) => {
         const series: BarSeriesOption = {
           barCategoryGap: options.gapWidth !== undefined ? `${options.gapWidth}%` : undefined,
@@ -198,6 +212,9 @@ export function getChartOption({
           type: 'bar',
           label,
           itemStyle: { borderRadius: type === 'bar' ? [2, 2, 0, 0] : [0, 2, 2, 0] },
+          ...(type === 'bar'
+            ? { yAxisIndex: options.seriesAxisIndexes?.[index] ?? 0 }
+            : { xAxisIndex: options.seriesAxisIndexes?.[index] ?? 0 }),
         }
         if (options.stack) series.stack = 'A'
         return series
@@ -214,7 +231,7 @@ export function getChartOption({
       title,
       tooltip: {},
       xAxis: categoryAxis,
-      yAxis: valueAxis,
+      yAxis: valueAxes('y'),
       series: plottedData.series.map((values, index) => {
         const series: LineSeriesOption = {
           data: values,
@@ -223,6 +240,7 @@ export function getChartOption({
           smooth: options.lineSmooth,
           showSymbol: options.marker,
           label,
+          yAxisIndex: options.seriesAxisIndexes?.[index] ?? 0,
         }
         if (options.stack) series.stack = 'A'
         return series
@@ -239,7 +257,7 @@ export function getChartOption({
       title,
       tooltip: {},
       xAxis: { ...categoryAxis, boundaryGap: false },
-      yAxis: valueAxis,
+      yAxis: valueAxes('y'),
       series: plottedData.series.map((values, index) => {
         const series: LineSeriesOption = {
           data: values,
@@ -247,6 +265,7 @@ export function getChartOption({
           type: 'line',
           areaStyle: {},
           label,
+          yAxisIndex: options.seriesAxisIndexes?.[index] ?? 0,
         }
         if (options.stack) series.stack = 'A'
         return series

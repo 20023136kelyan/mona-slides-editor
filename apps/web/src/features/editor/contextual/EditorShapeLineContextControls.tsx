@@ -205,7 +205,14 @@ function LineControls({
         renderOption={option => <LinePreview markers={[option.value, '']} padding={5} />}
         value={element.points[0]}
       />
-      <Button aria-label={t('foundation.editor.line.swap')} className={contextualControlIcon} onClick={() => update({ start: element.end, end: element.start }, `line-swap-${element.id}`)} size="editor-icon" title={t('foundation.editor.line.swap')} type="button" variant="ghost"><SwitchIcon /></Button>
+      <Button aria-label={t('foundation.editor.line.swap')} className={contextualControlIcon} onClick={() => update({
+        connections: {
+          ...(element.connections?.end ? { start: element.connections.end } : {}),
+          ...(element.connections?.start ? { end: element.connections.start } : {}),
+        },
+        end: element.start,
+        start: element.end,
+      }, `line-swap-${element.id}`)} size="editor-icon" title={t('foundation.editor.line.swap')} type="button" variant="ghost"><SwitchIcon /></Button>
       <InspectorSelect<LinePoint>
         ariaLabel={t('foundation.editor.line.endMarker')}
         className={contextualGhostSelect}

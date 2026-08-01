@@ -10,6 +10,7 @@ import type {
 import {
   createPresentationId,
   flattenElementTree,
+  powerPointCommentNoteId,
   type PowerPointImportCapabilityReport,
   type PowerPointImportDisposition,
   type PowerPointImportDispositionCounts,
@@ -26,6 +27,7 @@ import type {
   ChartType,
   Gradient,
   LinePoint,
+  Note,
   PPTElement,
   PPTGroupElement,
   PPTImageElement,
@@ -53,6 +55,45 @@ import type {
 } from './types'
 
 export type { ParsedPptxPresentation } from './types'
+
+const importedPowerPointNotes = (
+  sourcePackage: PowerPointPackageReference | undefined,
+  slidePart: string | undefined,
+): Note[] | undefined => {
+  if (!slidePart) return undefined
+  const comments = sourcePackage?.document?.comments.filter(comment => comment.slidePart === slidePart) ?? []
+  if (!comments.length) return undefined
+  const authors = new Map(
+    sourcePackage?.document?.commentAuthors.map(author => [author.id, author]) ?? [],
+  )
+  const toTimestamp = (value: string | undefined): number => {
+    const parsed = value ? Date.parse(value) : Number.NaN
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  const userName = (authorId: string | undefined): string => {
+    const author = authorId ? authors.get(authorId) : undefined
+    return author?.name || author?.initials || 'PowerPoint'
+  }
+  const repliesByParent = new Map<string, typeof comments>()
+  for (const comment of comments) {
+    if (!comment.parentId) continue
+    const replies = repliesByParent.get(comment.parentId) ?? []
+    replies.push(comment)
+    repliesByParent.set(comment.parentId, replies)
+  }
+  return comments.filter(comment => !comment.parentId).map(comment => ({
+    content: comment.text,
+    id: powerPointCommentNoteId(comment),
+    replies: (repliesByParent.get(comment.id) ?? []).map(reply => ({
+      content: reply.text,
+      id: powerPointCommentNoteId(reply),
+      time: toTimestamp(reply.createdAt),
+      user: userName(reply.authorId),
+    })),
+    time: toTimestamp(comment.createdAt),
+    user: userName(comment.authorId),
+  }))
+}
 
 const vAlignMap: Record<string, TextAlignVertical> = { down: 'bottom', mid: 'middle', up: 'top' }
 
@@ -249,6 +290,10 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
     top: element.top,
     type: 'line',
     width: +((element.borderWidth || 1) * ratio).toFixed(2),
+    powerPointGeometry: {
+      adjustments: structuredClone(element.keypoints ?? {}),
+      preset: element.shapType,
+    },
   }
   if (element.rotate) {
     const rotated = rotateLine(line, element.rotate)
@@ -258,28 +303,33 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
     line.top += rotated.offset[1]
     rotateOffset = rotated.offset
   }
+  const mapPathPoint = (point: { x: number; y: number }): [number, number] => {
+    let x = element.pathViewBox?.width
+      ? point.x / element.pathViewBox.width * element.width
+      : point.x * ratio
+    let y = element.pathViewBox?.height
+      ? point.y / element.pathViewBox.height * element.height
+      : point.y * ratio
+    if (element.isFlipH) x = element.width - x
+    if (element.isFlipV) y = element.height - y
+    if (element.rotate) {
+      const radians = element.rotate * Math.PI / 180
+      const middleX = (start[0] + end[0]) / 2
+      const middleY = (start[1] + end[1]) / 2
+      const xRotated = (x - middleX) * Math.cos(radians) - (y - middleY) * Math.sin(radians) + middleX
+      const yRotated = (x - middleX) * Math.sin(radians) + (y - middleY) * Math.cos(radians) + middleY
+      x = xRotated - Math.min(start[0], end[0]) - rotateOffset[0]
+      y = yRotated - Math.min(start[1], end[1]) - rotateOffset[1]
+    }
+    return [x, y]
+  }
   if (/bentConnector/.test(element.shapType)) {
     const defaults = () => {
       line.broken2 = [Math.abs(line.start[0] - line.end[0]) / 2, Math.abs(line.start[1] - line.end[1]) / 2]
     }
     const points = (limit: number) => {
       if (!element.path) return []
-      return pathPoints(element.path).map(point => {
-        let x = element.pathViewBox?.width ? point.x / element.pathViewBox.width * element.width : point.x * ratio
-        let y = element.pathViewBox?.height ? point.y / element.pathViewBox.height * element.height : point.y * ratio
-        if (element.isFlipH) x = element.width - x
-        if (element.isFlipV) y = element.height - y
-        if (element.rotate) {
-          const radians = element.rotate * Math.PI / 180
-          const middleX = (start[0] + end[0]) / 2
-          const middleY = (start[1] + end[1]) / 2
-          const xRotated = (x - middleX) * Math.cos(radians) - (y - middleY) * Math.sin(radians) + middleX
-          const yRotated = (x - middleX) * Math.sin(radians) + (y - middleY) * Math.cos(radians) + middleY
-          x = xRotated - Math.min(start[0], end[0]) - rotateOffset[0]
-          y = yRotated - Math.min(start[1], end[1]) - rotateOffset[1]
-        }
-        return [x, y] as [number, number]
-      }).slice(0, limit)
+      return pathPoints(element.path).map(mapPathPoint).slice(0, limit)
     }
     if (element.shapType === 'bentConnector2') {
       const values = points(3)
@@ -304,6 +354,60 @@ const parseLineElement = (element: PptxShape, ratio: number) => {
     else {
       const middleX = (line.start[0] + line.end[0]) / 2
       line.cubic = [[middleX, line.start[1]], [middleX, line.end[1]]]
+    }
+  }
+  if (
+    element.shapType === 'custom'
+    && (element.native?.kind === 'connector' || (element.strokeOnly && !element.content))
+    && element.path
+  ) {
+    try {
+      const commands = new SVGPathData(element.path)
+        .transform(SVGPathDataTransformer.TO_ABS())
+        .commands
+      const lineCommands = commands.filter(command => command.type === SVGPathData.LINE_TO)
+      const quadratic = commands.find(command => command.type === SVGPathData.QUAD_TO)
+      const cubic = commands.find(command => command.type === SVGPathData.CURVE_TO)
+      if (
+        cubic
+        && 'x1' in cubic && 'y1' in cubic
+        && 'x2' in cubic && 'y2' in cubic
+      ) {
+        line.cubic = [
+          mapPathPoint({ x: cubic.x1, y: cubic.y1 }),
+          mapPathPoint({ x: cubic.x2, y: cubic.y2 }),
+        ]
+      }
+      else if (quadratic && 'x1' in quadratic && 'y1' in quadratic) {
+        line.curve = mapPathPoint({ x: quadratic.x1, y: quadratic.y1 })
+      }
+      else if (lineCommands.length === 2) {
+        const control = lineCommands[0]!
+        if ('x' in control && 'y' in control) {
+          line.broken = mapPathPoint({ x: control.x, y: control.y })
+        }
+      }
+      else if (lineCommands.length >= 3) {
+        const first = lineCommands[0]!
+        const second = lineCommands[1]!
+        if ('x' in first && 'y' in first && 'x' in second && 'y' in second) {
+          const firstPoint = mapPathPoint({ x: first.x, y: first.y })
+          const secondPoint = mapPathPoint({ x: second.x, y: second.y })
+          line.broken2 = [
+            (firstPoint[0] + secondPoint[0]) / 2,
+            (firstPoint[1] + secondPoint[1]) / 2,
+          ]
+          line.broken2Direction = Math.abs(firstPoint[0] - line.start[0])
+            >= Math.abs(firstPoint[1] - line.start[1])
+            ? 'horizontal'
+            : 'vertical'
+        }
+      }
+    }
+    catch {
+      // The source package still retains the exact custom geometry. Leaving
+      // route controls absent keeps the connector visible as a straight
+      // fallback without inventing an editable path.
     }
   }
   return line
@@ -410,6 +514,7 @@ export const convertParsedPptxPresentation = ({
     const sourceTheme = sourcePackage?.hierarchy?.themes.find(candidate => (
       candidate.partPath === sourceDependency?.themePart
     ))
+    const importedNotes = importedPowerPointNotes(sourcePackage, sourceDependency?.slidePart)
     const slideTheme: SlideTheme = {
       ...theme,
       fontName: sourceTheme?.minorLatinFont || theme.fontName,
@@ -435,6 +540,7 @@ export const convertParsedPptxPresentation = ({
       elements: [],
       hidden: item.hidden,
       id: createPresentationId(10),
+      ...(importedNotes ? { notes: importedNotes } : {}),
       remark: item.note || '',
       title: item.name,
       turningMode: item.transition?.type ? turningModes[item.transition.type] ?? 'no' : 'no',
@@ -514,22 +620,57 @@ export const convertParsedPptxPresentation = ({
         }
         const pushElement = (destination: PPTElement) => {
           if (groupId) destination.groupId = groupId
+          if (
+            sourceIdentity?.decorative !== undefined
+            || sourceIdentity?.description !== undefined
+            || sourceIdentity?.hidden !== undefined
+            || sourceIdentity?.title !== undefined
+          ) {
+            destination.accessibility = {
+              ...(sourceIdentity.decorative !== undefined
+                ? { decorative: sourceIdentity.decorative }
+                : {}),
+              ...(sourceIdentity.description !== undefined
+                ? { description: sourceIdentity.description }
+                : {}),
+              ...(sourceIdentity.hidden !== undefined ? { hidden: sourceIdentity.hidden } : {}),
+              ...(sourceIdentity.title !== undefined ? { title: sourceIdentity.title } : {}),
+            }
+          }
+          if (
+            sourceIdentity?.locks?.noSelect
+            || sourceIdentity?.locks?.noMove
+            || sourceIdentity?.locks?.noResize
+          ) destination.lock = true
           if (sourcePackage && sourceDependency && sourceIdentity) {
             destination.source = {
               ...(sourceIdentity.connector
                 ? { connector: structuredClone(sourceIdentity.connector) }
                 : {}),
+              ...(sourceIdentity.decorative !== undefined
+                ? { decorative: sourceIdentity.decorative }
+                : {}),
+              ...(sourceIdentity.description ? { description: sourceIdentity.description } : {}),
+              ...(sourceIdentity.hidden !== undefined ? { hidden: sourceIdentity.hidden } : {}),
               kind: 'pptx',
+              ...(sourceIdentity.locks ? { locks: structuredClone(sourceIdentity.locks) } : {}),
               nativeShapeId: sourceIdentity.nativeId,
               packageId: sourcePackage.packageId,
               placeholderIndex: sourceIdentity.placeholderIndex,
               placeholderType: sourceIdentity.placeholderType,
+              ...(sourceIdentity.relationshipIds?.length
+                ? { relationshipIds: structuredClone(sourceIdentity.relationshipIds) }
+                : {}),
               slidePart: sourceDependency.slidePart,
               sourceObjectId: sourceIdentity.stableId,
               sourceLayer: resolvedSourceLayer,
               sourceOrder: element.order,
               sourcePart: sourceIdentity.partPath,
               stableId: sourceIdentity.stableId,
+              ...(sourceIdentity.title ? { title: sourceIdentity.title } : {}),
+              ...(sourceIdentity.visual
+                ? { visual: structuredClone(sourceIdentity.visual) }
+                : {}),
             }
           }
           destinationElements.push(destination)
@@ -597,6 +738,12 @@ export const convertParsedPptxPresentation = ({
           const image: PPTImageElement = {
             fixedRatio: true, flipH: element.isFlipH, flipV: element.isFlipV, height: element.height, id: createPresentationId(10), left: element.left,
             opacity: element.opacity, rotate: element.rotate, src: importedAssetUrl(element.base64), top: element.top, type: 'image', width: element.width,
+            powerPointImage: {
+              ...(element.rect ? { crop: structuredClone(element.rect) } : {}),
+              geometry: element.geom || 'rect',
+              ...(element.ref ? { mediaPart: element.ref } : {}),
+              ...(element.relationshipId ? { relationshipId: element.relationshipId } : {}),
+            },
           }
           if (element.borderWidth) image.outline = { color: element.borderColor, style: element.borderType, width: +(element.borderWidth * ratio).toFixed(2) }
           const clipShapes = ['rect', 'snip1Rect', 'snip2DiagRect', 'roundRect', 'ellipse', 'triangle', 'rtTriangle', 'diamond', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'chevron', 'homePlate', 'rightArrow', 'parallelogram', 'trapezoid']
@@ -639,6 +786,7 @@ export const convertParsedPptxPresentation = ({
                 latex: element.latex,
                 left: element.left,
                 path: rendered.path,
+                ...(element.omml ? { powerPointMath: { omml: structuredClone(element.omml) } } : {}),
                 rotate: element.rotate ?? 0,
                 strokeWidth: 2,
                 top: element.top,
@@ -680,7 +828,18 @@ export const convertParsedPptxPresentation = ({
           }
         }
         else if (element.type === 'shape') {
-          if (element.shapType === 'line' || /(straight|bent|curved)Connector/.test(element.shapType)) pushElement(parseLineElement(element, ratio))
+          if (
+            element.shapType === 'line'
+            || /(straight|bent|curved)Connector/.test(element.shapType)
+            || element.native?.kind === 'connector'
+            || (element.shapType === 'custom' && element.strokeOnly && !element.content)
+          ) {
+            const line = parseLineElement(element, ratio)
+            if (sourceIdentity?.connector) {
+              line.connections = structuredClone(sourceIdentity.connector)
+            }
+            pushElement(line)
+          }
           else {
             const shape = shapeList.find(candidate => candidate.pptxShapeType === element.shapType)
             const gradient: Gradient | undefined = element.fill?.type === 'gradient' ? { colors: element.fill.value.colors.map(color => ({ ...color, pos: Number.parseInt(color.pos) })), rotate: element.fill.value.rot, type: element.fill.value.path === 'line' ? 'linear' : 'radial' } : undefined
@@ -714,6 +873,12 @@ export const convertParsedPptxPresentation = ({
                     patternType: element.fill.value.type,
                   }
                 : undefined,
+              powerPointGeometry: {
+                adjustments: Object.fromEntries(Object.entries(element.keypoints ?? {}).map(
+                  ([name, value]) => [name, value * 50_000],
+                )),
+                preset: element.shapType,
+              },
               rotate: element.rotate,
               text: {
                 align: vAlignMap[element.vAlign] || 'middle',
@@ -824,7 +989,18 @@ export const convertParsedPptxPresentation = ({
               borders,
               colspan: cell.colSpan || 1,
               id: createPresentationId(10),
+              powerPointCell: { columnIndex, rowIndex },
               rowspan: cell.rowSpan || 1,
+              ...(cell.margin
+                ? {
+                    margin: [
+                      cell.margin.t * ratio,
+                      cell.margin.r * ratio,
+                      cell.margin.b * ratio,
+                      cell.margin.l * ratio,
+                    ] as [number, number, number, number],
+                  }
+                : {}),
               ...(structuredText ? { structuredText } : {}),
               style: {
                 ...baseStyle,
@@ -864,6 +1040,9 @@ export const convertParsedPptxPresentation = ({
             outline: { color: border?.borderColor || '#eeece1', style: (border?.borderType || 'solid') as 'dashed' | 'dotted' | 'solid', width: +((border?.borderWidth || 0) * ratio || 2).toFixed(2) },
             rotate: element.rotate ?? 0,
             rowHeights: element.rowHeights.map(height => height * ratio),
+            ...(element.tableProperties
+              ? { powerPointTable: structuredClone(element.tableProperties) }
+              : {}),
             top: element.top, type: 'table', width: element.width,
           })
           disposition = 'approximated'
@@ -916,6 +1095,25 @@ export const convertParsedPptxPresentation = ({
           options.showValue = element.showValue
           options.title = element.title || undefined
           options.valueAxisTitle = element.valueAxisTitle || undefined
+          if (element.chartSpace) {
+            const valueAxes = element.chartSpace.plotArea.axes.filter(axis => axis.kind === 'value')
+            if (valueAxes.length) {
+              options.valueAxes = valueAxes.map(axis => ({
+                id: axis.id,
+                ...(axis.scaling?.max !== undefined ? { maximumValue: axis.scaling.max } : {}),
+                ...(axis.scaling?.min !== undefined ? { minimumValue: axis.scaling.min } : {}),
+                ...(axis.numberFormat?.formatCode ? { numberFormat: axis.numberFormat.formatCode } : {}),
+                ...(axis.position ? { position: axis.position } : {}),
+                ...(axis.title ? { title: axis.title } : {}),
+              }))
+              const axisIndexById = new Map(valueAxes.map((axis, index) => [axis.id, index]))
+              options.seriesAxisIndexes = element.chartSpace.plotArea.families.flatMap(family => {
+                const valueAxisId = family.axisIds.find(id => axisIndexById.has(id))
+                const axisIndex = valueAxisId ? axisIndexById.get(valueAxisId) ?? 0 : 0
+                return family.series.map(() => axisIndex)
+              })
+            }
+          }
           const importedBarDirection = 'barDir' in element ? element.barDir : undefined
           // Chart families Mona has no equivalent for. They still import with
           // their retained series so the data stays visible and editable, but
@@ -999,6 +1197,16 @@ export const convertParsedPptxPresentation = ({
             left: element.left,
             rotate: 0,
             semanticType: 'diagram',
+            ...(element.resources
+              ? {
+                  powerPointDiagram: {
+                    ...structuredClone(element.resources),
+                    ...(element.semanticModel
+                      ? { model: structuredClone(element.semanticModel) }
+                      : {}),
+                  },
+                }
+              : {}),
             top: element.top,
             type: 'group',
             width: element.width,
@@ -1035,6 +1243,23 @@ export const convertParsedPptxPresentation = ({
           issue = {
             code: 'pptx.element.unsupported',
             message: `Unsupported PowerPoint element type: ${element.type}`,
+          }
+        }
+        const unsupportedEffects = sourceIdentity?.visual?.effects.filter(effect => (
+          !['outerShdw', 'solidFill'].includes(effect.type)
+        )) ?? []
+        if (
+          !issue
+          && sourceIdentity?.visual
+          && (unsupportedEffects.length || sourceIdentity.visual.hasScene3d || sourceIdentity.visual.hasShape3d)
+        ) {
+          issue = {
+            code: 'pptx.visual.approximated-effects',
+            message: `Native visual effects are retained but not fully rendered: ${[
+              ...new Set(unsupportedEffects.map(effect => effect.type)),
+              ...(sourceIdentity.visual.hasScene3d ? ['scene3d'] : []),
+              ...(sourceIdentity.visual.hasShape3d ? ['sp3d'] : []),
+            ].join(', ')}`,
           }
         }
         recordOutcome(element, resolvedSourceLayer, disposition, issue)

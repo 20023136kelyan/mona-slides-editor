@@ -1,22 +1,49 @@
-import type {
-  PPTElement,
-  PPTElementOutline,
-  PPTLineElement,
-  PresentationState,
-  ShapeText,
-  Slide,
+import {
+  powerPointCommentNoteId,
+  type Note,
+  type PPTChartElement,
+  type PPTElement,
+  type PPTElementOutline,
+  type PPTLineElement,
+  type PresentationState,
+  type ShapeText,
+  type Slide,
 } from '@mona/presentation-core'
 
 import type {
   PowerPointElementEntry,
+  PowerPointImageSnapshot,
+  PowerPointChartSnapshot,
   PowerPointConnectorSnapshot,
   PowerPointPatchOperation,
   PowerPointShapeStyleSnapshot,
+  PowerPointShapeGeometrySnapshot,
+  PowerPointTableSnapshot,
   PowerPointTextSnapshot,
   PowerPointTransformSnapshot,
   PowerPointWritebackIssue,
   PowerPointWritebackPlan,
 } from './types'
+import { parseAuthoredText } from './authored-text'
+
+const relationshipPartPath = (partPath: string): string => {
+  const slash = partPath.lastIndexOf('/')
+  const directory = slash < 0 ? '' : partPath.slice(0, slash + 1)
+  const fileName = slash < 0 ? partPath : partPath.slice(slash + 1)
+  return `${directory}_rels/${fileName}.rels`
+}
+
+const authoredHyperlinks = (content: string): Array<string | undefined> => (
+  parseAuthoredText(content).flatMap(paragraph => paragraph.runs.map(run => run.hyperlink))
+)
+
+const chartSnapshot = (element: PPTChartElement): PowerPointChartSnapshot => ({
+  ...(element.chartSpace ? { chartSpace: structuredClone(element.chartSpace) } : {}),
+  chartType: element.chartType,
+  data: structuredClone(element.data),
+  ...(element.options ? { options: structuredClone(element.options) } : {}),
+  themeColors: structuredClone(element.themeColors),
+})
 
 const textSnapshot = (
   element: PPTElement,
@@ -50,26 +77,51 @@ const textSnapshot = (
 const styleSnapshot = (element: PPTElement): PowerPointShapeStyleSnapshot | undefined => {
   if (element.type !== 'text' && element.type !== 'shape') return undefined
   return {
-    ...(element.type === 'shape'
-      ? {
-          complexFill: Boolean(
-            element.gradient
-            || element.pattern
-            || element.patternFit
-            || element.powerPointPattern,
-          ),
-        }
-      : {}),
     ...(element.fill !== undefined ? { fill: element.fill } : {}),
+    ...(element.type === 'shape' && element.gradient
+      ? { gradient: structuredClone(element.gradient) }
+      : {}),
     ...(element.outline ? { outline: structuredClone(element.outline) as PPTElementOutline } : {}),
+    ...(element.type === 'shape' && element.pattern !== undefined
+      ? { pattern: element.pattern }
+      : {}),
+    ...(element.type === 'shape' && element.patternFit
+      ? { patternFit: structuredClone(element.patternFit) }
+      : {}),
+    ...(element.type === 'shape' && element.powerPointPattern
+      ? { powerPointPattern: structuredClone(element.powerPointPattern) }
+      : {}),
   }
 }
+
+const shapeGeometrySnapshot = (
+  element: Extract<PPTElement, { type: 'shape' }>,
+): PowerPointShapeGeometrySnapshot => ({
+  ...(element.powerPointGeometry
+    ? { powerPointGeometry: structuredClone(element.powerPointGeometry) }
+    : {}),
+})
+
+const imageSnapshot = (
+  element: Extract<PPTElement, { type: 'image' }>,
+): PowerPointImageSnapshot => ({
+  ...(element.clip ? { clip: structuredClone(element.clip) } : {}),
+  ...(element.filters ? { filters: structuredClone(element.filters) } : {}),
+  ...(element.opacity !== undefined ? { opacity: element.opacity } : {}),
+  ...(element.outline ? { outline: structuredClone(element.outline) } : {}),
+  ...(element.powerPointImage
+    ? { powerPointImage: structuredClone(element.powerPointImage) }
+    : {}),
+  ...(element.shadow ? { shadow: structuredClone(element.shadow) } : {}),
+  src: element.src,
+})
 
 const connectorSnapshot = (element: PPTLineElement): PowerPointConnectorSnapshot => ({
   ...(element.broken ? { broken: structuredClone(element.broken) } : {}),
   ...(element.broken2 ? { broken2: structuredClone(element.broken2) } : {}),
   ...(element.broken2Direction ? { broken2Direction: element.broken2Direction } : {}),
   color: element.color,
+  ...(element.connections ? { connections: structuredClone(element.connections) } : {}),
   ...(element.cubic ? { cubic: structuredClone(element.cubic) } : {}),
   ...(element.curve ? { curve: structuredClone(element.curve) } : {}),
   end: structuredClone(element.end),
@@ -79,7 +131,73 @@ const connectorSnapshot = (element: PPTLineElement): PowerPointConnectorSnapshot
   style: element.style,
   top: element.top,
   width: element.width,
+  ...(element.powerPointGeometry
+    ? { powerPointGeometry: structuredClone(element.powerPointGeometry) }
+    : {}),
 })
+
+const tableSnapshot = (element: Extract<PPTElement, { type: 'table' }>): PowerPointTableSnapshot => ({
+  cellMinHeight: element.cellMinHeight,
+  colWidths: structuredClone(element.colWidths),
+  data: structuredClone(element.data),
+  outline: structuredClone(element.outline),
+  ...(element.powerPointTable
+    ? { powerPointTable: structuredClone(element.powerPointTable) }
+    : {}),
+  ...(element.rowHeights ? { rowHeights: structuredClone(element.rowHeights) } : {}),
+  ...(element.theme ? { theme: structuredClone(element.theme) } : {}),
+  width: element.width,
+})
+
+const tableTopologyIssues = (
+  element: Extract<PPTElement, { type: 'table' }>,
+  partPath: string,
+  slideId: string,
+): PowerPointWritebackIssue[] => {
+  const rows = element.data.length
+  const columns = element.data[0]?.length ?? 0
+  if (!rows || !columns || element.data.some(row => row.length !== columns)) {
+    return [unsupported(
+      'pptx.writeback.table-grid',
+      'A PowerPoint table must have a non-empty rectangular cell grid.',
+      { elementId: element.id, partPath, slideId },
+    )]
+  }
+  const covered = new Set<string>()
+  const issues: PowerPointWritebackIssue[] = []
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const cell = element.data[row]![column]!
+      const key = `${row}:${column}`
+      if (covered.has(key)) continue
+      const rowSpan = Math.max(1, Math.round(cell.rowspan || 1))
+      const columnSpan = Math.max(1, Math.round(cell.colspan || 1))
+      if (row + rowSpan > rows || column + columnSpan > columns) {
+        issues.push(unsupported(
+          'pptx.writeback.table-span',
+          `Table cell ${row + 1},${column + 1} spans outside the table grid.`,
+          { elementId: element.id, partPath, slideId },
+        ))
+        continue
+      }
+      for (let coveredRow = row; coveredRow < row + rowSpan; coveredRow += 1) {
+        for (let coveredColumn = column; coveredColumn < column + columnSpan; coveredColumn += 1) {
+          if (coveredRow === row && coveredColumn === column) continue
+          const coveredKey = `${coveredRow}:${coveredColumn}`
+          if (covered.has(coveredKey)) {
+            issues.push(unsupported(
+              'pptx.writeback.table-span-overlap',
+              'Merged table cells overlap and cannot be serialized safely.',
+              { elementId: element.id, partPath, slideId },
+            ))
+          }
+          covered.add(coveredKey)
+        }
+      }
+    }
+  }
+  return issues
+}
 
 const connectorAbsolutePoint = (
   connector: PowerPointConnectorSnapshot,
@@ -99,14 +217,8 @@ const connectorRoute = (connector: PowerPointConnectorSnapshot): unknown => ({
   broken2Direction: connector.broken2Direction,
   cubic: connector.cubic,
   curve: connector.curve,
+  powerPointGeometry: connector.powerPointGeometry,
 })
-
-const connectorIsStraight = (connector: PowerPointConnectorSnapshot): boolean => (
-  !connector.broken
-  && !connector.broken2
-  && !connector.curve
-  && !connector.cubic
-)
 
 const changed = (before: unknown, after: unknown): boolean => (
   JSON.stringify(before) !== JSON.stringify(after)
@@ -230,7 +342,7 @@ const compareSlideShell = (
   baseline: Slide,
   desired: Slide,
 ): PowerPointWritebackIssue[] => {
-  const ignored = new Set(['elements', 'id', 'source'])
+  const ignored = new Set(['background', 'elements', 'id', 'notes', 'remark', 'source'])
   const keys = [...new Set([
     ...Object.keys(baseline),
     ...Object.keys(desired),
@@ -252,6 +364,32 @@ const compareSlideShell = (
         )]
   ))
 }
+
+interface FlatNoteEntry {
+  content: string
+  id: string
+  parentId?: string
+  time: number
+  user: string
+}
+
+const flattenNotes = (notes: readonly Note[] | undefined): FlatNoteEntry[] => (
+  (notes ?? []).flatMap(note => [
+    {
+      content: note.content,
+      id: note.id,
+      time: note.time,
+      user: note.user,
+    },
+    ...(note.replies ?? []).map(reply => ({
+      content: reply.content,
+      id: reply.id,
+      parentId: note.id,
+      time: reply.time,
+      user: reply.user,
+    })),
+  ])
+)
 
 const comparePresentationShell = (
   baseline: PresentationState,
@@ -317,6 +455,102 @@ export const analyzePowerPointWriteback = (
     const desiredSlide = desiredByPart.get(partPath)
     if (!partPath || !desiredSlide) continue
     issues.push(...compareSlideShell(baselineSlide, desiredSlide))
+    if (changed(baselineSlide.background, desiredSlide.background)) {
+      if (desiredSlide.background?.type === 'image') {
+        issues.push(unsupported(
+          'pptx.writeback.background-image',
+          'Replacing a slide background image requires package asset and relationship allocation.',
+          { partPath, slideId: baselineSlide.id },
+        ))
+      }
+      else {
+        operations.push({
+          ...(desiredSlide.background ? { after: structuredClone(desiredSlide.background) } : {}),
+          ...(baselineSlide.background ? { before: structuredClone(baselineSlide.background) } : {}),
+          kind: 'background',
+          partPath,
+          slideId: baselineSlide.id,
+        })
+      }
+    }
+    if ((baselineSlide.remark ?? '') !== (desiredSlide.remark ?? '')) {
+      const notesPart = sourcePackage?.slides.find(slide => slide.slidePart === partPath)?.notesPart
+      if (!notesPart) {
+        issues.push(unsupported(
+          'pptx.writeback.notes-part',
+          'Adding speaker notes to a slide without a native notes part requires relationship-aware part allocation.',
+          { partPath, slideId: baselineSlide.id },
+        ))
+      }
+      else {
+        operations.push({
+          after: desiredSlide.remark ?? '',
+          before: baselineSlide.remark ?? '',
+          kind: 'notes',
+          notesPart,
+          partPath: notesPart,
+          ...(sourcePackage?.coordinateScale ? { scale: sourcePackage.coordinateScale } : {}),
+          slideId: baselineSlide.id,
+        })
+      }
+    }
+    if (JSON.stringify(baselineSlide.notes ?? []) !== JSON.stringify(desiredSlide.notes ?? [])) {
+      const sourceComments = sourcePackage?.document?.comments.filter(comment => (
+        comment.slidePart === partPath
+      )) ?? []
+      const sourceNoteIds = new Set(sourceComments.map(powerPointCommentNoteId))
+      const baselineNotes = flattenNotes(baselineSlide.notes)
+      const desiredNotes = flattenNotes(desiredSlide.notes)
+      const baselineByNoteId = new Map(baselineNotes.map(note => [note.id, note]))
+      const desiredByNoteId = new Map(desiredNotes.map(note => [note.id, note]))
+      const changesByPart = new Map<string, Array<{ after: string; before: string; id: string }>>()
+      for (const comment of sourceComments) {
+        const noteId = powerPointCommentNoteId(comment)
+        const beforeNote = baselineByNoteId.get(noteId)
+        const afterNote = desiredByNoteId.get(noteId)
+        if (!beforeNote || !afterNote) {
+          issues.push(unsupported(
+            'pptx.writeback.comment-structure',
+            'Adding, deleting, or reparenting imported PowerPoint comments is not writeback-safe yet.',
+            { partPath: comment.partPath, slideId: baselineSlide.id },
+          ))
+          continue
+        }
+        if (
+          beforeNote.parentId !== afterNote.parentId
+          || beforeNote.time !== afterNote.time
+          || beforeNote.user !== afterNote.user
+        ) {
+          issues.push(unsupported(
+            'pptx.writeback.comment-metadata',
+            'Changing a PowerPoint comment author, timestamp, or reply relationship is not writeback-safe yet.',
+            { partPath: comment.partPath, slideId: baselineSlide.id },
+          ))
+        }
+        if (beforeNote.content !== afterNote.content) {
+          const changes = changesByPart.get(comment.partPath) ?? []
+          changes.push({ after: afterNote.content, before: beforeNote.content, id: comment.id })
+          changesByPart.set(comment.partPath, changes)
+        }
+      }
+      const baselineLocal = baselineNotes.filter(note => !sourceNoteIds.has(note.id))
+      const desiredLocal = desiredNotes.filter(note => !sourceNoteIds.has(note.id))
+      if (JSON.stringify(baselineLocal) !== JSON.stringify(desiredLocal)) {
+        issues.push(unsupported(
+          'pptx.writeback.comment-structure',
+          'Adding or editing Mona comments inside an imported PowerPoint requires comment-author and relationship allocation.',
+          { partPath, slideId: baselineSlide.id },
+        ))
+      }
+      for (const [commentPart, changes] of changesByPart) {
+        operations.push({
+          changes,
+          kind: 'comments',
+          partPath: commentPart,
+          slideId: baselineSlide.id,
+        })
+      }
+    }
     const baselineTree = collectElements(baselineSlide)
     const desiredTree = collectElements(desiredSlide)
     const baselineByObject = new Map(
@@ -511,6 +745,21 @@ export const analyzePowerPointWriteback = (
         ))
         continue
       }
+      if (changed(beforeElement.accessibility, afterElement.accessibility)) {
+        operations.push({
+          ...(afterElement.accessibility
+            ? { after: structuredClone(afterElement.accessibility) }
+            : {}),
+          ...(beforeElement.accessibility
+            ? { before: structuredClone(beforeElement.accessibility) }
+            : {}),
+          elementId: afterElement.id,
+          kind: 'accessibility',
+          objectId,
+          partPath: source.sourcePart!,
+          slideId: baselineSlide.id,
+        })
+      }
       if (beforeElement.type === 'line' && afterElement.type === 'line') {
         const beforeConnector = connectorSnapshot(beforeElement)
         const afterConnector = connectorSnapshot(afterElement)
@@ -522,6 +771,10 @@ export const analyzePowerPointWriteback = (
         const endMoved = !pointEqual(beforeEnd, afterEnd)
         const routeChanged = changed(connectorRoute(beforeConnector), connectorRoute(afterConnector))
         const geometryChanged = startMoved || endMoved || routeChanged
+        const relationshipsChanged = changed(
+          beforeConnector.connections,
+          afterConnector.connections,
+        )
         const styleChanged = (
           !numberEqual(beforeConnector.width, afterConnector.width)
           || beforeConnector.color !== afterConnector.color
@@ -533,11 +786,14 @@ export const analyzePowerPointWriteback = (
           'broken',
           'broken2',
           'broken2Direction',
+          'accessibility',
           'color',
+          'connections',
           'cubic',
           'curve',
           'end',
           'points',
+          'powerPointGeometry',
           'shadow',
           'start',
           'style',
@@ -568,21 +824,11 @@ export const analyzePowerPointWriteback = (
           ))
         }
         if (
-          geometryChanged
-          && (!connectorIsStraight(beforeConnector) || !connectorIsStraight(afterConnector))
+          source.connector?.start
+          && startMoved
+          && JSON.stringify(afterConnector.connections?.start)
+            === JSON.stringify(source.connector.start)
         ) {
-          issues.push(unsupported(
-            'pptx.writeback.connector-route',
-            'Bent and curved connector route edits require an exact native adjustment serializer; their existing route is preserved for style-only edits.',
-            {
-              elementId: afterElement.id,
-              objectId,
-              partPath: source.sourcePart,
-              slideId: baselineSlide.id,
-            },
-          ))
-        }
-        if (source.connector?.start && startMoved) {
           issues.push(unsupported(
             'pptx.writeback.connector-start-relationship',
             'The connector start is attached to a PowerPoint shape. Move or detach that relationship explicitly before changing the endpoint.',
@@ -594,7 +840,12 @@ export const analyzePowerPointWriteback = (
             },
           ))
         }
-        if (source.connector?.end && endMoved) {
+        if (
+          source.connector?.end
+          && endMoved
+          && JSON.stringify(afterConnector.connections?.end)
+            === JSON.stringify(source.connector.end)
+        ) {
           issues.push(unsupported(
             'pptx.writeback.connector-end-relationship',
             'The connector end is attached to a PowerPoint shape. Move or detach that relationship explicitly before changing the endpoint.',
@@ -618,25 +869,39 @@ export const analyzePowerPointWriteback = (
             },
           ))
         }
-        if (geometryChanged && baselineEntry.parentObjectId) {
-          issues.push(unsupported(
-            'pptx.writeback.connector-group-transform',
-            'A connector inside a PowerPoint group uses the group coordinate space and cannot be moved safely until grouped connector transforms are modeled.',
-            {
-              elementId: afterElement.id,
-              objectId,
-              partPath: source.sourcePart,
-              slideId: baselineSlide.id,
-            },
-          ))
+        for (const [endpointName, endpoint] of Object.entries(
+          afterConnector.connections ?? {},
+        )) {
+          if (!endpoint) continue
+          const target = baselineByObject.get(endpoint.targetObjectId ?? '')
+          if (
+            !endpoint.nativeShapeId
+            || endpoint.siteIndex === undefined
+            || (endpoint.targetObjectId && !target)
+            || (target && target.element.source?.sourcePart !== source.sourcePart)
+          ) {
+            issues.push(unsupported(
+              'pptx.writeback.connector-relationship-target',
+              `The connector ${endpointName} attachment does not resolve to an exact shape and connection site in the same PowerPoint shape tree.`,
+              {
+                elementId: afterElement.id,
+                objectId,
+                partPath: source.sourcePart,
+                slideId: baselineSlide.id,
+              },
+            ))
+          }
         }
-        if (geometryChanged || styleChanged) {
+        if (geometryChanged || styleChanged || relationshipsChanged) {
           operations.push({
             after: afterConnector,
             before: beforeConnector,
             elementId: afterElement.id,
             kind: 'connector',
             objectId,
+            ...(baselineEntry.parentObjectId
+              ? { parentObjectId: baselineEntry.parentObjectId }
+              : {}),
             partPath: source.sourcePart!,
             ...(sourcePackage?.coordinateScale
               ? { scale: sourcePackage.coordinateScale }
@@ -646,13 +911,219 @@ export const analyzePowerPointWriteback = (
         }
         continue
       }
+      if (beforeElement.type === 'chart' && afterElement.type === 'chart') {
+        const beforeChart = chartSnapshot(beforeElement)
+        const afterChart = chartSnapshot(afterElement)
+        const chartChanged = changed(beforeChart, afterChart)
+        if (changed(beforeElement.chartSource, afterElement.chartSource)) {
+          issues.push(unsupported(
+            'pptx.writeback.chart-source',
+            'PowerPoint chart-part and workbook addresses are immutable source provenance.',
+            {
+              elementId: afterElement.id,
+              objectId,
+              partPath: source.sourcePart,
+              slideId: baselineSlide.id,
+            },
+          ))
+        }
+        if (chartChanged) {
+          const chartPart = beforeElement.chartSource?.partPath
+          if (!chartPart) {
+            issues.push(unsupported(
+              'pptx.writeback.chart-part',
+              'The imported chart has no exact native chart-part address.',
+              {
+                elementId: afterElement.id,
+                objectId,
+                partPath: source.sourcePart,
+                slideId: baselineSlide.id,
+              },
+            ))
+          }
+          else if (
+            beforeElement.chartSource?.externalWorkbook
+            && changed(beforeChart.data, afterChart.data)
+          ) {
+            issues.push(unsupported(
+              'pptx.writeback.chart-external-workbook',
+              'This chart links an external workbook. Mona will not overwrite linked data without an embedded source package.',
+              {
+                elementId: afterElement.id,
+                objectId,
+                partPath: chartPart,
+                slideId: baselineSlide.id,
+              },
+            ))
+          }
+          else {
+            operations.push({
+              after: afterChart,
+              before: beforeChart,
+              chartPart,
+              elementId: afterElement.id,
+              kind: 'chart',
+              objectId,
+              partPath: source.sourcePart!,
+              slideId: baselineSlide.id,
+              ...(beforeElement.chartSource?.workbookPart
+                ? { workbookPart: beforeElement.chartSource.workbookPart }
+                : {}),
+            })
+          }
+        }
+        if (hasTransformChange) {
+          operations.push({
+            after: after!,
+            before: before!,
+            elementId: afterElement.id,
+            kind: 'transform',
+            objectId,
+            partPath: source.sourcePart!,
+            slideId: baselineSlide.id,
+          })
+        }
+        continue
+      }
+      if (beforeElement.type === 'image' && afterElement.type === 'image') {
+        const beforeImage = imageSnapshot(beforeElement)
+        const afterImage = imageSnapshot(afterElement)
+        if (changed(beforeImage.src, afterImage.src)) {
+          issues.push(unsupported(
+            'pptx.writeback.image-replacement',
+            'Replacing native picture media requires allocating a package media part and relationship.',
+            {
+              elementId: afterElement.id,
+              objectId,
+              partPath: source.sourcePart,
+              slideId: baselineSlide.id,
+            },
+          ))
+        }
+        if (changed(beforeImage.powerPointImage, afterImage.powerPointImage)) {
+          issues.push(unsupported(
+            'pptx.writeback.image-source',
+            'Native picture relationship, media-part, and source crop provenance are immutable.',
+            {
+              elementId: afterElement.id,
+              objectId,
+              partPath: source.sourcePart,
+              slideId: baselineSlide.id,
+            },
+          ))
+        }
+        const supportedImageKeys = new Set([
+          'accessibility',
+          'clip',
+          'filters',
+          'opacity',
+          'outline',
+          'powerPointImage',
+          'shadow',
+          'src',
+        ])
+        const unsupportedImageKeys = contentKeys.filter(key => !supportedImageKeys.has(key))
+        if (unsupportedImageKeys.length) {
+          issues.push(unsupported(
+            'pptx.writeback.element-content',
+            `The imported image changed unsupported properties: ${unsupportedImageKeys.join(', ')}.`,
+            {
+              elementId: afterElement.id,
+              objectId,
+              partPath: source.sourcePart,
+              slideId: baselineSlide.id,
+            },
+          ))
+        }
+        if (changed(
+          { ...beforeImage, powerPointImage: undefined, src: undefined },
+          { ...afterImage, powerPointImage: undefined, src: undefined },
+        )) {
+          operations.push({
+            after: afterImage,
+            before: beforeImage,
+            elementId: afterElement.id,
+            kind: 'image',
+            objectId,
+            partPath: source.sourcePart!,
+            ...(sourcePackage?.coordinateScale
+              ? { scale: sourcePackage.coordinateScale }
+              : {}),
+            slideId: baselineSlide.id,
+          })
+        }
+        if (hasTransformChange) {
+          operations.push({
+            after: after!,
+            before: before!,
+            elementId: afterElement.id,
+            kind: 'transform',
+            objectId,
+            partPath: source.sourcePart!,
+            slideId: baselineSlide.id,
+          })
+        }
+        continue
+      }
+      if (beforeElement.type === 'table' && afterElement.type === 'table') {
+        const beforeTable = tableSnapshot(beforeElement)
+        const afterTable = tableSnapshot(afterElement)
+        const tableChanged = changed(beforeTable, afterTable)
+        if (tableChanged) {
+          issues.push(...tableTopologyIssues(afterElement, source.sourcePart!, baselineSlide.id))
+          if (changed(beforeTable.theme, afterTable.theme)) {
+            issues.push(unsupported(
+              'pptx.writeback.table-theme',
+              'Changing Mona table theme colors cannot be mapped to an exact PowerPoint table style ID.',
+              {
+                elementId: afterElement.id,
+                objectId,
+                partPath: source.sourcePart,
+                slideId: baselineSlide.id,
+              },
+            ))
+          }
+          operations.push({
+            after: afterTable,
+            before: beforeTable,
+            beforeWidth: beforeElement.width,
+            elementId: afterElement.id,
+            kind: 'table',
+            objectId,
+            partPath: source.sourcePart!,
+            ...(sourcePackage?.coordinateScale
+              ? { scale: sourcePackage.coordinateScale }
+              : {}),
+            slideId: baselineSlide.id,
+          })
+        }
+        if (hasTransformChange) {
+          operations.push({
+            after: after!,
+            before: before!,
+            elementId: afterElement.id,
+            kind: 'transform',
+            objectId,
+            partPath: source.sourcePart!,
+            slideId: baselineSlide.id,
+          })
+        }
+        continue
+      }
       const beforeText = textSnapshot(beforeElement)
       const afterText = textSnapshot(afterElement)
       const beforeStyle = styleSnapshot(beforeElement)
       const afterStyle = styleSnapshot(afterElement)
+      const beforeGeometry = beforeElement.type === 'shape'
+        ? shapeGeometrySnapshot(beforeElement)
+        : undefined
+      const afterGeometry = afterElement.type === 'shape'
+        ? shapeGeometrySnapshot(afterElement)
+        : undefined
       const hasTextChange = changed(beforeText, afterText)
       const hasStyleChange = changed(beforeStyle, afterStyle)
       const supportedKeys = new Set<string>()
+      supportedKeys.add('accessibility')
       if (beforeElement.type === 'text') {
         for (const key of [
           'columnGap',
@@ -679,27 +1150,17 @@ export const analyzePowerPointWriteback = (
           'pattern',
           'patternFit',
           'powerPointPattern',
+          'powerPointGeometry',
           'text',
         ]) supportedKeys.add(key)
       }
       const unsupportedKeys = contentKeys.filter(key => !supportedKeys.has(key))
-      if (beforeElement.type === 'shape' && afterElement.type === 'shape') {
-        const fillModeChanged = [
-          'fill',
-          'gradient',
-          'pattern',
-          'patternFit',
-          'powerPointPattern',
-        ].some(key => contentKeys.includes(key))
-        const desiredUsesComplexFill = Boolean(
-          afterElement.gradient
-          || afterElement.pattern
-          || afterElement.patternFit
-          || afterElement.powerPointPattern,
-        )
-        if (fillModeChanged && desiredUsesComplexFill) {
-          unsupportedKeys.push('gradient/pattern fill')
-        }
+      if (
+        beforeElement.type === 'shape'
+        && afterElement.type === 'shape'
+        && beforeElement.pattern !== afterElement.pattern
+      ) {
+        unsupportedKeys.push('picture-fill media replacement')
       }
       if (hasTextChange && (!beforeText || !afterText)) {
         unsupportedKeys.push('text body insertion/removal')
@@ -746,6 +1207,21 @@ export const analyzePowerPointWriteback = (
           slideId: baselineSlide.id,
         })
       }
+      if (
+        beforeGeometry
+        && afterGeometry
+        && changed(beforeGeometry, afterGeometry)
+      ) {
+        operations.push({
+          after: afterGeometry,
+          before: beforeGeometry,
+          elementId: afterElement.id,
+          kind: 'shape-geometry',
+          objectId,
+          partPath: source.sourcePart!,
+          slideId: baselineSlide.id,
+        })
+      }
       if (beforeElement.type === 'line' || afterElement.type === 'line') continue
       if (hasTransformChange) {
         operations.push({
@@ -765,7 +1241,18 @@ export const analyzePowerPointWriteback = (
     JSON.stringify(issue),
     issue,
   ])).values()]
-  const touchedParts = [...new Set(operations.map(operation => operation.partPath))].sort()
+  const touchedParts = [...new Set(operations.flatMap(operation => (
+    operation.kind === 'chart'
+      ? [operation.chartPart, ...(operation.workbookPart ? [operation.workbookPart] : [])]
+      : operation.kind === 'background' || operation.kind === 'notes' || operation.kind === 'comments'
+        ? [operation.partPath]
+        : operation.kind === 'text' && changed(
+            authoredHyperlinks(operation.before.content),
+            authoredHyperlinks(operation.after.content),
+          )
+          ? [operation.partPath, relationshipPartPath(operation.partPath)]
+      : [operation.partPath]
+  )))].sort()
   return {
     mode: dedupedIssues.length ? 'unsupported' : operations.length ? 'patch' : 'noop',
     operations,

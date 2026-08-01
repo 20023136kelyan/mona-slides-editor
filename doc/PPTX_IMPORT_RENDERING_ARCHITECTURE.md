@@ -4,8 +4,8 @@
 
 This document compares Mona's PPTist-derived presentation pipeline with
 ONLYOFFICE's presentation architecture and turns the comparison into an
-incremental implementation order. It covers import and rendering. Export is a
-later, independent phase.
+incremental implementation order. It covers import, rendering, and the
+source-preserving inverse serializers that now protect supported edits.
 
 The ONLYOFFICE comparison was made against `ONLYOFFICE/sdkjs` commit
 `72b0421c0bbf9d01eed9cf14834ae47eb2df1b50`. The code is used as an
@@ -40,11 +40,13 @@ areas are tracked in the matrix below:
   PowerPoint groups now retain local child coordinate trees, while `groupId`
   remains as the adapter for Mona-created legacy groups.
 - rich text becomes HTML.
-- charts become labels, legends, numeric series, a small chart-type union, and
-  two options.
-- equations become images.
-- diagrams now retain a semantic group root and nested drawing children,
-  although the complete SmartArt data/layout model is still future work.
+- charts retain native chart-space families, series, axes, caches, formulas,
+  options, workbook addresses, and theme overrides; the current editor adapter
+  intentionally exposes a smaller common subset.
+- equations retain OMML semantics beside their generated visual preview.
+- diagrams retain a semantic group root, nested drawing children, and their
+  data/layout/style/color/drawing resources; native SmartArt authoring remains
+  future work.
 - unsupported graphic frames now become source-backed opaque elements with a
   visible placeholder; unsupported-object coverage outside graphic frames is
   still incomplete.
@@ -254,6 +256,26 @@ The first compatibility foundation now exists:
     slide-local non-line object transforms/deletions, rich text, text-body
     layout, and solid fill/outline edits; every other mutation fails capability
     validation before provider write.
+40. Native tables retain and write back grid dimensions, row heights, merged
+    topology, banding/style flags, per-cell structured text, margins, fills,
+    vertical alignment, and per-side/diagonal borders.
+41. Native chart spaces retain families, series, caches, formulas, axes,
+    titles, legends, labels, external-data provenance, theme overrides, and
+    embedded workbook addresses. Supported edits patch caches and their
+    declared embedded-workbook ranges together.
+42. Existing speaker-notes and comments parts are modeled, shown through Mona's
+    notes/comment surfaces, and receive source-preserving text edits. Creating
+    new parts, authors, and threads remains relationship-allocation work.
+43. Alt text, accessibility title, decorative state, and hidden state are
+    editable semantic properties and write back through native nonvisual
+    drawing properties.
+44. External run hyperlinks can be added, removed, or retargeted with
+    collision-free relationship IDs. Unsupported internal/action links still
+    fail explicitly.
+45. Solid, gradient, and pattern slide-local backgrounds can be written over an
+    inherited background without modifying the shared layout or master.
+46. The dirty journal records the actual owner parts for chart/workbook,
+    notes, and comments edits instead of conservatively dirtying the slide.
 
 The backing store is deliberately independent of PptxGenJS. PptxGenJS is an
 export generator and cannot improve import fidelity. Mona-native generation now
@@ -312,9 +334,9 @@ Status in this table refers to Mona today:
 | A01 | Exact source package retention | Done | Persist the content-addressed backing store in the document-owned desktop recovery package, hydrate it on deck load, and garbage-collect unreferenced packages | Restarting the app produces the same SHA-256 and byte-for-byte package |
 | A02 | OPC part and relationship graph | Done | Replace the regex-only inventory reader with a namespace-aware XML/OPC reader; retain content types, internal/external relationships, and relationship IDs as indexed records | Every relationship target in the corpus resolves or produces a typed diagnostic |
 | A03 | Unknown and extension parts | Done for preservation | Keep every unrecognized part and relationship; add an `opaque` semantic record when an unknown object is referenced by a slide | Unknown parts survive and referenced unknown objects are reported rather than silently dropped |
-| A04 | Package safety and resource limits | Partial | Add decompressed-size, compression-ratio, XML-depth, entity, media-size, and per-part limits in addition to archive byte/part-count limits | Adversarial ZIP/XML fixtures fail safely without blocking the UI |
+| A04 | Package safety and resource limits | Done for configured limits | Archive, expanded-package, part, XML-part, part-count, compression-ratio, XML-depth, and entity/DOCTYPE limits are enforced; adversarial entity/depth cases are tested | Adversarial ZIP/XML fixtures fail safely without blocking the UI |
 | A05 | Import diagnostics | Done | Produce a structured per-package/per-slide report with preserved, modeled, approximated, opaque, and dropped counts | The report can prove that the dropped count is zero for a successful import |
-| A06 | Dirty-part journal | Partial | Track which OOXML semantic objects and package parts an edit changes; leave all other parts immutable | A one-element edit marks only its dependent parts dirty |
+| A06 | Dirty-part journal | Done for supported writeback | Track exact object parts plus chart/workbook, notes, and comment owner parts; leave all other parts immutable | A one-element edit marks only its dependent parts dirty |
 | A07 | Desktop ingestion and cancellation | Done | Run ZIP/XML parsing, conversion, and media writes in Electron main with operation-scoped cancellation and progress | Large-corpus import never blocks the renderer; cancellation prevents presentation commit and retained-package publication |
 | A08 | Stable package and object addressing | Done | Keep package hashes, part IDs, native shape IDs, creation IDs, and relationship IDs; carry `(part, cNvPr id)` through the maintained parser fork and refuse ambiguous identities | Reimporting the same file maps valid source objects to the same provenance keys; duplicate/malformed IDs receive a diagnostic rather than a false patch target |
 
@@ -322,7 +344,7 @@ Status in this table refers to Mona today:
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| B01 | First-class themes | Partial | Color schemes, script font schemes, format-scheme names, and color-map overrides are typed and rendered; add typed fill/line/effect schemes, extra color schemes, and theme overrides | A theme-only change updates dependent slides without rewriting their objects |
+| B01 | First-class themes | Partial | Color/font schemes, typed fill/line/effect/background matrices, extra color schemes, theme overrides, and color-map overrides are retained; add explicit theme editing and dependency invalidation | A theme-only change updates dependent slides without rewriting their objects |
 | B02 | Slide masters | Partial | Master background, shape tree, text-style levels, color map, placeholders, header/footer policy, and theme reference are stored once; complete structured style/effect inheritance | Master objects are stored once and used by every dependent layout |
 | B03 | Slide layouts | Partial | Layout records retain master reference, matching name/type, authored background, placeholder tree, visibility flags, and color-map overrides; remove the remaining parser compatibility adapter | Slides reference a layout instead of owning copied `layoutElements` |
 | B04 | Slide-to-layout-to-master graph | Done | Replace candidate paths with typed IDs and validated references; recover gracefully from broken relationships | Corpus slides resolve the same hierarchy as the OOXML relationship graph |
@@ -331,8 +353,8 @@ Status in this table refers to Mona today:
 | B07 | Slide backgrounds | Done for imported static backgrounds | Preserve authored solid, gradient, pattern, and picture backgrounds independently at slide/layout/master layers and resolve one effective background | Backgrounds render without converting patterns to white or losing transforms |
 | B08 | Presentation and slide properties | Partial | Model slide size, order, hidden state, sections, names, default text styles, custom shows, tags, and presentation/view properties | Nonvisual deck structure matches the source manifest |
 | B09 | Headers, footers, date, and slide numbers | Partial | Master policy and layout field placeholders render in inherited positions; add typed field content/date formats and explicit per-slide field editing | Dynamic/static footer fields display in the correct inherited position |
-| B10 | Notes hierarchy | Partial | Add notes masters and notes slides, relationships, placeholders, and rich note content; do not reduce notes to one string | Speaker notes and notes-page objects survive independently |
-| B11 | Comments and authors | Missing | Model modern/legacy comments, authors, replies, positions, timestamps, and relationships | Comment threads retain identity and slide/object anchoring |
+| B10 | Notes hierarchy | Done for preservation/model; partial editing | Notes masters/slides, relationships, placeholders, paragraphs/runs, and the editor remark adapter are retained; existing native notes bodies accept text edits | Speaker notes and notes-page objects survive independently |
+| B11 | Comments and authors | Partial | Modern/legacy comment records, authors, replies, positions, timestamps, and relationships are modeled; existing comment text is editable, while new authors/threads still require allocation | Comment threads retain identity and slide/object anchoring |
 
 The hierarchy model begins with:
 
@@ -352,17 +374,17 @@ only as a migration adapter while the renderer moves to the derived hierarchy.
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| C01 | Native nonvisual identity | Partial | Parse `cNvPr` IDs/names, creation IDs, descriptions, titles, hidden/print flags, locks, and extension metadata | Selection and later export address the original object identity |
+| C01 | Native nonvisual identity | Done for modeled drawing objects | Parse `cNvPr` IDs/names, creation IDs, relationship IDs, descriptions, titles, hidden/decorative state, locks, and visual-extension metadata; supported accessibility edits serialize back | Selection and export address the original object identity |
 | C02 | Native nested shape tree | Partial | Native groups, nested groups, diagram drawing children, and opaque graphic frames now form ordered trees; extend this to every content-part/object family | No object is flattened merely to fit `Slide.elements` |
 | C03 | Nested group transforms | Done for imported groups | Preserve parent/child coordinate spaces, `off/ext`, `chOff/chExt`, rotation, flips, locks, and recursive composition | Deeply nested group fixtures match reference bounds and hit-testing |
 | C04 | Z-order | Partial | Retain native tree order independently within master, layout, and slide layers | Overlapping objects match reference compositing order |
-| C05 | Preset and custom geometry | Partial | Preserve preset type, adjustments, guides, handles, connection sites, text rectangles, and custom paths | Adjustable and custom shapes remain editable without path approximation |
-| C06 | Connectors | Partial | Endpoint shape IDs/sites now survive import and source-preserving export; straight-line geometry, rotation/flip canonicalization, width, dash, solid color, and arrowheads write back natively. Add explicit attach/detach commands and exact bent/curved adjustment serializers. | Style edits retain connections; implicit endpoint detachment fails; straight geometry round-trips |
-| C07 | Fills | Partial | Model solid, scheme, gradient stops/paths, pattern, picture, transparency, tile/stretch, and color transforms | No gradient is averaged and no pattern is replaced with white |
+| C05 | Preset and custom geometry | Partial | Preset types and native adjustment values are retained and editable; custom paths remain source-preserved and explicitly reject unsafe preset replacement | Adjustable shapes remain native; custom geometry is never silently replaced |
+| C06 | Connectors | Done for supported native routes; partial breadth | Endpoint IDs/sites, explicit attach/detach, straight/bent/curved route controls, rotation/flip canonicalization, width, dash, color, and arrowheads write back natively; uncommon custom/effect cases remain explicit | Style edits retain connections; implicit endpoint detachment fails; supported routes round-trip |
+| C07 | Fills | Partial | Solid, native gradients, preset patterns, and retained picture-fill tile/stretch are modeled and write back; complete scheme transforms and picture-media replacement | No gradient is averaged and no pattern is replaced with white |
 | C08 | Lines | Partial | Model per-line width, dash, compound, cap, join, alignment, head/tail type and size, transparency, and theme references | Line styles match reference output at normal and zoomed scales |
 | C09 | Effects and 3D | Partial | Model shadows, glow, soft edges, reflection, bevel, scene/shape 3D, and effect inheritance; use explicit fallback for unsupported effects | Supported effects render; unsupported ones show a diagnostic/preview |
-| C10 | Hyperlinks and actions | Partial | Preserve web/file/email/slide links, action verbs, hover actions, sounds, and relationship IDs | Internal slide links and external links remain distinguishable |
-| C11 | Images and SVG | Partial | Preserve source media part, crop, shape mask, alpha/color transforms, DPI, SVG fallback, tiling, outline, and effects | Cropped/rotated/transformed images match source without destructive re-encoding |
+| C10 | Hyperlinks and actions | Partial | External run hyperlinks are preserved and support relationship-aware add/remove/retarget; complete internal slide links, element actions, hover actions, and sounds | Internal slide links and external links remain distinguishable |
+| C11 | Images and SVG | Partial | Source media part/relationship, crop/mask, opacity, luminance/saturation, outline, and outer shadow are retained and editable; complete media replacement, SVG fallback switching, and remaining transforms | Cropped/rotated/transformed images match source without destructive re-encoding |
 | C12 | Audio and video | Partial | Preserve media relationship, poster frame, trims, volume, looping, autoplay, and external media references | Static poster and supported playback metadata survive import |
 | C13 | OLE, ActiveX, 3D models, and unsupported objects | Partial | OLE previews and opaque graphic frames now retain identity, relationships, bounds, placeholder, and diagnostics; add typed coverage for ActiveX, 3D, and content parts | Unsupported objects remain visible and survive later export untouched |
 
@@ -374,11 +396,11 @@ only as a migration adapter while the renderer moves to the derived hierarchy.
 | D02 | Style cascade | Done for imported text and shapes | Extend the same compiler to table/chart/notes text and add dependency-aware invalidation | Theme font/color changes update all inheriting text |
 | D03 | Bullets and numbering | Partial | Retained and rendered: character/autonumber type, scheme/start, level, margins, indents, tabs, and 9-level styles. Add picture-bullet assets and exact marker font/color/size layout | Three-plus-level lists match numbering and indentation |
 | D04 | Paragraph layout | Partial | Retained and rendered: alignment, RTL, East Asian/Latin rules, line and before/after spacing, tabs, indents, and default run properties. Add Office-compatible line breaking and keep/widow behavior | Mixed-language paragraphs match reference line and paragraph breaks |
-| D05 | Text-body geometry | Partial | Retained and rendered: insets, columns/gap, wrap metadata, vertical anchor/writing, rotation metadata, and autofit mode. Add overflow, text warp, shape text rectangles, and exact vertical/rotated clipping | Vertical/column/rotated text uses the correct clipping and bounds |
+| D05 | Text-body geometry | Partial | Retained and rendered: insets, columns/gap, wrap metadata, vertical anchor/writing, rotation metadata, autofit mode, and native text-warp preset/adjustments. Add exact overflow, shape text rectangles, and vertical/rotated clipping | Vertical/column/rotated text uses the correct clipping and bounds |
 | D06 | Autofit and measurement | Partial | Imported shrink factors and line-spacing reduction render consistently; add dynamic no-fit/shrink/resize measurement with deterministic font metrics and invalidation | Text fits the same bounds at editor, thumbnail, and read-only scales |
 | D07 | Fonts and substitution | Partial | Theme/document/script fonts, language metadata, and supplemental mappings are retained, resolved, and preloaded. Add embedded fonts, deterministic missing-font substitution, and diagnostics | Missing fonts are reported and fallback is deterministic by script |
 | D08 | Text color/effects and WordArt | Partial | Preserve scheme colors/transforms, gradient/picture text fills, outlines, shadows, and text warp | Styled display text is not reduced to an averaged solid color |
-| D09 | Fields and links | Partial | Fields and run-level hyperlinks remain typed; slide numbers materialize from presentation order. Add dynamic date/time/header/footer/custom field evaluation and run-level actions | Field semantics remain distinct from their current displayed string |
+| D09 | Fields and links | Partial | Fields and run-level hyperlinks remain typed; slide numbers materialize from presentation order; external run links allocate/update relationships. Add dynamic date/time/header/footer/custom field evaluation and action links | Field semantics remain distinct from their current displayed string |
 
 HTML remains an editing-surface adapter until the rich-text editor consumes the
 structured model directly. It is not the PowerPoint source of truth.
@@ -387,14 +409,14 @@ structured model directly. It is not the PowerPoint source of truth.
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| E01 | Complete table grid | Partial | Preserve grid widths, row heights, cell spans, `hMerge`/`vMerge` continuations, banding, direction, and table style ID | Merged-cell topology and dimensions match the source |
-| E02 | Table cell semantics | Partial | Model per-side/inside borders, diagonal borders, fills, margins, vertical alignment, text body, and cell effects | Styled headers and asymmetric borders are retained per cell |
-| E03 | Chart-space model | Missing | Retain the chart part as typed chart-space: plot areas, chart families, series, axes, titles, legends, labels, layout, formatting, and extensions | Multiple chart types/axes/series do not collapse to the small Mona chart union |
-| E04 | Chart data sources | Missing | Preserve formulas, string/number caches, category/date/value axes, external data links, and embedded workbook relationships | Charts render from cached data and retain workbook/formula provenance |
-| E05 | Chart rendering | Partial | Add a renderer/adapter for the typed chart model with explicit fallback for unsupported chart features | Native bar/line/pie and multi-series fixtures visually match reference output |
-| E06 | Embedded workbooks | Missing | Retain workbook bytes and relationship graph; parse only the ranges needed for editing without rewriting the workbook | An unedited workbook remains byte-identical and an edited chart updates its declared range |
-| E07 | SmartArt/diagrams | Partial | Model diagram data/layout/style/colors/drawing parts and relationships; render semantic diagram or source preview | SmartArt is not silently converted into unrelated flat shapes |
-| E08 | Equations | Partial | Preserve OMML semantics plus generated preview; add a typed equation element instead of importing only an image | Equation source and visual preview both survive |
+| E01 | Complete table grid | Done for current table model | Grid widths, row heights, spans, merge continuations, banding/direction flags, and table style ID are retained and source-patched | Merged-cell topology and dimensions match the source |
+| E02 | Table cell semantics | Done for current table model; partial effects | Per-side/inside/diagonal borders, fills, margins, vertical alignment, and structured text are retained and editable; uncommon cell effects remain source-only | Styled headers and asymmetric borders are retained per cell |
+| E03 | Chart-space model | Partial | Typed chart-space retains plot families, series, axes, titles, legends, labels, options, formatting metadata, and extensions; Mona's editable chart adapter still exposes a smaller common subset | Multiple chart types/axes/series remain distinguishable in the native model |
+| E04 | Chart data sources | Done for cached/embedded sources; partial external links | Formulas, string/number caches, category/date/value axes, external-data provenance, and workbook relationships are retained | Charts render from cached data and retain workbook/formula provenance |
+| E05 | Chart rendering | Partial | The adapter renders supported combo series and primary/secondary value axes without collapsing assignments; uncommon families/options remain explicit fallbacks | Native bar/line/pie and multi-series fixtures visually match reference output |
+| E06 | Embedded workbooks | Done for supported chart ranges | Workbook bytes remain untouched on no-op export; edited chart data updates the declared worksheet ranges, dimensions, caches, and series headers together | An unedited workbook remains byte-identical and an edited chart updates its declared range |
+| E07 | SmartArt/diagrams | Partial | Diagram data/layout/style/color/drawing part addresses and relationships plus parsed semantic data are retained; drawing children render as a semantic group | SmartArt is not silently converted into unrelated flat shapes |
+| E08 | Equations | Partial | OMML is retained as a semantic tree beside the generated editable preview; native OMML editing remains future work | Equation source and visual preview both survive |
 | E09 | Embedded/linked objects | Partial | Embedded graphic frames without a semantic renderer are opaque objects with relationship provenance; add payload metadata and linked-state UI | Embedded content survives and external-link state is visible |
 
 ### F. Rendering, recalculation, and fidelity validation
@@ -404,22 +426,22 @@ structured model directly. It is not the PowerPoint source of truth.
 | F01 | Derived render graph | Done | Resolve effective theme/master/layout/slide nodes without mutating or duplicating source objects | Canvas receives a deterministic ordered render graph |
 | F02 | Dependency-aware invalidation | Missing | Add dirty flags/caches for theme, master, layout, slide, shape, text, chart, and asset dependencies | A theme/master edit recalculates only dependent objects |
 | F03 | Unified render geometry | Partial | Use the same transforms, bounds, clipping, and text metrics for canvas, thumbnails, read-only view, selection, snapping, and export previews | No selection jump or thumbnail/editor geometry divergence |
-| F04 | Static transitions and timing retention | Missing | Parse and retain transitions, builds, timing tree, triggers, targets, and media commands while initially rendering the static end state | Animation-bearing decks retain all static content and report retained playback data |
-| F05 | Accessibility and nonvisual data | Missing | Surface reading order, alt text, titles/descriptions, language, decorative/hidden state, and table headers | Accessibility metadata survives and reading order follows the shape tree |
+| F04 | Static transitions and timing retention | Done for preservation/model; playback pending | Slide/layout/master transition inheritance, builds, timing nodes, conditions, triggers, targets, and static end-state content are retained | Animation-bearing decks retain all static content and report retained playback data |
+| F05 | Accessibility and nonvisual data | Partial | Reading order, alt text/title/description, language, decorative/hidden state, and locks are retained; object accessibility edits write back. Add table-header authoring and a dedicated inspector | Accessibility metadata survives and reading order follows the shape tree |
 | F06 | Diagnostics and visible fallback | Partial | Opaque graphic frames render a bounded preview or neutral placeholder and expose their reason in the import report; extend the fallback to every unsupported object family | No referenced slide object disappears without a visible/reportable explanation |
 | F07 | Performance and memory | Partial | Keep parsing and conversion in the Electron main process; add lazy part decoding, asset deduplication, render caching, slide virtualization, and backing-store lifecycle | The 30+ slide stress deck stays within agreed import time/memory/interaction budgets without putting parser work in the renderer |
-| F08 | Reference rendering harness | Partial | Render source decks through PowerPoint/LibreOffice reference output and Mona at fixed dimensions; compare screenshots and structural manifests | Every compatibility slice adds deterministic visual and structural baselines |
+| F08 | Reference rendering harness | Partial | Mona screenshot/structural baselines and round-trip PPTX artifacts are deterministic; `pptx:reference-open` ZIP-validates them and converts through LibreOffice when a working executable is installed | Every compatibility slice adds deterministic visual and structural baselines |
 | F09 | Corpus coverage | Partial | Maintain native PowerPoint, Google Slides export, Keynote export, corporate master, design-heavy, tables/text, SmartArt, equations, RTL/CJK, 4:3, and stress fixtures | The matrix maps each row to at least one public or private fixture |
 
 ### G. Editing semantics required before export
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| G01 | Provenance-aware editing | Partial | Stable source identities, baseline comparison, and exact source-object routing are active for transforms/deletions and text/style writes; extend the property-level journal to each new inverse serializer | Editing an imported object does not detach unrelated source data |
+| G01 | Provenance-aware editing | Done for supported serializers | Stable identities, baseline comparison, exact object/part routing, and property/owner-part journaling cover every enabled inverse serializer; unsupported mutations fail before write | Editing an imported object does not detach unrelated source data |
 | G02 | Inherited-object editing | Missing | Implement explicit “edit master/layout” and copy-on-write slide overrides for inherited placeholders/shapes | A slide-local change does not mutate every slide sharing a master |
 | G03 | Agent command surface | Partial | Make agent tools operate on stable semantic IDs and typed properties rather than canvas approximations or comments | Agent edits produce the same commands as direct UI editing and remain undoable |
 | G04 | Unsupported-object protection | Partial | Source-backed slide-local transform/delete and text/simple-style writes are active and unsupported edits fail explicitly; add safe duplication/insertion and inherited/linked-part edit modes | Moving an opaque object changes its transform while retaining its source payload |
-| G05 | Undo/history boundaries | Partial | Keep package bytes and immutable source parts outside history; store only semantic edit commands and dirty-part references | Undo does not clone archives and restores the exact previous semantic state |
+| G05 | Undo/history boundaries | Done for current command model | Package bytes and immutable parts remain outside history; semantic commands and compact dirty references undo without archive cloning | Undo does not clone archives and restores the exact previous semantic state |
 
 ## Export architecture after import and rendering
 
@@ -440,10 +462,10 @@ Mona therefore needs two export paths:
 | --- | --- | --- | --- | --- |
 | X01 | Hybrid export coordinator | Partial | Full-deck, single-source standard export uses retained-package writeback; Mona-native and partial/raster exports use generation | Export path is explicit and testable |
 | X02 | Package patch writer | Partial | Exact no-ops return the retained archive; dirty slide XML is patched by source identity and every untouched package part remains byte-identical | Untouched parts remain byte-identical |
-| X03 | Semantic serializers | Partial | Slide-local transforms/deletions, straight-line geometry, connector style/arrowheads, rich text and paragraph/run formatting, text-body layout, and solid fill/outline serializers are implemented; add bent/curved routes, explicit connector attachment changes, hierarchy, tables, charts, notes, comments, timing, complex effects, assets, and relationships incrementally | Each completed import/model slice gains an inverse serializer |
+| X03 | Semantic serializers | Partial | Implemented: slide-local solid/gradient/pattern backgrounds; transforms/deletions; straight/bent/curved connectors and attachments; rich text/text-body/text warp; external run hyperlinks; shape fills/outlines/preset adjustments; picture crop/filters/outline/shadow; accessibility; full current table model; chart caches/options/colors plus embedded ranges; existing notes/comment text. Remaining: new assets/objects/slides, themes/masters/layouts, timing, and advanced effects | Each completed import/model slice gains an inverse serializer |
 | X04 | PptxGenJS upgrade and adapter | Complete | Mona-native generation uses PptxGenJS 4.0.1; imported decks never rely on it for source preservation | Existing export fixtures remain valid and new supported features improve |
-| X05 | Relationship/content-type repair | Missing | Allocate collision-free part names and relationship IDs and maintain `[Content_Types].xml` when insertion serializers arrive | PowerPoint opens output without repair warnings |
-| X06 | Round-trip harness | Partial | Public- and available private-corpus exact no-op tests, object/line geometry, connector relationship/style, delete/text/style re-import tests, editor-menu export, project-provider writeback, and packaged `mona://` smoke are active; add Office reference-open and visual round trips for each serializer | No-op export preserves untouched parts and edited output remains stable |
+| X05 | Relationship/content-type repair | Partial | External run hyperlinks allocate collision-free relationship IDs and create a relationships part when necessary; new media/object/slide parts still need coordinated content-type allocation | PowerPoint opens output without repair warnings |
+| X06 | Round-trip harness | Partial | Public/private exact no-op tests and serializer re-import tests cover the supported edit matrix; round-trip artifacts receive ZIP integrity checks and optional LibreOffice reference-open conversion. Add installed Office/LibreOffice visual comparison in CI | No-op export preserves untouched parts and edited output remains stable |
 
 ## Implementation order and release gates
 
@@ -478,7 +500,7 @@ now complete for ordinary text and shape bodies. The next text-layout work is:
 1. add deterministic Office-compatible font measurement, line breaking,
    overflow, shrink-text, and resize-shape behavior;
 2. complete picture bullets, exact marker styling, vertical/rotated clipping,
-   text warp, embedded fonts, and substitution diagnostics;
+   embedded fonts, and substitution diagnostics;
 3. reuse the same structured-text compiler for table cells, chart text, notes,
    and other content parts rather than introducing another HTML-only path.
 
@@ -487,7 +509,7 @@ not the long-term source of truth.
 
 ## Verified import and static-rendering gate
 
-The July 24, 2026 verification pass establishes the following:
+The August 1, 2026 verification pass establishes the following:
 
 - The five public corpus decks pass headless desktop-ingestion tests and
   structural renderer tests.
@@ -527,14 +549,29 @@ The July 24, 2026 verification pass establishes the following:
   master/layout/local inheritance, theme font/color resolution, relative line
   spacing, columns, and safe hyperlinks; core coverage verifies nested list
   structure, script-specific fonts, field materialization, and edit detachment.
+- The complete workspace test pass covers `528` tests: core `45`, ingestion
+  `15`, writeback `37`, web `361`, desktop `11`, agent `54`, and the remaining
+  project/document packages `5`. The full Electron suite covers `49` journeys;
+  two parallel-run timing flakes (a sub-pixel startup width and a development-
+  only Redux warning at `33 ms`) passed on an immediate serial rerun alongside
+  all four private fidelity decks.
+- Source-package round trips now cover native table topology/cell styles,
+  chart caches and embedded workbook ranges, chart colors/options, notes,
+  comment text, external hyperlink relationship allocation, accessibility,
+  picture treatments, complex shape fills, preset geometry, connectors, and
+  slide-local backgrounds.
+- `MONA_WRITE_PPTX_ROUNDTRIP_ARTIFACTS=1` emits deterministic edited decks to
+  `.artifacts/pptx-roundtrip/`. `npm run pptx:reference-open` validates their ZIP
+  packages and uses LibreOffice for PDF reference-open checks when a working
+  executable is installed. This workstation currently has only a broken
+  Homebrew launcher, so the LibreOffice conversion portion was reported as
+  skipped rather than counted as evidence.
 
 This is a strong static-rendering result for the current corpus, not a claim
 that the entire ECMA-376 presentation specification is complete. The remaining
 high-value compatibility work is still explicit in the matrix: deterministic
-PowerPoint text measurement/fitting and advanced text effects, a full native
-chart-space/workbook model, opaque coverage for unsupported object families
-beyond graphic frames, typed header/footer/date field content beyond the
-current resolved placeholders,
-notes/comments/timing semantics, advanced effects/3D, dependency-aware
-recalculation, and inverse serializers beyond the completed slide-local
-transform/delete plus rich-text/text-body/solid-style writeback slices.
+PowerPoint text measurement/fitting, advanced text/effect/3D rendering, opaque
+coverage beyond graphic frames, typed header/footer/date field content,
+dependency-aware recalculation, new media/object/slide insertion, explicit
+master/layout editing, full animation playback/editing, internal/action links,
+and installed reference-engine visual comparison.

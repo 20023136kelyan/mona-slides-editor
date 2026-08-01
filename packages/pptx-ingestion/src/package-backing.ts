@@ -2,6 +2,11 @@ import JSZip from 'jszip'
 import { XMLParser, XMLValidator } from 'fast-xml-parser'
 
 import type {
+  PowerPointBuild,
+  PowerPointComment,
+  PowerPointCommentAuthor,
+  PowerPointCustomShow,
+  PowerPointDocumentSemantics,
   PowerPointPackageManifest,
   PowerPointPackageIssue,
   PowerPointPackagePart,
@@ -12,15 +17,25 @@ import type {
   PowerPointHeaderFooterPolicy,
   PowerPointHierarchy,
   PowerPointMasterTextStyles,
+  PowerPointNotesMaster,
+  PowerPointNotesParagraph,
+  PowerPointNotesPlaceholder,
+  PowerPointNotesSlide,
+  PowerPointPresentationProperties,
   PowerPointTextStyleLevel,
   PowerPointSlideLayout,
   PowerPointSlideMaster,
   PowerPointSourceObjectIdentity,
   PowerPointSourceObjectKind,
   PowerPointSlideDependency,
+  PowerPointSlideTiming,
+  PowerPointSlideTransition,
+  PowerPointTimingCondition,
+  PowerPointTimingNode,
   PowerPointTheme,
   PowerPointThemeColor,
   PowerPointThemeFont,
+  PowerPointThemeStyleEntry,
   StructuredTextParagraphProperties,
   StructuredTextRunProperties,
 } from '@mona/presentation-core'
@@ -103,7 +118,7 @@ const classifyPart = (path: string): PowerPointPackagePartKind => {
   if (/^ppt\/slides\/slide\d+\.xml$/i.test(path)) return 'slide'
   if (/^ppt\/slideLayouts\/slideLayout\d+\.xml$/i.test(path)) return 'layout'
   if (/^ppt\/slideMasters\/slideMaster\d+\.xml$/i.test(path)) return 'master'
-  if (/^ppt\/theme\/theme\d+\.xml$/i.test(path)) return 'theme'
+  if (/^ppt\/theme\/(?:theme|themeOverride)\d+\.xml$/i.test(path)) return 'theme'
   if (/^ppt\/notes(?:Masters|Slides)\//i.test(path)) return 'notes'
   if (/^ppt\/comments?\//i.test(path)) return 'comments'
   if (/^ppt\/charts?\//i.test(path)) return 'chart'
@@ -340,6 +355,10 @@ const collectSourceObjects = (
           ? findFirstNode(nodeEntries(nonVisual).flatMap(([, nested]) => nested), 'creationId')
           : undefined
         const creationId = creationNode ? nodeAttributes(creationNode).id : undefined
+        const decorativeNode = nonVisual
+          ? findFirstNode(nodeEntries(nonVisual).flatMap(([, nested]) => nested), 'decorative')
+          : undefined
+        const decorativeValue = decorativeNode ? nodeAttributes(decorativeNode).val : undefined
         const placeholder = findFirstNode(nonVisualChildren, 'ph')
         const placeholderValues = placeholder ? nodeAttributes(placeholder) : {}
         const connectorProperties = kind === 'connector'
@@ -348,6 +367,20 @@ const collectSourceObjects = (
         const connectorChildren = connectorProperties
           ? childNodes(connectorProperties)
           : []
+        const lockNode = findFirstNode(nonVisualChildren, kind === 'group'
+          ? 'cNvGrpSpPr'
+          : kind === 'picture'
+            ? 'cNvPicPr'
+            : kind === 'connector'
+              ? 'cNvCxnSpPr'
+              : 'cNvSpPr')
+        const locks = Object.fromEntries(Object.entries(lockNode ? nodeAttributes(lockNode) : {}).flatMap(
+          ([name, value]) => (
+            name.startsWith('no')
+              ? [[name, value !== '0' && value !== 'false']]
+              : []
+          ),
+        ))
         const connectorEndpoint = (name: 'endCxn' | 'stCxn') => {
           const endpoint = findFirstNode(connectorChildren, name)
           const endpointValues = endpoint ? nodeAttributes(endpoint) : {}
@@ -360,8 +393,37 @@ const collectSourceObjects = (
         }
         const connectorStart = connectorEndpoint('stCxn')
         const connectorEnd = connectorEndpoint('endCxn')
+        const visualProperties = findDirectNode(children, ['grpSpPr', 'spPr'])
+        const visualChildren = visualProperties ? childNodes(visualProperties) : []
+        const effectContainer = findDirectNode(visualChildren, ['effectDag', 'effectLst'])
+        const effectKinds = new Set([
+          'alphaBiLevel', 'alphaCeiling', 'alphaFloor', 'alphaInv', 'alphaMod',
+          'alphaModFix', 'alphaOutset', 'alphaRepl', 'biLevel', 'blend', 'blur',
+          'clrChange', 'clrRepl', 'duotone', 'fill', 'fillOverlay', 'glow',
+          'grayscl', 'innerShdw', 'lum', 'outerShdw', 'prstShdw', 'reflection',
+          'relOff', 'softEdge', 'solidFill', 'tint', 'xfrm',
+        ])
+        const effects: Array<{ attributes: Record<string, string>; type: string }> = []
+        if (effectContainer) {
+          walkXml(childNodes(effectContainer), (effectTag, effectNode) => {
+            if (effectKinds.has(effectTag)) {
+              effects.push({ attributes: { ...nodeAttributes(effectNode) }, type: effectTag })
+            }
+          })
+        }
+        const hasScene3d = Boolean(findDirectNode(visualChildren, ['scene3d']))
+        const hasShape3d = Boolean(findDirectNode(visualChildren, ['sp3d']))
+        const relationshipIds = new Set<string>()
+        walkXml(children, (_childTag, childNode) => {
+          for (const [name, value] of Object.entries(nodeAttributes(childNode))) {
+            if (/^r:(?:embed|id|link)$/.test(name) && value) relationshipIds.add(value)
+          }
+        })
         objects.push({
           ...(creationId ? { creationId } : {}),
+          ...(decorativeValue !== undefined
+            ? { decorative: decorativeValue !== '0' && decorativeValue !== 'false' }
+            : {}),
           ...(connectorStart || connectorEnd
             ? {
                 connector: {
@@ -371,16 +433,24 @@ const collectSourceObjects = (
               }
             : {}),
           ...(values.descr ? { description: values.descr } : {}),
+          ...(values.hidden !== undefined
+            ? { hidden: values.hidden !== '0' && values.hidden !== 'false' }
+            : {}),
           kind,
+          ...(Object.keys(locks).length ? { locks } : {}),
           ...(values.name ? { name: values.name } : {}),
           nativeId,
           ...(parentStableId ? { parentStableId } : {}),
           partPath,
           ...(placeholderValues.idx ? { placeholderIndex: placeholderValues.idx } : {}),
           ...(placeholderValues.type ? { placeholderType: placeholderValues.type } : {}),
+          ...(relationshipIds.size ? { relationshipIds: [...relationshipIds].sort() } : {}),
           sourceIndex,
           stableId,
           ...(values.title ? { title: values.title } : {}),
+          ...(effects.length || hasScene3d || hasShape3d
+            ? { visual: { effects, hasScene3d, hasShape3d } }
+            : {}),
         })
         sourceIndex += 1
         visit(children, stableId)
@@ -439,6 +509,54 @@ const parseColorScheme = (node: OrderedXmlNode | undefined): PowerPointThemeColo
   return colors
 }
 
+const findAllNodes = (
+  nodes: OrderedXmlNode[],
+  expectedTag: string,
+): OrderedXmlNode[] => {
+  const matches: OrderedXmlNode[] = []
+  walkXml(nodes, (tag, node) => {
+    if (tag === expectedTag) matches.push(node)
+  })
+  return matches
+}
+
+const parseThemeStyleList = (
+  nodes: OrderedXmlNode[],
+  listTag: 'bgFillStyleLst' | 'effectStyleLst' | 'fillStyleLst' | 'lnStyleLst',
+): PowerPointThemeStyleEntry[] => {
+  const listNode = findFirstNode(nodes, listTag)
+  const listChildren = childNodes(listNode, listTag)
+  const styles: PowerPointThemeStyleEntry[] = []
+  for (const child of listChildren) {
+    for (const [sourceTag, children] of nodeEntries(child)) {
+      const colors: PowerPointThemeColor[] = []
+      walkXml(children, (tag, colorNode) => {
+        const type = tag === 'srgbClr'
+          ? 'srgb'
+          : tag === 'sysClr'
+            ? 'system'
+            : tag === 'schemeClr'
+              ? 'scheme'
+              : tag === 'prstClr'
+                ? 'preset'
+                : undefined
+        if (!type) return
+        const values = nodeAttributes(colorNode)
+        const value = type === 'system' ? values.lastClr ?? values.val : values.val ?? values.lastClr
+        if (value) colors.push({ name: tag, type, value })
+      })
+      styles.push({
+        attributes: nodeAttributes(child),
+        childTypes: children.flatMap(node => nodeEntries(node).map(([tag]) => localName(tag))),
+        colors,
+        index: styles.length,
+        kind: localName(sourceTag),
+      })
+    }
+  }
+  return styles
+}
+
 const parseThemeFont = (node: OrderedXmlNode | undefined): PowerPointThemeFont | undefined => {
   if (!node) return undefined
   const children = childNodes(node)
@@ -476,11 +594,24 @@ const parseTheme = (
   const minorFontNode = findFirstNode(nodes, 'minorFont')
   const majorFont = parseThemeFont(majorFontNode)
   const minorFont = parseThemeFont(minorFontNode)
+  const extraColorSchemes = findAllNodes(nodes, 'extraClrScheme').map(node => {
+    const colorScheme = findFirstNode(childNodes(node, 'extraClrScheme'), 'clrScheme')
+    return {
+      colors: parseColorScheme(colorScheme),
+      name: colorScheme ? nodeAttributes(colorScheme).name : undefined,
+    }
+  })
   return {
+    backgroundFillStyles: parseThemeStyleList(nodes, 'bgFillStyleLst'),
     colorSchemeName: findFirstAttributes(nodes, 'clrScheme').name,
     colors,
+    ...(extraColorSchemes.length ? { extraColorSchemes } : {}),
+    effectStyles: parseThemeStyleList(nodes, 'effectStyleLst'),
+    fillStyles: parseThemeStyleList(nodes, 'fillStyleLst'),
     formatSchemeName: findFirstAttributes(nodes, 'fmtScheme').name,
     id: stablePartId(packageId, partPath),
+    isOverride: /\/themeOverride\d+\.xml$/i.test(partPath),
+    lineStyles: parseThemeStyleList(nodes, 'lnStyleLst'),
     ...(majorFont ? { majorFont } : {}),
     majorLatinFont: majorFont?.latin,
     ...(minorFont ? { minorFont } : {}),
@@ -828,6 +959,7 @@ const buildSlideDependencies = async (
     const layoutPart = findInternalTarget(relationships, slide.slidePart, 'slideLayout')
     const masterPart = findInternalTarget(relationships, layoutPart, 'slideMaster')
     const themePart = findInternalTarget(relationships, masterPart, 'theme')
+    const notesPart = findInternalTarget(relationships, slide.slidePart, 'notesSlide')
     const nodes = parseXml(await readXmlPart(slide.slidePart), slide.slidePart)
     const root = findFirstAttributes(nodes, 'sld')
     const colorMapOverride = parseColorMap(nodes, 'overrideClrMapping')
@@ -836,11 +968,422 @@ const buildSlideDependencies = async (
       ...(colorMapOverride ? { colorMapOverride } : {}),
       layoutPart,
       masterPart,
+      notesPart,
       showMasterPlaceholderAnimations: parseBooleanAttribute(root.showMasterPhAnim, true),
       showMasterShapes: parseBooleanAttribute(root.showMasterSp, true),
       themePart,
     }
   }))
+}
+
+const descendantText = (nodes: readonly OrderedXmlNode[]): string => {
+  let value = ''
+  for (const node of nodes) {
+    const text = node['#text']
+    if (typeof text === 'string') value += text
+    for (const [, children] of nodeEntries(node)) value += descendantText(children)
+  }
+  return value
+}
+
+const textParagraphs = (textBody: OrderedXmlNode | undefined): PowerPointNotesParagraph[] => {
+  if (!textBody) return []
+  const paragraphs: PowerPointNotesParagraph[] = []
+  for (const paragraph of childNodes(textBody).filter(node => (
+    localName(nodeEntries(node)[0]?.[0] ?? '') === 'p'
+  ))) {
+    const paragraphChildren = childNodes(paragraph)
+    const paragraphProperties = findDirectNode(paragraphChildren, ['pPr'])
+    const paragraphValues = paragraphProperties ? nodeAttributes(paragraphProperties) : {}
+    const runs: PowerPointNotesParagraph['runs'] = []
+    for (const run of paragraphChildren) {
+      const kind = localName(nodeEntries(run)[0]?.[0] ?? '')
+      if (kind === 'br') {
+        runs.push({ text: '\n' })
+        continue
+      }
+      if (kind === 'tab') {
+        runs.push({ text: '\t' })
+        continue
+      }
+      if (kind !== 'r' && kind !== 'fld') continue
+      const runChildren = childNodes(run)
+      const runProperties = findDirectNode(runChildren, ['rPr'])
+      const values = runProperties ? nodeAttributes(runProperties) : {}
+      const font = runProperties
+        ? findFirstAttributes(childNodes(runProperties), 'latin').typeface
+        : undefined
+      const textNode = findDirectNode(runChildren, ['t'])
+      runs.push({
+        ...(values.b !== undefined ? { bold: parseBooleanAttribute(values.b, false) } : {}),
+        ...(font ? { fontFamily: font } : {}),
+        ...(values.sz && Number.isFinite(Number(values.sz)) ? { fontSize: Number(values.sz) / 100 } : {}),
+        ...(values.i !== undefined ? { italic: parseBooleanAttribute(values.i, false) } : {}),
+        ...(values.lang ? { language: values.lang } : {}),
+        text: textNode ? descendantText(childNodes(textNode)) : '',
+        ...(values.u ? { underline: values.u } : {}),
+      })
+    }
+    const endProperties = findDirectNode(paragraphChildren, ['endParaRPr'])
+    if (!runs.length && endProperties) runs.push({ text: '' })
+    paragraphs.push({
+      ...(paragraphValues.algn ? { alignment: paragraphValues.algn } : {}),
+      ...(paragraphValues.lvl && Number.isFinite(Number(paragraphValues.lvl))
+        ? { level: Number(paragraphValues.lvl) }
+        : {}),
+      runs,
+    })
+  }
+  return paragraphs
+}
+
+const parseNotesPlaceholders = (nodes: OrderedXmlNode[]): PowerPointNotesPlaceholder[] => {
+  const placeholders: PowerPointNotesPlaceholder[] = []
+  const visit = (children: OrderedXmlNode[]): void => {
+    for (const node of children) {
+      const tag = localName(nodeEntries(node)[0]?.[0] ?? '')
+      if (tag !== 'sp') {
+        visit(childNodes(node))
+        continue
+      }
+      const shapeChildren = childNodes(node)
+      const nonVisual = findFirstNode(shapeChildren, 'cNvPr')
+      const placeholder = findFirstNode(shapeChildren, 'ph')
+      const nonVisualValues = nonVisual ? nodeAttributes(nonVisual) : {}
+      const placeholderValues = placeholder ? nodeAttributes(placeholder) : {}
+      if (nonVisualValues.id) {
+        placeholders.push({
+          nativeShapeId: nonVisualValues.id,
+          paragraphs: textParagraphs(findDirectNode(shapeChildren, ['txBody'])),
+          ...(placeholderValues.idx !== undefined ? { placeholderIndex: placeholderValues.idx } : {}),
+          ...(placeholderValues.type ? { placeholderType: placeholderValues.type } : {}),
+        })
+      }
+      visit(shapeChildren)
+    }
+  }
+  visit(nodes)
+  return placeholders
+}
+
+const parsePresentationProperties = (nodes: OrderedXmlNode[]): PowerPointPresentationProperties => {
+  const presentation = findFirstAttributes(nodes, 'presentation')
+  const slideSize = findFirstAttributes(nodes, 'sldSz')
+  const integer = (value: string | undefined): number | undefined => {
+    const result = Number(value)
+    return Number.isFinite(result) ? result : undefined
+  }
+  return {
+    ...(integer(presentation.firstSlideNum) !== undefined
+      ? { firstSlideNumber: integer(presentation.firstSlideNum) }
+      : {}),
+    ...(presentation.rtl !== undefined
+      ? { rightToLeft: parseBooleanAttribute(presentation.rtl, false) }
+      : {}),
+    ...(presentation.showSpecialPlsOnTitleSld !== undefined
+      ? { showSpecialPlaceholdersOnTitleSlide: parseBooleanAttribute(presentation.showSpecialPlsOnTitleSld, true) }
+      : {}),
+    ...(integer(slideSize.cy) !== undefined ? { slideHeightEmu: integer(slideSize.cy) } : {}),
+    ...(integer(slideSize.cx) !== undefined ? { slideWidthEmu: integer(slideSize.cx) } : {}),
+    ...(presentation.strictFirstAndLastChars !== undefined
+      ? { strictFirstAndLastChars: parseBooleanAttribute(presentation.strictFirstAndLastChars, false) }
+      : {}),
+  }
+}
+
+const parseSections = (nodes: OrderedXmlNode[]) => {
+  const sections: PowerPointDocumentSemantics['sections'] = []
+  walkXml(nodes, (tag, node, children) => {
+    if (tag !== 'section') return
+    const values = nodeAttributes(node)
+    if (!values.id) return
+    const slideIds: string[] = []
+    walkXml(children, (childTag, child) => {
+      if (childTag !== 'sldId') return
+      const id = nodeAttributes(child).id
+      if (id) slideIds.push(id)
+    })
+    sections.push({ id: values.id, ...(values.name ? { name: values.name } : {}), slideIds })
+  })
+  return sections
+}
+
+const parseCustomShows = (nodes: OrderedXmlNode[]): PowerPointCustomShow[] => {
+  const shows: PowerPointCustomShow[] = []
+  walkXml(nodes, (tag, node, children) => {
+    if (tag !== 'custShow') return
+    const values = nodeAttributes(node)
+    if (!values.name) return
+    const relationshipIds: string[] = []
+    walkXml(children, (childTag, child) => {
+      if (childTag !== 'sld') return
+      const relationshipId = nodeAttributes(child)['r:id']
+      if (relationshipId) relationshipIds.push(relationshipId)
+    })
+    shows.push({
+      ...(values.id ? { id: values.id } : {}),
+      name: values.name,
+      relationshipIds,
+    })
+  })
+  return shows
+}
+
+const transitionFrom = (
+  nodes: OrderedXmlNode[],
+  sourceLayer: PowerPointSlideTransition['sourceLayer'],
+): PowerPointSlideTransition | undefined => {
+  const transition = findFirstNode(nodes, 'transition')
+  if (!transition) return undefined
+  const values = nodeAttributes(transition)
+  const children = childNodes(transition)
+  const effectNode = children.find(node => !['sndAc', 'extLst'].includes(
+    localName(nodeEntries(node)[0]?.[0] ?? ''),
+  ))
+  const effectTag = effectNode ? localName(nodeEntries(effectNode)[0]?.[0] ?? '') : undefined
+  const duration = Object.entries(values).find(([key]) => localName(key) === 'dur')?.[1]
+  const sound = findFirstNode(children, 'snd')
+  const soundId = sound ? nodeAttributes(sound)['r:embed'] ?? nodeAttributes(sound)['r:link'] : undefined
+  return {
+    ...(values.advTm && Number.isFinite(Number(values.advTm)) ? { advanceAfterMs: Number(values.advTm) } : {}),
+    ...(values.advClick !== undefined ? { advanceOnClick: parseBooleanAttribute(values.advClick, true) } : {}),
+    ...(duration && Number.isFinite(Number(duration)) ? { durationMs: Number(duration) } : {}),
+    ...(effectNode && effectTag
+      ? { effect: { attributes: { ...nodeAttributes(effectNode) }, type: effectTag } }
+      : {}),
+    ...(soundId ? { soundRelationshipId: soundId } : {}),
+    ...(values.spd ? { speed: values.spd } : {}),
+    sourceLayer,
+  }
+}
+
+const timingTarget = (
+  nodes: OrderedXmlNode[],
+  objectByNativeId: Map<string, string>,
+): { targetObjectId?: string; targetShapeId?: string } => {
+  const target = findFirstNode(nodes, 'spTgt')
+  const targetShapeId = target ? nodeAttributes(target).spid : undefined
+  return targetShapeId
+    ? {
+        ...(objectByNativeId.get(targetShapeId)
+          ? { targetObjectId: objectByNativeId.get(targetShapeId) }
+          : {}),
+        targetShapeId,
+      }
+    : {}
+}
+
+const timingConditions = (
+  nodes: OrderedXmlNode[],
+  objectByNativeId: Map<string, string>,
+): PowerPointTimingCondition[] => {
+  const conditions: PowerPointTimingCondition[] = []
+  for (const node of nodes) {
+    const tag = localName(nodeEntries(node)[0]?.[0] ?? '')
+    if (tag === 'cond') {
+      const values = nodeAttributes(node)
+      const target = timingTarget(childNodes(node), objectByNativeId)
+      conditions.push({
+        ...(values.delay ? { delay: values.delay } : {}),
+        ...(values.evt ? { event: values.evt } : {}),
+        ...(values['r:id'] ? { relationshipId: values['r:id'] } : {}),
+        ...target,
+      })
+    }
+    conditions.push(...timingConditions(childNodes(node), objectByNativeId))
+  }
+  return conditions
+}
+
+const timingNodeFrom = (
+  node: OrderedXmlNode,
+  objectByNativeId: Map<string, string>,
+): PowerPointTimingNode => {
+  const tag = localName(nodeEntries(node)[0]?.[0] ?? '')
+  const children = childNodes(node)
+  const values = { ...nodeAttributes(node) }
+  const conditions = timingConditions(children.filter(child => (
+    ['endCondLst', 'stCondLst'].includes(localName(nodeEntries(child)[0]?.[0] ?? ''))
+  )), objectByNativeId)
+  const target = timingTarget(children, objectByNativeId)
+  return {
+    attributes: values,
+    children: children
+      .filter(child => !['bldLst', 'endCondLst', 'stCondLst', 'tgtEl'].includes(
+        localName(nodeEntries(child)[0]?.[0] ?? ''),
+      ))
+      .map(child => timingNodeFrom(child, objectByNativeId)),
+    ...(conditions.length ? { conditions } : {}),
+    ...(values.id ? { id: values.id } : {}),
+    nodeType: tag,
+    ...target,
+  }
+}
+
+const slideTimingFrom = (
+  slidePart: string,
+  slideNodes: OrderedXmlNode[],
+  transition: PowerPointSlideTransition | undefined,
+  objects: PowerPointSourceObjectIdentity[],
+): PowerPointSlideTiming | undefined => {
+  const timing = findFirstNode(slideNodes, 'timing')
+  if (!timing && !transition) return undefined
+  const objectByNativeId = new Map(objects
+    .filter(object => object.partPath === slidePart)
+    .map(object => [object.nativeId, object.stableId]))
+  const timingChildren = timing ? childNodes(timing) : []
+  const builds: PowerPointBuild[] = []
+  const buildList = timing ? findFirstNode(timingChildren, 'bldLst') : undefined
+  if (buildList) {
+    for (const build of childNodes(buildList)) {
+      const values = { ...nodeAttributes(build) }
+      const targetShapeId = values.spid
+      builds.push({
+        attributes: values,
+        kind: localName(nodeEntries(build)[0]?.[0] ?? ''),
+        ...(targetShapeId && objectByNativeId.get(targetShapeId)
+          ? { targetObjectId: objectByNativeId.get(targetShapeId) }
+          : {}),
+        ...(targetShapeId ? { targetShapeId } : {}),
+      })
+    }
+  }
+  const timeNodeList = timing ? findFirstNode(timingChildren, 'tnLst') : undefined
+  return {
+    builds,
+    roots: timeNodeList
+      ? childNodes(timeNodeList).map(node => timingNodeFrom(node, objectByNativeId))
+      : [],
+    slidePart,
+    ...(transition ? { transition } : {}),
+  }
+}
+
+const buildDocumentSemantics = async ({
+  objects,
+  parts,
+  presentationNodes,
+  readXmlPart,
+  relationships,
+  slides,
+}: {
+  objects: PowerPointSourceObjectIdentity[]
+  parts: PowerPointPackagePart[]
+  presentationNodes: OrderedXmlNode[]
+  readXmlPart: (path: string) => Promise<string>
+  relationships: PowerPointRelationship[]
+  slides: PowerPointSlideDependency[]
+}): Promise<PowerPointDocumentSemantics> => {
+  const notesMasterParts = parts.filter(part => /^ppt\/notesMasters\/[^/]+\.xml$/i.test(part.path))
+  const notesSlideParts = parts.filter(part => /^ppt\/notesSlides\/[^/]+\.xml$/i.test(part.path))
+  const notesMasters: PowerPointNotesMaster[] = await Promise.all(notesMasterParts.map(async part => {
+    const nodes = parseXml(await readXmlPart(part.path), part.path)
+    return {
+      objectIds: objects.filter(object => object.partPath === part.path).map(object => object.stableId),
+      partPath: part.path,
+      placeholders: parseNotesPlaceholders(nodes),
+      ...(findInternalTarget(relationships, part.path, 'theme')
+        ? { themePart: findInternalTarget(relationships, part.path, 'theme') }
+        : {}),
+    }
+  }))
+  const notesSlides: PowerPointNotesSlide[] = []
+  for (const part of notesSlideParts) {
+    const slidePart = relationships.find(relationship => (
+      !relationship.external
+      && relationship.sourcePart === part.path
+      && relationshipKind(relationship) === 'slide'
+    ))?.target ?? slides.find(slide => slide.notesPart === part.path)?.slidePart
+    if (!slidePart) continue
+    const nodes = parseXml(await readXmlPart(part.path), part.path)
+    notesSlides.push({
+      ...(findInternalTarget(relationships, part.path, 'notesMaster')
+        ? { masterPart: findInternalTarget(relationships, part.path, 'notesMaster') }
+        : {}),
+      objectIds: objects.filter(object => object.partPath === part.path).map(object => object.stableId),
+      partPath: part.path,
+      placeholders: parseNotesPlaceholders(nodes),
+      slidePart,
+    })
+  }
+
+  const commentAuthors: PowerPointCommentAuthor[] = []
+  const authorParts = parts.filter(part => /(?:commentAuthors|persons)\.xml$/i.test(part.path))
+  for (const part of authorParts) {
+    const nodes = parseXml(await readXmlPart(part.path), part.path)
+    walkXml(nodes, (tag, node) => {
+      if (!['author', 'cmAuthor', 'person'].includes(tag)) return
+      const values = nodeAttributes(node)
+      const id = values.id ?? values.authorId
+      if (!id) return
+      const lastIndex = Number(values.lastIdx)
+      commentAuthors.push({
+        id,
+        ...(values.initials ? { initials: values.initials } : {}),
+        ...(Number.isFinite(lastIndex) ? { lastIndex } : {}),
+        ...(values.name || values.displayName ? { name: values.name ?? values.displayName } : {}),
+        ...(values.providerId ? { providerId: values.providerId } : {}),
+        ...(values.userId ? { userId: values.userId } : {}),
+      })
+    })
+  }
+
+  const comments: PowerPointComment[] = []
+  const commentParts = parts.filter(part => /ppt\/(?:comments|modernComments)\//i.test(part.path) && part.path.endsWith('.xml'))
+  for (const part of commentParts) {
+    const nodes = parseXml(await readXmlPart(part.path), part.path)
+    const slidePart = relationships.find(relationship => (
+      !relationship.external
+      && relationship.target === part.path
+      && relationshipKind(relationship).toLowerCase().includes('comment')
+    ))?.sourcePart
+    walkXml(nodes, (tag, node, children) => {
+      if (!['cm', 'comment'].includes(tag)) return
+      const values = nodeAttributes(node)
+      const id = values.id ?? values.idx
+      if (!id) return
+      const position = findFirstNode(children, 'pos')
+      const positionValues = position ? nodeAttributes(position) : {}
+      const x = Number(positionValues.x)
+      const y = Number(positionValues.y)
+      const textNode = findFirstNode(children, 'text') ?? findFirstNode(children, 't')
+      comments.push({
+        ...(values.authorId ? { authorId: values.authorId } : {}),
+        ...(values.dt || values.created ? { createdAt: values.dt ?? values.created } : {}),
+        id,
+        ...(values.parentId ? { parentId: values.parentId } : {}),
+        partPath: part.path,
+        ...(Number.isFinite(x) && Number.isFinite(y) ? { position: { x, y } } : {}),
+        ...(slidePart ? { slidePart } : {}),
+        ...(values.status ? { status: values.status } : {}),
+        text: textNode ? descendantText(childNodes(textNode)) : descendantText(children),
+      })
+    })
+  }
+
+  const timings: PowerPointSlideTiming[] = []
+  for (const slide of slides) {
+    const slideNodes = parseXml(await readXmlPart(slide.slidePart), slide.slidePart)
+    let transition = transitionFrom(slideNodes, 'slide')
+    if (!transition && slide.layoutPart) {
+      transition = transitionFrom(parseXml(await readXmlPart(slide.layoutPart), slide.layoutPart), 'layout')
+    }
+    if (!transition && slide.masterPart) {
+      transition = transitionFrom(parseXml(await readXmlPart(slide.masterPart), slide.masterPart), 'master')
+    }
+    const timing = slideTimingFrom(slide.slidePart, slideNodes, transition, objects)
+    if (timing) timings.push(timing)
+  }
+  return {
+    commentAuthors,
+    comments,
+    customShows: parseCustomShows(presentationNodes),
+    notesMasters,
+    notesSlides,
+    properties: parsePresentationProperties(presentationNodes),
+    sections: parseSections(presentationNodes),
+    timings,
+  }
 }
 
 const buildPackageIssues = (
@@ -995,6 +1538,14 @@ export const createPowerPointPackageBacking = async (
     readXmlPart,
     relationships,
   })
+  const document = await buildDocumentSemantics({
+    objects,
+    parts,
+    presentationNodes: parseXml(presentationXml, 'ppt/presentation.xml'),
+    readXmlPart,
+    relationships,
+    slides: slideDependencies,
+  })
   const slides = slideDependencies.map(slide => ({
     ...slide,
     layoutId: slide.layoutPart ? stablePartId(packageId, slide.layoutPart) : undefined,
@@ -1003,6 +1554,7 @@ export const createPowerPointPackageBacking = async (
   }))
   const reference: PowerPointPackageReference = {
     byteLength: sourceCopy.byteLength,
+    document,
     fileName,
     hierarchy,
     kind: 'pptx',
