@@ -1,5 +1,5 @@
 import type { PPTElement, PPTShapeElement, PPTTableElement, PPTTextElement, Slide, SlideBackground, SlideTheme } from './model'
-import { flattenElementTree } from './elements'
+import { copyElementTreeWithPowerPointOrigins, flattenElementTree } from './elements'
 import type {
   PowerPointElementSourceLayer,
   PowerPointHeaderFooterPolicy,
@@ -43,6 +43,39 @@ export interface ResolvedSlideRenderState extends PowerPointSlideRenderHierarchy
   background?: SlideBackground
   nodes: SlideRenderNode[]
   placeholders: ResolvedPowerPointPlaceholder[]
+}
+
+/**
+ * Materialize one inherited hierarchy object as a slide-local copy-on-write
+ * override. The shared layout/master records remain untouched.
+ *
+ * The root containing `sourceObjectId` is copied so a child of a native group
+ * never loses its parent coordinate system. The returned tree has new Mona IDs
+ * and no exact OOXML target identity; its `copyOnWrite` origin is what lets a
+ * later package serializer clone the native payload safely.
+ */
+export const createSlideLocalPowerPointOverride = (
+  slide: Slide,
+  sourcePackages: readonly PowerPointPackageReference[],
+  sourceObjectId: string,
+  createId: () => string,
+): PPTElement | undefined => {
+  if (!slide.source) return undefined
+  const hierarchy = resolvePowerPointSlideRenderHierarchy(slide, sourcePackages)
+  const roots = [
+    ...(hierarchy.master?.elements ?? []),
+    ...(hierarchy.layout?.elements ?? []),
+  ]
+  const root = roots.find(element => flattenElementTree([element]).some(candidate => (
+    candidate.source?.sourceObjectId === sourceObjectId
+  )))
+  if (!root) return undefined
+  return copyElementTreeWithPowerPointOrigins(
+    [root],
+    createId,
+    'override',
+    { packageId: slide.source.packageId, slidePart: slide.source.slidePart },
+  ).elements[0]
 }
 
 export const resolvePowerPointSlideRenderHierarchy = (
@@ -426,7 +459,17 @@ export const resolveSlideRenderState = (
     : createLayerNodes(master?.elements ?? [], 'master')
   const layoutNodes = createLayerNodes(layout?.elements ?? [], 'layout')
   const localElements = flattenElementTree(slide.elements)
-  const inherited = [...masterNodes, ...layoutNodes]
+  const overriddenObjectIds = new Set(localElements.flatMap(element => (
+    element.source?.copyOnWrite?.mode === 'override'
+      ? [element.source.copyOnWrite.sourceObjectId]
+      : []
+  )))
+  const hiddenObjectIds = new Set(slide.source?.hiddenInheritedObjectIds ?? [])
+  const inherited = [...masterNodes, ...layoutNodes].filter(node => {
+    const objectId = node.element.source?.sourceObjectId
+    if (!objectId) return true
+    return !overriddenObjectIds.has(objectId) && !hiddenObjectIds.has(objectId)
+  })
   const slideNumber = sourcePackage && slide.source
     ? Math.max(1, sourcePackage.slides.findIndex(candidate => candidate.slidePart === slide.source!.slidePart) + 1)
     : 1

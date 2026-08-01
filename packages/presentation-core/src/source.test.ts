@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { applyPresentationCommand } from './commands'
 import { resolveSlideRenderState } from './render-graph'
 import type { PPTChartElement } from './model'
-import type { PresentationState } from './state'
+import { cloneSerializable, type PresentationState } from './state'
 import type { PowerPointPackageReference } from './source'
 
 const presentation = (): PresentationState => ({
@@ -127,6 +127,121 @@ describe('PowerPoint source package state', () => {
       revision: 1,
     })
     expect(result.state.sourcePackages?.[0]?.dirty?.parts).toHaveLength(2)
+  })
+
+  it('journals only changed native owners when the JSON agent replaces the full deck', () => {
+    const sourceObjectId = 'pptx:fixture/ppt/slides/slide1.xml#7'
+    const element = {
+      fixedRatio: true,
+      height: 100,
+      id: 'source-image',
+      left: 0,
+      rotate: 0,
+      source: {
+        kind: 'pptx' as const,
+        nativeShapeId: '7',
+        packageId: sourcePackage.packageId,
+        slidePart: sourcePackage.slides[0]!.slidePart,
+        sourceLayer: 'slide' as const,
+        sourceObjectId,
+        sourcePart: sourcePackage.slides[0]!.slidePart,
+        stableId: sourceObjectId,
+      },
+      src: 'data:image/png;base64,',
+      top: 0,
+      type: 'image' as const,
+      width: 100,
+    }
+    const slide = {
+      elements: [element],
+      id: 'slide-1',
+      source: {
+        ...sourcePackage.slides[0]!,
+        kind: 'pptx' as const,
+        packageId: sourcePackage.packageId,
+      },
+    }
+    const state: PresentationState = {
+      ...presentation(),
+      slides: [slide],
+      sourcePackages: [sourcePackage],
+    }
+    const replacement = cloneSerializable(slide)
+    replacement.elements[0]!.left = 42
+
+    const result = applyPresentationCommand(state, {
+      slides: [replacement],
+      type: 'presentation.slides.replace',
+    })
+
+    expect(result.state.sourcePackages?.[0]?.dirty).toEqual({
+      parts: [{
+        objectIds: [sourceObjectId],
+        partPath: 'ppt/slides/slide1.xml',
+        properties: ['left'],
+        reasons: ['presentation.slides.replace'],
+      }],
+      revision: 1,
+    })
+    expect(applyPresentationCommand(state, {
+      slides: cloneSerializable(state.slides),
+      type: 'presentation.slides.replace',
+    }).change.changed).toBe(false)
+  })
+
+  it('keeps a deleted local override hidden without mutating its shared source layer', () => {
+    const override = {
+      fixedRatio: true,
+      height: 100,
+      id: 'override-1',
+      left: 10,
+      rotate: 0,
+      source: {
+        copyOnWrite: {
+          mode: 'override' as const,
+          packageId: sourcePackage.packageId,
+          sourceLayer: 'layout' as const,
+          sourceObjectId: 'pptx:fixture/ppt/slideLayouts/slideLayout1.xml#8',
+          sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+        },
+        kind: 'pptx' as const,
+        packageId: sourcePackage.packageId,
+        slidePart: 'ppt/slides/slide1.xml',
+        sourceLayer: 'slide' as const,
+        stableId: 'mona:override:override-1',
+      },
+      src: 'data:image/png;base64,',
+      top: 10,
+      type: 'image' as const,
+      width: 100,
+    }
+    const state: PresentationState = {
+      ...presentation(),
+      slides: [{
+        elements: [override],
+        id: 'slide-1',
+        source: {
+          ...sourcePackage.slides[0]!,
+          kind: 'pptx',
+          packageId: sourcePackage.packageId,
+        },
+      }],
+      sourcePackages: [sourcePackage],
+    }
+    const result = applyPresentationCommand(state, {
+      elementIds: override.id,
+      type: 'element.delete',
+    })
+
+    expect(result.state.slides[0]!.elements).toEqual([])
+    expect(result.state.slides[0]!.source?.hiddenInheritedObjectIds).toEqual([
+      override.source.copyOnWrite.sourceObjectId,
+    ])
+    expect(result.state.sourcePackages?.[0]?.dirty?.parts).toContainEqual(expect.objectContaining({
+      partPath: 'ppt/slides/slide1.xml',
+      properties: ['deleted', 'inherited-visibility'],
+      reasons: ['element.delete'],
+    }))
   })
 
   it('turns a background edit into a slide-local override instead of leaving inherited rendering active', () => {

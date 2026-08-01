@@ -40,6 +40,87 @@ test.beforeEach(async ({ app, page }, testInfo) => {
   await configureLocalSaveFolder(app, page, join(testInfo.outputDir, 'presentations'))
 })
 
+test('duplicates, edits, exports, and reimports a retained native slide through Electron', async ({ app, page }, testInfo) => {
+  test.setTimeout(90_000)
+  await createNewPresentation(app, page)
+  await importFile(app, 'pptx', TEXT_CORPUS_PPTX, page)
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  )), { timeout: 30_000 }).toBe(1)
+
+  await page.getByRole('button', { name: 'Duplicate slide' }).click()
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  ))).toBe(2)
+  const copiedTarget = await page.evaluate(() => {
+    const state = window.__MONA_TEST__!.getState()
+    const slide = state.presentation.slides[1]!
+    const element = slide.elements.find(candidate => (
+      candidate.type !== 'line'
+      && candidate.source?.copyOnWrite?.sourceLayer === 'slide'
+      && candidate.width > 0
+      && candidate.height > 0
+    ))
+    if (!element) return null
+    return {
+      id: element.id,
+      left: element.left,
+      sourceObjectId: element.source?.copyOnWrite?.sourceObjectId,
+      sourceSlidePart: slide.source?.copyOnWrite?.sourceSlidePart,
+      theme: state.presentation.theme,
+    }
+  })
+  expect(copiedTarget).not.toBeNull()
+  await page.locator(
+    `.mona-editor-slide-canvas [data-element-id="${copiedTarget!.id}"]`,
+  ).click({ position: { x: 4, y: 4 } })
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(() => page.evaluate(targetId => {
+    const state = window.__MONA_TEST__!.getState()
+    return state.presentation.slides[1]!.elements.find(element => element.id === targetId)?.left
+  }, copiedTarget!.id)).toBeCloseTo(copiedTarget!.left + 1, 5)
+
+  await chooseMenuCommand(app, 'file.export.pptx', page)
+  const dialog = page.getByRole('dialog', { name: 'Export' })
+  const output = join(testInfo.outputDir, 'retained-native-slide-copy.pptx')
+  await stubSaveDialog(app, output)
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click()
+  await expect.poll(
+    () => readFile(output).then(() => true, () => false),
+    { timeout: 30_000 },
+  ).toBe(true)
+
+  const bytes = await readFile(output)
+  const reimported = await ingestPowerPoint(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    {
+      fileName: 'retained-native-slide-copy.pptx',
+      theme: copiedTarget!.theme as SlideTheme,
+    },
+  )
+  expect(reimported.presentation.slides).toHaveLength(2)
+  const originalSlide = reimported.presentation.slides[0]!
+  const copiedSlide = reimported.presentation.slides[1]!
+  expect(copiedSlide.source?.slidePart).not.toBe(originalSlide.source?.slidePart)
+  const nativeShapeId = copiedTarget!.sourceObjectId?.split('#').at(-1)
+  const original = flattenElementTree(originalSlide.elements).find(element => (
+    element.source?.nativeShapeId === nativeShapeId
+  ))
+  const copied = flattenElementTree(copiedSlide.elements).find(element => (
+    element.source?.nativeShapeId === nativeShapeId
+  ))
+  expect(original?.left).toBeCloseTo(copiedTarget!.left, 2)
+  expect(copied?.left).toBeCloseTo(copiedTarget!.left + 1, 2)
+  const originalDependency = reimported.backing.manifest.slides.find(slide => (
+    slide.slidePart === originalSlide.source?.slidePart
+  ))
+  const copiedDependency = reimported.backing.manifest.slides.find(slide => (
+    slide.slidePart === copiedSlide.source?.slidePart
+  ))
+  expect(copiedDependency?.notesPart).toBeTruthy()
+  expect(copiedDependency?.notesPart).not.toBe(originalDependency?.notesPart)
+})
+
 test('imports a real PPTX, preserves edits in JSON and Mona artifacts, and recovers safely from invalid input', async ({ app, page }, testInfo) => {
   test.setTimeout(90_000)
   await createNewPresentation(app, page)

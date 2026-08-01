@@ -18,8 +18,11 @@ const source = (): PPTGroupElement => ({
     source: {
       kind: 'pptx',
       packageId: 'package-1',
+      nativeShapeId: '2',
       slidePart: 'ppt/slides/slide1.xml',
       sourceLayer: 'slide',
+      sourceObjectId: 'package-1/ppt/slides/slide1.xml#2',
+      sourcePart: 'ppt/slides/slide1.xml',
       stableId: 'package-1/ppt/slides/slide1.xml#2',
     },
     top: 20,
@@ -33,8 +36,11 @@ const source = (): PPTGroupElement => ({
   source: {
     kind: 'pptx',
     packageId: 'package-1',
+    nativeShapeId: '1',
     slidePart: 'ppt/slides/slide1.xml',
     sourceLayer: 'slide',
+    sourceObjectId: 'package-1/ppt/slides/slide1.xml#1',
+    sourcePart: 'ppt/slides/slide1.xml',
     stableId: 'package-1/ppt/slides/slide1.xml#1',
   },
   top: 40,
@@ -43,14 +49,29 @@ const source = (): PPTGroupElement => ({
 })
 
 describe('canvas duplicate previews', () => {
-  it('assigns fresh nested IDs and never carries native source identities into the clone', () => {
+  it('assigns fresh IDs and retains native payload origins without aliasing the originals', () => {
     const original = source()
     const [duplicate] = duplicatePreviewElements([original])
 
     expect(duplicate?.id).not.toBe(original.id)
     expect(duplicate?.type).toBe('group')
     expect(duplicate?.type === 'group' && duplicate.elements[0]?.id).not.toBe(original.elements[0]?.id)
-    expect(flattenElementTree([duplicate!]).every(element => element.source === undefined)).toBe(true)
+    const copiedSources = flattenElementTree([duplicate!]).map(element => element.source)
+    expect(copiedSources).toEqual([
+      expect.objectContaining({
+        copyOnWrite: expect.objectContaining({
+          mode: 'copy',
+          sourceObjectId: 'package-1/ppt/slides/slide1.xml#1',
+        }),
+      }),
+      expect.objectContaining({
+        copyOnWrite: expect.objectContaining({
+          mode: 'copy',
+          sourceObjectId: 'package-1/ppt/slides/slide1.xml#2',
+        }),
+      }),
+    ])
+    expect(copiedSources.every(copiedSource => copiedSource?.sourceObjectId === undefined)).toBe(true)
     expect(flattenElementTree([original]).every(element => element.source !== undefined)).toBe(true)
   })
 })

@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 
-import { flattenElementTree, type PPTElement, type SlideTheme } from '@mona/presentation-core'
+import {
+  flattenElementTree,
+  retainElementTreeCopyOrigins,
+  resolveSlideRenderState,
+  type PPTElement,
+  type SlideTheme,
+} from '@mona/presentation-core'
 import { ingestPowerPoint } from '@mona/pptx-ingestion'
 
 import {
@@ -1402,5 +1408,582 @@ describe('PowerPoint source-package writeback', () => {
       manifest: fixture.ingested.backing.manifest,
       presentation: desired,
     })).rejects.toBeInstanceOf(PowerPointWritebackError)
+  })
+
+  it('clones a duplicate native object into the slide without aliasing its source identity', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = patchableElement(desired)
+    const targetSlide = desired.slides.find(slide => (
+      flattenElementTree(slide.elements).some(element => element.id === target.id)
+    ))
+    if (!targetSlide?.source?.slidePart) throw new Error('Native source slide could not be resolved.')
+    const duplicate = structuredClone(target)
+    duplicate.id = 'native-copy'
+    duplicate.left += 24
+    duplicate.top += 12
+    retainElementTreeCopyOrigins([duplicate], 'copy', {
+      packageId: fixture.ingested.backing.manifest.packageId,
+      slidePart: targetSlide.source.slidePart,
+    })
+    targetSlide.elements.push(duplicate)
+
+    const plan = analyzePowerPointWriteback(
+      fixture.ingested.presentation,
+      desired,
+      fixture.ingested.backing.manifest.packageId,
+    )
+
+    expect(plan.mode).toBe('patch')
+    expect(plan.unsupported).toEqual([])
+    expect(plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'insert-object',
+      elementId: duplicate.id,
+      sourceObjectId: duplicate.source?.copyOnWrite?.sourceObjectId,
+    }))
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'native-copy.pptx',
+      theme,
+    })
+    const slide = reimported.presentation.slides.find(candidate => (
+      candidate.source?.slidePart === targetSlide.source?.slidePart
+    ))
+    const matchingType = slide?.elements.filter(element => element.type === target.type) ?? []
+    expect(matchingType.length).toBeGreaterThanOrEqual(2)
+    expect(matchingType.some(element => (
+      Math.abs(element.left - duplicate.left) < 0.1
+      && Math.abs(element.top - duplicate.top) < 0.1
+    ))).toBe(true)
+  })
+
+  it('writes independent text and geometry changes into a copied native text object', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = editableTextElement(desired)
+    const targetSlide = desired.slides.find(slide => (
+      flattenElementTree(slide.elements).some(element => element.id === target.id)
+    ))
+    if (!targetSlide?.source?.slidePart) throw new Error('Native source slide could not be resolved.')
+    const duplicate = structuredClone(target)
+    duplicate.id = 'native-text-copy'
+    duplicate.left += 36
+    if (duplicate.type === 'text') duplicate.content = '<p>Independent native copy</p>'
+    else if (duplicate.text) duplicate.text.content = '<p>Independent native copy</p>'
+    retainElementTreeCopyOrigins([duplicate], 'copy', {
+      packageId: fixture.ingested.backing.manifest.packageId,
+      slidePart: targetSlide.source.slidePart,
+    })
+    targetSlide.elements.push(duplicate)
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'native-text-copy.pptx',
+      theme,
+    })
+    const contents = reimported.presentation.slides
+      .flatMap(slide => flattenElementTree(slide.elements))
+      .flatMap(element => (
+        element.type === 'text'
+          ? [element.content]
+          : element.type === 'shape' && element.text
+            ? [element.text.content]
+            : []
+      ))
+    expect(contents.some(content => content.includes('Independent native copy'))).toBe(true)
+    const original = elementBySource(reimported.presentation, target)
+    const originalContent = original?.type === 'text'
+      ? original.content
+      : original?.type === 'shape'
+        ? original.text?.content
+        : undefined
+    expect(originalContent).not.toContain('Independent native copy')
+  })
+
+  it('registers an independently editable native slide clone in presentation order', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const sourceSlide = desired.slides[0]!
+    if (!sourceSlide.source) throw new Error('Fixture has no native slide source.')
+    const duplicate = structuredClone(sourceSlide)
+    duplicate.id = 'native-slide-copy'
+    duplicate.source = {
+      ...sourceSlide.source,
+      copyOnWrite: {
+        packageId: sourceSlide.source.packageId,
+        sourceSlidePart: sourceSlide.source.slidePart,
+      },
+    }
+    retainElementTreeCopyOrigins(duplicate.elements, 'copy', {
+      packageId: sourceSlide.source.packageId,
+      slidePart: sourceSlide.source.slidePart,
+    })
+    const copiedText = duplicate.elements.flatMap(element => flattenElementTree([element])).find(
+      (element): element is Extract<PPTElement, { type: 'shape' | 'text' }> => (
+        element.type === 'text' || (element.type === 'shape' && Boolean(element.text))
+      ),
+    )
+    if (!copiedText) throw new Error('Fixture has no native text object to edit on the copied slide.')
+    if (copiedText.type === 'text') copiedText.content = '<p>Copied slide is independent</p>'
+    else copiedText.text!.content = '<p>Copied slide is independent</p>'
+    copiedText.left += 31
+    desired.slides.splice(1, 0, duplicate)
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      index: 1,
+      kind: 'insert-slide',
+      slideId: duplicate.id,
+      sourcePart: sourceSlide.source.slidePart,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'native-slide-copy.pptx',
+      theme,
+    })
+    expect(reimported.presentation.slides).toHaveLength(
+      fixture.ingested.presentation.slides.length + 1,
+    )
+    const roundTrippedCopy = reimported.presentation.slides[1]!
+    expect(roundTrippedCopy.source?.slidePart).not.toBe(sourceSlide.source.slidePart)
+    const copyContents = flattenElementTree(roundTrippedCopy.elements).flatMap(element => (
+      element.type === 'text'
+        ? [element.content]
+        : element.type === 'shape' && element.text
+          ? [element.text.content]
+          : []
+    ))
+    expect(copyContents.some(content => content.includes('Copied slide is independent'))).toBe(true)
+    const sourceContents = flattenElementTree(reimported.presentation.slides[0]!.elements).flatMap(element => (
+      element.type === 'text'
+        ? [element.content]
+        : element.type === 'shape' && element.text
+          ? [element.text.content]
+          : []
+    ))
+    expect(sourceContents.some(content => content.includes('Copied slide is independent'))).toBe(false)
+    const sourceDependency = reimported.backing.manifest.slides.find(slide => (
+      slide.slidePart === reimported.presentation.slides[0]!.source?.slidePart
+    ))
+    const copiedDependency = reimported.backing.manifest.slides.find(slide => (
+      slide.slidePart === roundTrippedCopy.source?.slidePart
+    ))
+    expect(copiedDependency?.notesPart).toBeTruthy()
+    expect(copiedDependency?.notesPart).not.toBe(sourceDependency?.notesPart)
+  })
+
+  it('clones chart parts and embedded workbooks for copied native slides', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-04-chart-table.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'chart-copy.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourceSlide = desired.slides[0]!
+    if (!sourceSlide.source) throw new Error('Chart fixture has no native slide source.')
+    const duplicate = structuredClone(sourceSlide)
+    duplicate.id = 'native-chart-slide-copy'
+    duplicate.source = {
+      ...sourceSlide.source,
+      copyOnWrite: {
+        packageId: sourceSlide.source.packageId,
+        sourceSlidePart: sourceSlide.source.slidePart,
+      },
+    }
+    retainElementTreeCopyOrigins(duplicate.elements, 'copy', {
+      packageId: sourceSlide.source.packageId,
+      slidePart: sourceSlide.source.slidePart,
+    })
+    desired.slides.push(duplicate)
+
+    const plan = analyzePowerPointWriteback(
+      ingested.presentation,
+      desired,
+      ingested.backing.manifest.packageId,
+    )
+    expect(plan.unsupported).toEqual([])
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'chart-slide-copy-roundtrip.pptx',
+      theme,
+    })
+    const originalCharts = flattenElementTree(reimported.presentation.slides[0]!.elements).filter(
+      (element): element is Extract<PPTElement, { type: 'chart' }> => element.type === 'chart',
+    )
+    const copiedCharts = flattenElementTree(reimported.presentation.slides.at(-1)!.elements).filter(
+      (element): element is Extract<PPTElement, { type: 'chart' }> => element.type === 'chart',
+    )
+    expect(copiedCharts).toHaveLength(originalCharts.length)
+    expect(new Set(copiedCharts.map(chart => chart.chartSource?.partPath))).not.toEqual(
+      new Set(originalCharts.map(chart => chart.chartSource?.partPath)),
+    )
+    expect(new Set(copiedCharts.map(chart => chart.chartSource?.workbookPart))).not.toEqual(
+      new Set(originalCharts.map(chart => chart.chartSource?.workbookPart)),
+    )
+  })
+
+  it('clones a chart object with an independent chart part and embedded workbook', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-04-chart-table.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'chart-object-copy.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourceChart = editableChartElement(desired)
+    const slide = desired.slides.find(candidate => flattenElementTree(candidate.elements).some(
+      element => element.id === sourceChart.id,
+    ))!
+    const copy = structuredClone(sourceChart)
+    copy.id = 'native-chart-object-copy'
+    copy.left += 48
+    retainElementTreeCopyOrigins([copy], 'copy', {
+      packageId: ingested.backing.manifest.packageId,
+      slidePart: slide.source!.slidePart,
+    })
+    slide.elements.push(copy)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'chart-object-copy-roundtrip.pptx',
+      theme,
+    })
+    const charts = flattenElementTree(reimported.presentation.slides[0]!.elements).filter(
+      (element): element is Extract<PPTElement, { type: 'chart' }> => element.type === 'chart',
+    )
+    const original = charts.find(chart => chart.source?.sourceObjectId === sourceChart.source?.sourceObjectId)
+    const inserted = charts.find(chart => Math.abs(chart.left - copy.left) < 0.1)
+    expect(inserted).toBeTruthy()
+    expect(inserted?.chartSource?.partPath).not.toBe(original?.chartSource?.partPath)
+    expect(inserted?.chartSource?.workbookPart).not.toBe(original?.chartSource?.workbookPart)
+  })
+
+  it('clones native image relationships and allocates independent drawing identities', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-03-media.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'image-object-copy.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const slide = desired.slides[0]!
+    const sourceImage = flattenElementTree(slide.elements).find(
+      (element): element is Extract<PPTElement, { type: 'image' }> => (
+        element.type === 'image' && Boolean(element.source?.sourceObjectId)
+      ),
+    )
+    if (!sourceImage || !slide.source) throw new Error('Media fixture has no native image.')
+    const copy = structuredClone(sourceImage)
+    copy.id = 'native-image-object-copy'
+    copy.left += 42
+    retainElementTreeCopyOrigins([copy], 'copy', {
+      packageId: slide.source.packageId,
+      slidePart: slide.source.slidePart,
+    })
+    slide.elements.push(copy)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'image-object-copy-roundtrip.pptx',
+      theme,
+    })
+    const images = flattenElementTree(reimported.presentation.slides[0]!.elements).filter(
+      (element): element is Extract<PPTElement, { type: 'image' }> => element.type === 'image',
+    )
+    expect(images).toHaveLength(
+      flattenElementTree(ingested.presentation.slides[0]!.elements).filter(element => element.type === 'image').length + 1,
+    )
+    expect(images.some(image => Math.abs(image.left - copy.left) < 0.1)).toBe(true)
+    expect(new Set(images.map(image => image.source?.sourceObjectId)).size).toBe(images.length)
+  })
+
+  it('clones a native group as one hierarchy with unique child drawing identities', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-05-groups.pptx'))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName: 'group-object-copy.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const slide = desired.slides[0]!
+    const sourceGroup = slide.elements.find(
+      (element): element is Extract<PPTElement, { type: 'group' }> => (
+        element.type === 'group' && Boolean(element.source?.sourceObjectId)
+      ),
+    )
+    if (!sourceGroup || !slide.source) throw new Error('Group fixture has no native group.')
+    const copy = structuredClone(sourceGroup)
+    copy.id = 'native-group-copy'
+    copy.left += 35
+    retainElementTreeCopyOrigins([copy], 'copy', {
+      packageId: slide.source.packageId,
+      slidePart: slide.source.slidePart,
+    })
+    slide.elements.push(copy)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'group-object-copy-roundtrip.pptx',
+      theme,
+    })
+    const groups = reimported.presentation.slides[0]!.elements.filter(
+      (element): element is Extract<PPTElement, { type: 'group' }> => element.type === 'group',
+    )
+    expect(groups).toHaveLength(
+      ingested.presentation.slides[0]!.elements.filter(element => element.type === 'group').length + 1,
+    )
+    expect(groups.some(group => Math.abs(group.left - copy.left) < 0.1)).toBe(true)
+    const objectIds = reimported.backing.manifest.objects
+      .filter(object => object.partPath === reimported.presentation.slides[0]!.source?.slidePart)
+      .map(object => object.stableId)
+    expect(new Set(objectIds).size).toBe(objectIds.length)
+  })
+
+  it('retains an unaddressable child when malformed OOXML repeats a drawing id inside a copied group', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-05-groups.pptx'))
+    const zip = await JSZip.loadAsync(bytes)
+    const slidePath = 'ppt/slides/slide1.xml'
+    const xml = await zip.file(slidePath)!.async('text')
+    zip.file(slidePath, xml.replace('<p:cNvPr id="5" name="Oval 4"', '<p:cNvPr id="4" name="Oval 4"'))
+    const archive = await zip.generateAsync({ type: 'arraybuffer' })
+    const ingested = await ingestPowerPoint(archive, { fileName: 'duplicate-drawing-id.pptx', theme })
+    const desired = structuredClone(ingested.presentation)
+    const slide = desired.slides[0]!
+    const sourceGroup = slide.elements.find(
+      (element): element is Extract<PPTElement, { type: 'group' }> => (
+        element.type === 'group'
+        && Boolean(element.source?.sourceObjectId)
+        && flattenElementTree(element.elements).some(child => !child.source?.sourceObjectId)
+      ),
+    )
+    if (!sourceGroup || !slide.source) throw new Error('Malformed fixture did not retain the group around its repeated native id.')
+    const copy = structuredClone(sourceGroup)
+    copy.id = 'duplicate-native-id-group-copy'
+    copy.left += 14
+    retainElementTreeCopyOrigins([copy], 'copy', {
+      packageId: slide.source.packageId,
+      slidePart: slide.source.slidePart,
+    })
+    slide.elements.push(copy)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'duplicate-drawing-id-group-copy-roundtrip.pptx',
+      theme,
+    })
+    const groups = reimported.presentation.slides[0]!.elements.filter(
+      (element): element is Extract<PPTElement, { type: 'group' }> => element.type === 'group',
+    )
+    expect(groups).toHaveLength(
+      ingested.presentation.slides[0]!.elements.filter(element => element.type === 'group').length + 1,
+    )
+    expect(groups.some(group => (
+      Math.abs(group.left - copy.left) < 0.1
+      && group.elements.length === sourceGroup.elements.length
+    ))).toBe(true)
+  })
+
+  it.skipIf(!PRIVATE_FIXTURES.length)('serializes a slide-local inherited hide through a private layout/master pair', async () => {
+    const fileName = PRIVATE_FIXTURES.find(name => name.includes('corporate')) ?? PRIVATE_FIXTURES[0]!
+    const bytes = await readFile(join(PRIVATE_FIXTURE_ROOT, fileName))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName, theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourcePackages = desired.sourcePackages ?? []
+    const candidate = desired.slides.flatMap(slide => (
+      resolveSlideRenderState(slide, sourcePackages).nodes
+        .filter(node => node.layer !== 'slide' && Boolean(node.element.source?.sourceObjectId))
+        .map(node => ({ element: node.element, slide }))
+    ))[0]
+    if (!candidate?.slide.source || !candidate.element.source?.sourceObjectId) {
+      throw new Error('Private fixture has no addressable inherited object.')
+    }
+    candidate.slide.source.hiddenInheritedObjectIds = [candidate.element.source.sourceObjectId]
+
+    const plan = analyzePowerPointWriteback(
+      ingested.presentation,
+      desired,
+      ingested.backing.manifest.packageId,
+    )
+
+    expect(plan.mode).toBe('patch')
+    expect(plan.unsupported).toEqual([])
+    expect(plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'inherited-visibility',
+      slideId: candidate.slide.id,
+    }))
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: `private-${fileName}`,
+      theme,
+    })
+    const roundTrippedSlide = reimported.presentation.slides[desired.slides.indexOf(candidate.slide)]!
+    const inheritedCount = resolveSlideRenderState(
+      roundTrippedSlide,
+      reimported.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    const originalCount = resolveSlideRenderState(
+      ingested.presentation.slides[desired.slides.indexOf(candidate.slide)]!,
+      ingested.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    expect(inheritedCount).toBe(originalCount - 1)
+  })
+
+  it.skipIf(!PRIVATE_FIXTURES.length)('serializes an inherited object override as one local clone over a private hierarchy', async () => {
+    const fileName = PRIVATE_FIXTURES.find(name => name.includes('corporate')) ?? PRIVATE_FIXTURES[0]!
+    const bytes = await readFile(join(PRIVATE_FIXTURE_ROOT, fileName))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName, theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourcePackages = desired.sourcePackages ?? []
+    const candidate = desired.slides.flatMap(slide => (
+      resolveSlideRenderState(slide, sourcePackages).nodes
+        .filter(node => node.layer !== 'slide' && Boolean(node.element.source?.sourceObjectId))
+        .map(node => ({ element: node.element, slide }))
+    ))[0]
+    if (!candidate?.slide.source || !candidate.element.source?.sourceObjectId) {
+      throw new Error('Private fixture has no addressable inherited object.')
+    }
+    const override = structuredClone(candidate.element)
+    override.id = 'private-inherited-override'
+    override.left += 18
+    retainElementTreeCopyOrigins([override], 'override', {
+      packageId: candidate.slide.source.packageId,
+      slidePart: candidate.slide.source.slidePart,
+    })
+    candidate.slide.elements.push(override)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.mode).toBe('patch')
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'insert-object',
+      mode: 'override',
+      sourceObjectId: candidate.element.source.sourceObjectId,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: `override-${fileName}`,
+      theme,
+    })
+    const slideIndex = desired.slides.indexOf(candidate.slide)
+    const roundTrippedSlide = reimported.presentation.slides[slideIndex]!
+    const localAtOverride = roundTrippedSlide.elements.some(element => (
+      Math.abs(element.left - override.left) < 0.1
+      && Math.abs(element.top - override.top) < 0.1
+      && element.type === override.type
+    ))
+    expect(localAtOverride).toBe(true)
+    const originalInheritedCount = resolveSlideRenderState(
+      ingested.presentation.slides[slideIndex]!,
+      ingested.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    const roundTrippedInheritedCount = resolveSlideRenderState(
+      roundTrippedSlide,
+      reimported.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    expect(roundTrippedInheritedCount).toBe(originalInheritedCount - 1)
+  })
+
+  it.skipIf(!PRIVATE_FIXTURES.length)('serializes an inherited override on a newly copied native slide', async () => {
+    const fileName = PRIVATE_FIXTURES.find(name => name.includes('corporate')) ?? PRIVATE_FIXTURES[0]!
+    const bytes = await readFile(join(PRIVATE_FIXTURE_ROOT, fileName))
+    const archive = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, { fileName, theme })
+    const desired = structuredClone(ingested.presentation)
+    const sourcePackages = desired.sourcePackages ?? []
+    const candidate = desired.slides.flatMap(slide => (
+      resolveSlideRenderState(slide, sourcePackages).nodes
+        .filter(node => node.layer !== 'slide' && Boolean(node.element.source?.sourceObjectId))
+        .map(node => ({ element: node.element, slide }))
+    ))[0]
+    if (!candidate?.slide.source || !candidate.element.source?.sourceObjectId) {
+      throw new Error('Private fixture has no addressable inherited object.')
+    }
+    const duplicate = structuredClone(candidate.slide)
+    duplicate.id = 'copied-slide-inherited-override'
+    duplicate.source = {
+      ...candidate.slide.source,
+      copyOnWrite: {
+        packageId: candidate.slide.source.packageId,
+        sourceSlidePart: candidate.slide.source.slidePart,
+      },
+    }
+    retainElementTreeCopyOrigins(duplicate.elements, 'copy', {
+      packageId: candidate.slide.source.packageId,
+      slidePart: candidate.slide.source.slidePart,
+    })
+    const override = structuredClone(candidate.element)
+    override.id = 'copied-slide-layout-override'
+    override.left += 23
+    retainElementTreeCopyOrigins([override], 'override', {
+      packageId: candidate.slide.source.packageId,
+      slidePart: candidate.slide.source.slidePart,
+    })
+    duplicate.elements.push(override)
+    desired.slides.push(duplicate)
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: `copied-override-${fileName}`,
+      theme,
+    })
+    const roundTrippedSlide = reimported.presentation.slides.at(-1)!
+    expect(roundTrippedSlide.source?.slidePart).not.toBe(candidate.slide.source.slidePart)
+    expect(roundTrippedSlide.elements.some(element => (
+      Math.abs(element.left - override.left) < 0.1
+      && Math.abs(element.top - override.top) < 0.1
+      && element.type === override.type
+    ))).toBe(true)
+    const originalInheritedCount = resolveSlideRenderState(
+      candidate.slide,
+      ingested.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    const copiedInheritedCount = resolveSlideRenderState(
+      roundTrippedSlide,
+      reimported.presentation.sourcePackages ?? [],
+    ).nodes.filter(node => node.layer !== 'slide').length
+    expect(copiedInheritedCount).toBe(originalInheritedCount - 1)
   })
 })

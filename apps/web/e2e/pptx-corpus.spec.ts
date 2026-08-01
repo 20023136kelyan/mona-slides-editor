@@ -199,17 +199,17 @@ for (const fixture of fixtures) {
         const original = elements.find(element => element.id === originalId)
         const duplicateId = state.session.activeElementIds[0]
         const duplicate = elements.find(element => element.id === duplicateId)
-        const hasNoNativeSources = (element: (typeof elements)[number]): boolean => (
-          element.source === undefined
-          && (element.type !== 'group' || element.elements.every(hasNoNativeSources))
+        const hasRetainedCopyOrigins = (element: (typeof elements)[number]): boolean => (
+          Boolean(element.source?.copyOnWrite)
+          && (element.type !== 'group' || element.elements.every(hasRetainedCopyOrigins))
         )
         return {
-          duplicateDetached: Boolean(duplicate && hasNoNativeSources(duplicate)),
+          duplicateSourceBacked: Boolean(duplicate && hasRetainedCopyOrigins(duplicate)),
           originalRetained: Boolean(original?.source),
         }
       }, importedGroups.elementId)
       expect(copyProvenance).toEqual({
-        duplicateDetached: true,
+        duplicateSourceBacked: true,
         originalRetained: true,
       })
       await page.keyboard.press('Delete')

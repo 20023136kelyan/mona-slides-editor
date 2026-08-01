@@ -33,7 +33,12 @@ import {
   selectPresentation,
   selectShowRuler,
 } from '@mona/editor-state'
-import { createPresentationId, selectFormattedCurrentSlideAnimations, type PresentationCommand } from '@mona/presentation-core'
+import {
+  createPresentationId,
+  createSlideLocalPowerPointOverride,
+  selectFormattedCurrentSlideAnimations,
+  type PresentationCommand,
+} from '@mona/presentation-core'
 import type { PPTElement, PPTShapeElement } from '@mona/presentation-core/model'
 
 import { EditorContextMenu, LinkEditor } from '@/features/editor/EditorContextMenu'
@@ -507,6 +512,34 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
       pendingActiveGroupElementId,
       pendingToggleIds,
     })
+  }
+
+  const handleInheritedPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    element: PPTElement,
+  ) => {
+    if (event.button !== 0 || spacePressedRef.current || session.activeTool) return
+    const objectId = element.source?.sourceObjectId
+    if (!objectId) return
+    const state = runtime.store.getState()
+    const slide = selectCurrentSlide(state)
+    if (!slide) return
+    const override = createSlideLocalPowerPointOverride(
+      slide,
+      state.presentation.sourcePackages ?? [],
+      objectId,
+      createPresentationId,
+    )
+    if (!override) return
+    event.stopPropagation()
+    if (!runtime.commit('Create slide-local PowerPoint override', [{
+      elements: override,
+      slideId: slide.id,
+      type: 'element.add',
+    }], { historyKey: 'powerpoint-inherited-override' })) return
+    runtime.store.dispatch(editorActions.selectionChanged([override.id]))
+    runtime.store.dispatch(editorActions.handleElementChanged(override.id))
+    runtime.store.dispatch(editorActions.pageSelectionChanged(false))
   }
 
   const createTextAtPoint = (point: PointerPosition) => {
@@ -1070,6 +1103,7 @@ export function EditorCanvas({ activeCreateTool, customShapeActive, drawingStore
                 viewportRatio: presentation.viewportRatio,
                 viewportSize: presentation.viewportSize,
               })}
+              onInheritedPointerDown={handleInheritedPointerDown}
               shapeEditor={element => ({
                 ariaLabel: t('foundation.editor.selectElement', { type: element.name || element.type, id: element.id }),
                 content: element.text?.content || shapeTextEditorId === element.id

@@ -1,4 +1,10 @@
-import type { PresentationState, Slide, SlideTheme } from '@mona/presentation-core'
+import {
+  resolveSlideRenderState,
+  type PPTElement,
+  type PresentationState,
+  type Slide,
+  type SlideTheme,
+} from '@mona/presentation-core'
 
 import { validateAgentSlides } from '@/features/editor/agent/agent-deck-validator'
 import { isDeckAssetUrl, storeDeckAsset } from '@/features/editor/editor-deck-assets'
@@ -21,11 +27,20 @@ export interface AgentSnapshotOutput {
   assets: Record<string, AgentAssetInfo>
   revision: string
   slideIndex: number
-  slides: Slide[]
+  slides: AgentWorkspaceSlide[]
   theme: SlideTheme
   title: string
   viewportRatio: number
   viewportSize: number
+}
+
+/**
+ * The JSON file the agent sees. Inherited elements are exposed beside local
+ * `elements` so the model can inspect and edit them without mutating a shared
+ * master/layout record. The field is virtual and is consumed at apply time.
+ */
+export type AgentWorkspaceSlide = Slide & {
+  powerPointInheritedElements?: PPTElement[]
 }
 
 export interface AgentApplyInput {
@@ -34,7 +49,7 @@ export interface AgentApplyInput {
   /** The revision the workspace was taken at. */
   expectedRevision: string
   explanation?: string
-  slides: Slide[]
+  slides: AgentWorkspaceSlide[]
   theme?: Partial<SlideTheme>
   title?: string
 }
@@ -114,12 +129,22 @@ const base64ToBlob = (asset: AgentAsset): Blob => {
  * ~193 MB. The server asks for each one separately through `readAssetBytes`.
  */
 export const buildDeckSnapshot = async (presentation: PresentationState): Promise<AgentSnapshotOutput> => {
+  const slides: AgentWorkspaceSlide[] = presentation.slides.map(slide => {
+    const inherited = resolveSlideRenderState(slide, presentation.sourcePackages ?? [])
+      .nodes
+      .filter(node => node.layer !== 'slide')
+      .map(node => structuredClone(node.element))
+    return {
+      ...slide,
+      ...(inherited.length ? { powerPointInheritedElements: inherited } : {}),
+    }
+  })
   const assets: Record<string, AgentAssetInfo> = {}
   // Nothing is re-homed and nothing is copied. Every asset is already a file the
   // deck names by path, so the manifest is a description of what is on disk. This
   // used to re-mint inline `data:` payloads as object URLs first, because slides
   // carrying their own bytes put 193 MB of one real deck on the wire.
-  for (const url of collectAssetUrls(presentation.slides)) {
+  for (const url of collectAssetUrls(slides)) {
     const blob = await fetch(url).then(response => response.blob()).catch(() => undefined)
     if (blob) assets[url] = { byteLength: blob.size, mediaType: blob.type }
   }
@@ -127,7 +152,7 @@ export const buildDeckSnapshot = async (presentation: PresentationState): Promis
     assets,
     revision: getAgentDocumentRevision(presentation),
     slideIndex: presentation.slideIndex,
-    slides: presentation.slides,
+    slides,
     theme: presentation.theme,
     title: presentation.title,
     viewportRatio: presentation.viewportRatio,
@@ -185,18 +210,13 @@ export const applyAgentWorkspace = async (
   const slides = replaceReferences(input.slides, urlByPath)
 
   const explanation = (input.explanation ?? 'Mona agent edit').trim().slice(0, 160) || 'Mona agent edit'
-  let transaction
-  try {
-    transaction = validateAgentSlides(state.presentation, {
-      slides,
-      ...(input.theme ? { theme: input.theme } : {}),
-      ...(typeof input.title === 'string' ? { title: input.title } : {}),
-    })
-  }
-  catch (error) {
-    // The files stay; the next successful save collects any the deck does not name.
-    throw error
-  }
+  // If validation fails the files stay; the next successful save collects any
+  // that the deck does not name.
+  const transaction = validateAgentSlides(state.presentation, {
+    slides,
+    ...(input.theme ? { theme: input.theme } : {}),
+    ...(typeof input.title === 'string' ? { title: input.title } : {}),
+  })
   transaction.label = explanation
 
   const applied = runtime.commitTransaction(transaction, { historyKey: 'mona-agent-run' })

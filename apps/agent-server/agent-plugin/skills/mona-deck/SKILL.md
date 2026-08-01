@@ -39,6 +39,13 @@ Geometry is in the slide coordinate system: `deck.json` carries
 `viewport.size` (the width, usually 1000) and `viewport.ratio` (height ÷ width,
 usually 0.5625). So a 1000×562.5 canvas. Keep elements inside it.
 
+An imported PowerPoint slide can also contain `powerPointInheritedElements`.
+Those are the effective objects coming from its layout or master. They are
+ordinary editable JSON in the workspace, but Mona treats an edit as a
+slide-local copy-on-write override; it never mutates every slide that shares
+the source layout. Removing an entry hides that inherited object only on this
+slide. Keep its `source` and `id` while editing it.
+
 ```jsonc
 // text — the copy lives in `content`, as HTML
 { "type": "text", "content": "<p>Revenue</p>", "defaultFontName": "Arial",
@@ -81,6 +88,20 @@ Write a new `deck/slides/NN.json` **and** add it to the `slides` array in
 `deck.json` — that array is the deck order, and a file missing from it is ignored.
 Give a new slide an id nothing else uses. To reorder, reorder that array. To
 delete, remove the entry.
+
+To duplicate an imported element, copy its whole JSON object and give the copy
+a new `id` (and new ids for every nested child). Keep `source`: Mona converts it
+to a retained native-copy reference during `apply`, so the duplicate can never
+overwrite the original PowerPoint object. Do not invent or modify `source`
+fields; they are immutable package addresses.
+
+To duplicate an imported slide, copy its slide file, give the slide and every
+local element a new `id`, add the file to the `slides` index, and keep every
+`source` field exactly as read. Mona converts the slide source into a native
+clone origin, keeps its layout/master hierarchy, and gives mutable linked parts
+such as notes, charts, and embedded workbooks independent package identities at
+PowerPoint export. You may edit `powerPointInheritedElements` in the new slide
+during the same run; those changes become slide-local overrides.
 
 ## When the deck moves underneath you
 

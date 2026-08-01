@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type PointerEvent as ReactPointerEvent } from 'react'
 
 import {
   compileSlideTheme,
@@ -19,6 +19,7 @@ interface SlideRendererProps {
   slide: Slide
   mediaEditor?: (element: Extract<PPTElement, { type: 'audio' | 'video' }>) => MediaElementEditor | undefined
   mediaScreen?: MediaElementScreen
+  onInheritedPointerDown?: (event: ReactPointerEvent<HTMLDivElement>, element: PPTElement) => void
   shapeEditor?: (element: Extract<PPTElement, { type: 'shape' }>) => ShapeElementEditor | undefined
   sourcePackages?: readonly PowerPointPackageReference[]
   theme: SlideTheme
@@ -33,6 +34,7 @@ export function SlideRenderer({
   slide,
   mediaEditor,
   mediaScreen,
+  onInheritedPointerDown,
   shapeEditor,
   sourcePackages = [],
   tableEditor,
@@ -63,13 +65,17 @@ export function SlideRenderer({
     >
       {renderState.nodes.map(node => {
         const editable = node.layer === 'slide'
+        const materializable = !editable && Boolean(onInheritedPointerDown)
         return (
           <div
-            aria-hidden={editable ? undefined : true}
+            aria-hidden={editable || materializable ? undefined : true}
             className="mona-rendered-element"
             data-pptx-layer={node.layer}
             key={node.element.id}
-            style={{ pointerEvents: editable ? undefined : 'none', zIndex: node.zIndex }}
+            onPointerDown={materializable
+              ? event => onInheritedPointerDown?.(event, node.element)
+              : undefined}
+            style={{ pointerEvents: editable || materializable ? undefined : 'none', zIndex: node.zIndex }}
           >
             <ElementRenderer
               element={node.element}

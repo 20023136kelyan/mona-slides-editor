@@ -219,6 +219,59 @@ const markPowerPointSlideDirty = (
   return { ...state, sourcePackages }
 }
 
+const changedTopLevelProperties = (
+  before: object,
+  after: object,
+  ignored: ReadonlySet<string> = new Set(),
+): string[] => [...new Set([...Object.keys(before), ...Object.keys(after)])]
+  .filter(property => !ignored.has(property))
+  .filter(property => JSON.stringify(
+    (before as Record<string, unknown>)[property],
+  ) !== JSON.stringify(
+    (after as Record<string, unknown>)[property],
+  ))
+  .sort()
+
+/** Record the exact source owners changed by a JSON/full-deck replacement. */
+const markPowerPointReplacementDirty = (
+  state: PresentationState,
+  previous: Slide,
+  desired: Slide,
+  reason: PresentationCommand['type'],
+): PresentationState => {
+  let next = state
+  const beforeById = new Map(flattenElementTree(previous.elements).map(element => [element.id, element]))
+  const afterById = new Map(flattenElementTree(desired.elements).map(element => [element.id, element]))
+  for (const [elementId, before] of beforeById) {
+    const after = afterById.get(elementId)
+    if (!after) {
+      next = markPowerPointSlideDirty(next, previous, reason, [elementId], ['deleted'])
+      continue
+    }
+    const properties = changedTopLevelProperties(before, after, new Set(['id', 'source']))
+    if (properties.length) {
+      next = markPowerPointSlideDirty(next, previous, reason, [elementId], properties)
+    }
+  }
+  if ([...afterById.keys()].some(elementId => !beforeById.has(elementId))) {
+    next = markPowerPointSlideDirty(next, previous, reason, [], ['added'])
+  }
+  const slideProperties = changedTopLevelProperties(
+    previous,
+    desired,
+    new Set(['background', 'elements', 'id', 'source']),
+  )
+  if (slideProperties.length) {
+    next = markPowerPointSlideDirty(next, previous, reason, [], slideProperties)
+  }
+  const hiddenBefore = previous.source?.hiddenInheritedObjectIds ?? []
+  const hiddenAfter = desired.source?.hiddenInheritedObjectIds ?? []
+  if (JSON.stringify(hiddenBefore) !== JSON.stringify(hiddenAfter)) {
+    next = markPowerPointSlideDirty(next, previous, reason, [], ['inherited-visibility'])
+  }
+  return next
+}
+
 export const applyPresentationCommand = (
   state: PresentationState,
   command: PresentationCommand,
@@ -241,6 +294,10 @@ export const applyPresentationCommand = (
       return changed({ ...state, viewportRatio: command.ratio }, command)
     }
     case 'presentation.slides.replace': {
+      if (
+        JSON.stringify(state.slides) === JSON.stringify(command.slides)
+        && (!command.theme || JSON.stringify({ ...state.theme, ...command.theme }) === JSON.stringify(state.theme))
+      ) return unchanged(state, command)
       const previousById = new Map(state.slides.map(slide => [slide.id, slide]))
       const backgroundChanges: Slide[] = []
       const slides = command.slides.map(slide => {
@@ -272,6 +329,11 @@ export const applyPresentationCommand = (
           [],
           ['background'],
         )
+      }
+      for (const slide of slides) {
+        const previous = previousById.get(slide.id)
+        if (!previous || JSON.stringify(previous) === JSON.stringify(slide)) continue
+        nextState = markPowerPointReplacementDirty(nextState, previous, slide, command.type)
       }
       return changed(nextState, command, slides.map(slide => slide.id))
     }
@@ -422,9 +484,23 @@ export const applyPresentationCommand = (
       if (!currentSlide) throw new PresentationCommandError('Current slide not found')
       const missing = elementIds.find(id => !findElementById(currentSlide.elements, id))
       if (missing) throw new PresentationCommandError(`Element not found: ${missing}`)
+      const hiddenInheritedObjectIds = new Set(currentSlide.source?.hiddenInheritedObjectIds ?? [])
+      const hiddenCountBefore = hiddenInheritedObjectIds.size
+      for (const elementId of elementIds) {
+        const origin = findElementById(currentSlide.elements, elementId)?.source?.copyOnWrite
+        if (origin?.mode === 'override') hiddenInheritedObjectIds.add(origin.sourceObjectId)
+      }
       const slide = {
         ...currentSlide,
         elements: removeElementsFromTree(currentSlide.elements, deleted),
+        ...(currentSlide.source && hiddenInheritedObjectIds.size
+          ? {
+              source: {
+                ...currentSlide.source,
+                hiddenInheritedObjectIds: [...hiddenInheritedObjectIds].sort(),
+              },
+            }
+          : {}),
       }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
@@ -434,7 +510,10 @@ export const applyPresentationCommand = (
           currentSlide,
           command.type,
           elementIds,
-          ['deleted'],
+          [
+            'deleted',
+            ...(hiddenInheritedObjectIds.size > hiddenCountBefore ? ['inherited-visibility'] : []),
+          ],
         ),
         command,
         [slide.id],

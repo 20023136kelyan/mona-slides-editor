@@ -2,11 +2,13 @@ import { createInteractionController } from '@mona/editor-interactions'
 import { createEditorStore, editorActions, type EditorStore } from '@mona/editor-state'
 import {
   applyPresentationTransaction,
+  copyElementTreeWithPowerPointOrigins,
   createPresentationId,
   createPresentationTransaction,
-  detachElementTreeSources,
   flattenElementTree,
   remapElementTreeIds,
+  retainElementTreeCopyOrigins,
+  resolveSlideRenderState,
   validateImportedSlides,
   type PresentationCommand,
   type PresentationState,
@@ -253,14 +255,46 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     options: { preserveSource?: boolean } = {},
   ) => {
     const preserveSource = options.preserveSource ?? false
+    const presentation = store.getState().presentation
     const slideIdMap = new Map(source.map(slide => [slide.id, createPresentationId()]))
     return source.map(sourceSlide => {
       const slide = structuredClone(sourceSlide)
-      const remapped = remapElementTreeIds(slide.elements, createPresentationId)
+      const canCloneNativeSlide = Boolean(
+        !preserveSource
+        && sourceSlide.source
+        && presentation.sourcePackages?.some(sourcePackage => (
+          sourcePackage.packageId === sourceSlide.source?.packageId
+        )),
+      )
+      const renderState = !preserveSource && sourceSlide.source && !canCloneNativeSlide
+        ? resolveSlideRenderState(sourceSlide, presentation.sourcePackages ?? [])
+        : undefined
+      const elements = renderState
+        ? [
+            ...sourceSlide.elements,
+            ...renderState.nodes
+              .filter(node => node.layer !== 'slide')
+              .map(node => node.element),
+          ]
+        : slide.elements
+      const remapped = preserveSource
+        ? remapElementTreeIds(elements, createPresentationId)
+        : copyElementTreeWithPowerPointOrigins(elements, createPresentationId, 'copy')
       slide.elements = remapped.elements
       if (!preserveSource) {
-        delete slide.source
-        detachElementTreeSources(slide.elements)
+        if (canCloneNativeSlide && sourceSlide.source) {
+          slide.source = {
+            ...sourceSlide.source,
+            copyOnWrite: {
+              packageId: sourceSlide.source.packageId,
+              sourceSlidePart: sourceSlide.source.slidePart,
+            },
+          }
+        }
+        else {
+          delete slide.source
+          if (renderState?.background) slide.background = structuredClone(renderState.background)
+        }
       }
       const groupIdMap = new Map<string, string>()
       for (const element of flattenElementTree(slide.elements)) {
@@ -335,12 +369,22 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
     const source = parseClipboard(serialized)
     if (!source?.length) return []
     const groupMap = new Map<string, string>()
-    const additions = remapElementTreeIds(source, createPresentationId).elements
-    detachElementTreeSources(additions)
+    const state = store.getState()
+    const currentSlide = state.presentation.slides[state.presentation.slideIndex]
+    const additions = copyElementTreeWithPowerPointOrigins(
+      source,
+      createPresentationId,
+      'copy',
+      currentSlide?.source
+        ? {
+            packageId: currentSlide.source.packageId,
+            slidePart: currentSlide.source.slidePart,
+          }
+        : undefined,
+    ).elements
     for (const element of flattenElementTree(additions)) {
       if (element.groupId && !groupMap.has(element.groupId)) groupMap.set(element.groupId, createPresentationId())
     }
-    const state = store.getState()
     const currentElements = state.presentation.slides[state.presentation.slideIndex]?.elements ?? []
     const firstElement = source[0]!
     let offset = 0
@@ -527,10 +571,10 @@ export const createEditorRuntime = (presentation: PresentationState): EditorRunt
       const safe = sanitizeSlides([...source])
       const isEmptySlide = state.slides.length === 1 && state.slides[0]?.elements.length === 0
       if (isEmptySlide) {
-        const slides = structuredClone([...safe])
+        const slides = structuredClone(safe)
         for (const slide of slides) {
           delete slide.source
-          detachElementTreeSources(slide.elements)
+          retainElementTreeCopyOrigins(slide.elements, 'copy')
         }
         if (!commit('Replace empty deck with template', [{ type: 'presentation.slides.replace', slides, theme }], { historyKey: 'add-slides-or-elements' })) return []
         return slides.map(slide => slide.id)

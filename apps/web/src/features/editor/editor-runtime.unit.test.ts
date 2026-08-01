@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { editorActions } from '@mona/editor-state'
 import {
   createPresentationTransaction,
-  flattenElementTree,
+  resolveSlideRenderState,
   type PresentationState,
 } from '@mona/presentation-core'
 
@@ -263,7 +263,7 @@ describe('editor runtime', () => {
     expect(second.map(element => [element.left, element.top])).toEqual([[40, 50], [180, 50]])
   })
 
-  it('preserves native provenance only for imported originals and detaches every user-created clone', () => {
+  it('keeps imported originals exact and gives every user-created clone a native payload origin', () => {
     const importedSlide = structuredClone(presentation.slides[0]!)
     importedSlide.source = {
       kind: 'pptx',
@@ -272,9 +272,12 @@ describe('editor runtime', () => {
     }
     importedSlide.elements[0]!.source = {
       kind: 'pptx',
+      nativeShapeId: '1',
       packageId: 'package-1',
       slidePart: 'ppt/slides/slide1.xml',
       sourceLayer: 'slide',
+      sourceObjectId: 'package-1/ppt/slides/slide1.xml#1',
+      sourcePart: 'ppt/slides/slide1.xml',
       stableId: 'package-1/ppt/slides/slide1.xml#1',
     }
 
@@ -292,12 +295,108 @@ describe('editor runtime', () => {
     const pastedIds = runtime.paste(runtime.copySelection())
     const pasted = runtime.store.getState().presentation.slides[0]!.elements.find(element => element.id === pastedIds[0])
     expect(importedSlide.elements[0]!.source).toBeDefined()
-    expect(pasted?.source).toBeUndefined()
+    expect(pasted?.source).toMatchObject({
+      copyOnWrite: {
+        mode: 'copy',
+        packageId: 'package-1',
+        sourceObjectId: 'package-1/ppt/slides/slide1.xml#1',
+      },
+    })
+    expect(pasted?.source?.sourceObjectId).toBeUndefined()
 
     const [duplicatedSlideId] = runtime.duplicateSlides()
     const duplicate = runtime.store.getState().presentation.slides.find(slide => slide.id === duplicatedSlideId)!
     expect(duplicate.source).toBeUndefined()
-    expect(flattenElementTree(duplicate.elements).every(element => element.source === undefined)).toBe(true)
+    expect(duplicate.elements[0]?.source).toMatchObject({
+      copyOnWrite: {
+        mode: 'copy',
+        packageId: 'package-1',
+        sourceObjectId: 'package-1/ppt/slides/slide1.xml#1',
+      },
+    })
+  })
+
+  it('retains the native hierarchy as a copy-on-write source when duplicating an imported slide', () => {
+    const inheritedObjectId = 'package-1/ppt/slideLayouts/slideLayout1.xml#7'
+    const inherited = {
+      ...structuredClone(presentation.slides[0]!.elements[0]!),
+      id: 'layout-decoration',
+      source: {
+        kind: 'pptx' as const,
+        nativeShapeId: '7',
+        packageId: 'package-1',
+        slidePart: 'ppt/slides/slide1.xml',
+        sourceLayer: 'layout' as const,
+        sourceObjectId: inheritedObjectId,
+        sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+        stableId: inheritedObjectId,
+      },
+    }
+    const imported: PresentationState = {
+      ...structuredClone(presentation),
+      slides: [{
+        ...structuredClone(presentation.slides[0]!),
+        source: {
+          kind: 'pptx',
+          layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+          packageId: 'package-1',
+          slidePart: 'ppt/slides/slide1.xml',
+        },
+      }],
+      sourcePackages: [{
+        byteLength: 100,
+        fileName: 'inherited.pptx',
+        hierarchy: {
+          layouts: [{
+            background: { color: '#123456', type: 'solid' },
+            elements: [inherited],
+            id: 'layout-1',
+            objectIds: [inheritedObjectId],
+            packageId: 'package-1',
+            partPath: 'ppt/slideLayouts/slideLayout1.xml',
+            preserve: false,
+            showMasterPlaceholderAnimations: true,
+            showMasterShapes: true,
+          }],
+          masters: [],
+          placeholders: [],
+          themes: [],
+        },
+        kind: 'pptx',
+        packageId: 'package-1',
+        slides: [{
+          backgroundSource: 'layout',
+          layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+          slidePart: 'ppt/slides/slide1.xml',
+        }],
+      }],
+    }
+    imported.slides[0]!.source!.backgroundSource = 'layout'
+    const runtime = createEditorRuntime(imported)
+
+    const [duplicateId] = runtime.duplicateSlides()
+    const duplicate = runtime.store.getState().presentation.slides.find(slide => slide.id === duplicateId)!
+    const rendered = resolveSlideRenderState(
+      duplicate,
+      runtime.store.getState().presentation.sourcePackages ?? [],
+    )
+    const renderedInherited = rendered.nodes.find(node => (
+      node.element.source?.sourceObjectId === inheritedObjectId
+    ))
+
+    expect(duplicate.source).toMatchObject({
+      copyOnWrite: {
+        packageId: 'package-1',
+        sourceSlidePart: 'ppt/slides/slide1.xml',
+      },
+      layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+      packageId: 'package-1',
+      slidePart: 'ppt/slides/slide1.xml',
+    })
+    expect(duplicate.elements).toHaveLength(imported.slides[0]!.elements.length)
+    expect(rendered.background).toEqual({ color: '#123456', type: 'solid' })
+    expect(renderedInherited?.layer).toBe('layout')
+    expect(imported.sourcePackages?.[0]?.hierarchy?.layouts[0]?.elements).toEqual([inherited])
   })
 
   it('uses the source editor-compatible encrypted payloads and remaps complete slide relationships', () => {

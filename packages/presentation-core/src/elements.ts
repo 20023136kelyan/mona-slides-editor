@@ -1,4 +1,5 @@
 import type { PPTElement, PPTGroupElement } from './model'
+import type { PowerPointCopyOnWriteSource } from './source'
 
 export interface ElementTreeEntry {
   element: PPTElement
@@ -43,6 +44,74 @@ export const detachElementTreeSources = (elements: readonly PPTElement[]): void 
   walkElementTree(elements, ({ element }) => {
     delete element.source
   })
+}
+
+export interface PowerPointElementCopyTarget {
+  packageId: string
+  slidePart: string
+}
+
+/**
+ * Turns cloned editor elements into source-backed copies without pretending
+ * that they are still the native objects they came from.
+ *
+ * Exact source identities are immutable aliases for OOXML nodes. Reusing one
+ * on a duplicate makes the package writer patch the original. A copy therefore
+ * receives a fresh Mona identity plus a `copyOnWrite` pointer to the native
+ * payload that must eventually be cloned by export. Elements without one exact
+ * native origin remain ordinary Mona-created elements.
+ */
+export const retainElementTreeCopyOrigins = (
+  elements: readonly PPTElement[],
+  mode: PowerPointCopyOnWriteSource['mode'],
+  target?: PowerPointElementCopyTarget,
+): void => {
+  walkElementTree(elements, ({ element }) => {
+    const source = element.source
+    const origin = source?.sourceObjectId && source.sourcePart
+      ? {
+          mode,
+          packageId: source.packageId,
+          sourceLayer: source.sourceLayer,
+          sourceObjectId: source.sourceObjectId,
+          sourcePart: source.sourcePart,
+        } satisfies PowerPointCopyOnWriteSource
+      : source?.copyOnWrite
+        ? { ...source.copyOnWrite, mode }
+        : undefined
+    if (!source || !origin) {
+      delete element.source
+      return
+    }
+    const {
+      connector: _connector,
+      nativeShapeId: _nativeShapeId,
+      relationshipIds: _relationshipIds,
+      sourceObjectId: _sourceObjectId,
+      sourcePart: _sourcePart,
+      ...retained
+    } = source
+    element.source = {
+      ...retained,
+      copyOnWrite: origin,
+      packageId: target?.packageId ?? source.packageId,
+      slidePart: target?.slidePart ?? source.slidePart,
+      sourceLayer: 'slide',
+      stableId: `mona:${mode}:${element.id}`,
+    }
+  })
+}
+
+/** Clone a complete element tree and retain safe native copy provenance. */
+export const copyElementTreeWithPowerPointOrigins = (
+  elements: readonly PPTElement[],
+  createId: () => string,
+  mode: PowerPointCopyOnWriteSource['mode'],
+  target?: PowerPointElementCopyTarget,
+): { elements: PPTElement[]; idMap: ReadonlyMap<string, string> } => {
+  const copied = remapElementTreeIds(elements, createId)
+  retainElementTreeCopyOrigins(copied.elements, mode, target)
+  return copied
 }
 
 export const findElementById = (

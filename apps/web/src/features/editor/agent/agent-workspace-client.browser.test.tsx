@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { PresentationState, Slide } from '@mona/presentation-core'
+import {
+  flattenElementTree,
+  type PowerPointPackageReference,
+  type PPTElement,
+  type PresentationState,
+  type Slide,
+} from '@mona/presentation-core'
 
 import { validateAgentSlides } from '@/features/editor/agent/agent-deck-validator'
 import { applyAgentWorkspace, buildDeckSnapshot, readAssetBytes } from '@/features/editor/agent/agent-workspace-client'
@@ -44,6 +50,74 @@ const presentation = (slides: Slide[]): PresentationState => ({
 })
 
 const base = presentation([{ elements: [textElement('t1', 'TEAM 5')], id: 'slide-1', title: 'Cover' }])
+
+const importedPresentation = (): PresentationState => {
+  const layoutObjectId = 'pptx:agent/ppt/slideLayouts/slideLayout1.xml#7'
+  const layoutElement: PPTElement = {
+    ...textElement('layout-title', 'Inherited title'),
+    source: {
+      kind: 'pptx',
+      nativeShapeId: '7',
+      packageId: 'pptx:agent',
+      slidePart: 'ppt/slides/slide1.xml',
+      sourceLayer: 'layout',
+      sourceObjectId: layoutObjectId,
+      sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+      stableId: layoutObjectId,
+    },
+  }
+  const localObjectId = 'pptx:agent/ppt/slides/slide1.xml#8'
+  const localElement: PPTElement = {
+    ...textElement('local-title', 'Local title'),
+    source: {
+      kind: 'pptx',
+      nativeShapeId: '8',
+      packageId: 'pptx:agent',
+      slidePart: 'ppt/slides/slide1.xml',
+      sourceLayer: 'slide',
+      sourceObjectId: localObjectId,
+      sourcePart: 'ppt/slides/slide1.xml',
+      stableId: localObjectId,
+    },
+  }
+  const sourcePackage: PowerPointPackageReference = {
+    byteLength: 100,
+    fileName: 'agent.pptx',
+    hierarchy: {
+      layouts: [{
+        elements: [layoutElement],
+        id: 'layout-1',
+        objectIds: [layoutObjectId],
+        packageId: 'pptx:agent',
+        partPath: 'ppt/slideLayouts/slideLayout1.xml',
+        preserve: false,
+        showMasterPlaceholderAnimations: true,
+        showMasterShapes: true,
+      }],
+      masters: [],
+      placeholders: [],
+      themes: [],
+    },
+    kind: 'pptx',
+    packageId: 'pptx:agent',
+    slides: [{
+      layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+      slidePart: 'ppt/slides/slide1.xml',
+    }],
+  }
+  return {
+    ...presentation([{
+      elements: [localElement],
+      id: 'slide-1',
+      source: {
+        ...sourcePackage.slides[0]!,
+        kind: 'pptx',
+        packageId: sourcePackage.packageId,
+      },
+    }]),
+    sourcePackages: [sourcePackage],
+  }
+}
 
 /** Just enough runtime to record what a commit was asked to do. */
 const runtimeFor = (state: PresentationState, ok = true) => {
@@ -113,6 +187,17 @@ describe('buildDeckSnapshot', () => {
   it('reports the revision the workspace will be checked against', async () => {
     const snapshot = await buildDeckSnapshot(base)
     expect(snapshot.revision).toBe(getAgentDocumentRevision(base))
+  })
+
+  it('exposes effective inherited objects as editable JSON without copying them into local elements', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+
+    expect(snapshot.slides[0]?.elements).toHaveLength(1)
+    expect(snapshot.slides[0]?.powerPointInheritedElements).toEqual([
+      expect.objectContaining({ id: 'layout-title', source: expect.objectContaining({ sourceLayer: 'layout' }) }),
+    ])
+    expect(imported.slides[0]?.elements).toHaveLength(1)
   })
 })
 
@@ -221,6 +306,177 @@ describe('validateAgentSlides', () => {
     const renamed = validateAgentSlides(base, { slides: base.slides, title: 'Q3 review' })
     expect(renamed.commands.map(command => command.type))
       .toEqual(['presentation.slides.replace', 'presentation.title.set'])
+  })
+
+  it('turns an inherited JSON edit into a slide-local override', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    snapshot.slides[0]!.powerPointInheritedElements![0]!.left = 220
+
+    const transaction = validateAgentSlides(imported, { slides: snapshot.slides })
+    const command = transaction.commands[0] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.slides.replace' }
+    >
+    const override = command.slides[0]!.elements.find(element => (
+      element.source?.copyOnWrite?.mode === 'override'
+    ))
+    expect(override).toMatchObject({
+      left: 220,
+      source: {
+        copyOnWrite: {
+          mode: 'override',
+          sourceLayer: 'layout',
+          sourceObjectId: 'pptx:agent/ppt/slideLayouts/slideLayout1.xml#7',
+        },
+        sourceLayer: 'slide',
+      },
+    })
+    expect(imported.sourcePackages?.[0]?.hierarchy?.layouts[0]?.elements?.[0]?.left).toBe(10)
+  })
+
+  it('keeps inherited provenance immutable and preserves unaddressable inherited JSON read-only', async () => {
+    const imported = importedPresentation()
+    const forged = await buildDeckSnapshot(imported)
+    forged.slides[0]!.powerPointInheritedElements![0]!.source!.sourcePart = 'ppt/slides/forged.xml'
+    expect(() => validateAgentSlides(imported, { slides: forged.slides }))
+      .toThrow(/Keep the source field exactly as read/)
+
+    const unaddressable = importedPresentation()
+    const inherited = unaddressable.sourcePackages![0]!.hierarchy!.layouts[0]!.elements![0]!
+    delete inherited.source!.sourceObjectId
+    delete inherited.source!.sourcePart
+    const snapshot = await buildDeckSnapshot(unaddressable)
+    expect(() => validateAgentSlides(unaddressable, { slides: snapshot.slides })).not.toThrow()
+    snapshot.slides[0]!.powerPointInheritedElements![0]!.left += 1
+    expect(() => validateAgentSlides(unaddressable, { slides: snapshot.slides }))
+      .toThrow(/no exact native source identity/)
+  })
+
+  it('records removal from the inherited JSON layer as a slide-local hide', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    snapshot.slides[0]!.powerPointInheritedElements = []
+
+    const transaction = validateAgentSlides(imported, { slides: snapshot.slides })
+    const command = transaction.commands[0] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.slides.replace' }
+    >
+    expect(command.slides[0]!.source?.hiddenInheritedObjectIds).toEqual([
+      'pptx:agent/ppt/slideLayouts/slideLayout1.xml#7',
+    ])
+  })
+
+  it('retains a native payload pointer when the agent duplicates imported JSON', () => {
+    const imported = importedPresentation()
+    const original = imported.slides[0]!.elements[0]!
+    const duplicate = { ...structuredClone(original), id: 'local-title-copy', left: 80 }
+    const slides = structuredClone(imported.slides)
+    slides[0]!.elements.push(duplicate)
+
+    const transaction = validateAgentSlides(imported, { slides })
+    const command = transaction.commands[0] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.slides.replace' }
+    >
+    expect(command.slides[0]!.elements[1]?.source).toMatchObject({
+      copyOnWrite: {
+        mode: 'copy',
+        sourceLayer: 'slide',
+        sourceObjectId: original.source?.sourceObjectId,
+        sourcePart: 'ppt/slides/slide1.xml',
+      },
+      sourceLayer: 'slide',
+    })
+    expect(command.slides[0]!.elements[1]?.source?.sourceObjectId).toBeUndefined()
+  })
+
+  it('retains native slide provenance without materializing unchanged inheritance when the agent duplicates a slide', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    const duplicate = structuredClone(snapshot.slides[0]!)
+    duplicate.id = 'slide-2'
+
+    const transaction = validateAgentSlides(imported, {
+      slides: [snapshot.slides[0]!, duplicate],
+    })
+    const command = transaction.commands[0] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.slides.replace' }
+    >
+    const copiedSlide = command.slides[1]!
+    const origins = flattenElementTree(copiedSlide.elements).map(element => (
+      element.source?.copyOnWrite?.sourceObjectId
+    ))
+
+    expect(copiedSlide.source).toMatchObject({
+      copyOnWrite: {
+        packageId: 'pptx:agent',
+        sourceSlidePart: 'ppt/slides/slide1.xml',
+      },
+    })
+    expect(new Set(origins)).toEqual(new Set([
+      'pptx:agent/ppt/slides/slide1.xml#8',
+    ]))
+    expect(new Set(flattenElementTree(copiedSlide.elements).map(element => element.id)).size)
+      .toBe(flattenElementTree(copiedSlide.elements).length)
+  })
+
+  it('materializes an inherited override edited in the same agent turn that duplicates a slide', async () => {
+    const imported = importedPresentation()
+    const snapshot = await buildDeckSnapshot(imported)
+    const duplicate = structuredClone(snapshot.slides[0]!)
+    duplicate.id = 'slide-2'
+    duplicate.powerPointInheritedElements![0]!.left += 17
+
+    const transaction = validateAgentSlides(imported, {
+      slides: [snapshot.slides[0]!, duplicate],
+    })
+    const command = transaction.commands[0] as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.slides.replace' }
+    >
+    const copiedSlide = command.slides[1]!
+    const override = flattenElementTree(copiedSlide.elements).find(element => (
+      element.source?.copyOnWrite?.mode === 'override'
+    ))
+
+    expect(copiedSlide.source).toMatchObject({
+      copyOnWrite: {
+        packageId: 'pptx:agent',
+        sourceSlidePart: 'ppt/slides/slide1.xml',
+      },
+    })
+    expect(override?.left).toBe(
+      snapshot.slides[0]!.powerPointInheritedElements![0]!.left + 17,
+    )
+    expect(override?.source?.copyOnWrite).toMatchObject({
+      mode: 'override',
+      sourceObjectId: 'pptx:agent/ppt/slideLayouts/slideLayout1.xml#7',
+    })
+  })
+
+  it('rejects forged provenance and opaque JSON without a retained payload', () => {
+    const imported = importedPresentation()
+    const forged = structuredClone(imported.slides)
+    forged[0]!.elements[0]!.source!.sourceObjectId = 'pptx:agent/ppt/slides/slide1.xml#999'
+    expect(() => validateAgentSlides(imported, { slides: forged }))
+      .toThrow(/Keep the source field exactly as read/)
+
+    expect(() => validateAgentSlides(base, { slides: [{
+      elements: [{
+        height: 40,
+        id: 'opaque-new',
+        left: 0,
+        opaqueType: 'urn:unknown',
+        rotate: 0,
+        top: 0,
+        type: 'opaque',
+        width: 40,
+      }],
+      id: 'slide-1',
+    }] })).toThrow(/no retained native payload/)
   })
 })
 

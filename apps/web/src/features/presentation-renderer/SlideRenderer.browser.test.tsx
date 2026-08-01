@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest'
+import type { ComponentProps } from 'react'
+import { expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
@@ -251,4 +252,92 @@ test('renders compiled structured text inheritance and body columns', async () =
   expect(getComputedStyle(run).color).toBe('rgb(18, 52, 86)')
   expect(getComputedStyle(textContent).columnCount).toBe('2')
   expect(getComputedStyle(textContent).columnGap).toBe('24px')
+})
+
+test('makes an inherited object materializable only when the editor supplies the handler', async () => {
+  const inherited: PPTTextElement = {
+    content: '<p>Inherited decoration</p>',
+    defaultColor: '#111111',
+    defaultFontName: 'Arial',
+    fixedHeight: true,
+    height: 50,
+    id: 'layout-decoration',
+    left: 80,
+    rotate: 0,
+    source: {
+      kind: 'pptx',
+      packageId: 'pptx:source',
+      slidePart: 'ppt/slides/slide1.xml',
+      sourceLayer: 'layout',
+      sourceObjectId: 'pptx:source/ppt/slideLayouts/slideLayout1.xml#8',
+      sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+      stableId: 'pptx:source/ppt/slideLayouts/slideLayout1.xml#8',
+    },
+    top: 80,
+    type: 'text',
+    width: 300,
+  }
+  const sourcePackage: PowerPointPackageReference = {
+    byteLength: 100,
+    fileName: 'inherited.pptx',
+    hierarchy: {
+      layouts: [{
+        elements: [inherited],
+        id: 'layout-1',
+        masterId: 'master-1',
+        objectIds: [inherited.source!.sourceObjectId!],
+        packageId: 'pptx:source',
+        partPath: 'ppt/slideLayouts/slideLayout1.xml',
+        preserve: false,
+        showMasterPlaceholderAnimations: true,
+        showMasterShapes: true,
+      }],
+      masters: [{
+        id: 'master-1',
+        layoutIds: ['layout-1'],
+        objectIds: [],
+        packageId: 'pptx:source',
+        partPath: 'ppt/slideMasters/slideMaster1.xml',
+        preserve: false,
+      }],
+      placeholders: [],
+      themes: [],
+    },
+    kind: 'pptx',
+    packageId: 'pptx:source',
+    slides: [{
+      layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+      masterPart: 'ppt/slideMasters/slideMaster1.xml',
+      slidePart: 'ppt/slides/slide1.xml',
+    }],
+  }
+  const slide: Slide = {
+    elements: [],
+    id: 'slide-1',
+    source: {
+      ...sourcePackage.slides[0]!,
+      kind: 'pptx',
+      packageId: sourcePackage.packageId,
+    },
+  }
+  const onInheritedPointerDown = vi.fn<NonNullable<
+    ComponentProps<typeof SlideRenderer>['onInheritedPointerDown']
+  >>()
+
+  await render(
+    <SlideRenderer
+      onInheritedPointerDown={onInheritedPointerDown}
+      slide={slide}
+      sourcePackages={[sourcePackage]}
+      theme={theme}
+      viewportRatio={0.5625}
+      viewportSize={1000}
+    />,
+  )
+
+  const inheritedLayer = document.querySelector<HTMLElement>('[data-pptx-layer="layout"]')!
+  expect(getComputedStyle(inheritedLayer).pointerEvents).not.toBe('none')
+  await page.getByText('Inherited decoration').click({ force: true })
+  expect(onInheritedPointerDown).toHaveBeenCalledOnce()
+  expect(onInheritedPointerDown.mock.calls[0]?.[1]).toBe(inherited)
 })

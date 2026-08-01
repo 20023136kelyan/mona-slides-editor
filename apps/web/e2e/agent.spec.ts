@@ -1,6 +1,14 @@
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import type { ElectronApplication } from '@playwright/test'
 
-import { expect, openApp, stubSignedInAccount, test } from './electron-fixture'
+import { chooseMenuCommand, configureLocalSaveFolder, expect, importFile, openApp, stubSignedInAccount, test } from './electron-fixture'
+
+const TEXT_CORPUS_PPTX = fileURLToPath(new URL(
+  '../../../tests/corpus/public/corpus-01-text.pptx',
+  import.meta.url,
+))
 
 /**
  * The agent journey, without a model.
@@ -26,6 +34,7 @@ import { expect, openApp, stubSignedInAccount, test } from './electron-fixture'
 interface StubbedTurn {
   /** Appended to the first slide, or nothing to leave the deck alone. */
   addElement?: Record<string, unknown>
+  duplicateNativeSlide?: boolean
   replyText: string
   /** Apply against a revision that was never current, to exercise the refusal. */
   staleRevision?: boolean
@@ -66,9 +75,16 @@ const stubAgentTurn = async (app: ElectronApplication, turn: StubbedTurn): Promi
 
       void (async () => {
         const snapshot = await callTool('stub-snapshot', 'snapshot', {})
-        const deck = snapshot.output as { revision: string; slides: Array<{ elements: unknown[] }> }
+        const deck = snapshot.output as { revision: string; slides: Array<{ elements: Array<Record<string, unknown>>; id: string }> }
         const slides = structuredClone(deck.slides)
         if (script.addElement) slides[0]!.elements.push(script.addElement)
+        if (script.duplicateNativeSlide) {
+          const duplicate = structuredClone(slides[0]!)
+          duplicate.id = 'agent-native-slide-copy'
+          const first = duplicate.elements[0]
+          if (first && typeof first.left === 'number') first.left += 19
+          slides.push(duplicate)
+        }
 
         const applied = await callTool('stub-apply', 'apply', {
           expectedRevision: script.staleRevision ? 'mona-a-revision-that-never-existed' : deck.revision,
@@ -131,6 +147,63 @@ test('streams a turn into the transcript and applies its deck edit as one undo',
   // However many turns it took, it is one thing to undo.
   await page.getByRole('application', { name: 'Editable slide canvas' }).press('Control+z')
   await expect.poll(() => elementCount(page)).toBe(before)
+})
+
+test('duplicates and edits an imported native slide through the Electron agent bridge', async ({ app, page }, testInfo) => {
+  await configureLocalSaveFolder(app, page, join(testInfo.outputDir, 'presentations'))
+  await chooseMenuCommand(app, 'file.new', page)
+  await page.waitForURL(/\/documents\/[^/?]+/)
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  ))).toBe(1)
+  await importFile(app, 'pptx', TEXT_CORPUS_PPTX, page)
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  )), { timeout: 30_000 }).toBe(1)
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
+  )), { timeout: 30_000 }).toBe(5)
+  const originalLeft = await page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides[0]!.elements[0]!.left
+  ))
+
+  await stubAgentTurn(app, {
+    duplicateNativeSlide: true,
+    replyText: 'Duplicated the imported slide and moved its first object.',
+  })
+  await sendPrompt(page, 'Duplicate this imported slide and adjust the copy')
+  await expect(page.getByText('Duplicated the imported slide and moved its first object.')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  )), { timeout: 20_000 }).toBe(2)
+
+  const result = await page.evaluate(() => {
+    const state = window.__MONA_TEST__!.getState()
+    const source = state.presentation.slides[0]!
+    const copy = state.presentation.slides[1]!
+    return {
+      copyOrigin: copy.source?.copyOnWrite,
+      copiedElementOrigin: copy.elements[0]?.source?.copyOnWrite,
+      copiedLeft: copy.elements[0]?.left,
+      sourceLeft: source.elements[0]?.left,
+    }
+  })
+  expect(result.copyOrigin).toMatchObject({
+    packageId: expect.any(String),
+    sourceSlidePart: 'ppt/slides/slide1.xml',
+  })
+  expect(result.copiedElementOrigin).toMatchObject({
+    mode: 'copy',
+    sourceLayer: 'slide',
+    sourceObjectId: expect.any(String),
+  })
+  expect(result.sourceLeft).toBeCloseTo(originalLeft, 5)
+  expect(result.copiedLeft).toBeCloseTo(originalLeft + 19, 5)
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect.poll(() => page.evaluate(() => (
+    window.__MONA_TEST__!.getState().presentation.slides.length
+  ))).toBe(1)
 })
 
 test('routes text-inspector AI actions through the same deck-editing agent', async ({ app, page }) => {

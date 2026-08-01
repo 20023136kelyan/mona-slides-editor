@@ -9,6 +9,7 @@ import type {
 } from './model'
 import {
   compileSlideTheme,
+  createSlideLocalPowerPointOverride,
   resolveSlideRenderGraph,
   resolveSlideRenderState,
 } from './render-graph'
@@ -185,6 +186,73 @@ describe('PowerPoint render graph', () => {
       'slide',
     ])
     expect(slide.elements).toHaveLength(1)
+  })
+
+  it('materializes one inherited object as a copy-on-write override on only the target slide', () => {
+    const layout = image('layout-art', 'layout')
+    layout.source = {
+      ...layout.source!,
+      sourceObjectId: 'pptx:source/ppt/slideLayouts/slideLayout1.xml#7',
+      sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+      stableId: 'pptx:source/ppt/slideLayouts/slideLayout1.xml#7',
+    }
+    const dependencies = [1, 2].map(index => ({
+      layoutPart: 'ppt/slideLayouts/slideLayout1.xml',
+      slidePart: `ppt/slides/slide${index}.xml`,
+    }))
+    const sourcePackage: PowerPointPackageReference = {
+      byteLength: 10,
+      fileName: 'override.pptx',
+      hierarchy: {
+        layouts: [{
+          elements: [layout],
+          id: 'layout-1',
+          objectIds: [layout.source.sourceObjectId!],
+          packageId: 'pptx:source',
+          partPath: 'ppt/slideLayouts/slideLayout1.xml',
+          preserve: false,
+          showMasterPlaceholderAnimations: true,
+          showMasterShapes: true,
+        }],
+        masters: [],
+        placeholders: [],
+        themes: [],
+      },
+      kind: 'pptx',
+      packageId: 'pptx:source',
+      slides: dependencies,
+    }
+    const slides: Slide[] = dependencies.map((dependency, index) => ({
+      elements: [],
+      id: `slide-${index + 1}`,
+      source: { ...dependency, kind: 'pptx', packageId: sourcePackage.packageId },
+    }))
+    let sequence = 0
+    const override = createSlideLocalPowerPointOverride(
+      slides[0]!,
+      [sourcePackage],
+      layout.source.sourceObjectId!,
+      () => `copy-${++sequence}`,
+    )!
+    override.left = 240
+    slides[0]!.elements.push(override)
+
+    const first = resolveSlideRenderState(slides[0]!, [sourcePackage])
+    const second = resolveSlideRenderState(slides[1]!, [sourcePackage])
+    expect(first.nodes.map(node => [node.element.id, node.layer, node.element.left]))
+      .toEqual([['copy-1', 'slide', 240]])
+    expect(second.nodes.map(node => [node.element.id, node.layer, node.element.left]))
+      .toEqual([['layout-art', 'layout', 0]])
+    expect(override.source).toMatchObject({
+      copyOnWrite: {
+        mode: 'override',
+        sourceLayer: 'layout',
+        sourceObjectId: layout.source.sourceObjectId,
+        sourcePart: 'ppt/slideLayouts/slideLayout1.xml',
+      },
+      sourceLayer: 'slide',
+    })
+    expect(layout.left).toBe(0)
   })
 
   it('honors a layout that suppresses master shapes', () => {

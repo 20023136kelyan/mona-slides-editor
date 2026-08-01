@@ -1,5 +1,7 @@
 import {
+  flattenElementTree,
   powerPointCommentNoteId,
+  resolveSlideRenderState,
   type Note,
   type PPTChartElement,
   type PPTElement,
@@ -265,6 +267,31 @@ const collectElements = (
   return { entries, sequenceByParent }
 }
 
+const collectCopyInsertionRoots = (
+  slide: Slide,
+): Array<{ element: PPTElement; parentObjectId?: string }> => {
+  const roots: Array<{ element: PPTElement; parentObjectId?: string }> = []
+  const visit = (
+    elements: readonly PPTElement[],
+    parentObjectId?: string,
+    parentIsCopy = false,
+  ): void => {
+    for (const element of elements) {
+      const isCopy = Boolean(element.source?.copyOnWrite)
+      if (isCopy && !parentIsCopy) roots.push({ element, ...(parentObjectId ? { parentObjectId } : {}) })
+      if (element.type === 'group') {
+        visit(
+          element.elements,
+          sourceObjectId(element) ?? parentObjectId,
+          parentIsCopy || isCopy,
+        )
+      }
+    }
+  }
+  visit(slide.elements)
+  return roots
+}
+
 const transformSnapshot = (
   element: Exclude<PPTElement, { type: 'line' }>,
 ): PowerPointTransformSnapshot => ({
@@ -419,9 +446,46 @@ const relativeOrder = (
   baseline: readonly string[],
   desired: readonly string[],
 ): boolean => {
+  const baselineSet = new Set(baseline)
   const desiredSet = new Set(desired)
   return baseline.filter(objectId => desiredSet.has(objectId)).join('\0')
-    === desired.join('\0')
+    === desired.filter(objectId => baselineSet.has(objectId)).join('\0')
+}
+
+const unaddressedCopySnapshot = (element: PPTElement): unknown => {
+  const clone = structuredClone(element) as unknown as Record<string, unknown>
+  const strip = (candidate: Record<string, unknown>): void => {
+    delete candidate.id
+    delete candidate.source
+    delete candidate.groupId
+    if (candidate.type === 'group' && Array.isArray(candidate.elements)) {
+      for (const child of candidate.elements) {
+        if (child && typeof child === 'object' && !Array.isArray(child)) {
+          strip(child as Record<string, unknown>)
+        }
+      }
+    }
+  }
+  strip(clone)
+  return clone
+}
+
+const unaddressedCopyPayloadIsUnchanged = (
+  before: PPTElement,
+  after: PPTElement,
+): boolean => {
+  if (before.type !== after.type) return false
+  if (!after.source?.copyOnWrite) {
+    if (before.source?.sourceObjectId) return false
+    return JSON.stringify(unaddressedCopySnapshot(before))
+      === JSON.stringify(unaddressedCopySnapshot(after))
+  }
+  if (before.type !== 'group' || after.type !== 'group') return true
+  if (before.elements.length !== after.elements.length) return false
+  return before.elements.every((child, index) => (
+    Boolean(after.elements[index])
+    && unaddressedCopyPayloadIsUnchanged(child, after.elements[index]!)
+  ))
 }
 
 export const analyzePowerPointWriteback = (
@@ -434,20 +498,124 @@ export const analyzePowerPointWriteback = (
   const sourcePackage = baseline.sourcePackages?.find(source => source.packageId === packageId)
   const baselineSlides = baseline.slides.filter(slide => slide.source?.packageId === packageId)
   const desiredSlides = presentation.slides.filter(slide => slide.source?.packageId === packageId)
-  const desiredByPart = new Map(desiredSlides.map(slide => [slidePart(slide), slide]))
+  const desiredExactSlides = desiredSlides.filter(slide => !slide.source?.copyOnWrite)
+  const desiredSlideCopies = desiredSlides.filter(slide => Boolean(slide.source?.copyOnWrite))
+  const desiredByPart = new Map(desiredExactSlides.map(slide => [slidePart(slide), slide]))
+  const knownSourceObjectIds = new Set<string>()
+  const originElementByObjectId = new Map<string, PPTElement>()
+  for (const slide of baselineSlides) {
+    for (const element of flattenElementTree(slide.elements)) {
+      if (element.source?.sourceObjectId) {
+        knownSourceObjectIds.add(element.source.sourceObjectId)
+        originElementByObjectId.set(element.source.sourceObjectId, element)
+      }
+    }
+  }
+  for (const layer of [
+    ...(sourcePackage?.hierarchy?.masters ?? []),
+    ...(sourcePackage?.hierarchy?.layouts ?? []),
+  ]) {
+    for (const element of flattenElementTree(layer.elements ?? [])) {
+      if (element.source?.sourceObjectId) {
+        knownSourceObjectIds.add(element.source.sourceObjectId)
+        originElementByObjectId.set(element.source.sourceObjectId, element)
+      }
+    }
+  }
 
+  const baselineOrder = baselineSlides.map(slideIdentity)
+  const desiredExistingOrder = desiredExactSlides.map(slideIdentity)
+  const baselineIdentities = new Set(baselineOrder)
+  const desiredExistingIdentities = new Set(desiredExistingOrder)
+  const unsupportedNewSlides = presentation.slides.filter(slide => (
+    slide.source?.packageId === packageId
+      ? !baselineIdentities.has(slideIdentity(slide)) && !slide.source.copyOnWrite
+      : !baseline.slides.some(candidate => candidate.id === slide.id)
+  ))
   if (
-    baseline.slides.length !== presentation.slides.length
-    || baseline.slides.some(
-      (slide, index) => slideIdentity(slide) !== slideIdentity(presentation.slides[index]!),
-    )
-    || baselineSlides.length !== desiredSlides.length
+    JSON.stringify(baselineOrder) !== JSON.stringify(desiredExistingOrder)
+    || unsupportedNewSlides.length
+    || baselineSlides.some(slide => !desiredExistingIdentities.has(slideIdentity(slide)))
   ) {
     issues.push(unsupported(
       'pptx.writeback.slide-structure',
-      'Adding, deleting, or reordering slides in an imported PowerPoint is not writeback-safe yet.',
+      'Deleting, reordering, or inserting a slide without one retained native clone origin is not writeback-safe yet.',
       { partPath: 'ppt/presentation.xml' },
     ))
+  }
+  for (const slide of desiredSlideCopies) {
+    const sourcePart = slide.source?.copyOnWrite?.sourceSlidePart
+    const sourceSlide = baselineSlides.find(candidate => candidate.source?.slidePart === sourcePart)
+    if (!sourcePart || !sourceSlide || slide.source?.copyOnWrite?.packageId !== packageId) {
+      issues.push(unsupported(
+        'pptx.writeback.slide-copy-origin',
+        'A duplicated slide no longer resolves to one retained native slide part.',
+        { partPath: sourcePart, slideId: slide.id },
+      ))
+      continue
+    }
+    issues.push(...compareSlideShell(sourceSlide, slide))
+    if (
+      changed(sourceSlide.background, slide.background)
+      && slide.background?.type === 'image'
+    ) {
+      issues.push(unsupported(
+        'pptx.writeback.background-image',
+        'Replacing the copied slide background with a new image requires package media allocation.',
+        { partPath: sourcePart, slideId: slide.id },
+      ))
+    }
+    if (changed(sourceSlide.notes ?? [], slide.notes ?? [])) {
+      issues.push(unsupported(
+        'pptx.writeback.slide-copy-comments',
+        'Changing comments while duplicating a native slide requires comment-author allocation.',
+        { partPath: sourcePart, slideId: slide.id },
+      ))
+    }
+    const sourceElements = flattenElementTree(sourceSlide.elements)
+    for (const [elementIndex, element] of flattenElementTree(slide.elements).entries()) {
+      const origin = element.source?.copyOnWrite
+      if (!origin) {
+        const sourceElement = sourceElements[elementIndex]
+        if (
+          sourceElement
+          && !sourceElement.source?.sourceObjectId
+          && JSON.stringify(unaddressedCopySnapshot(sourceElement))
+            === JSON.stringify(unaddressedCopySnapshot(element))
+        ) continue
+        issues.push(unsupported(
+          'pptx.writeback.slide-copy-element-added',
+          'Every object on a copied native slide must retain an exact native copy origin.',
+          { elementId: element.id, partPath: sourcePart, slideId: slide.id },
+        ))
+        continue
+      }
+      if (origin.packageId !== packageId || !knownSourceObjectIds.has(origin.sourceObjectId)) {
+        issues.push(unsupported(
+          'pptx.writeback.slide-copy-element-origin',
+          'An object on the copied slide no longer resolves to one retained native PowerPoint object.',
+          {
+            elementId: element.id,
+            objectId: origin.sourceObjectId,
+            partPath: origin.sourcePart,
+            slideId: slide.id,
+          },
+        ))
+      }
+    }
+    operations.push({
+      after: structuredClone(slide),
+      before: structuredClone(sourceSlide),
+      index: presentation.slides.indexOf(slide),
+      ...(sourcePackage ? {
+        inheritedBefore: resolveSlideRenderState(sourceSlide, [sourcePackage]).nodes
+          .filter(node => node.layer !== 'slide')
+          .map(node => structuredClone(node.element)),
+      } : {}),
+      kind: 'insert-slide',
+      slideId: slide.id,
+      sourcePart,
+    })
   }
 
   for (const baselineSlide of baselineSlides) {
@@ -455,6 +623,29 @@ export const analyzePowerPointWriteback = (
     const desiredSlide = desiredByPart.get(partPath)
     if (!partPath || !desiredSlide) continue
     issues.push(...compareSlideShell(baselineSlide, desiredSlide))
+    if (changed(
+      baselineSlide.source?.hiddenInheritedObjectIds ?? [],
+      desiredSlide.source?.hiddenInheritedObjectIds ?? [],
+    )) {
+      const dependency = sourcePackage?.slides.find(slide => slide.slidePart === partPath)
+      if (!dependency?.layoutPart) {
+        issues.push(unsupported(
+          'pptx.writeback.inherited-visibility-layout',
+          'The slide has no exact native layout from which a private visibility layer can be derived.',
+          { partPath, slideId: baselineSlide.id },
+        ))
+      }
+      else {
+        operations.push({
+          hiddenObjectIds: structuredClone(desiredSlide.source?.hiddenInheritedObjectIds ?? []),
+          kind: 'inherited-visibility',
+          layoutPart: dependency.layoutPart,
+          ...(dependency.masterPart ? { masterPart: dependency.masterPart } : {}),
+          partPath,
+          slideId: baselineSlide.id,
+        })
+      }
+    }
     if (changed(baselineSlide.background, desiredSlide.background)) {
       if (desiredSlide.background?.type === 'image') {
         issues.push(unsupported(
@@ -571,10 +762,81 @@ export const analyzePowerPointWriteback = (
     const desiredById = new Map(
       desiredTree.entries.map(entry => [entry.element.id, entry] as const),
     )
+    const insertionRootById = new Map(
+      collectCopyInsertionRoots(desiredSlide).map(entry => [entry.element.id, entry]),
+    )
+    const insertionTreeIds = new Set(
+      [...insertionRootById.values()].flatMap(entry => (
+        flattenElementTree([entry.element]).map(element => element.id)
+      )),
+    )
 
     for (const desiredEntry of desiredTree.entries) {
       const source = desiredEntry.element.source
+      if (source?.copyOnWrite) {
+        const origin = source.copyOnWrite
+        if (
+          origin.packageId !== packageId
+          || !knownSourceObjectIds.has(origin.sourceObjectId)
+        ) {
+          issues.push(unsupported(
+            'pptx.writeback.copy-origin',
+            'A source-backed copy no longer resolves to one retained native PowerPoint object.',
+            {
+              elementId: desiredEntry.element.id,
+              objectId: origin.sourceObjectId,
+              partPath: origin.sourcePart,
+              slideId: desiredSlide.id,
+            },
+          ))
+        }
+        else if (insertionRootById.has(desiredEntry.element.id)) {
+          const before = originElementByObjectId.get(origin.sourceObjectId)
+          if (!before || !partPath) {
+            issues.push(unsupported(
+              'pptx.writeback.copy-origin-model',
+              'The retained native copy origin has no semantic source element or target slide part.',
+              {
+                elementId: desiredEntry.element.id,
+                objectId: origin.sourceObjectId,
+                partPath: origin.sourcePart,
+                slideId: desiredSlide.id,
+              },
+            ))
+          }
+          else {
+            const insertion = insertionRootById.get(desiredEntry.element.id)!
+            if (!unaddressedCopyPayloadIsUnchanged(before, desiredEntry.element)) {
+              issues.push(unsupported(
+                'pptx.writeback.copy-unaddressable-child',
+                'An unaddressable child inside the copied native object was changed or structurally replaced.',
+                {
+                  elementId: desiredEntry.element.id,
+                  objectId: origin.sourceObjectId,
+                  partPath: origin.sourcePart,
+                  slideId: desiredSlide.id,
+                },
+              ))
+              continue
+            }
+            operations.push({
+              after: structuredClone(desiredEntry.element),
+              before: structuredClone(before),
+              elementId: desiredEntry.element.id,
+              kind: 'insert-object',
+              mode: origin.mode,
+              ...(insertion.parentObjectId ? { parentObjectId: insertion.parentObjectId } : {}),
+              slideId: desiredSlide.id,
+              sourceObjectId: origin.sourceObjectId,
+              sourcePart: origin.sourcePart,
+              targetPart: partPath,
+            })
+          }
+        }
+        continue
+      }
       if (!source) {
+        if (insertionTreeIds.has(desiredEntry.element.id)) continue
         const baselineEntry = baselineById.get(desiredEntry.element.id)
         if (
           baselineEntry
@@ -1242,7 +1504,23 @@ export const analyzePowerPointWriteback = (
     issue,
   ])).values()]
   const touchedParts = [...new Set(operations.flatMap(operation => (
-    operation.kind === 'chart'
+    operation.kind === 'insert-slide'
+      ? [operation.sourcePart, 'ppt/presentation.xml', 'ppt/_rels/presentation.xml.rels']
+      : operation.kind === 'insert-object'
+        ? [
+            operation.sourcePart,
+            operation.targetPart,
+            relationshipPartPath(operation.sourcePart),
+            relationshipPartPath(operation.targetPart),
+          ]
+        : operation.kind === 'inherited-visibility'
+          ? [
+              operation.partPath,
+              operation.layoutPart,
+              relationshipPartPath(operation.partPath),
+              relationshipPartPath(operation.layoutPart),
+            ]
+        : operation.kind === 'chart'
       ? [operation.chartPart, ...(operation.workbookPart ? [operation.workbookPart] : [])]
       : operation.kind === 'background' || operation.kind === 'notes' || operation.kind === 'comments'
         ? [operation.partPath]

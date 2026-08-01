@@ -492,11 +492,48 @@ export interface PowerPointPackageManifest extends PowerPointPackageReference {
 }
 
 export interface PowerPointSlideSource extends PowerPointSlideDependency {
+  /**
+   * The retained slide part behind a newly duplicated Mona slide.
+   *
+   * `slidePart` continues to resolve the hierarchy while the presentation is
+   * open. `copyOnWrite` is the crucial distinction at export: this slide is a
+   * new native slide cloned from that part, never another alias for it.
+   */
+  copyOnWrite?: {
+    packageId: string
+    sourceSlidePart: string
+  }
+  /**
+   * Inherited drawing objects intentionally hidden only on this slide.
+   *
+   * PowerPoint does not give every master/layout object a slide-local delete
+   * switch. Mona keeps the intent here and native writeback derives a private
+   * layout/master chain for this slide, so the shared source hierarchy is never
+   * mutated as a side effect.
+   */
+  hiddenInheritedObjectIds?: string[]
   kind: 'pptx'
   packageId: string
 }
 
 export type PowerPointElementSourceLayer = 'inherited' | 'layout' | 'master' | 'slide'
+
+/**
+ * The native object retained behind a Mona-created copy or slide-local
+ * override.
+ *
+ * This is deliberately not a new exact source identity. `sourceObjectId`
+ * continues to mean "this element is that OOXML object"; `copyOnWrite` means
+ * "this element was forked from that object". Keeping the distinction prevents
+ * a duplicate from ever patching or deleting its original by accident.
+ */
+export interface PowerPointCopyOnWriteSource {
+  mode: 'copy' | 'override'
+  packageId: string
+  sourceLayer: PowerPointElementSourceLayer
+  sourceObjectId: string
+  sourcePart: string
+}
 
 /**
  * Provenance for a Mona element derived from a PowerPoint object.
@@ -509,6 +546,7 @@ export type PowerPointElementSourceLayer = 'inherited' | 'layout' | 'master' | '
  */
 export interface PowerPointElementSource {
   connector?: PowerPointConnectorRelationships
+  copyOnWrite?: PowerPointCopyOnWriteSource
   decorative?: boolean
   description?: string
   hidden?: boolean

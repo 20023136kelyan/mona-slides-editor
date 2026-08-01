@@ -54,6 +54,43 @@ export interface PowerPointDeletePatch {
   slideId: string
 }
 
+/** Clone one retained native drawing object into a slide shape tree. */
+export interface PowerPointObjectInsertPatch {
+  after: PPTElement
+  before: PPTElement
+  elementId: string
+  kind: 'insert-object'
+  mode: 'copy' | 'override'
+  /** Existing native group which receives the clone; absent means slide root. */
+  parentObjectId?: string
+  slideId: string
+  sourceObjectId: string
+  sourcePart: string
+  targetPart: string
+}
+
+/** Materialize slide-local visibility for shared layout/master objects. */
+export interface PowerPointInheritedVisibilityPatch {
+  hiddenObjectIds: string[]
+  kind: 'inherited-visibility'
+  layoutPart: string
+  masterPart?: string
+  partPath: string
+  slideId: string
+}
+
+/** Clone one retained native slide and register it in presentation order. */
+export interface PowerPointSlideInsertPatch {
+  after: import('@mona/presentation-core').Slide
+  before: import('@mona/presentation-core').Slide
+  index: number
+  /** Effective retained layout/master objects available to slide-local overrides. */
+  inheritedBefore?: PPTElement[]
+  kind: 'insert-slide'
+  slideId: string
+  sourcePart: string
+}
+
 export interface PowerPointAccessibilityPatch {
   after?: PPTElement['accessibility']
   before?: PPTElement['accessibility']
@@ -266,12 +303,15 @@ export type PowerPointPatchOperation =
   | PowerPointConnectorPatch
   | PowerPointDeletePatch
   | PowerPointImagePatch
+  | PowerPointInheritedVisibilityPatch
+  | PowerPointObjectInsertPatch
   | PowerPointNotesPatch
   | PowerPointShapeGeometryPatch
   | PowerPointShapeStylePatch
   | PowerPointTablePatch
   | PowerPointTextPatch
   | PowerPointTransformPatch
+  | PowerPointSlideInsertPatch
 
 export interface PowerPointWritebackPlan {
   mode: 'noop' | 'patch' | 'unsupported'

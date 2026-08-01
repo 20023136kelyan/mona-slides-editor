@@ -1,7 +1,11 @@
 import {
   applyPresentationTransaction,
+  copyElementTreeWithPowerPointOrigins,
   createPresentationTransaction,
+  createPresentationId,
   flattenElementTree,
+  retainElementTreeCopyOrigins,
+  resolveSlideRenderState,
   type PresentationCommand,
   type PresentationState,
   type PresentationTransaction,
@@ -19,6 +23,298 @@ const MAX_ELEMENT_EXTENT = 100_000
  * Anything near this ceiling means bytes are being inlined again.
  */
 const MAX_SLIDES_BYTES = 12_000_000
+
+type AgentWorkspaceSlide = Slide & {
+  powerPointInheritedElements?: PPTElement[]
+}
+
+const same = (left: unknown, right: unknown): boolean => (
+  JSON.stringify(left) === JSON.stringify(right)
+)
+
+interface KnownNativeOrigin {
+  packageId: string
+  sourceLayer: NonNullable<PPTElement['source']>['sourceLayer']
+  sourceObjectId: string
+  sourcePart: string
+}
+
+const nativeOrigin = (element: PPTElement): KnownNativeOrigin | undefined => {
+  const source = element.source
+  if (!source) return undefined
+  if (source.sourceObjectId && source.sourcePart) {
+    return {
+      packageId: source.packageId,
+      sourceLayer: source.sourceLayer,
+      sourceObjectId: source.sourceObjectId,
+      sourcePart: source.sourcePart,
+    }
+  }
+  const origin = source.copyOnWrite
+  return origin
+    ? {
+        packageId: origin.packageId,
+        sourceLayer: origin.sourceLayer,
+        sourceObjectId: origin.sourceObjectId,
+        sourcePart: origin.sourcePart,
+      }
+    : undefined
+}
+
+/**
+ * Consume the virtual inherited layer exposed in the agent's slide JSON.
+ *
+ * An unchanged entry is discarded. Editing one creates a slide-local
+ * copy-on-write override; removing one records a slide-local hide intent. The
+ * shared master/layout object is never edited as a side effect of applying a
+ * slide file.
+ */
+const materializeInheritedAgentEdits = (
+  state: PresentationState,
+  slides: AgentWorkspaceSlide[],
+): Slide[] => {
+  const currentById = new Map(state.slides.map(slide => [slide.id, slide]))
+  return slides.map(inputSlide => {
+    const {
+      powerPointInheritedElements,
+      ...slideWithoutVirtualLayer
+    } = inputSlide
+    const slide = slideWithoutVirtualLayer as Slide
+    const copyOrigin = slide.source?.copyOnWrite
+    const previous = currentById.get(slide.id) ?? (
+      copyOrigin
+        ? state.slides.find(candidate => (
+            candidate.source?.packageId === copyOrigin.packageId
+            && candidate.source?.slidePart === copyOrigin.sourceSlidePart
+          ))
+        : undefined
+    )
+    if (!previous || powerPointInheritedElements === undefined) return slide
+    if (!Array.isArray(powerPointInheritedElements)) {
+      throw new Error(`Slide "${slide.id}" has an invalid powerPointInheritedElements list.`)
+    }
+    const inherited = resolveSlideRenderState(previous, state.sourcePackages ?? [])
+      .nodes
+      .filter(node => node.layer !== 'slide')
+      .map(node => node.element)
+    const baselineByObject = new Map(inherited.flatMap(element => {
+      const objectId = element.source?.sourceObjectId
+      return objectId ? [[objectId, element] as const] : []
+    }))
+    const baselineById = new Map(inherited.map(element => [element.id, element]))
+    const desiredByObject = new Map<string, PPTElement>()
+    const retainedUnaddressableIds = new Set<string>()
+    for (const element of powerPointInheritedElements) {
+      const objectId = element.source?.sourceObjectId
+      if (!objectId) {
+        const baselineElement = baselineById.get(element.id)
+        if (!baselineElement || baselineElement.source?.sourceObjectId || !same(baselineElement, element)) {
+          throw new Error(
+            `Slide "${slide.id}" changed an inherited element that has no exact native source identity.`,
+          )
+        }
+        if (retainedUnaddressableIds.has(element.id)) {
+          throw new Error(`Slide "${slide.id}" repeats inherited element "${element.id}".`)
+        }
+        retainedUnaddressableIds.add(element.id)
+        continue
+      }
+      const baselineElement = baselineByObject.get(objectId)
+      if (!baselineElement) {
+        throw new Error(
+          `Slide "${slide.id}" contains an inherited element without a valid native source identity.`,
+        )
+      }
+      if (!same(baselineElement.source, element.source)) {
+        throw new Error(
+          `Inherited element "${element.id}" changed PowerPoint source provenance. Keep the source field exactly as read.`,
+        )
+      }
+      if (desiredByObject.has(objectId)) {
+        throw new Error(`Slide "${slide.id}" repeats inherited object "${objectId}".`)
+      }
+      desiredByObject.set(objectId, element)
+    }
+    for (const baselineElement of inherited) {
+      if (
+        !baselineElement.source?.sourceObjectId
+        && !retainedUnaddressableIds.has(baselineElement.id)
+      ) {
+        throw new Error(
+          `Slide "${slide.id}" removed an inherited element that has no exact native source identity.`,
+        )
+      }
+    }
+    const hidden = new Set(slide.source?.hiddenInheritedObjectIds ?? [])
+    const overrides: PPTElement[] = []
+    for (const [objectId, baselineElement] of baselineByObject) {
+      const desiredElement = desiredByObject.get(objectId)
+      if (!desiredElement) {
+        hidden.add(objectId)
+        continue
+      }
+      if (same(baselineElement, desiredElement)) continue
+      const copied = copyElementTreeWithPowerPointOrigins(
+        [desiredElement],
+        createPresentationId,
+        'override',
+        previous.source
+          ? {
+              packageId: previous.source.packageId,
+              slidePart: previous.source.slidePart,
+            }
+          : undefined,
+      ).elements[0]
+      if (copied) overrides.push(copied)
+    }
+    if (!overrides.length && !hidden.size) return slide
+    return {
+      ...slide,
+      elements: [...slide.elements, ...overrides],
+      ...(slide.source
+        ? {
+            source: {
+              ...slide.source,
+              ...(hidden.size ? { hiddenInheritedObjectIds: [...hidden].sort() } : {}),
+            },
+          }
+        : {}),
+    }
+  })
+}
+
+/**
+ * Source provenance is data owned by Mona, not an agent-editable style field.
+ * Existing identities must remain byte-for-byte equal. Copying an imported
+ * element under a new Mona id is allowed and is converted to an explicit native
+ * copy reference instead of aliasing the original OOXML object.
+ */
+const normalizeAgentElementProvenance = (
+  state: PresentationState,
+  slides: Slide[],
+): void => {
+  const previousById = new Map<string, { element: PPTElement; slideId: string }>()
+  const knownNativeObjects = new Map<string, KnownNativeOrigin>()
+  for (const slide of state.slides) {
+    for (const element of flattenElementTree(slide.elements)) {
+      previousById.set(element.id, { element, slideId: slide.id })
+      const origin = nativeOrigin(element)
+      if (origin) knownNativeObjects.set(origin.sourceObjectId, origin)
+    }
+    for (const node of resolveSlideRenderState(slide, state.sourcePackages ?? []).nodes) {
+      const origin = nativeOrigin(node.element)
+      if (origin) knownNativeObjects.set(origin.sourceObjectId, origin)
+    }
+  }
+
+  for (const slide of slides) {
+    const previousSlide = state.slides.find(candidate => candidate.id === slide.id)
+    if (previousSlide && !same(previousSlide.source, slide.source)) {
+      throw new Error(
+        `Slide "${slide.id}" changed PowerPoint source provenance. Keep the source field exactly as read.`,
+      )
+    }
+    if (!previousSlide && slide.source) {
+      const sourceSlide = state.slides.find(candidate => same(candidate.source, slide.source))
+      if (!sourceSlide) {
+        throw new Error(`Slide "${slide.id}" has forged or unknown PowerPoint source provenance.`)
+      }
+      // The copy keeps the retained slide as a read-only clone origin. It may
+      // continue resolving the same layout/master while open, but writeback
+      // sees `copyOnWrite` and allocates a new slide part rather than patching
+      // the source slide. Duplicate element IDs are remapped atomically because
+      // IDs are deck-global.
+      const roots = slide.elements
+      const existingIds = new Set(state.slides.flatMap(candidate => (
+        flattenElementTree(candidate.elements).map(element => element.id)
+      )))
+      if (flattenElementTree(roots).some(element => existingIds.has(element.id))) {
+        const copied = copyElementTreeWithPowerPointOrigins(roots, createPresentationId, 'copy')
+        slide.elements = copied.elements
+        if (slide.animations) {
+          for (const animation of slide.animations) {
+            animation.id = createPresentationId()
+            animation.elId = copied.idMap.get(animation.elId) ?? animation.elId
+          }
+        }
+      }
+      else slide.elements = roots
+      slide.source = {
+        ...sourceSlide.source!,
+        copyOnWrite: {
+          packageId: sourceSlide.source!.packageId,
+          sourceSlidePart: sourceSlide.source!.copyOnWrite?.sourceSlidePart
+            ?? sourceSlide.source!.slidePart,
+        },
+      }
+    }
+    const target = slide.source
+      ? { packageId: slide.source.packageId, slidePart: slide.source.slidePart }
+      : undefined
+    const validateNewTree = (elements: readonly PPTElement[]): void => {
+      for (const element of flattenElementTree(elements)) {
+        const origin = nativeOrigin(element)
+        if (element.source) {
+          const known = origin && knownNativeObjects.get(origin.sourceObjectId)
+          if (!known || !same(known, origin)) {
+            throw new Error(
+              `Element "${element.id}" has a forged or unknown PowerPoint source identity (${JSON.stringify(origin)}).`,
+            )
+          }
+          continue
+        }
+        if (element.type === 'opaque') {
+          throw new Error(
+            `Opaque element "${element.id}" has no retained native payload and cannot be created from scratch.`,
+          )
+        }
+      }
+    }
+    const normalizeRoots = (elements: PPTElement[]): void => {
+      for (const element of elements) {
+        const previous = previousById.get(element.id)
+        if (previous?.slideId === slide.id) {
+          if (!same(previous.element.source, element.source)) {
+            throw new Error(
+              `Element "${element.id}" changed PowerPoint source provenance. Keep the source field exactly as read.`,
+            )
+          }
+          if (element.type === 'group') normalizeRoots(element.elements)
+          continue
+        }
+        if (element.source) {
+          if (previous && !same(previous.element.source, element.source)) {
+            throw new Error(
+              `Element "${element.id}" changed PowerPoint source provenance. Keep the source field exactly as read.`,
+            )
+          }
+          validateNewTree([element])
+          retainElementTreeCopyOrigins([element], 'copy', target)
+          continue
+        }
+        validateNewTree([element])
+        if (element.type === 'group') normalizeRoots(element.elements)
+      }
+    }
+    normalizeRoots(slide.elements)
+
+    const desiredIds = new Set(flattenElementTree(slide.elements).map(element => element.id))
+    if (previousSlide) {
+      const hidden = new Set(slide.source?.hiddenInheritedObjectIds ?? [])
+      for (const previous of flattenElementTree(previousSlide.elements)) {
+        if (desiredIds.has(previous.id)) continue
+        const origin = previous.source?.copyOnWrite
+        if (origin?.mode === 'override') hidden.add(origin.sourceObjectId)
+      }
+      if (slide.source && hidden.size) {
+        slide.source = {
+          ...slide.source,
+          hiddenInheritedObjectIds: [...hidden].sort(),
+        }
+      }
+    }
+  }
+}
 
 /**
  * Accepts a bare string where the model meant "set the text".
@@ -103,15 +399,20 @@ const assertLocalImage = (element: PPTElement, label: string) => {
  */
 export const validateAgentSlides = (
   state: PresentationState,
-  { slides, theme, title }: { slides: readonly Slide[]; theme?: Partial<SlideTheme>; title?: string },
+  { slides, theme, title }: { slides: readonly AgentWorkspaceSlide[]; theme?: Partial<SlideTheme>; title?: string },
 ): PresentationTransaction => {
   if (!slides.length) throw new Error('The deck has no slides. A deck must keep at least one.')
   if (JSON.stringify(slides).length > MAX_SLIDES_BYTES) {
     throw new Error(`The deck exceeds ${Math.round(MAX_SLIDES_BYTES / 1_000_000)} MB. Keep assets as files rather than inline data.`)
   }
 
-  // Cloned up front so normalising never touches the caller's slides.
-  const cloned = structuredClone(slides) as Slide[]
+  // Cloned up front so normalising never touches the caller's slides. Native
+  // provenance is checked before the virtual inherited layer is consumed, so
+  // the normalizer's own hidden/override metadata cannot be mistaken for an
+  // agent attempt to forge a source identity.
+  const workspaceSlides = structuredClone(slides) as AgentWorkspaceSlide[]
+  normalizeAgentElementProvenance(state, workspaceSlides)
+  const cloned = materializeInheritedAgentEdits(state, workspaceSlides)
   const previousElements = new Map<string, PPTElement>()
   for (const slide of state.slides) {
     for (const element of flattenElementTree(slide.elements)) previousElements.set(element.id, element)

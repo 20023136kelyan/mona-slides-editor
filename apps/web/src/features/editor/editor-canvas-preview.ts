@@ -13,9 +13,8 @@ import {
 } from '@mona/editor-interactions/geometry'
 import {
   createPresentationId,
-  detachElementTreeSources,
+  copyElementTreeWithPowerPointOrigins,
   flattenElementTree,
-  remapElementTreeIds,
   SHAPE_PATH_FORMULAS,
   type PresentationCommand,
 } from '@mona/presentation-core'
@@ -479,8 +478,11 @@ export const duplicatePreviewElements = (
   detachFromGroup = false,
 ): PPTElement[] => {
   const groupIds = new Map<string, string>()
-  const duplicates = remapElementTreeIds(source, createPresentationId).elements
-  detachElementTreeSources(duplicates)
+  const duplicates = copyElementTreeWithPowerPointOrigins(
+    source,
+    createPresentationId,
+    'copy',
+  ).elements
   for (const element of flattenElementTree(duplicates)) {
     if (element.groupId && !groupIds.has(element.groupId)) groupIds.set(element.groupId, createPresentationId())
   }
