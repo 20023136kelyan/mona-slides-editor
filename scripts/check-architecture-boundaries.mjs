@@ -26,7 +26,12 @@ for (const property of ['id:', 'elements:', 'title?:', 'hidden?:', 'durationMs?:
 }
 
 const frameworkFreeRoots = [
+  'packages/data-source/src',
+  'packages/document-jobs/src',
+  'packages/pptx-ingestion/src',
+  'packages/pptx-writeback/src',
   'packages/presentation-core/src',
+  'packages/project-core/src',
   'packages/editor-state/src',
   'packages/editor-interactions/src',
   'packages/test-fixtures/src',
@@ -35,6 +40,19 @@ const frameworkFreeRoots = [
 const forbiddenFrameworkImport = /(?:from\s+|import\s*\()['"](?:vue|pinia|react|react-dom)(?:\/[^'"]*)?['"]/
 for (const file of frameworkFreeRoots.flatMap(walk)) {
   if (forbiddenFrameworkImport.test(read(file))) failures.push(`${file} imports a UI framework.`)
+}
+
+for (const file of [
+  ...walk('packages/pptx-ingestion/src'),
+  ...walk('packages/pptx-writeback/src'),
+]) {
+  const source = read(file)
+  if (/\b(?:document|window)\s*\.|new\s+DOMParser\b|NodeFilter\s*\./.test(source)) {
+    failures.push(`${file} depends on a renderer DOM; desktop PPTX ingestion must remain headless.`)
+  }
+  if (/(?:from\s+|import\s*\()['"]@\/[^'"]+['"]/.test(source)) {
+    failures.push(`${file} imports a web application alias; PPTX ingestion must be app-independent.`)
+  }
 }
 
 const applicationRoots = ['apps/web/src', ...frameworkFreeRoots]
@@ -49,6 +67,12 @@ const directUiPrimitiveImport = /(?:from\s+|import\s*\()['"](?:radix-ui|@radix-u
 for (const file of featureFiles) {
   if (directUiPrimitiveImport.test(read(file))) {
     failures.push(`${file} bypasses the shadcn component layer with a direct Radix import.`)
+  }
+}
+
+for (const file of walk('apps/web/src/features/projects')) {
+  if (/(?:from\s+|import\s*\()['"]@\/features\/editor(?:\/[^'"]*)?['"]/.test(read(file))) {
+    failures.push(`${file} couples the project surface to the single-document editor.`)
   }
 }
 

@@ -19,7 +19,7 @@
   /* AI dock column width (the rail and drawer take their widths from Tailwind). */
   --dock-w: 400px;
   /* The one surface the whole canvas column paints on. */
-  --editor-canvas-surface: #f3f4f7;
+  --editor-canvas-surface: var(--workspace-surface);
   position: relative;
   display: flex;
   min-width: 0;
@@ -2256,11 +2256,6 @@
 /* The rail's first row doubles as somewhere to grab the window, so its controls
    have to opt back out — a drag region swallows clicks, which made the collapse
    toggle and the brand look dead. */
-.mona-editor-rail-titlebar { -webkit-app-region: drag; }
-.mona-editor-rail-titlebar button,
-.mona-editor-rail-titlebar a,
-.mona-editor-rail-titlebar [role='button'] { -webkit-app-region: no-drag; }
-
 /* macOS draws the traffic lights over the rail's top-left. Both numbers live
    here so the two sides stay symmetric: the shell insets the lights by
    --mona-traffic-inset, and the collapsed rail is that inset again on the far

@@ -37,6 +37,7 @@ const template = (): MenuItemConstructorOptions[] => [
   {
     label: 'File',
     submenu: [
+      { label: 'All Presentations', accelerator: 'Cmd+Shift+O', click: send('file.home') },
       { label: 'New Presentation', accelerator: 'Cmd+N', click: send('file.new') },
       { type: 'separator' },
       { label: 'Import PowerPoint…', accelerator: 'Cmd+O', click: send('file.import.pptx') },

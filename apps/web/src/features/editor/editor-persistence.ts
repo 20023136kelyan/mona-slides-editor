@@ -2,13 +2,12 @@ import { validateImportedSlides, validatePresentationState, type PresentationSta
 
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
-import { clearPowerPointPackages, clearSketchRecords } from '@/lib/deck-storage'
 import { collectDeckAssetNames } from '@/features/editor/editor-deck-assets'
 import { maybeMonaBridge, monaBridge } from '@/lib/mona-bridge'
 
 /**
- * Working-copy persistence: the deck autosaves to disk shortly after every change
- * and is read back on the next launch, so a crash or a quit cannot lose work.
+ * Per-document persistence: the deck autosaves to its own directory shortly
+ * after every change and is read back from its document route.
  *
  * It used to keep the deck in IndexedDB with binary in a second store keyed by
  * `blob:` URL, which meant every save had to fetch the bytes back through a handle
@@ -20,9 +19,6 @@ import { maybeMonaBridge, monaBridge } from '@/lib/mona-bridge'
 const SAVE_DEBOUNCE_MS = 800
 /** 5 is the first version whose assets are files rather than IndexedDB blobs. */
 const STORAGE_VERSION = 5
-
-/** Set by a restore, read once by the banner that offers to start fresh. */
-let restoredWorkingCopy = false
 
 interface StoredDeck {
   presentation: PresentationState
@@ -49,6 +45,11 @@ export interface DeckPersistenceSnapshot {
   status: DeckPersistenceStatus
 }
 
+interface DeckPersistenceOptions {
+  flushDerived?: () => Promise<void>
+  onSaved?: (presentation: PresentationState, savedAt: number) => void
+}
+
 // Fixture sessions are throwaway and automated runs must stay hermetic:
 // persistence is off for development fixtures, in audience mirror windows, and
 // under webdriver unless a persistence test opts in via ?persistTest=1.
@@ -57,12 +58,6 @@ export const isPersistenceEnabled = (url: URL = new URL(window.location.href)): 
   if (url.searchParams.get('mode') === 'audience') return false
   if (navigator.webdriver && !url.searchParams.has('persistTest')) return false
   return true
-}
-
-export const consumeRestoredDeckFlag = (): boolean => {
-  const value = restoredWorkingCopy
-  restoredWorkingCopy = false
-  return value
 }
 
 const isStoredDeck = (value: unknown): value is StoredDeck => {
@@ -114,18 +109,17 @@ const migrateStoredDeck = (stored: StoredDeck): StoredDeck => {
   }
 }
 
-export const restoreWorkingDeck = async (): Promise<PresentationState | null> => {
+export const restoreDocument = async (documentId: string): Promise<PresentationState | null> => {
   try {
-    const stored = await monaBridge().deck.read()
+    const stored = await monaBridge().documents.read(documentId)
     if (!stored) return null
     if (!isStoredDeck(stored)) {
-      // A corrupt or foreign-shaped slot must never wedge boot: drop it.
-      await monaBridge().deck.clear().catch(() => {})
+      // Never delete a corrupt document automatically. The library still knows
+      // where it is, so a recovery flow can inspect or restore it later.
       return null
     }
     const migrated = migrateStoredDeck(stored)
     if (!validateImportedSlides(migrated.presentation.slides).valid) {
-      await monaBridge().deck.clear().catch(() => {})
       return null
     }
 
@@ -139,10 +133,8 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
       slideIndex: Math.min(Math.max(migrated.presentation.slideIndex, 0), migrated.presentation.slides.length - 1),
     }
     if (!validatePresentationState(presentation).valid) {
-      await monaBridge().deck.clear().catch(() => {})
       return null
     }
-    restoredWorkingCopy = true
     return presentation
   }
   catch {
@@ -150,13 +142,11 @@ export const restoreWorkingDeck = async (): Promise<PresentationState | null> =>
   }
 }
 
-export const discardWorkingDeck = async (): Promise<void> => {
-  await monaBridge().deck.clear().catch(() => {})
-  await clearPowerPointPackages().catch(() => {})
-  await clearSketchRecords().catch(() => {})
-}
-
-export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => {
+export const initDeckPersistence = (
+  runtime: EditorRuntime,
+  documentId: string,
+  options: DeckPersistenceOptions = {},
+): DeckPersistence => {
   let lastSaved = runtime.store.getState().presentation
   let stopped = false
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -196,11 +186,12 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
 
         // The assets are already on disk - they were written before anything
         // referenced them - so saving the deck is one write and nothing else.
-        const savedAt = await monaBridge().deck.write(presentation)
+        const savedAt = await monaBridge().documents.write(documentId, presentation)
         lastSaved = presentation
+        options.onSaved?.(presentation, savedAt)
         // Only after the deck naming them is safely stored: an orphan costs disk,
         // where deleting one still referenced costs a picture.
-        void monaBridge().deck.collectGarbage([...collectDeckAssetNames(presentation)])
+        void monaBridge().deck.collectGarbage(documentId, [...collectDeckAssetNames(presentation)])
           .catch(() => undefined)
         if (runtime.store.getState().presentation === presentation) {
           updateSnapshot({
@@ -254,13 +245,14 @@ export const initDeckPersistence = (runtime: EditorRuntime): DeckPersistence => 
     schedule()
   })
 
-  const flush = (): Promise<void> => {
+  const flush = async (): Promise<void> => {
     if (timer) {
       clearTimeout(timer)
       timer = null
     }
-    if (!snapshot.dirty) return saving
-    return enqueueSave()
+    if (snapshot.dirty) await enqueueSave()
+    else await saving
+    await options.flushDerived?.()
   }
 
   const retry = (): Promise<void> => {

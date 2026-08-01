@@ -1,3 +1,28 @@
+import type {
+  DataSourceChangeEvent,
+  DataSourceDocument,
+  DataSourceDocumentReference,
+  DataSourceItem,
+  DataSourcePickedDocument,
+  DataSourceQuery,
+  DataSourceSummary,
+} from '@mona/data-source'
+import type { DocumentJobRecord } from '@mona/document-jobs'
+import type { EmbeddedFont } from '@mona/pptx-ingestion'
+import type {
+  PowerPointImportReport,
+  PowerPointPackageReference,
+  PresentationState,
+  SlideTheme,
+} from '@mona/presentation-core'
+import type {
+  AddProjectArtifactInput,
+  AppendProjectMessageInput,
+  CreateProjectInput,
+  ProjectRecord,
+  ProjectSummary,
+} from '@mona/project-core'
+
 /**
  * The desktop shell, as the renderer sees it.
  *
@@ -40,6 +65,41 @@ export interface MonaFileFilter {
   name: string
 }
 
+export interface MonaDocumentSummary {
+  createdAt: number
+  id: string
+  lastOpenedAt: number
+  slideCount: number
+  sourceReference?: DataSourceDocumentReference
+  thumbnailRevision?: number
+  title: string
+  updatedAt: number
+}
+
+export interface MonaStoredDocument {
+  presentation: unknown
+  savedAt: number
+  version: number
+}
+
+export interface MonaPowerPointIngestion {
+  embeddedFonts: EmbeddedFont[]
+  presentation: PresentationState
+  report: PowerPointImportReport
+  sourcePackage: PowerPointPackageReference
+  usedFonts: string[]
+}
+
+export interface MonaPowerPointWriteback {
+  bytes: ArrayBuffer
+  plan: {
+    mode: 'noop' | 'patch' | 'unsupported'
+    operations: unknown[]
+    touchedParts: string[]
+    unsupported: Array<{ code: string; message: string }>
+  }
+}
+
 export interface MonaBridge {
   account: () => Promise<MonaAccount>
   agent: {
@@ -50,7 +110,104 @@ export interface MonaBridge {
     respondTool: (id: string, outcome: { errorText?: string; output?: unknown }) => void
     send: (prompt: { effort?: string; model?: string; text: string }) => void
   }
+  projectAgent: {
+    interrupt: (projectId: string) => void
+    onChunk: (listener: (event: {
+      chunk: unknown
+      projectId: string
+    }) => void) => () => void
+    send: (prompt: {
+      effort?: string
+      model?: string
+      projectId: string
+      text: string
+    }) => void
+  }
+  projectJobs: {
+    cancel: (projectId: string, jobId: string) => Promise<DocumentJobRecord>
+    list: (projectId: string) => Promise<DocumentJobRecord[]>
+    onChange: (listener: (projectId: string) => void) => () => void
+    read: (projectId: string, jobId: string) => Promise<DocumentJobRecord | null>
+  }
+  projects: {
+    addArtifact: (id: string, artifact: AddProjectArtifactInput) => Promise<ProjectRecord>
+    appendMessage: (id: string, message: AppendProjectMessageInput) => Promise<ProjectRecord>
+    create: (input?: CreateProjectInput) => Promise<ProjectRecord>
+    delete: (id: string) => Promise<void>
+    list: () => Promise<ProjectSummary[]>
+    onChange: (listener: () => void) => () => void
+    read: (id: string) => Promise<ProjectRecord | null>
+    removeArtifact: (id: string, artifactId: string) => Promise<ProjectRecord>
+    rename: (id: string, title: string) => Promise<ProjectRecord>
+  }
   browseMedia: <Result>(kind: 'images' | 'videos', query: unknown) => Promise<Result>
+  documents: {
+    cancelPowerPoint: (operationId: string) => Promise<boolean>
+    create: (
+      presentation: unknown,
+      sourceReference?: DataSourceDocumentReference,
+    ) => Promise<MonaDocumentSummary>
+    createLocal: (presentation: unknown, sourceId: string) => Promise<MonaDocumentSummary>
+    delete: (id: string) => Promise<void>
+    discardRecovery: (id: string) => Promise<void>
+    duplicate: (id: string, title?: string) => Promise<MonaDocumentSummary>
+    exportPowerPoint: (
+      id: string,
+      presentation: unknown,
+      packageId?: string,
+    ) => Promise<MonaPowerPointWriteback>
+    ingestPowerPoint: (
+      id: string,
+      bytes: ArrayBuffer,
+      request: {
+        coordinateLabels?: string[]
+        fileName: string
+        fixedViewport?: boolean
+        operationId: string
+        theme: SlideTheme
+      },
+    ) => Promise<MonaPowerPointIngestion>
+    list: () => Promise<MonaDocumentSummary[]>
+    moveToSource: (id: string, sourceId: string) => Promise<MonaDocumentSummary>
+    openSource: (reference: DataSourceDocumentReference) => Promise<MonaDocumentSummary>
+    package: (id: string) => Promise<ArrayBuffer>
+    read: (id: string) => Promise<MonaStoredDocument | null>
+    rename: (id: string, title: string) => Promise<MonaDocumentSummary>
+    write: (id: string, presentation: unknown) => Promise<number>
+    writePreview: (
+      id: string,
+      bytes: ArrayBuffer,
+      request: { expectedSavedAt: number; mediaType: string; slideId: string },
+    ) => Promise<MonaDocumentSummary | null>
+  }
+  dataSources: {
+    addLocalFolder: () => Promise<DataSourceSummary | null>
+    chooseDefaultLocalFolder: () => Promise<DataSourceSummary | null>
+    list: () => Promise<DataSourceSummary[]>
+    listChildren: (sourceId: string, parentItemId: string) => Promise<DataSourceItem[]>
+    listDocuments: (query?: DataSourceQuery) => Promise<DataSourceDocument[]>
+    onChange: (listener: (event: DataSourceChangeEvent) => void) => () => void
+    readDocument: (reference: DataSourceDocumentReference) => Promise<DataSourcePickedDocument>
+    remove: (sourceId: string) => Promise<void>
+    setDefaultSaveLocation: (sourceId: string) => Promise<DataSourceSummary>
+  }
+  documentData: {
+    legacyMigration: {
+      complete: (id: string, kind: 'powerpoint-packages' | 'sketches') => Promise<void>
+      pending: (id: string, kind: 'powerpoint-packages' | 'sketches') => Promise<boolean>
+    }
+    powerpointPackages: {
+      delete: (id: string, packageId: string) => Promise<void>
+      listIds: (id: string) => Promise<string[]>
+      read: (id: string, packageId: string) => Promise<unknown>
+      write: (id: string, packageId: string, value: unknown) => Promise<string>
+    }
+    sketches: {
+      delete: (id: string, slideId: string) => Promise<void>
+      list: (id: string) => Promise<unknown[]>
+      write: (id: string, slideId: string, value: unknown) => Promise<string>
+    }
+  }
   /** Null from any of these means the user cancelled, which is not a failure. */
   files: {
     open: (request: { filters: MonaFileFilter[]; multiple?: boolean; title?: string }) => Promise<MonaPickedFile[] | null>
@@ -62,23 +219,22 @@ export interface MonaBridge {
     save: (request: { bytes: ArrayBuffer; defaultName: string; filters: MonaFileFilter[] }) => Promise<string | null>
   }
   deck: {
-    clear: () => Promise<void>
-    collectGarbage: (keep: readonly string[]) => Promise<void>
+    collectGarbage: (id: string, keep: readonly string[]) => Promise<void>
+    /** Flushes every mounted document store before an in-app route change. */
+    flushPending: () => Promise<void>
     /**
      * The shell asking for anything unsaved, before it lets a window close.
      * Returns an unsubscribe. The shell waits for the listener to settle.
      */
     onFlushRequest: (listener: () => Promise<void>) => () => void
-    read: () => Promise<{ presentation: unknown; savedAt: number; version: number } | null>
-    write: (presentation: unknown) => Promise<number>
-    writeAsset: (name: string, bytes: ArrayBuffer) => Promise<string>
+    writeAsset: (id: string, name: string, bytes: ArrayBuffer) => Promise<string>
   }
   models: () => Promise<MonaModel[]>
   /** The slideshow's second window, and the channel the two talk over. */
   screen: {
     closeAudience: () => Promise<void>
     onSync: (listener: (message: unknown) => void) => () => void
-    openAudience: () => Promise<void>
+    openAudience: (documentPath: string) => Promise<void>
     sync: (message: unknown) => void
   }
   /** Returns an unsubscribe. Only ever fires on macOS, where the menu bar exists. */

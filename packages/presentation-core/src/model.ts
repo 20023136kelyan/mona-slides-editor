@@ -1,42 +1,46 @@
 import type { PowerPointElementSource, PowerPointSlideSource } from './source'
 
-export const enum ShapePathFormulasKeys {
-  ROUND_RECT = 'roundRect',
-  ROUND_RECT_DIAGONAL = 'roundRectDiagonal',
-  ROUND_RECT_SINGLE = 'roundRectSingle',
-  ROUND_RECT_SAMESIDE = 'roundRectSameSide',
-  CUT_RECT_DIAGONAL = 'cutRectDiagonal',
-  CUT_RECT_SINGLE = 'cutRectSingle',
-  CUT_RECT_SAMESIDE = 'cutRectSameSide',
-  CUT_ROUND_RECT = 'cutRoundRect',
-  MESSAGE = 'message',
-  ROUND_MESSAGE = 'roundMessage',
-  L = 'L',
-  RING_RECT = 'ringRect',
-  PLUS = 'plus',
-  TRIANGLE = 'triangle',
-  PARALLELOGRAM_LEFT = 'parallelogramLeft',
-  PARALLELOGRAM_RIGHT = 'parallelogramRight',
-  TRAPEZOID = 'trapezoid',
-  BULLET = 'bullet',
-  INDICATOR = 'indicator',
-  DONUT = 'donut',
-  DIAGSTRIPE = 'diagStripe',
-}
+export const ShapePathFormulasKeys = {
+  BULLET: 'bullet',
+  CUT_RECT_DIAGONAL: 'cutRectDiagonal',
+  CUT_RECT_SAMESIDE: 'cutRectSameSide',
+  CUT_RECT_SINGLE: 'cutRectSingle',
+  CUT_ROUND_RECT: 'cutRoundRect',
+  DIAGSTRIPE: 'diagStripe',
+  DONUT: 'donut',
+  INDICATOR: 'indicator',
+  L: 'L',
+  MESSAGE: 'message',
+  PARALLELOGRAM_LEFT: 'parallelogramLeft',
+  PARALLELOGRAM_RIGHT: 'parallelogramRight',
+  PLUS: 'plus',
+  RING_RECT: 'ringRect',
+  ROUND_MESSAGE: 'roundMessage',
+  ROUND_RECT: 'roundRect',
+  ROUND_RECT_DIAGONAL: 'roundRectDiagonal',
+  ROUND_RECT_SAMESIDE: 'roundRectSameSide',
+  ROUND_RECT_SINGLE: 'roundRectSingle',
+  TRAPEZOID: 'trapezoid',
+  TRIANGLE: 'triangle',
+} as const
+export type ShapePathFormulasKeys = (
+  typeof ShapePathFormulasKeys[keyof typeof ShapePathFormulasKeys]
+)
 
-export const enum ElementTypes {
-  TEXT = 'text',
-  IMAGE = 'image',
-  SHAPE = 'shape',
-  LINE = 'line',
-  CHART = 'chart',
-  TABLE = 'table',
-  LATEX = 'latex',
-  VIDEO = 'video',
-  AUDIO = 'audio',
-  GROUP = 'group',
-  OPAQUE = 'opaque',
-}
+export const ElementTypes = {
+  AUDIO: 'audio',
+  CHART: 'chart',
+  GROUP: 'group',
+  IMAGE: 'image',
+  LATEX: 'latex',
+  LINE: 'line',
+  OPAQUE: 'opaque',
+  SHAPE: 'shape',
+  TABLE: 'table',
+  TEXT: 'text',
+  VIDEO: 'video',
+} as const
+export type ElementTypes = typeof ElementTypes[keyof typeof ElementTypes]
 
 /**
  * 渐变

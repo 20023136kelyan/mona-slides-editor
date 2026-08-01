@@ -74,6 +74,13 @@ jobs:
         if: runner.os == 'macOS'
         run: npm exec -w @mona/web -- playwright test
 
+      # Unlike the journeys above, this launches the generated .app with no
+      # Vite server. It covers the mona:// protocol, asar/resource layout,
+      # packaged Claude binary and native persistence/export paths.
+      - name: Packaged app smoke (macOS)
+        if: runner.os == 'macOS'
+        run: npm run e2e:packaged
+
       - name: Production build
         run: npm run build
 

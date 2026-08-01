@@ -2,15 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TFunction } from 'i18next'
 
 import { editorActions } from '@mona/editor-state'
+import type { PowerPointIngestionStage } from '@mona/pptx-ingestion'
 import { validateImportedSlides, type PresentationCommand } from '@mona/presentation-core'
 import type { Slide, SlideTheme } from '@mona/presentation-core/model'
 
 import { sanitizePowerPointPackageReference, sanitizeSlides } from '@/lib/deck-sanitizer'
+import { monaBridge } from '@/lib/mona-bridge'
 
+import { getActiveDocumentId } from '@/features/documents/active-document'
+import { storeDeckAssetBytes } from '@/features/editor/editor-deck-assets'
 import { decryptNativePresentation } from '@/features/editor/editor-file-format'
 import { loadPresentationFonts } from '@/features/editor/editor-fonts'
 import { getImportedAspectRatio } from '@/features/editor/editor-import-geometry'
-import type { PowerPointImportStage } from '@/features/editor/editor-pptx-worker-client'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { EditorNotificationService } from '@/features/editor/services/editor-notifications'
 
@@ -93,9 +96,87 @@ const applySerializedPresentation = (runtime: EditorRuntime, serialized: Seriali
 }
 
 
+const replacePackagedAssetOwner = (value: unknown, fromId: string, toId: string): unknown => {
+  if (typeof value === 'string') {
+    const prefix = `mona://asset/${encodeURIComponent(fromId)}/`
+    return value.startsWith(prefix)
+      ? `mona://asset/${encodeURIComponent(toId)}/${value.slice(prefix.length)}`
+      : value
+  }
+  if (Array.isArray(value)) return value.map(entry => replacePackagedAssetOwner(entry, fromId, toId))
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      replacePackagedAssetOwner(entry, fromId, toId),
+    ]),
+  )
+}
+
+const readNativePackage = async (file: File): Promise<SerializedPresentation | null> => {
+  const bytes = await readArrayBuffer(file)
+  const signature = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 4))
+  if (signature[0] !== 0x50 || signature[1] !== 0x4b) return null
+  const { default: JSZip } = await import('jszip')
+  const archive = await JSZip.loadAsync(bytes, { checkCRC32: true })
+  if (Object.keys(archive.files).length > 20_000) {
+    throw new Error('This Mona document contains too many package entries.')
+  }
+  const manifestEntry = archive.file('manifest.json')
+  const deckEntry = archive.file('deck.json')
+  if (!manifestEntry || !deckEntry) throw new Error('This is not a complete Mona document.')
+  const manifest = JSON.parse(await manifestEntry.async('string')) as {
+    documentId?: unknown
+    format?: unknown
+    version?: unknown
+  }
+  if (
+    manifest.format !== 'mona.presentation'
+    || manifest.version !== 1
+    || typeof manifest.documentId !== 'string'
+  ) {
+    throw new Error('This Mona document has an invalid manifest.')
+  }
+  const deck = JSON.parse(await deckEntry.async('string')) as {
+    presentation?: unknown
+  }
+  if (!deck.presentation || typeof deck.presentation !== 'object') {
+    throw new Error('This Mona document has an invalid presentation model.')
+  }
+
+  const currentDocumentId = getActiveDocumentId()
+  const assetEntries = Object.entries(archive.files).filter(([path, entry]) => (
+    !entry.dir
+    && path.startsWith('assets/')
+    && !path.slice('assets/'.length).includes('/')
+  ))
+  await Promise.all(assetEntries.map(async ([path, entry]) => {
+    const name = path.slice('assets/'.length)
+    const asset = await entry.async('arraybuffer')
+    await storeDeckAssetBytes(name, asset)
+  }))
+
+  const presentation = replacePackagedAssetOwner(
+    deck.presentation,
+    manifest.documentId,
+    currentDocumentId,
+  ) as Record<string, unknown>
+  return {
+    height: typeof presentation.viewportSize === 'number'
+      && typeof presentation.viewportRatio === 'number'
+      ? presentation.viewportSize * presentation.viewportRatio
+      : undefined,
+    slides: presentation.slides as Slide[],
+    theme: presentation.theme as Partial<SlideTheme> | undefined,
+    title: typeof presentation.title === 'string' ? presentation.title : undefined,
+    width: typeof presentation.viewportSize === 'number' ? presentation.viewportSize : undefined,
+  }
+}
+
 const importSerialized = async (runtime: EditorRuntime, file: File, type: 'json' | 'native', cover: boolean) => {
-  const source = await readText(file)
-  const parsed: unknown = JSON.parse(type === 'native' ? decryptNativePresentation(source) : source)
+  const packaged = type === 'native' ? await readNativePackage(file) : null
+  const source = packaged ? '' : await readText(file)
+  const parsed: unknown = packaged ?? JSON.parse(type === 'native' ? decryptNativePresentation(source) : source)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Imported file is not a presentation envelope')
   const envelope = parsed as Partial<SerializedPresentation> & Record<string, unknown>
   const validation = validateImportedSlides(envelope.slides)
@@ -118,22 +199,42 @@ const importPptx = async (
   t: TFunction,
   options: NonNullable<ImportRequestDetail['options']>,
   signal: AbortSignal,
-  onProgress: (stage: PowerPointImportStage) => void,
+  onProgress: (stage: PowerPointIngestionStage) => void,
   notify: EditorNotificationService['notify'],
 ) => {
-  const [{ convertParsedPptxPresentation, persistImportedAssets }, { parsePowerPointPackage }] = await Promise.all([
-    import('@/features/editor/editor-pptx-import'),
-    import('@/features/editor/editor-pptx-worker-client'),
-  ])
   const bytes = await readArrayBuffer(file)
   if (signal.aborted) throw Object.assign(new Error('PowerPoint import was cancelled'), { name: 'AbortError' })
-  const { backing, parsed } = await parsePowerPointPackage(bytes, file.name, { onProgress, signal })
+  const presentation = runtime.store.getState().presentation
+  const operationId = globalThis.crypto.randomUUID()
+  const abortDesktopImport = () => {
+    void monaBridge().documents.cancelPowerPoint(operationId)
+  }
+  signal.addEventListener('abort', abortDesktopImport, { once: true })
+  onProgress('inventory')
+  const ingestion = await monaBridge().documents.ingestPowerPoint(
+    getActiveDocumentId(),
+    bytes,
+    {
+      coordinateLabels: Array.from(
+        { length: 128 },
+        (_, index) => t('chartData.coordinate', { number: index + 1 }),
+      ),
+      fileName: file.name,
+      fixedViewport: options.fixedViewport,
+      operationId,
+      theme: presentation.theme,
+    },
+  ).finally(() => signal.removeEventListener('abort', abortDesktopImport))
+  if (signal.aborted) {
+    throw Object.assign(new Error('PowerPoint import was cancelled'), { name: 'AbortError' })
+  }
+  onProgress('parse')
   // Font resolution runs alongside conversion rather than gating it: slides
   // paint immediately and reflow as faces arrive. Only families with no
   // deterministic stand-in are worth telling the user about.
   void loadPresentationFonts({
-    embeddedFonts: parsed.embeddedFonts,
-    usedFonts: parsed.usedFonts,
+    embeddedFonts: ingestion.embeddedFonts,
+    usedFonts: ingestion.usedFonts,
   }).then(report => {
     if (!report.missing.length) return
     notify({
@@ -141,44 +242,10 @@ const importPptx = async (
       type: 'warning',
     })
   }, () => { /* Font resolution never fails an import. */ })
-  const presentation = runtime.store.getState().presentation
-  const width = parsed.size.width
-  const height = parsed.size.height
-  const ratio = options.fixedViewport ? 1000 / width : 96 / 72
-  const importedTheme = { ...presentation.theme, themeColors: parsed.themeColors }
-  // The converter builds HTML out of pptx XML text runs, so its output goes
-  // through the same sanitizer as directly imported markup.
-  const conversion = convertParsedPptxPresentation({
-    coordinateLabel: number => t('chartData.coordinate', { number }),
-    parsed,
-    ratio,
-    sourceManifest: backing.manifest,
-    sourcePackage: backing.reference,
-    theme: importedTheme,
-  })
-  // Before anything can reference them: the conversion mints an object URL per
-  // asset, and until the bytes are in the media store that URL is the only handle
-  // on them. A deck saved in that window keeps references it can never resolve
-  // again - which is exactly how images come back broken after a reload.
-  const unstored = await persistImportedAssets()
-  if (unstored.length) {
-    notify({
-      text: t('runtime.importAssetsUnstored', { count: unstored.length }),
-      type: 'warning',
-    })
-  }
-  const slides = sanitizeSlides(conversion.slides)
+  const slides = sanitizeSlides(ingestion.presentation.slides)
   const sourceReference = {
-    ...sanitizePowerPointPackageReference(conversion.sourcePackage ?? backing.reference),
-    importReport: conversion.report,
-  }
-  const retainedBacking = {
-    ...backing,
-    manifest: {
-      ...backing.manifest,
-      importReport: conversion.report,
-    },
-    reference: sourceReference,
+    ...sanitizePowerPointPackageReference(ingestion.sourcePackage),
+    importReport: ingestion.report,
   }
   const replacing = options.cover || isEmptyPresentation(runtime)
   const sourcePackages = replacing
@@ -188,18 +255,28 @@ const importPptx = async (
         sourceReference,
       ]
   const previousPackageIds = (presentation.sourcePackages ?? []).map(source => source.packageId)
-  await runtime.pptxBackingStore.persist(retainedBacking)
+  if (!await runtime.pptxBackingStore.restore(sourceReference)) {
+    throw new Error('The desktop host ingested the PowerPoint but did not retain its source package.')
+  }
   const commands: PresentationCommand[] = [
     { type: 'presentation.source-packages.replace', sourcePackages },
-    { type: 'presentation.theme.update', props: { themeColors: parsed.themeColors } },
+    {
+      type: 'presentation.theme.update',
+      props: { themeColors: ingestion.presentation.theme.themeColors },
+    },
   ]
-  if (!options.fixedViewport) commands.push({ type: 'presentation.viewport-size.set', size: width * ratio })
+  if (!options.fixedViewport) {
+    commands.push({
+      type: 'presentation.viewport-size.set',
+      size: ingestion.presentation.viewportSize,
+    })
+  }
   try {
     if (replacing) {
       const latest = runtime.store.getState().presentation
       const replace: PresentationCommand[] = [...commands, { type: 'slide.focus', index: 0 }]
       replace.push({ type: 'presentation.slides.replace', slides })
-      const aspectRatio = getImportedAspectRatio(width, height)
+      const aspectRatio = ingestion.presentation.viewportRatio
       if (aspectRatio !== latest.viewportRatio) replace.push({ type: 'presentation.viewport-ratio.set', ratio: aspectRatio })
       if (!runtime.commit('Import PowerPoint', replace, { recordHistory: false })) {
         throw new Error('Imported PowerPoint was rejected')
@@ -224,7 +301,7 @@ export function useEditorImport(
   notify: EditorNotificationService['notify'],
 ) {
   const [importing, setImporting] = useState(false)
-  const [importStage, setImportStage] = useState<PowerPointImportStage | null>(null)
+  const [importStage, setImportStage] = useState<PowerPointIngestionStage | null>(null)
   const importInFlightRef = useRef(false)
   const activeImportControllerRef = useRef<AbortController | null>(null)
 

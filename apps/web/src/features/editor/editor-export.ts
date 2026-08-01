@@ -17,10 +17,10 @@ import type {
 } from '@mona/presentation-core/model'
 
 import type { EditorExportActions } from '@/features/editor/EditorExportPopover'
+import { getActiveDocumentId } from '@/features/documents/active-document'
 import { getExportFileStem } from '@/features/editor/editor-export-filename'
 import { PRESENTATION_FILTERS, saveFile } from '@/features/editor/editor-files'
 import { monaBridge } from '@/lib/mona-bridge'
-import { encryptNativePresentation } from '@/features/editor/editor-file-format'
 import { applyPptxSlideMetadata } from '@/features/editor/editor-pptx-slide-metadata'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
@@ -636,6 +636,25 @@ async function savePptx(pptx: PptxGenJS, fileStem: string) {
   await saveFile(bytes, `${fileStem}.pptx`, PRESENTATION_FILTERS.pptx)
 }
 
+const isCompleteSlideSelection = (
+  presentation: PresentationState,
+  slides: readonly Slide[],
+): boolean => (
+  slides.length === presentation.slides.length
+  && slides.every((slide, index) => slide.id === presentation.slides[index]?.id)
+)
+
+const sourcePackageForWriteback = (
+  presentation: PresentationState,
+): string | undefined => {
+  const packages = presentation.sourcePackages ?? []
+  if (packages.length !== 1) return undefined
+  const packageId = packages[0]!.packageId
+  return presentation.slides.some(slide => slide.source?.packageId === packageId)
+    ? packageId
+    : undefined
+}
+
 function exportPayload(presentation: PresentationState, slides = presentation.slides) {
   return {
     height: presentation.viewportSize * presentation.viewportRatio,
@@ -689,20 +708,42 @@ export function useEditorExportActions(runtime: EditorRuntime, t: TFunction): Ed
         notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
-    exportNative: async slides => {
+    exportNative: async _slides => {
       try {
-        await saveFile(encryptNativePresentation(JSON.stringify(exportPayload(presentation, slides))), `${fileStem}.mona`, PRESENTATION_FILTERS.native)
+        const documentId = getActiveDocumentId()
+        await monaBridge().documents.write(documentId, presentation)
+        const bytes = await monaBridge().documents.package(documentId)
+        await saveFile(bytes, `${fileStem}.mona`, PRESENTATION_FILTERS.native)
       }
-      catch {
+      catch (error) {
+        console.error('Native Mona export failed.', error)
         notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
       }
     },
     exportPptx: async (slides, masterOverwrite, ignoreMedia) => {
       try {
+        const sourcePackageId = sourcePackageForWriteback(presentation)
+        if (sourcePackageId && isCompleteSlideSelection(presentation, slides)) {
+          const result = await monaBridge().documents.exportPowerPoint(
+            getActiveDocumentId(),
+            presentation,
+            sourcePackageId,
+          )
+          await saveFile(
+            result.bytes,
+            `${fileStem}.pptx`,
+            PRESENTATION_FILTERS.pptx,
+          )
+          return
+        }
         await exportEditablePptx(presentation, slides, masterOverwrite, ignoreMedia, fileStem, t)
       }
-      catch {
-        notifications.notify({ text: t('runtime.exportFailed'), type: 'error' })
+      catch (error) {
+        console.error('PowerPoint export failed.', error)
+        notifications.notify({
+          text: error instanceof Error ? error.message : t('runtime.exportFailed'),
+          type: 'error',
+        })
       }
     },
     printPdf: async (node, page) => {

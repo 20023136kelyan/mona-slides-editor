@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { ElectronApplication } from '@playwright/test'
 
-import { chooseMenuCommand, expect, importFile, openApp, test, type Page } from './electron-fixture'
+import { chooseMenuCommand, configureLocalSaveFolder, expect, importFile, openApp, test, type Page } from './electron-fixture'
 
 interface CorpusBaseline {
   fixture: string
@@ -35,16 +36,18 @@ const fixtures = [
 
 const createNewPresentation = async (app: ElectronApplication, page: Page) => {
   await chooseMenuCommand(app, 'file.new', page)
-  await page.getByRole('button', { name: 'Create new' }).click()
+  await page.waitForURL(/\/documents\/[^/?]+/)
+  await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
   ))).toBe(0)
 }
 
-test.beforeEach(async ({ app, page }) => {
+test.beforeEach(async ({ app, page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
   await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
+  await configureLocalSaveFolder(app, page, join(testInfo.outputDir, 'presentations'))
   await createNewPresentation(app, page)
 })
 

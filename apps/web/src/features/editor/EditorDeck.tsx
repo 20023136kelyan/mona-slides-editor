@@ -37,6 +37,7 @@ import { isPersistenceEnabled } from '@/features/editor/editor-persistence'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { EditorShellProvider } from '@/features/editor/shell/EditorShellProvider'
 import { useEditorShell, type EditorElementCategory, type EditorTaskPanelRoute } from '@/features/editor/shell/editor-shell'
+import { maybeMonaBridge } from '@/lib/mona-bridge'
 
 const EditorAgentDock = lazy(async () => {
   const module = await import('@/features/editor/EditorAgentDock')
@@ -158,7 +159,9 @@ function EditorDeckContent({
 
   useEffect(() => {
     void drawingStore.hydrate()
+    const stopFlushRequests = maybeMonaBridge()?.deck.onFlushRequest(() => drawingStore.flush())
     return () => {
+      stopFlushRequests?.()
       void drawingStore.stop()
     }
   }, [drawingStore])

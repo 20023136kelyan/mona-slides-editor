@@ -48,7 +48,7 @@ export const registerPresenterIpc = (rendererUrl: string, preload: string): void
     }
   })
 
-  ipcMain.handle('mona:screen:open-audience', event => {
+  ipcMain.handle('mona:screen:open-audience', (event, documentPath: unknown) => {
     if (audienceWindow && !audienceWindow.isDestroyed()) {
       audienceWindow.focus()
       return
@@ -70,6 +70,9 @@ export const registerPresenterIpc = (rendererUrl: string, preload: string): void
     audienceWindow.once('ready-to-show', () => audienceWindow?.show())
     audienceWindow.on('closed', () => { audienceWindow = null })
     const url = new URL(rendererUrl)
+    if (typeof documentPath === 'string' && /^\/documents\/[a-zA-Z0-9_-]+$/.test(documentPath)) {
+      url.pathname = documentPath
+    }
     url.searchParams.set('mode', 'audience')
     void audienceWindow.loadURL(url.toString())
   })

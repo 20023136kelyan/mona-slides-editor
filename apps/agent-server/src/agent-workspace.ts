@@ -105,7 +105,10 @@ const ASSET_STEMS: Record<string, string> = {
  * was captured without anyone having named `pattern` anywhere.
  */
 const isAssetReference = (value: string): boolean => (
-  value.startsWith('blob:') || value.startsWith('data:')
+  value.startsWith('blob:')
+  || value.startsWith('data:')
+  || value.startsWith('mona://asset/')
+  || value.startsWith('pptx-asset://')
 )
 
 /** Wide enough that lexical order is slide order, in Glob results and in `ls`. */

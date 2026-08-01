@@ -2,19 +2,21 @@ import type {
   PowerPointPackageManifest,
   PowerPointPackageReference,
 } from '@mona/presentation-core'
+import type { PowerPointPackageBacking } from '@mona/pptx-ingestion'
 
 import {
+  deleteDocumentPowerPointPackage,
   deletePowerPointPackage,
+  listDocumentPowerPointPackageIds,
   listPowerPointPackageIds,
+  readDocumentPowerPointPackage,
   readPowerPointPackage,
+  writeDocumentPowerPointPackage,
   writePowerPointPackage,
 } from '@/lib/deck-storage'
+import { maybeActiveDocumentId } from '@/features/documents/active-document'
 
-export interface PowerPointPackageBacking {
-  readonly bytes: Uint8Array
-  readonly manifest: PowerPointPackageManifest
-  readonly reference: PowerPointPackageReference
-}
+export type { PowerPointPackageBacking } from '@mona/pptx-ingestion'
 
 interface StoredPowerPointPackage {
   bytes: Uint8Array
@@ -35,6 +37,17 @@ const indexedDbPersistence: PowerPointPackagePersistence = {
   listIds: listPowerPointPackageIds,
   read: readPowerPointPackage,
   write: writePowerPointPackage,
+}
+
+const defaultPersistence = (): PowerPointPackagePersistence => {
+  const documentId = maybeActiveDocumentId()
+  if (!documentId) return indexedDbPersistence
+  return {
+    delete: packageId => deleteDocumentPowerPointPackage(documentId, packageId),
+    listIds: () => listDocumentPowerPointPackageIds(documentId),
+    read: packageId => readDocumentPowerPointPackage(documentId, packageId),
+    write: (packageId, value) => writeDocumentPowerPointPackage(documentId, packageId, value),
+  }
 }
 
 const cloneBacking = (backing: PowerPointPackageBacking): PowerPointPackageBacking => ({
@@ -75,7 +88,7 @@ const isStoredPowerPointPackage = (value: unknown): value is StoredPowerPointPac
  * Large source archives stay outside Redux/history. Presentation state keeps
  * only serializable package references that address entries in this store.
  *
- * The memory cache is hydrated from IndexedDB when a working deck is restored.
+ * The memory cache is hydrated from the active document's retained source files.
  * Every record is re-hashed before use so corrupt or mismatched package bytes
  * can never masquerade as the source referenced by the presentation.
  */
@@ -87,7 +100,7 @@ export class PowerPointPackageBackingStore {
 
   constructor(
     references: readonly PowerPointPackageReference[] = [],
-    persistence: PowerPointPackagePersistence = indexedDbPersistence,
+    persistence: PowerPointPackagePersistence = defaultPersistence(),
   ) {
     this.#persistence = persistence
     this.#ready = this.#hydrate(references)
@@ -160,6 +173,19 @@ export class PowerPointPackageBackingStore {
 
   async ready(): Promise<void> {
     await this.#ready
+  }
+
+  /**
+   * Hydrates one package that the desktop process has just ingested.
+   *
+   * Main owns source bytes and writes the retained package directly to the
+   * document store. The renderer then loads that record instead of receiving a
+   * second copy of a potentially hundreds-of-megabytes archive over IPC.
+   */
+  async restore(reference: PowerPointPackageReference): Promise<boolean> {
+    await this.#ready
+    if (!this.#packages.has(reference.packageId)) await this.#hydrate([reference])
+    return this.#packages.has(reference.packageId)
   }
 
   readBytes(packageId: string): Uint8Array | undefined {

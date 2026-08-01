@@ -37,6 +37,20 @@ export type PowerPointSourceObjectKind =
   | 'shape'
   | 'unknown'
 
+export interface PowerPointConnectorEndpoint {
+  /** PowerPoint's non-visual drawing id for the connected shape. */
+  nativeShapeId: string
+  /** Connection-site index on the target shape. */
+  siteIndex: string
+  /** Exact package-scoped target when the native id resolves uniquely. */
+  targetObjectId?: string
+}
+
+export interface PowerPointConnectorRelationships {
+  end?: PowerPointConnectorEndpoint
+  start?: PowerPointConnectorEndpoint
+}
+
 /**
  * Stable identity read directly from a PowerPoint shape-tree part.
  *
@@ -45,6 +59,7 @@ export type PowerPointSourceObjectKind =
  * depending on Mona's generated editor IDs.
  */
 export interface PowerPointSourceObjectIdentity {
+  connector?: PowerPointConnectorRelationships
   creationId?: string
   description?: string
   kind: PowerPointSourceObjectKind
@@ -182,6 +197,7 @@ export interface PowerPointHierarchy {
 export interface PowerPointDirtyPart {
   objectIds: string[]
   partPath: string
+  properties?: string[]
   reasons: string[]
 }
 
@@ -279,6 +295,8 @@ export interface PowerPointImportReport {
  */
 export interface PowerPointPackageReference {
   byteLength: number
+  /** Mona canvas units per PowerPoint point for this specific import. */
+  coordinateScale?: number
   dirty?: PowerPointDirtyPartJournal
   fileName: string
   importReport?: PowerPointImportReport
@@ -317,6 +335,7 @@ export type PowerPointElementSourceLayer = 'inherited' | 'layout' | 'master' | '
  * not receive a source identity and are never treated as exact patch targets.
  */
 export interface PowerPointElementSource {
+  connector?: PowerPointConnectorRelationships
   kind: 'pptx'
   nativeShapeId?: string
   packageId: string

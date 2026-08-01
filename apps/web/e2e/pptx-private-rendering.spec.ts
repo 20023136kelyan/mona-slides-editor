@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import type { ElectronApplication } from '@playwright/test'
 
-import { chooseMenuCommand, expect, importFile, openApp, test, type Page, type TestInfo } from './electron-fixture'
+import { chooseMenuCommand, configureLocalSaveFolder, expect, importFile, openApp, test, type Page, type TestInfo } from './electron-fixture'
 
 const privateCorpusRoot = fileURLToPath(new URL('../../../tests/corpus/private/', import.meta.url))
 const fidelityArtifactRoot = resolve(privateCorpusRoot, '../../../.artifacts/pptx-fidelity')
@@ -23,7 +23,8 @@ const isFontCdnFailure = (text: string) => (
 
 const createNewPresentation = async (app: ElectronApplication, page: Page) => {
   await chooseMenuCommand(app, 'file.new', page)
-  await page.getByRole('button', { name: 'Create new' }).click()
+  await page.waitForURL(/\/documents\/[^/?]+/)
+  await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
   await expect.poll(() => page.evaluate(() => (
     window.__MONA_TEST__!.getState().presentation.slides[0]!.elements.length
   ))).toBe(0)
@@ -31,10 +32,11 @@ const createNewPresentation = async (app: ElectronApplication, page: Page) => {
 
 test.describe.configure({ mode: 'serial' })
 
-test.beforeEach(async ({ app, page }) => {
+test.beforeEach(async ({ app, page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
   await openApp(page, '?developmentFixture=slides')
   await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
+  await configureLocalSaveFolder(app, page, resolve(testInfo.outputDir, 'presentations'))
   await createNewPresentation(app, page)
 })
 

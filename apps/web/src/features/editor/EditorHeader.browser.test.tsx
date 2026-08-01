@@ -91,6 +91,7 @@ const createApplication = (persistence: DeckPersistence | null): EditorApplicati
   agentOpen: false,
   closeAgent: () => {},
   closeExport: () => {},
+  createDocument: async () => {},
   exitPresentation: () => {},
   exportType: null,
   importFiles: async () => {},
@@ -98,6 +99,7 @@ const createApplication = (persistence: DeckPersistence | null): EditorApplicati
   notifications: createEditorNotificationService(),
   openAgent: () => {},
   openExport: () => {},
+  openDocumentLibrary: async () => {},
   persistence,
   presenting: false,
   startPresentation: () => {},
@@ -166,16 +168,23 @@ test('keeps title geometry stable across focus, typing, cancel, commit, and undo
   expectStable(geometry())
 })
 
-test('drives save status from persistence and confirms a fully undoable new presentation', async () => {
+test('drives save status from persistence and requests a separate new document', async () => {
   const runtime = createEditorRuntime(presentation)
   const persistence = createFakePersistence()
   let retryCount = 0
+  let createCount = 0
   persistence.retry = async () => {
     retryCount += 1
   }
+  const application = {
+    ...createApplication(persistence),
+    createDocument: async () => {
+      createCount += 1
+    },
+  }
   await render(
     <div style={{ width: 1357 }}>
-      <EditorApplicationProvider value={createApplication(persistence)}>
+      <EditorApplicationProvider value={application}>
         <EditorShellProvider>
           <EditorHeader onToggleDrawing={() => {}} runtime={runtime} />
         </EditorShellProvider>
@@ -214,14 +223,7 @@ test('drives save status from persistence and confirms a fully undoable new pres
 
   await page.getByRole('button', { name: 'File', exact: true }).click()
   await page.getByRole('menuitem', { name: 'New presentation' }).click()
-  await expect.element(page.getByRole('alertdialog')).toBeVisible()
-  await page.getByRole('button', { name: 'Create new' }).click()
-
-  expect(runtime.store.getState().presentation.title).toBe('')
-  expect(runtime.store.getState().presentation.slides).toHaveLength(1)
-  expect(runtime.store.getState().presentation.slides[0]!.elements).toEqual([])
-  await new Promise(resolve => setTimeout(resolve, 320))
-  expect(runtime.undo()).toBe(true)
+  expect(createCount).toBe(1)
   expect(runtime.store.getState().presentation.title).toBe('Header fixture')
   expect(runtime.store.getState().presentation.slides[0]!.elements).toHaveLength(1)
 })

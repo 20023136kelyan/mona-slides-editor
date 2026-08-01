@@ -152,7 +152,7 @@ describe('applyAgentWorkspace', () => {
     const shell = window.mona!
     window.mona = {
       ...shell,
-      deck: { ...shell.deck, writeAsset: async name => `mona://asset/${name}` },
+      deck: { ...shell.deck, writeAsset: async (_id, name) => `mona://asset/${name}` },
     }
     try {
       await applyAgentWorkspace({

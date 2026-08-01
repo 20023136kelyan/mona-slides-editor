@@ -1,4 +1,5 @@
 import { monaBridge } from '@/lib/mona-bridge'
+import { getActiveDocumentId } from '@/features/documents/active-document'
 
 /**
  * Binary that belongs to the deck, stored as files.
@@ -10,8 +11,9 @@ import { monaBridge } from '@/lib/mona-bridge'
  * bytes that existed nowhere, the image was blank, and re-saving could not mend it
  * because the handle it would have re-read was already dead.
  *
- * `mona://asset/<name>` has no such gap. The reference *is* the location, so a deck
- * that names an asset either finds it or the file is genuinely gone.
+ * `mona://asset/<document-id>/<name>` has no such gap. The reference *is* the
+ * location, and including the owner prevents one deck from resolving or
+ * garbage-collecting another deck's same-named file.
  */
 
 const ASSET_PREFIX = 'mona://asset/'
@@ -19,9 +21,14 @@ const ASSET_PREFIX = 'mona://asset/'
 /** Whether a value is one of ours, as opposed to a remote or inline reference. */
 export const isDeckAssetUrl = (value: string): boolean => value.startsWith(ASSET_PREFIX)
 
+/** The stable URL for an asset owned by the active document. */
+export const deckAssetUrl = (name: string, documentId = getActiveDocumentId()): string => (
+  `${ASSET_PREFIX}${encodeURIComponent(documentId)}/${encodeURIComponent(name)}`
+)
+
 /** The filename a deck asset URL points at. */
 export const deckAssetName = (url: string): string => (
-  decodeURIComponent(url.slice(ASSET_PREFIX.length))
+  decodeURIComponent(url.slice(ASSET_PREFIX.length).split('/').at(-1) ?? '')
 )
 
 const EXTENSIONS: Record<string, string> = {
@@ -62,7 +69,7 @@ export const plannedAssetName = (bytes: Uint8Array, mediaType: string): string =
 
 /** Writes bytes under a name already decided, and returns the deck's URL for it. */
 export const storeDeckAssetBytes = (name: string, bytes: ArrayBuffer): Promise<string> => (
-  monaBridge().deck.writeAsset(name, bytes)
+  monaBridge().deck.writeAsset(getActiveDocumentId(), name, bytes)
 )
 
 /** Stores a blob whose name has not been decided yet — a paste, an upload. */

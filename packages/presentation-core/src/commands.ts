@@ -110,6 +110,7 @@ const markPowerPointSlideDirty = (
   slide: Slide,
   reason: PresentationCommand['type'],
   elementIds: readonly string[] = [],
+  properties: readonly string[] = [],
 ): PresentationState => {
   const source = slide.source
   if (!source || !state.sourcePackages?.length) return state
@@ -143,6 +144,16 @@ const markPowerPointSlideDirty = (
     nextParts.set(partPath, {
       objectIds: [...new Set([...(existingPart?.objectIds ?? []), ...objectIds])].sort(),
       partPath,
+      ...(
+        properties.length || existingPart?.properties?.length
+          ? {
+              properties: [...new Set([
+                ...(existingPart?.properties ?? []),
+                ...properties,
+              ])].sort(),
+            }
+          : {}
+      ),
       reasons: [...new Set([...(existingPart?.reasons ?? []), reason])].sort(),
     })
   }
@@ -202,7 +213,13 @@ export const applyPresentationCommand = (
         theme: command.theme ? { ...state.theme, ...command.theme } : state.theme,
       }
       for (const previous of backgroundChanges) {
-        nextState = markPowerPointSlideDirty(nextState, previous, command.type)
+        nextState = markPowerPointSlideDirty(
+          nextState,
+          previous,
+          command.type,
+          [],
+          ['background'],
+        )
       }
       return changed(nextState, command, slides.map(slide => slide.id))
     }
@@ -249,7 +266,17 @@ export const applyPresentationCommand = (
       }
       const slides = state.slides.slice()
       slides[slideIndex] = slide
-      return changed(markPowerPointSlideDirty({ ...state, slides }, previousSlide, command.type), command, [slide.id])
+      return changed(
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          previousSlide,
+          command.type,
+          [],
+          Object.keys(command.props),
+        ),
+        command,
+        [slide.id],
+      )
     }
     case 'slide.properties.remove': {
       const properties = normalizePropertyList(command.payload.property)
@@ -261,7 +288,17 @@ export const applyPresentationCommand = (
       })
       if (!didChange) throw new PresentationCommandError(`Slide not found: ${command.payload.id}`)
       const previousSlide = state.slides.find(slide => slide.id === command.payload.id)!
-      return changed(markPowerPointSlideDirty({ ...state, slides }, previousSlide, command.type), command, [command.payload.id])
+      return changed(
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          previousSlide,
+          command.type,
+          [],
+          properties.map(property => `removed:${property}`),
+        ),
+        command,
+        [command.payload.id],
+      )
     }
     case 'slide.delete': {
       const slideIds = Array.isArray(command.slideIds) ? command.slideIds : [command.slideIds]
@@ -313,7 +350,13 @@ export const applyPresentationCommand = (
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(
-        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, additions.map(element => element.id)),
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          currentSlide,
+          command.type,
+          additions.map(element => element.id),
+          ['added'],
+        ),
         command,
         [slide.id],
         additions.map(element => element.id),
@@ -334,7 +377,13 @@ export const applyPresentationCommand = (
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(
-        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, elementIds),
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          currentSlide,
+          command.type,
+          elementIds,
+          ['deleted'],
+        ),
         command,
         [slide.id],
         elementIds,
@@ -397,7 +446,13 @@ export const applyPresentationCommand = (
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(
-        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, elementIds),
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          currentSlide,
+          command.type,
+          elementIds,
+          Object.keys(command.payload.props),
+        ),
         command,
         [slide.id],
         elementIds,
@@ -420,7 +475,13 @@ export const applyPresentationCommand = (
       const slides = state.slides.slice()
       slides[slideIndex] = slide
       return changed(
-        markPowerPointSlideDirty({ ...state, slides }, currentSlide, command.type, [command.payload.id]),
+        markPowerPointSlideDirty(
+          { ...state, slides },
+          currentSlide,
+          command.type,
+          [command.payload.id],
+          properties.map(property => `removed:${property}`),
+        ),
         command,
         [slide.id],
         [command.payload.id],

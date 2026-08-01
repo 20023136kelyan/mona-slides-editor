@@ -42,9 +42,6 @@ blob-report/
 
 *.tsbuildinfo
 
-# Local agent server state (encrypted credentials, development master key, assets)
-/apps/agent-server/var/
-
 # Local secrets
 .env
 .env.local

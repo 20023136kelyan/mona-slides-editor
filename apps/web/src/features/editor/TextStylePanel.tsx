@@ -1,5 +1,5 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- the established editor's preset div is retained for its exact anonymous-flex text layout; keyboard button semantics are implemented below. */
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react'
+import { useState, useSyncExternalStore, type CSSProperties, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -44,9 +44,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InspectorButton, InspectorButtonGroup, InspectorColorButton, InspectorNumberInput, InspectorPopoverButton, InspectorPopoverClose, InspectorSelect, InspectorSwitch, inspectorDividerClass, inspectorPopoverMenuItemCenteredClass, inspectorRowClass, inspectorSelectGroupClass, inspectorSplitRowClass } from '@/features/editor/EditorInspectorPrimitives'
 import { ElementOpacityControl, ElementOutlineControls, ElementShadowControls, PropertyRow } from '@/features/editor/ElementStyleCommons'
+import { enqueueAgentPrompt } from '@/features/editor/agent/agent-prompt-queue'
+import { buildTextRewritePrompt } from '@/features/editor/agent/agent-text-prompt'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { editorFontOptions, editorFontSizeOptions, editorLineHeightOptions, editorParagraphSpaceOptions, editorWordSpaceOptions } from '@/features/editor/editor-text-options'
-import { requestAIWriting } from '@/features/editor/ai-writing'
+import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { cn } from '@/lib/utils'
 
 // Preset tiles form a 2-up grid with collapsed borders (negative margins),
@@ -212,50 +214,36 @@ function htmlToText(html: string) {
 
 function AIWritingControl({
   element,
-  execute,
+  runtime,
 }: {
   element: PPTTextElement | PPTShapeElement
-  execute: (action: RichTextAction) => boolean
+  runtime: EditorRuntime
 }) {
   const { t } = useTranslation()
+  const { openAgent } = useEditorApplication()
   const [open, setOpen] = useState(false)
-  const [isWriting, setIsWriting] = useState(false)
-  const writingRef = useRef(false)
 
-  useEffect(() => () => {
-    writingRef.current = false
-  }, [])
-
-  const run = async (command: string) => {
+  const run = (instruction: string) => {
     setOpen(false)
     const content = element.type === 'text' ? element.content : element.text?.content || ''
-    if (!content) {
+    const currentText = htmlToText(content).trim()
+    if (!currentText) {
       toast.error(t('foundation.editor.text.noTextContent'))
       return
     }
-    const stream = await requestAIWriting({ command, content: htmlToText(content) })
-    if (!(stream instanceof Response) && stream.state === -1) {
-      toast.error(t('foundation.editor.text.aiBusy'))
-      return
-    }
-    if (!(stream instanceof Response) || !stream.body) return
+    const presentation = runtime.store.getState().presentation
+    const slide = presentation.slides.find(candidate => (
+      candidate.elements.some(candidateElement => candidateElement.id === element.id)
+    ))
+    if (!slide) return
 
-    writingRef.current = true
-    setIsWriting(true)
-    const reader = stream.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let resultText = ''
-    while (writingRef.current) {
-      const { done, value } = await reader.read()
-      if (!writingRef.current) return
-      if (done) {
-        writingRef.current = false
-        setIsWriting(false)
-        return
-      }
-      resultText += decoder.decode(value, { stream: true })
-      execute({ command: 'replace', value: resultText })
-    }
+    enqueueAgentPrompt(buildTextRewritePrompt({
+      currentText,
+      elementId: element.id,
+      instruction,
+      slideId: slide.id,
+    }))
+    openAgent()
   }
 
   return (
@@ -286,7 +274,7 @@ function AIWritingControl({
         open={open}
         style={{ width: '25%' }}
       >
-        <span className={isWriting ? 'mt-2 inline-block size-4 animate-spin rounded-full border border-foreground border-t-transparent' : ''}>{isWriting ? '' : 'AI'}</span>
+        <span>AI</span>
       </InspectorPopoverButton>
     </>
   )
@@ -354,7 +342,7 @@ export function RichTextBaseControls({
       </InspectorButtonGroup>
 
       <InspectorButtonGroup className={`${inspectorRowClass} is-passive`}>
-        <AIWritingControl element={element} execute={action => execute(action)} key={element.id} />
+        <AIWritingControl element={element} key={element.id} runtime={runtime} />
         <InspectorButton ariaLabel={t('foundation.editor.text.clear')} onClick={() => execute({ command: 'clear' })} style={{ width: '25%' }}><FormatIcon /></InspectorButton>
         <InspectorButton
           active={Boolean(richText.formatPainter)}

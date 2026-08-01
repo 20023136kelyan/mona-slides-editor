@@ -115,10 +115,12 @@ describe('PowerPoint source package state', () => {
       parts: [{
         objectIds: ['pptx:fixture/ppt/diagrams/drawing1.xml#12'],
         partPath: 'ppt/diagrams/drawing1.xml',
+        properties: ['left'],
         reasons: ['element.update'],
       }, {
         objectIds: ['pptx:fixture/ppt/slides/slide1.xml#7'],
         partPath: 'ppt/slides/slide1.xml',
+        properties: ['left'],
         reasons: ['element.update'],
       }],
       revision: 1,

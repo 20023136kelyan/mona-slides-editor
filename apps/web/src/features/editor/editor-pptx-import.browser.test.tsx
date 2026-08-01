@@ -58,7 +58,7 @@ test('the bytes are written before the deck can refer to them', async () => {
     ...shell,
     deck: {
       ...shell.deck,
-      writeAsset: async (name, bytes) => {
+      writeAsset: async (_id, name, bytes) => {
         expect(bytes.byteLength).toBeGreaterThan(60)
         written.push(name)
         return `mona://asset/${name}`
@@ -70,7 +70,7 @@ test('the bytes are written before the deck can refer to them', async () => {
 
     expect(await persistImportedAssets()).toEqual([])
     expect(written).toHaveLength(1)
-    expect(url).toBe(`mona://asset/${written[0]}`)
+    expect(url).toBe(`mona://asset/browser-test-document/${written[0]}`)
   }
   finally {
     window.mona = shell

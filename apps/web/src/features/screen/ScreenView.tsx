@@ -116,7 +116,7 @@ function PresenterScreen({
   // The shell puts it on the display the audience is looking at, fullscreen.
   const openAudience = () => {
     fullscreen.manualExitFullscreen()
-    void monaBridge().screen.openAudience()
+    void monaBridge().screen.openAudience(window.location.pathname)
   }
   // Vue's exitScreening leaves browser fullscreen before unmounting the show.
   const exitShow = () => {

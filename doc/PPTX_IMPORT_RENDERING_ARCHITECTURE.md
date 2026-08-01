@@ -15,12 +15,16 @@ TypeScript and React architecture.
 ## Current Mona pipeline
 
 ```text
-.pptx ArrayBuffer
-  -> @mona/pptx-parser.parse()
-  -> ParsedPptxPresentation
-  -> convertParsedPptxSlides()
-  -> Slide[] / semantic PPTElement trees
-  -> React renderer
+.pptx provider bytes
+  -> Electron main process
+  -> @mona/pptx-ingestion
+       -> exact OOXML package inventory/backing
+       -> @mona/pptx-parser.parse()
+       -> DOM-free semantic Mona conversion
+       -> content-addressed asset set
+  -> document-owned recovery files and retained source package
+  -> PresentationState over IPC (never a second archive copy)
+  -> shared React production renderer
 ```
 
 The original conversion boundary was destructive. The remaining destructive
@@ -47,8 +51,12 @@ areas are tracked in the matrix below:
 
 Relevant Mona files:
 
+- `packages/pptx-ingestion/src/index.ts`
+- `packages/pptx-ingestion/src/package-backing.ts`
+- `packages/pptx-ingestion/src/conversion.ts`
+- `apps/desktop/src/powerpoint-ingestion.ts`
+- `apps/desktop/src/deck-store.ts`
 - `apps/web/src/features/editor/editor-import.ts`
-- `apps/web/src/features/editor/editor-pptx-import.ts`
 - `packages/presentation-core/src/model.ts`
 - `apps/web/src/features/presentation-renderer/SlideRenderer.tsx`
 
@@ -132,7 +140,7 @@ the document model still retains the information.
 
 The first compatibility foundation now exists:
 
-1. `editor-pptx-package.ts` retains an exact byte copy of the imported package.
+1. `@mona/pptx-ingestion/package-backing` retains an exact byte copy of the imported package.
 2. The package receives a stable SHA-256 ID.
 3. Every package part is inventoried and classified without excluding unknown
    parts.
@@ -144,8 +152,9 @@ The first compatibility foundation now exists:
    potentially large archive bytes remain in a dedicated backing store.
 8. Slides and converted elements now retain PowerPoint source provenance.
 9. Inherited objects are kept beneath slide-local objects during rendering.
-10. Source archives are persisted in a versioned IndexedDB store and re-hashed
-    before hydration after reload.
+10. Source archives are persisted as versioned document-owned desktop records
+    and re-hashed before renderer hydration after reload. IndexedDB is only a
+    one-time legacy migration source.
 11. Working-copy saves prune unreferenced source packages, while discard clears
     the retained package store.
 12. OOXML content types, relationships, slide order, native object identity,
@@ -163,9 +172,10 @@ The first compatibility foundation now exists:
     package inventory and never uses a name or parser-order fallback as an
     exact source identity. Malformed duplicate or missing IDs are reported and
     deliberately remain ineligible for exact source patching.
-16. PPTX inventory and conversion parsing run in a cancellable worker with
-    progress stages; the main-thread implementation remains as a compatibility
-    fallback.
+16. PPTX inventory, parsing, conversion, media materialization, and source
+    retention run in the Electron main process as one cancellable operation.
+    The renderer receives the semantic result and loads the retained backing
+    record from disk; there is no production browser/worker parser path.
 17. Element and slide edits add source-part/object entries to a dirty-part
     journal without cloning the retained archive.
 18. Themes, masters, layouts, placeholder catalogs, and typed slide dependency
@@ -232,9 +242,23 @@ The first compatibility foundation now exists:
     back to the mounted import baseline restores the exact authored body and
     compatibility HTML instead of leaving a visually reverted but semantically
     detached object.
+37. Conversion is framework- and DOM-free. The old `DOMParser` list/table
+    adapters were replaced by a deterministic fragment reader for the bounded
+    HTML emitted by the parser.
+38. Media conversion returns an explicit content-addressed asset set. The
+    desktop host writes every asset before the model becomes reachable, removing
+    the old module-global pending queue and active-document dependency.
+39. Local-folder and project data-source PowerPoint files use the same desktop
+    ingestion contract. A project agent receives slide JSON and extracted media
+    as readable context. Source-preserving writeback is enabled for existing
+    slide-local non-line object transforms/deletions, rich text, text-body
+    layout, and solid fill/outline edits; every other mutation fails capability
+    validation before provider write.
 
 The backing store is deliberately independent of PptxGenJS. PptxGenJS is an
-export generator and cannot improve import fidelity.
+export generator and cannot improve import fidelity. Mona-native generation now
+uses PptxGenJS 4.0.1, while imported-deck preservation uses the retained-package
+writer.
 
 ## What “import fixed” means
 
@@ -285,13 +309,13 @@ Status in this table refers to Mona today:
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| A01 | Exact source package retention | Done | Persist the content-addressed backing store in IndexedDB, hydrate it on deck load, and garbage-collect unreferenced packages | Reloading the browser produces the same SHA-256 and byte-for-byte package |
+| A01 | Exact source package retention | Done | Persist the content-addressed backing store in the document-owned desktop recovery package, hydrate it on deck load, and garbage-collect unreferenced packages | Restarting the app produces the same SHA-256 and byte-for-byte package |
 | A02 | OPC part and relationship graph | Done | Replace the regex-only inventory reader with a namespace-aware XML/OPC reader; retain content types, internal/external relationships, and relationship IDs as indexed records | Every relationship target in the corpus resolves or produces a typed diagnostic |
 | A03 | Unknown and extension parts | Done for preservation | Keep every unrecognized part and relationship; add an `opaque` semantic record when an unknown object is referenced by a slide | Unknown parts survive and referenced unknown objects are reported rather than silently dropped |
 | A04 | Package safety and resource limits | Partial | Add decompressed-size, compression-ratio, XML-depth, entity, media-size, and per-part limits in addition to archive byte/part-count limits | Adversarial ZIP/XML fixtures fail safely without blocking the UI |
 | A05 | Import diagnostics | Done | Produce a structured per-package/per-slide report with preserved, modeled, approximated, opaque, and dropped counts | The report can prove that the dropped count is zero for a successful import |
 | A06 | Dirty-part journal | Partial | Track which OOXML semantic objects and package parts an edit changes; leave all other parts immutable | A one-element edit marks only its dependent parts dirty |
-| A07 | Import worker and cancellation | Done | Move ZIP/XML parsing and heavy asset decoding off the main thread; support cancellation and progress | Large-corpus import remains responsive and cancellation releases memory |
+| A07 | Desktop ingestion and cancellation | Done | Run ZIP/XML parsing, conversion, and media writes in Electron main with operation-scoped cancellation and progress | Large-corpus import never blocks the renderer; cancellation prevents presentation commit and retained-package publication |
 | A08 | Stable package and object addressing | Done | Keep package hashes, part IDs, native shape IDs, creation IDs, and relationship IDs; carry `(part, cNvPr id)` through the maintained parser fork and refuse ambiguous identities | Reimporting the same file maps valid source objects to the same provenance keys; duplicate/malformed IDs receive a diagnostic rather than a false patch target |
 
 ### B. Presentation hierarchy, themes, and inheritance
@@ -333,7 +357,7 @@ only as a migration adapter while the renderer moves to the derived hierarchy.
 | C03 | Nested group transforms | Done for imported groups | Preserve parent/child coordinate spaces, `off/ext`, `chOff/chExt`, rotation, flips, locks, and recursive composition | Deeply nested group fixtures match reference bounds and hit-testing |
 | C04 | Z-order | Partial | Retain native tree order independently within master, layout, and slide layers | Overlapping objects match reference compositing order |
 | C05 | Preset and custom geometry | Partial | Preserve preset type, adjustments, guides, handles, connection sites, text rectangles, and custom paths | Adjustable and custom shapes remain editable without path approximation |
-| C06 | Connectors | Partial | Preserve connector geometry, endpoint shape IDs/sites, routing, arrowheads, and line transforms | Moving a connected object keeps its connector attached |
+| C06 | Connectors | Partial | Endpoint shape IDs/sites now survive import and source-preserving export; straight-line geometry, rotation/flip canonicalization, width, dash, solid color, and arrowheads write back natively. Add explicit attach/detach commands and exact bent/curved adjustment serializers. | Style edits retain connections; implicit endpoint detachment fails; straight geometry round-trips |
 | C07 | Fills | Partial | Model solid, scheme, gradient stops/paths, pattern, picture, transparency, tile/stretch, and color transforms | No gradient is averaged and no pattern is replaced with white |
 | C08 | Lines | Partial | Model per-line width, dash, compound, cap, join, alignment, head/tail type and size, transparency, and theme references | Line styles match reference output at normal and zoomed scales |
 | C09 | Effects and 3D | Partial | Model shadows, glow, soft edges, reflection, bevel, scene/shape 3D, and effect inheritance; use explicit fallback for unsupported effects | Supported effects render; unsupported ones show a diagnostic/preview |
@@ -383,7 +407,7 @@ structured model directly. It is not the PowerPoint source of truth.
 | F04 | Static transitions and timing retention | Missing | Parse and retain transitions, builds, timing tree, triggers, targets, and media commands while initially rendering the static end state | Animation-bearing decks retain all static content and report retained playback data |
 | F05 | Accessibility and nonvisual data | Missing | Surface reading order, alt text, titles/descriptions, language, decorative/hidden state, and table headers | Accessibility metadata survives and reading order follows the shape tree |
 | F06 | Diagnostics and visible fallback | Partial | Opaque graphic frames render a bounded preview or neutral placeholder and expose their reason in the import report; extend the fallback to every unsupported object family | No referenced slide object disappears without a visible/reportable explanation |
-| F07 | Performance and memory | Partial | Add worker parsing, lazy part decoding, asset deduplication, render caching, slide virtualization, and backing-store lifecycle | The 30+ slide stress deck stays within agreed import time/memory/interaction budgets |
+| F07 | Performance and memory | Partial | Keep parsing and conversion in the Electron main process; add lazy part decoding, asset deduplication, render caching, slide virtualization, and backing-store lifecycle | The 30+ slide stress deck stays within agreed import time/memory/interaction budgets without putting parser work in the renderer |
 | F08 | Reference rendering harness | Partial | Render source decks through PowerPoint/LibreOffice reference output and Mona at fixed dimensions; compare screenshots and structural manifests | Every compatibility slice adds deterministic visual and structural baselines |
 | F09 | Corpus coverage | Partial | Maintain native PowerPoint, Google Slides export, Keynote export, corporate master, design-heavy, tables/text, SmartArt, equations, RTL/CJK, 4:3, and stress fixtures | The matrix maps each row to at least one public or private fixture |
 
@@ -391,16 +415,16 @@ structured model directly. It is not the PowerPoint source of truth.
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| G01 | Provenance-aware editing | Partial | Route edits to the semantic source object and keep source provenance on derived render nodes | Editing an imported object does not detach unrelated source data |
+| G01 | Provenance-aware editing | Partial | Stable source identities, baseline comparison, and exact source-object routing are active for transforms/deletions and text/style writes; extend the property-level journal to each new inverse serializer | Editing an imported object does not detach unrelated source data |
 | G02 | Inherited-object editing | Missing | Implement explicit “edit master/layout” and copy-on-write slide overrides for inherited placeholders/shapes | A slide-local change does not mutate every slide sharing a master |
 | G03 | Agent command surface | Partial | Make agent tools operate on stable semantic IDs and typed properties rather than canvas approximations or comments | Agent edits produce the same commands as direct UI editing and remain undoable |
-| G04 | Unsupported-object protection | Partial | Generic move, resize, duplicate, delete, and agent operations retain opaque provenance and nested child parts; source-package patch export remains pending | Moving an opaque object changes its transform while retaining its source payload |
+| G04 | Unsupported-object protection | Partial | Source-backed slide-local transform/delete and text/simple-style writes are active and unsupported edits fail explicitly; add safe duplication/insertion and inherited/linked-part edit modes | Moving an opaque object changes its transform while retaining its source payload |
 | G05 | Undo/history boundaries | Partial | Keep package bytes and immutable source parts outside history; store only semantic edit commands and dirty-part references | Undo does not clone archives and restores the exact previous semantic state |
 
 ## Export architecture after import and rendering
 
-Export is a later workstream, but it must be designed around the retained
-package. Rebuilding every imported deck solely through PptxGenJS would discard
+Export is split around the retained package. Rebuilding every imported deck
+solely through PptxGenJS would discard
 OOXML that PptxGenJS does not model, undoing the preservation work.
 
 Mona therefore needs two export paths:
@@ -412,14 +436,14 @@ Mona therefore needs two export paths:
    created entirely in Mona, with Mona-native serializers for capabilities that
    PptxGenJS cannot express.
 
-| ID | Capability | Action | Acceptance gate |
-| --- | --- | --- | --- |
-| X01 | Hybrid export coordinator | Choose patch export for source-backed decks and generation export for Mona-native decks | Export path is explicit and testable |
-| X02 | Package patch writer | Copy source package and rewrite only dirty XML/assets/relationships | Untouched parts remain byte-identical |
-| X03 | Semantic serializers | Serialize hierarchy, shapes, text, tables, charts, notes, comments, timing, and relationships incrementally | Each completed import/model slice gains an inverse serializer |
-| X04 | PptxGenJS upgrade and adapter | Upgrade from current PptxGenJS 3.12 after an isolated compatibility test; use it for new-deck generation, not source preservation | Existing export fixtures remain valid and new supported features improve |
-| X05 | Relationship/content-type repair | Allocate collision-free part names and relationship IDs and maintain `[Content_Types].xml` | PowerPoint opens output without repair warnings |
-| X06 | Round-trip harness | Import → no-op export → reimport, and import → edit → export → reimport, with package/semantic/visual comparisons | No-op export preserves untouched parts and edited output remains stable |
+| ID | Capability | Status | Action | Acceptance gate |
+| --- | --- | --- | --- | --- |
+| X01 | Hybrid export coordinator | Partial | Full-deck, single-source standard export uses retained-package writeback; Mona-native and partial/raster exports use generation | Export path is explicit and testable |
+| X02 | Package patch writer | Partial | Exact no-ops return the retained archive; dirty slide XML is patched by source identity and every untouched package part remains byte-identical | Untouched parts remain byte-identical |
+| X03 | Semantic serializers | Partial | Slide-local transforms/deletions, straight-line geometry, connector style/arrowheads, rich text and paragraph/run formatting, text-body layout, and solid fill/outline serializers are implemented; add bent/curved routes, explicit connector attachment changes, hierarchy, tables, charts, notes, comments, timing, complex effects, assets, and relationships incrementally | Each completed import/model slice gains an inverse serializer |
+| X04 | PptxGenJS upgrade and adapter | Complete | Mona-native generation uses PptxGenJS 4.0.1; imported decks never rely on it for source preservation | Existing export fixtures remain valid and new supported features improve |
+| X05 | Relationship/content-type repair | Missing | Allocate collision-free part names and relationship IDs and maintain `[Content_Types].xml` when insertion serializers arrive | PowerPoint opens output without repair warnings |
+| X06 | Round-trip harness | Partial | Public- and available private-corpus exact no-op tests, object/line geometry, connector relationship/style, delete/text/style re-import tests, editor-menu export, project-provider writeback, and packaged `mona://` smoke are active; add Office reference-open and visual round trips for each serializer | No-op export preserves untouched parts and edited output remains stable |
 
 ## Implementation order and release gates
 
@@ -465,7 +489,8 @@ not the long-term source of truth.
 
 The July 24, 2026 verification pass establishes the following:
 
-- The five public corpus decks pass structural browser import tests.
+- The five public corpus decks pass headless desktop-ingestion tests and
+  structural renderer tests.
 - The public groups/freeform deck now retains three semantic native groups,
   including a nested group, rather than six flattened `groupId` children.
   Browser coverage selects one group root, moves and resizes it while preserving
@@ -474,7 +499,7 @@ The July 24, 2026 verification pass establishes the following:
 - The synthetic chart/table deck imports all three native PowerPoint charts
   (bar, line, and pie) plus its table. Each chart produces a non-empty SVG
   render; the old baseline that accepted three missing charts was removed.
-- The four private real-world decks pass a serial browser rendering gate:
+- The four private real-world decks pass a serial Electron-renderer gate:
   a 34-slide native-chart stress deck, a native pie-chart deck, an 18-slide
   corporate master/template deck, and a 28-slide design/SmartArt/notes deck.
 - Every chart-bearing slide in those decks produces rendered vector marks.
@@ -511,4 +536,5 @@ chart-space/workbook model, opaque coverage for unsupported object families
 beyond graphic frames, typed header/footer/date field content beyond the
 current resolved placeholders,
 notes/comments/timing semantics, advanced effects/3D, dependency-aware
-recalculation, and source-package patch export.
+recalculation, and inverse serializers beyond the completed slide-local
+transform/delete plus rich-text/text-body/solid-style writeback slices.

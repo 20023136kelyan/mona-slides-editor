@@ -8,6 +8,74 @@ See also:
 - [`doc/EDITOR_EXPERIENCE.md`](EDITOR_EXPERIENCE.md) — disclosure behavior and interaction gates
 - [`doc/I18N.md`](I18N.md) — locale catalogs for chrome labels
 
+## Persistent application spine
+
+Every primary Mona surface starts with a full-height shadcn `Sidebar`. The
+sidebar is the application's stable spatial anchor: its contents change with the
+surface, but the left column does not disappear during normal navigation.
+
+- `ApplicationSidebar` owns the fixed brand header, settings footer, expanded
+  and collapsed geometry, button placement, and synchronized transition classes.
+  Routes supply only `SidebarContent`.
+- `ApplicationSidebarStateProvider` lives above the router, so the collapsed
+  state survives Home ↔ Editor ↔ Project Chat navigation.
+- Home and the document editor use the same 14rem expanded width and the same
+  icon-rail collapse. On macOS, the expand keycap hands off to the adjacent
+  content surface while the collapsed rail reserves the traffic-light region.
+- On Home and Project surfaces, `SidebarContent` is divided into Data sources,
+  Projects, and Workflows. Data sources expose folder trees; Projects behave like
+  chat threads; Workflows sit at the bottom of the navigational content and list
+  routine names only.
+- Project chat preserves this column. Its composition is sidebar, centred
+  conversation, and a separate right artifact panel. When the project agent is
+  applying document changes, a flat job-activity region appears with ordered
+  progress, status, and cooperative cancellation. It belongs to the conversation
+  surface and does not introduce a card.
+- A toolbar may run across the remaining content inset, as `EditorHeader` does.
+  It must not run across the application sidebar or masquerade as a traditional
+  full-window header.
+- Focused presentation playback and audience windows are mode surfaces, not
+  application navigation, and are the exception.
+
+Home composition:
+
+```text
+SidebarProvider
+  ├─ ApplicationSidebar
+  │    ├─ SidebarHeader (shared Mona brand, collapse, macOS drag region)
+  │    ├─ SidebarContent
+  │    │    ├─ Data sources (provider instances + folder trees)
+  │    │    ├─ Projects (chat-like threads)
+  │    │    └─ Workflows (scheduled routines, anchored last)
+  │    └─ SidebarFooter (shared settings)
+  └─ SidebarInset
+       ├─ ApplicationSidebarContentToggle (macOS collapsed handoff)
+       └─ Document browser (source/folder/search/provider filtered)
+```
+
+Sidebar selection semantics:
+
+- Selecting a data source or folder changes the scope of the centre document
+  browser; it does not navigate to a second library implementation.
+- Selecting a project changes the centre surface to its conversation and makes
+  the project's document outputs available in the right artifact panel.
+- Selecting a workflow name changes the centre surface to its routine definition,
+  schedule, run status, and history. Those parameters never expand inside the
+  sidebar.
+- Provider controls in the document browser and nodes in the data-source tree
+  filter the same underlying query state.
+
+Surface colors are structural:
+
+- `--sidebar` paints the persistent left rail, left drawers, and right-side
+  inspector/agent/artifact panels.
+- `--workspace-surface` paints the center route content plane.
+- Controls use the variants for the surface that owns them:
+  `SidebarMenuButton` inside the rail and `header-pill` controls in an adjacent
+  content header. Route features must not invent parallel colors or button skins.
+- Empty, loading, and no-results states render directly on their owning surface.
+  They do not introduce a card fill, border, or shadow around the status content.
+
 ## Entry and runtime branch
 
 [`apps/web/src/features/foundation/FoundationPage.tsx`](../apps/web/src/features/foundation/FoundationPage.tsx) creates one [`EditorRuntime`](../apps/web/src/features/editor/editor-runtime.ts) and wraps the session in `EditorApplicationProvider`.

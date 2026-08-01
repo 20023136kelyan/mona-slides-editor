@@ -12,6 +12,7 @@ import {
   type EditorShell,
   type EditorTaskPanelRoute,
 } from '@/features/editor/shell/editor-shell'
+import { useOptionalApplicationSidebarState } from '@/features/application-shell/application-sidebar-context'
 
 const focusFallbackForRoute = (route: EditorTaskPanelRoute | null) => {
   if (!route) return
@@ -20,7 +21,10 @@ const focusFallbackForRoute = (route: EditorTaskPanelRoute | null) => {
 
 export function EditorShellProvider({ children }: { children: ReactNode }) {
   const [taskPanelRoute, setTaskPanelRoute] = useState<EditorTaskPanelRoute | null>(null)
-  const [railCollapsed, setRailCollapsed] = useState(false)
+  const applicationSidebarState = useOptionalApplicationSidebarState()
+  const [localRailCollapsed, setLocalRailCollapsed] = useState(false)
+  const railCollapsed = applicationSidebarState?.collapsed ?? localRailCollapsed
+  const setRailCollapsed = applicationSidebarState?.setCollapsed ?? setLocalRailCollapsed
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const routeRef = useRef<EditorTaskPanelRoute | null>(null)
 
@@ -60,7 +64,7 @@ export function EditorShellProvider({ children }: { children: ReactNode }) {
     openTaskPanel,
     taskPanelRoute,
     toggleTaskPanel,
-  }), [closeTaskPanel, openTaskPanel, railCollapsed, taskPanelRoute, toggleTaskPanel])
+  }), [closeTaskPanel, openTaskPanel, railCollapsed, setRailCollapsed, taskPanelRoute, toggleTaskPanel])
 
   return <EditorShellContext value={value}>{children}</EditorShellContext>
 }

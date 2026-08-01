@@ -1,4 +1,6 @@
-import { expect, openApp, resizeWindow, test } from './electron-fixture'
+import { join } from 'node:path'
+
+import { configureLocalSaveFolder, expect, openApp, resizeWindow, test } from './electron-fixture'
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -17,22 +19,53 @@ test('loads Mona and changes locale without browser errors', async ({ page }) =>
 
   await openApp(page)
 
-  // The document title gains the deck's name as soon as one loads, so an exact
-  // match races that. What is being asserted is that the window names the
-  // application, which holds before and after.
-  await expect(page).toHaveTitle(/Mona$/)
-  await expect(page.getByLabel('Mona presentation editor')).toBeVisible()
-  await expect(page.locator('.mona-editor-header-title-input')).toHaveValue('Untitled presentation')
+  await expect(page).toHaveTitle('Presentations - Mona')
+  await expect(page.getByRole('heading', { name: 'Presentations' })).toBeVisible()
+  const homeSidebar = page.getByRole('navigation', { name: 'Mona navigation' })
+  await expect(page.getByRole('button', { name: 'New presentation' }).first()).toBeVisible()
+  await expect(page.locator('header')).toHaveCount(0)
 
-  // Settings lives at the bottom of the creation rail (the future account slot).
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await page.getByRole('combobox', { name: 'Language' }).click()
+  await homeSidebar.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Language', exact: true }).click()
   await page.getByRole('option', { name: 'Simplified Chinese', exact: true }).click()
 
-  await expect(page.locator('.mona-editor-rail-settings[aria-label="设置"]')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '演示文稿' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '设置', exact: true })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN')
-  await expect(page.locator('.mona-editor-header-title-input')).toHaveValue('Untitled presentation')
   expect(browserProblems).toEqual([])
+})
+
+test('keeps one sidebar shell, collapse state, and geometry across Home and Editor', async ({ app, page }, testInfo) => {
+  const viewport = await resizeWindow(app, 1440, 900)
+  test.skip(!viewport.fits, `needs a 1440x900 window; this display is ${viewport.display}`)
+  await openApp(page)
+  await configureLocalSaveFolder(app, page, join(testInfo.outputDir, 'presentations'))
+
+  const homeSidebar = page.getByRole('navigation', { name: 'Mona navigation' })
+  const homeHeader = homeSidebar.locator('[data-sidebar="header"]')
+  await expect(homeSidebar).toBeVisible()
+  const expandedHomeBox = await homeSidebar.boundingBox()
+  const homeHeaderBox = await homeHeader.boundingBox()
+  expect(expandedHomeBox?.width).toBe(224)
+  expect(homeHeaderBox?.height).toBe(44)
+
+  await homeSidebar.getByRole('button', { name: 'Collapse sidebar' }).click()
+  await expect.poll(async () => (await homeSidebar.boundingBox())?.width).toBeLessThanOrEqual(100)
+  const collapsedHomeWidth = (await homeSidebar.boundingBox())!.width
+
+  // Route-specific content changes, while the shared sidebar state remains.
+  await page.getByRole('button', { name: 'New presentation' }).first().click()
+  await page.waitForURL(/\/documents\/[^/?]+/)
+  const editorSidebar = page.getByRole('navigation', { name: 'Editor tools' })
+  await expect(editorSidebar).toBeVisible()
+  expect((await editorSidebar.boundingBox())?.width).toBe(collapsedHomeWidth)
+  expect((await editorSidebar.locator('[data-sidebar="header"]').boundingBox())?.height).toBe(44)
+
+  await page.getByRole('menubar', { name: 'Menu bar' }).getByRole('button', { name: 'Expand sidebar' }).click()
+  await expect.poll(async () => (await editorSidebar.boundingBox())?.width).toBe(224)
+  await editorSidebar.getByRole('button', { name: 'All presentations' }).click()
+  await expect(page.getByRole('navigation', { name: 'Mona navigation' })).toBeVisible()
+  expect((await page.getByRole('navigation', { name: 'Mona navigation' }).boundingBox())?.width).toBe(224)
 })
 
 test('renders the complete native fixture and selects a slide read-only', async ({ page }) => {

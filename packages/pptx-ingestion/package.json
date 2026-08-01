@@ -1,0 +1,31 @@
+{
+  "name": "@mona/pptx-ingestion",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./assets": "./src/assets.ts",
+    "./conversion": "./src/conversion.ts",
+    "./package-backing": "./src/package-backing.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "type-check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mona/pptx-parser": "0.0.0",
+    "@mona/presentation-core": "0.0.0",
+    "fast-xml-parser": "5.10.1",
+    "hfmath": "^0.0.2",
+    "jszip": "3.10.1",
+    "svg-pathdata": "^8.0.0",
+    "tinycolor2": "1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "@types/tinycolor2": "1.4.6",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

@@ -15,6 +15,7 @@ export interface EditorApplication {
   agentOpen: boolean
   closeAgent: () => void
   closeExport: () => void
+  createDocument: () => Promise<void>
   exitPresentation: () => void
   /** Selected file type in the header export dropdown, or null while closed. */
   exportType: ExportType | null
@@ -22,6 +23,7 @@ export interface EditorApplication {
   importing: boolean
   notifications: EditorNotificationService
   openAgent: () => void
+  openDocumentLibrary: () => Promise<void>
   openExport: (type?: ExportType) => void
   persistence: DeckPersistence | null
   presenting: boolean

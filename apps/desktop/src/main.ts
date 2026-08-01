@@ -8,9 +8,16 @@ import { app, BrowserWindow, dialog, protocol } from 'electron'
 import { installApplicationMenu } from './app-menu.js'
 import { loadDevelopmentEnvironment } from './development-env.js'
 import { attachWindowAgent, registerAgentIpc } from './agent-ipc.js'
+import { dataSourceService, registerDataSourceIpc } from './data-source-ipc.js'
 import { flushBeforeClose, handleAssetRequest, registerDeckIpc } from './deck-store.js'
 import { PRINT_PATH, printDocument, registerFileIpc } from './file-dialogs.js'
 import { registerPresenterIpc } from './presenter.js'
+import {
+  ProjectDocumentAgentExecutor,
+  ProjectDocumentJobEngine,
+} from './project-document-jobs.js'
+import { registerProjectJobIpc } from './project-job-ipc.js'
+import { registerProjectIpc } from './project-ipc.js'
 import { guardNavigation } from './window-guards.js'
 
 /**
@@ -63,6 +70,25 @@ const MIME = new Map(Object.entries({
   '.woff2': 'font/woff2',
 }))
 
+/**
+ * The renderer may display remote user-selected media, but executable content
+ * comes only from the packaged application. Applied by the custom protocol in
+ * production, leaving Vite free to supply its development-only HMR policy.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' mona: data: blob: https:",
+  "media-src 'self' mona: data: blob: https:",
+  "font-src 'self' data: https:",
+  "connect-src 'self' mona: https:",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+].join('; ')
+
 const mimeFor = (path: string): string => {
   const dot = path.lastIndexOf('.')
   return (dot === -1 ? undefined : MIME.get(path.slice(dot))) ?? 'application/octet-stream'
@@ -79,7 +105,7 @@ const serveRenderer = () => {
   protocol.handle(SCHEME, async request => {
     // Two hosts on one scheme: `mona://app/...` is the renderer, `mona://asset/...`
     // is deck binary served straight off disk.
-    const asset = await handleAssetRequest(request)
+    const asset = await handleAssetRequest(request, dataSourceService)
     if (asset) return asset
     const { pathname } = new URL(request.url)
     // The document a PDF export is being rendered from. Served here rather than
@@ -93,9 +119,9 @@ const serveRenderer = () => {
     const file = inside && await stat(target).then(entry => entry.isFile()).catch(() => false)
       ? target
       : join(RENDERER_ROOT, 'index.html')
-    return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, {
-      headers: { 'content-type': mimeFor(file) },
-    })
+    const headers: Record<string, string> = { 'content-type': mimeFor(file) }
+    if (file.endsWith('.html')) headers['content-security-policy'] = CONTENT_SECURITY_POLICY
+    return new Response(Readable.toWeb(createReadStream(file)) as ReadableStream, { headers })
   })
 }
 
@@ -105,6 +131,9 @@ const rendererUrl = app.isPackaged
   : process.env.MONA_DESKTOP_RENDERER_URL ?? 'http://127.0.0.1:5173'
 
 const MAC = process.platform === 'darwin'
+const projectDocumentJobEngine = new ProjectDocumentJobEngine({
+  dataSources: dataSourceService,
+})
 
 const createWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
@@ -130,7 +159,15 @@ const createWindow = async (): Promise<void> => {
     width: 1440,
   })
 
-  attachWindowAgent(window)
+  attachWindowAgent(
+    window,
+    undefined,
+    projectId => new ProjectDocumentAgentExecutor({
+      dataSources: dataSourceService,
+      engine: projectDocumentJobEngine,
+      projectId,
+    }),
+  )
 
   guardNavigation(window, rendererUrl)
   flushBeforeClose(window)
@@ -141,13 +178,19 @@ const createWindow = async (): Promise<void> => {
 
 const main = async (): Promise<void> => {
   await loadDevelopmentEnvironment()
+  if (app.isPackaged && !process.env.MONA_AGENT_PLUGIN_DIR) {
+    process.env.MONA_AGENT_PLUGIN_DIR = join(process.resourcesPath, 'agent-plugin')
+  }
   await app.whenReady()
   installApplicationMenu()
   serveRenderer()
   registerAgentIpc()
-  registerDeckIpc()
+  registerDataSourceIpc(dataSourceService)
+  registerDeckIpc(dataSourceService)
   registerFileIpc()
   registerPresenterIpc(rendererUrl, resolve(HERE, 'preload.cjs'))
+  await registerProjectJobIpc()
+  registerProjectIpc()
   try {
     await createWindow()
   }

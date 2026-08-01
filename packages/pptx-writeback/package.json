@@ -1,0 +1,24 @@
+{
+  "name": "@mona/pptx-writeback",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "type-check": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mona/presentation-core": "0.0.0",
+    "@mona/pptx-ingestion": "0.0.0",
+    "fast-xml-parser": "5.10.1",
+    "jszip": "3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

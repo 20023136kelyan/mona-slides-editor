@@ -189,6 +189,8 @@ function PptxOptions({ actions, onExporting, registerDownload, runtime }: TypeOp
   const [mode, setMode] = useState<'image' | 'standard'>('standard')
   const [ignoreMedia, setIgnoreMedia] = useState(true)
   const [masterOverwrite, setMasterOverwrite] = useState(true)
+  const sourcePreserving = Boolean(presentation.sourcePackages?.length === 1)
+    && rangeState.rangeType === 'all'
   useEffect(() => registerDownload(() => {
     onExporting(true)
     const promise = mode === 'standard'
@@ -208,11 +210,15 @@ function PptxOptions({ actions, onExporting, registerDownload, runtime }: TypeOp
         <ExportRadioGroup ariaLabel={t('export.mode')} items={[{ label: t('export.standard'), value: 'standard' }, { label: t('export.imageOnly'), value: 'image' }]} onChange={value => setMode(value as 'image' | 'standard')} value={mode} />
       </ExportField>
       {mode === 'standard' ? (
-        <>
-          <ExportSwitchRow checked={ignoreMedia} label={t('export.ignoreMedia')} onChange={setIgnoreMedia} />
-          <ExportSwitchRow checked={masterOverwrite} label={t('export.overwriteMaster')} onChange={setMasterOverwrite} />
-          {!ignoreMedia ? <ExportTip>{t('export.mediaTip')}</ExportTip> : null}
-        </>
+        sourcePreserving
+          ? <ExportTip>{t('export.sourcePreservingTip')}</ExportTip>
+          : (
+              <>
+                <ExportSwitchRow checked={ignoreMedia} label={t('export.ignoreMedia')} onChange={setIgnoreMedia} />
+                <ExportSwitchRow checked={masterOverwrite} label={t('export.overwriteMaster')} onChange={setMasterOverwrite} />
+                {!ignoreMedia ? <ExportTip>{t('export.mediaTip')}</ExportTip> : null}
+              </>
+            )
       ) : null}
     </>
   )

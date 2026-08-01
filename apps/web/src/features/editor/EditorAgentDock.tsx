@@ -39,11 +39,12 @@ import { Textarea } from '@/components/ui/textarea'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import type { SketchAgentHandoff } from '@/features/editor/drawing/drawing-serialization'
 import { useAgentChat } from '@/features/editor/agent/use-agent-chat'
-import { agentModelStore, useAgentModelSelection } from '@/features/editor/agent/agent-model-store'
-import { AgentProviderIcon } from '@/features/editor/agent/AgentProviderIcon'
-import { effortLevelsFor, useAgentModels, type AgentModel } from '@/features/editor/agent/agent-model-catalog'
+import { agentModelStore, useAgentModelSelection } from '@/features/agent/agent-model-store'
+import { AgentProviderIcon } from '@/features/agent/AgentProviderIcon'
+import { effortLevelsFor, useAgentModels, type AgentModel } from '@/features/agent/agent-model-catalog'
+import { consumeAgentPrompt, useQueuedAgentPrompt } from '@/features/editor/agent/agent-prompt-queue'
 import { buildToolLabel, slideLabelFor } from '@/features/editor/agent/agent-tool-label'
-import { refreshAgentAccount, useAgentAccount } from '@/features/editor/agent/agent-account'
+import { refreshAgentAccount, useAgentAccount } from '@/features/agent/agent-account'
 import { useEditorApplication } from '@/features/editor/services/editor-application'
 import { useEdgeFade } from '@/features/editor/use-edge-fade'
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
@@ -106,6 +107,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   const { closeAgent } = useEditorApplication()
   const selection = useAgentModelSelection()
   const account = useAgentAccount()
+  const queuedPrompt = useQueuedAgentPrompt()
   const [draft, setDraft] = useState(() => (
     handoff ? t('foundation.editor.agent.sketchInstruction') : ''
   ))
@@ -116,10 +118,12 @@ export function EditorAgentDock({ handoff = null, runtime }: {
     model: selection.model ?? '',
     runtime,
   })
-  const [providerOpen, setProviderOpen] = useState(false)
+  const sendAgentMessage = chat.sendMessage
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const [modelQuery, setModelQuery] = useState('')
   const [slashIndex, setSlashIndex] = useState(0)
+  const stagedPromptIdRef = useRef<number | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
   const slides = useEditorSelector(runtime.store, state => state.presentation.slides)
@@ -142,7 +146,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   useEffect(() => {
     if (selection.effort && !effortLevels.includes(selection.effort)) agentModelStore.setEffort(undefined)
   }, [selection.effort, effortLevels])
-  const providerReady = account.connected
+  const agentReady = account.connected
   // The SDK reports the run: submitted before the first token, streaming after.
   const busy = chat.status === 'streaming' || chat.status === 'submitted'
   const runStartedAt = useMemo(() => busy ? Date.now() : null, [busy])
@@ -160,6 +164,23 @@ export function EditorAgentDock({ handoff = null, runtime }: {
   useEffect(() => {
     void refreshAgentAccount()
   }, [])
+
+  useEffect(() => {
+    if (!queuedPrompt) return
+    if (stagedPromptIdRef.current !== queuedPrompt.id) {
+      stagedPromptIdRef.current = queuedPrompt.id
+      setDraft(queuedPrompt.text)
+    }
+    if (!agentReady) return
+
+    // Claim before sending. React development mode may replay an effect setup;
+    // only the setup that removed this prompt is allowed to start the turn.
+    if (!consumeAgentPrompt(queuedPrompt.id)) return
+    stagedPromptIdRef.current = null
+    setDraft('')
+    setSlashIndex(0)
+    void sendAgentMessage({ text: queuedPrompt.text })
+  }, [agentReady, queuedPrompt, sendAgentMessage])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
@@ -185,7 +206,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
 
   const activateModel = (model: AgentModelOption) => {
     agentModelStore.setModel(model.id)
-    setProviderOpen(false)
+    setModelPickerOpen(false)
   }
 
   // Until threads are persisted with their own titles, the chat is named after
@@ -234,7 +255,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
 
   const submit = () => {
     const instruction = draft.trim()
-    if (!instruction || !providerReady) return
+    if (!instruction || !agentReady) return
     const command = parseSlashCommand(instruction)
     const rewritten = command ? runSlashCommand(command) : null
     if (command && !rewritten) return
@@ -249,17 +270,17 @@ export function EditorAgentDock({ handoff = null, runtime }: {
 
   return (
     <Sidebar aria-label={t('foundation.editor.agent.title')} className="mona-agent-dock w-[var(--dock-w)] shrink-0 overflow-hidden border-l border-sidebar-border" collapsible="none" id="mona-agent-dock" role="complementary" side="right">
-      {/* The provider Popover wraps the whole dock: its content is portaled,
+      {/* The model Popover wraps the whole dock: its content is portaled,
           and the trigger sits inside the composer, the way current assistant
           UIs place their model picker. The root renders no DOM node. */}
       <Popover
         onOpenChange={open => {
-          setProviderOpen(open)
+          setModelPickerOpen(open)
           if (!open) {
             setModelQuery('')
           }
         }}
-        open={providerOpen}
+        open={modelPickerOpen}
       >
       {/* Slim chat header: a name and a quiet scope hint. */}
       <SidebarHeader className="flex min-h-11.5 flex-row items-center justify-between gap-3 px-4 pt-1.5 pb-0 [&_>button_svg]:size-4">
@@ -269,7 +290,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
         <h2 className="m-0 min-w-0 truncate text-control font-medium" id="mona-agent-dock-title" title={chatName}>{chatName}</h2>
       </SidebarHeader>
           <PopoverContent
-            aria-label={t('foundation.editor.agent.chooseProvider')}
+            aria-label={t('foundation.editor.agent.chooseModel')}
             align="start"
             className="w-[min(248px,calc(100vw-24px))] max-h-[min(70vh,460px)] gap-0 overflow-y-auto p-1.25"
             data-editor-interactive-overlay
@@ -411,7 +432,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               place rather than behind a dialog. Signed in: the slides this
               prompt will act on, carried as chips like attachments. */}
           <div className="mona-agent-strip flex min-h-8 flex-wrap items-center gap-1.5 px-1.5 pt-0.5 pb-1.5">
-            {!providerReady ? (
+            {!agentReady ? (
               <>
                 <span className={cn(LANE_FACE, 'grid size-6.5 shrink-0 place-items-center text-muted-foreground [&_svg]:size-3.25')}>
                   {account.loading ? (
@@ -503,48 +524,47 @@ export function EditorAgentDock({ handoff = null, runtime }: {
             value={draft}
           />
           <div className="flex min-h-11 items-center gap-1 px-1.5 pt-1 pb-1.5 [&_button_svg]:size-3.75">
-            <PopoverTrigger asChild>
-              <Button
-                aria-label={t('foundation.editor.agent.chooseProvider')}
-                // Matches the header's controls: `rounded-action` rather than a
-                // full pill, and the same raised shadow that flattens on press.
-                // Sized to its label rather than stretched - it used to carry
-                // `flex-1` to fill a row that also held the mode and depth
-                // chips, and once those went it had the whole row to itself.
-                className="mr-auto min-w-0 max-w-full text-[12.5px] text-foreground [&_>svg]:size-3 [&_>svg]:shrink-0"
-                size="header-pill"
-                type="button"
-                variant="header-pill"
-              >
-                <AgentProviderIcon className="size-3.5" />
-                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{activeModel.name}</span>
-                <ChevronDown />
-              </Button>
-            </PopoverTrigger>
-            {/* Reasoning depth, offered only where the model takes one. Haiku
-                reports no levels, and sending it one would be rejected. */}
-            {effortLevels.length ? (
-              <Select onValueChange={agentModelStore.setEffort} value={selection.effort ?? 'high'}>
-                <SelectTrigger
-                  aria-label={t('foundation.editor.agent.thinkingLevel')}
-                  // `size="sm"` rather than an h-7 class: the trigger sets its
-                  // height through `data-[size=default]:h-8`, which is
-                  // attribute-qualified and so outranks a plain utility.
-                  size="sm"
-                  className="w-auto shrink-0 gap-1 rounded-action border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] px-2 text-[12.5px] font-medium text-foreground/80 shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] hover:text-foreground [&>svg]:size-3 [&_svg]:shrink-0"
+            <div
+              className={cn(
+                LANE_FACE,
+                'mr-auto flex h-7 min-w-0 max-w-full overflow-hidden transition-all has-[button:active]:translate-y-px has-[button:active]:shadow-none has-[[data-state=open]]:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] has-[[data-state=open]]:shadow-none',
+              )}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  aria-label={t('foundation.editor.agent.chooseModel')}
+                  className="min-w-0 max-w-full flex-1 gap-1 rounded-none border-0 bg-transparent px-2 text-[12.5px] text-foreground shadow-none hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground active:translate-y-0! [&_>svg]:size-3 [&_>svg]:shrink-0"
+                  size="header-pill"
+                  type="button"
+                  variant="ghost"
                 >
-                  <Gauge className="size-3.5" />
-                  <span>{t(`foundation.editor.agent.thinkingLevels.${selection.effort ?? 'high'}`)}</span>
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  {effortLevels.map(level => (
-                    <SelectItem key={level} value={level}>
-                      {t(`foundation.editor.agent.thinkingLevels.${level}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
+                  <AgentProviderIcon className="size-3.5" />
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{activeModel.name}</span>
+                  <ChevronDown />
+                </Button>
+              </PopoverTrigger>
+              {/* Reasoning depth, offered only where the model takes one. Haiku
+                  reports no levels, and sending it one would be rejected. */}
+              {effortLevels.length ? (
+                <Select onValueChange={agentModelStore.setEffort} value={selection.effort ?? 'high'}>
+                  <SelectTrigger
+                    aria-label={t('foundation.editor.agent.thinkingLevel')}
+                    className="h-full w-auto shrink-0 gap-1 rounded-none border-y-0 border-r-0 border-l border-border bg-transparent px-2 text-[12.5px] font-medium text-foreground/80 shadow-none hover:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--background))] hover:text-foreground data-[state=open]:bg-transparent [&>svg]:size-3 [&_svg]:shrink-0"
+                    size="sm"
+                  >
+                    <Gauge className="size-3.5" />
+                    <span>{t(`foundation.editor.agent.thinkingLevels.${selection.effort ?? 'high'}`)}</span>
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    {effortLevels.map(level => (
+                      <SelectItem key={level} value={level}>
+                        {t(`foundation.editor.agent.thinkingLevels.${level}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+            </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
               <Button
                 aria-label={t('foundation.editor.agent.attach')}
@@ -575,7 +595,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
                 <Button
                   aria-label={busy ? t('foundation.editor.agent.steer') : t('foundation.editor.agent.send')}
                   className="[&_svg]:stroke-[2.4]"
-                  disabled={!draft.trim() || !providerReady}
+                  disabled={!draft.trim() || !agentReady}
                   size="action-icon"
                   type="submit"
                   variant="action-pill"
@@ -609,7 +629,7 @@ export function EditorAgentDock({ handoff = null, runtime }: {
               )
             })}
           </div>
-        ) : providerReady ? null : (
+        ) : agentReady ? null : (
           // Only the connect prompt survives here. The notice that used to sit
           // opposite it described the old review-and-apply flow, which no longer
           // exists - the agent edits directly and one undo reverts the run.

@@ -1,42 +1,47 @@
 # Mona release hardening record
 
-Last reviewed: 2026-07-24
+Last reviewed: 2026-07-27
 
 This file records the security and stability decisions that are easy to lose
 when looking only at a package-manager vulnerability count. It is not a claim
 that installed third-party packages are vulnerability-free.
 
-## Agent and account trust boundary
+## Desktop, agent and document trust boundaries
 
-- OpenAI and Anthropic sign-in happens through the agent server. OAuth
-  credentials are never returned to the editor, placed in generated
-  JavaScript, or stored in browser storage.
-- Credentials are scoped to Mona's signed `HttpOnly`, `SameSite=Lax` browser
-  session and encrypted at rest with AES-256-GCM.
-- Every state-changing agent request requires an approved `Origin`.
-- The OpenAI adapter uses device authorization so it does not require a
-  localhost browser callback.
-- The current upstream Anthropic adapter binds a fixed localhost callback port.
-  Mona exposes its manual callback prompt for hosted use and rejects
-  overlapping Anthropic login attempts with HTTP 409 instead of allowing a
-  callback-port collision.
-- Generated presentation programs execute in an opaque-origin sandbox with no
-  credentials, cookies, filesystem, or ambient network access. The parent
-  accepts only the bounded presentation-command protocol.
-- Google AI Studio remains the explicit bring-your-own-key path. Its key lives
-  only in the current browser tab's memory.
-- The Mona-managed provider is disabled in the editor when its server status
-  reports that the deployment has not configured it.
-
-Production deployments must follow `apps/agent-server/README.md`, supply their
-own signing and encryption secrets, use encrypted persistent storage, and
-replace the local credential-vault adapter before running multiple server
-instances.
+- Mona is a desktop application. No HTTP agent server, WebSocket, session
+  cookie, credential vault or browser OAuth callback exists.
+- The sandboxed renderer has `nodeIntegration: false` and
+  `contextIsolation: true`. Its only privileged surface is the explicitly named
+  preload bridge.
+- Packaged renderer code is served from the secure `mona://app` origin with a
+  Content Security Policy. Navigation to another origin is refused; links open
+  in the user's default browser.
+- The Claude Agent SDK runs in the Electron main process and uses the machine's
+  existing `claude` login. Mona asks the CLI for account status but never reads
+  the credential from the operating-system keychain.
+- The agent receives a temporary deck workspace and an allowlisted environment.
+  It may use ordinary file and shell tools inside that workspace, but changes
+  reach the live document only through the revision-checked, validated `apply`
+  transaction.
+- A deck is untrusted input. Asset names are reduced to safe basenames, imported
+  content is sanitised, and the hidden PDF renderer runs with JavaScript
+  disabled.
+- Each presentation owns one `documents/<id>` directory. Document IDs are
+  validated before they become path segments, asset URLs are scoped by that ID,
+  and both `deck.json` and the rebuildable `library.json` catalogue use atomic
+  sibling-file replacement.
+- Duplicate and delete include document media, sketches and retained source PPTX
+  archives. The previous singleton deck is moved by rename and its legacy
+  renderer records are imported once rather than attached to whichever document
+  opens first.
+- The packaged Claude binary is executable only because its platform package is
+  unpacked beside `app.asar`. The Mona agent plugin is shipped as a separate
+  read-only resource; the packaged-app smoke test checks both.
 
 ## Dependency audit disposition
 
-The 2026-07-23 `npm audit --omit=dev` result reports 13 transitive findings:
-one high and twelve moderate. They form two dependency families.
+The 2026-07-27 `npm audit --omit=dev` result reports 12 dependency findings:
+one high and eleven moderate. They form two dependency families.
 
 ### Excalidraw optional Mermaid converter
 
@@ -59,25 +64,28 @@ the vulnerable optional parser code is excluded from Mona's production graph.
 Do not accept npm's suggested downgrade to Excalidraw 0.17.6 merely to reduce
 the audit count.
 
-### Provider library optional Google/MCP branch
+### Claude Agent SDK desktop payload
 
-`@earendil-works/pi-ai` installs `@google/genai`, which has an optional MCP
-server dependency that reaches an old `@hono/node-server`. Mona's agent server
-imports and registers only the OpenAI Codex and Anthropic provider modules. It
-does not register the Google GenAI provider, create an MCP server, import
-Hono's static-file middleware, or run on Windows.
+The Claude Agent SDK brings a platform-specific executable into the packaged
+application. This explains most of Mona's installed size. `electron-builder`
+keeps the executable outside `app.asar`, and the release smoke test verifies its
+execute bit and exact platform package. Do not remove `asarUnpack` merely to
+reduce the visible resource tree: a subprocess cannot execute a member of an
+asar archive.
 
-Google support is implemented separately in the browser as the AI Studio-key
-adapter. Reassess this exception whenever the provider library is upgraded or
-Mona adds a server-side Google/MCP integration.
+The SDK also installs `@modelcontextprotocol/sdk`, whose optional Hono Node
+server currently carries a Windows encoded-backslash path-traversal advisory.
+Mona does not start an MCP HTTP server or use Hono's static-file middleware: its
+MCP server is the Agent SDK's in-process transport. npm's offered fix is a
+downgrade from `@anthropic-ai/claude-agent-sdk@0.3.x` to `0.2.85`, so it is not
+accepted silently. Reassess when Anthropic publishes a compatible SDK release.
 
 ### Effective overrides
 
-The root package currently pins only two compatible, tested transitive
-security releases:
+The root package currently pins one compatible, tested transitive security
+release:
 
 - `fast-uri@3.1.4`
-- `image-size@1.2.1`
 
 No unverified major-version override and no `npm audit fix --force` is
 permitted in the release path. An upstream dependency update should replace
@@ -96,6 +104,7 @@ npm run check:architecture
 npm run test:core
 npm run test:react
 npm run e2e:react
+npm run e2e:packaged
 npm run build
 npm run test:production-stability
 npm run profile:memory

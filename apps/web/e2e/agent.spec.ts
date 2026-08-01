@@ -133,6 +133,25 @@ test('streams a turn into the transcript and applies its deck edit as one undo',
   await expect.poll(() => elementCount(page)).toBe(before)
 })
 
+test('routes text-inspector AI actions through the same deck-editing agent', async ({ app, page }) => {
+  await stubAgentTurn(app, { replyText: 'The targeted text rewrite is complete.' })
+
+  await page
+    .locator('.mona-editor-slide-canvas [data-element-id]')
+    .filter({ hasText: 'Native, editable presentations in the browser.' })
+    .click()
+  await page.getByRole('button', { exact: true, name: 'Style' }).click()
+  await page.getByRole('button', { name: 'AI assist' }).click()
+  await page.getByRole('button', { exact: true, name: 'Polish' }).click()
+
+  const dock = page.getByRole('complementary', { name: 'Mona AI' })
+  await expect(dock).toBeVisible()
+  await expect(dock.getByText('Edit one existing text-bearing element in the presentation.')).toBeVisible()
+  await expect(dock.getByText(/Slide id:/)).toBeVisible()
+  await expect(dock.getByText(/Element id:/)).toBeVisible()
+  await expect(dock.getByText('The targeted text rewrite is complete.')).toBeVisible()
+})
+
 test('refuses an edit written against a deck that has since changed', async ({ app, page }) => {
   const before = await elementCount(page)
   await stubAgentTurn(app, { addElement: ADDED_ELEMENT, replyText: 'Trying an edit.', staleRevision: true })

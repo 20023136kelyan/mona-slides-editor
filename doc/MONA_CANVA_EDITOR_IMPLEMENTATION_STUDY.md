@@ -1,10 +1,16 @@
 # Mona editor implementation study
 
-**Status:** living implementation blueprint and release-evidence record
+**Status:** historical UI implementation study and release-evidence record
 
 **Date:** 2026-07-24
 
 **Scope:** map the observed Canva editor behavior and global header model onto the current Mona React codebase, end to end.
+
+> The UI observations remain useful, but sections describing a hosted
+> provider-neutral agent, OpenAI/Anthropic OAuth, Google AI Studio keys,
+> IndexedDB as the deck store, or browser-only execution were superseded by the
+> Electron architecture on 2026-07-27. Current runtime decisions live in
+> `doc/PRODUCT_ARCHITECTURE.md` and `doc/MONA_RESTART_ARCHITECTURE.md`.
 
 This document combines:
 
@@ -162,9 +168,10 @@ type PresentationTransactionOrigin =
 
 However, `EditorRuntime.commit()` always creates an origin of `user`. The correct seam for agentic editing exists but is not exposed.
 
-#### Persistence
+#### Persistence at the time of the study
 
-IndexedDB autosave is real and includes blob media. Its public contract exposes only:
+At the time of the study, IndexedDB autosave included blob media and its public
+contract exposed only:
 
 ```ts
 interface DeckPersistence {
@@ -173,13 +180,18 @@ interface DeckPersistence {
 }
 ```
 
-The header therefore cannot honestly show saving, saved, failed, last-saved, or retry states.
+That implementation could not honestly show saving, saved, failed, last-saved,
+or retry states. The current Electron build stores the working deck and its
+assets on disk and exposes real persistence status to the header.
 
-#### AI
+#### AI at the time of the study
 
-The AI button now opens `EditorAgentDialog`. The dialog dispatches `mona:agent-generate-request`, but no code listens for that event. Its submit path is not an AI editing workflow.
-
-There is also an older `ai-writing.ts` text-writing endpoint used by text controls. It directly streams writing into rich text and is not a provider-neutral agent transaction pipeline.
+The first React port opened `EditorAgentDialog` and dispatched an unhandled
+`mona:agent-generate-request` event. Text controls also called an
+`ai-writing.ts` HTTP endpoint directly. Both paths have since been retired.
+The current AI button and text-writing actions feed the same desktop agent dock;
+the local Claude agent edits the deck through the validated JavaScript
+presentation tools.
 
 #### React subscriptions
 
@@ -1137,7 +1149,7 @@ apps/web/src/features/editor/
     deck-persistence-store.ts
 ```
 
-### Current-file migration map
+### Original migration map
 
 | Current file | Destination/action |
 | --- | --- |
@@ -1155,7 +1167,7 @@ apps/web/src/features/editor/
 | `editor-persistence.ts` | Become observable persistence store |
 | `FoundationPage.tsx` | Provide application services; keep lazy features and Activity |
 | `EditorAgentDialog.tsx` | Replace with task-panel agent workspace and real execution pipeline |
-| `ai-writing.ts` | Adapt behind `AgentService` or retire after equivalent writing action exists |
+| `ai-writing.ts` | Retired; text-inspector actions now hand a targeted prompt to the desktop agent dock |
 | `editor.css` | Split shell geometry from feature styles; use semantic tokens |
 
 ---

@@ -1,8 +1,12 @@
 import {
+  deleteDocumentSketchRecord,
   deleteSketchRecord,
+  readDocumentSketchRecords,
   readSketchRecords,
+  writeDocumentSketchRecord,
   writeSketchRecord,
 } from '@/lib/deck-storage'
+import { maybeActiveDocumentId } from '@/features/documents/active-document'
 
 export const SLIDE_SKETCH_VERSION = 1
 const PERSIST_DEBOUNCE_MS = 350
@@ -49,6 +53,12 @@ const defaultAdapter: DrawingPersistenceAdapter = {
   write: writeSketchRecord,
 }
 
+const documentAdapter = (documentId: string): DrawingPersistenceAdapter => ({
+  delete: slideId => deleteDocumentSketchRecord(documentId, slideId),
+  list: () => readDocumentSketchRecords(documentId),
+  write: (slideId, sketch) => writeDocumentSketchRecord(documentId, slideId, sketch),
+})
+
 const isScene = (value: unknown): value is SerializedDrawingScene => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   return Array.isArray((value as Partial<SerializedDrawingScene>).elements)
@@ -78,12 +88,15 @@ const withinStorageBudget = (scene: SerializedDrawingScene) => {
 }
 
 export const createDrawingStore = ({
-  adapter = defaultAdapter,
+  adapter,
   persistenceEnabled = true,
 }: {
   adapter?: DrawingPersistenceAdapter
   persistenceEnabled?: boolean
 } = {}): DrawingStore => {
+  const documentId = maybeActiveDocumentId()
+  const persistenceAdapter = adapter
+    ?? (documentId ? documentAdapter(documentId) : defaultAdapter)
   const sketches = new Map<string, SlideSketch>()
   const touchedSlideIds = new Set<string>()
   const pendingWrites = new Map<string, SlideSketch | null>()
@@ -107,7 +120,7 @@ export const createDrawingStore = ({
       const sketch = pendingWrites.get(slideId)
       pendingWrites.delete(slideId)
       writeQueue = writeQueue
-        .then(() => sketch ? adapter.write(slideId, sketch) : adapter.delete(slideId))
+        .then(() => sketch ? persistenceAdapter.write(slideId, sketch) : persistenceAdapter.delete(slideId))
         .then(() => undefined)
         .catch(() => undefined)
     }, PERSIST_DEBOUNCE_MS))
@@ -150,7 +163,7 @@ export const createDrawingStore = ({
     pendingWrites.clear()
     writeQueue = writeQueue.then(async () => {
       await Promise.all(writes.map(([slideId, sketch]) => (
-        sketch ? adapter.write(slideId, sketch) : adapter.delete(slideId)
+        sketch ? persistenceAdapter.write(slideId, sketch) : persistenceAdapter.delete(slideId)
       )))
     }).catch(() => undefined)
     await writeQueue
@@ -171,7 +184,7 @@ export const createDrawingStore = ({
         return
       }
       hydrated = true
-      const records = await adapter.list().catch(() => [])
+      const records = await persistenceAdapter.list().catch(() => [])
       let changed = false
       for (const record of records) {
         if (!isSlideSketch(record) || touchedSlideIds.has(record.slideId) || !withinStorageBudget(record.scene)) continue

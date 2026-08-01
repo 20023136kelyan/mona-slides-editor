@@ -7,18 +7,35 @@ design record, not an implementation plan. Sections marked **OPEN** are undecide
 See also:
 
 - [`doc/UI_ARCHITECTURE.md`](UI_ARCHITECTURE.md) — how the editor surface is composed
+- [`doc/DATA_SOURCE_ARCHITECTURE.md`](DATA_SOURCE_ARCHITECTURE.md) — provider adapters, source identities, catalogs, and unified queries
+- [`doc/DOCUMENT_JOB_ARCHITECTURE.md`](DOCUMENT_JOB_ARCHITECTURE.md) — multi-document mutation, source revisions, cancellation, and recovery
 - [`doc/MONA_RESTART_ARCHITECTURE.md`](MONA_RESTART_ARCHITECTURE.md) — the editor runtime and command bus
 - [`doc/EDITOR_EXPERIENCE.md`](EDITOR_EXPERIENCE.md) — editor disclosure and interaction gates
 
 ## The shape of the product
 
-Everything built so far is **the editor**. The editor is the detailed control panel
-for one document. It is fundamental, but it is not the point of the app — it is one
-of three surfaces over a shared document core.
+Mona now has a user-owned local-file browser, durable Project Chat, and the
+detailed editor for one document. The editor is fundamental, but it is not the
+point of the app — it is one of three surfaces over a shared document core.
+
+Project Chat persists projects and conversations locally, references documents
+across configured sources without copying them, reuses the machine's Claude
+login, and presents attached documents in a separate artifact panel. Its agent
+can coordinate, research, and edit several native `.mona` presentations in one
+temporary filesystem workspace. Applying those changes creates an ordered,
+durable document job that validates every source revision before it writes
+through the owning provider. PowerPoint sources are now parsed by the reusable
+desktop ingestion package and appear in that workspace as semantic slides plus
+extracted media. Project agents can now move, resize, rotate, flip, delete,
+rewrite rich text, and change supported text-body/solid shape styles on existing
+slide-local PowerPoint objects through source-preserving OOXML writeback,
+including straight-line geometry and line/connector styling. Every unsupported
+edit remains explicit and read-only rather than
+silently flattening the source deck.
 
 | Surface | Entered by | Purpose |
 | --- | --- | --- |
-| Home | App launch, after onboarding | Sidebar of projects; a centred chat input; a grid or list (user's choice) of documents |
+| Home | App launch, after onboarding | Unified document browser, filtered by the persistent data-source tree; entry point for projects and workflows |
 | Project chat | Opening a project, or typing in the home chat input | Agentic editing across many documents at once; artifact panel on the right |
 | Document editor | Opening a document, or opening one from the artifact panel | The detailed single-document editor — what exists today |
 
@@ -33,7 +50,30 @@ The two editors are deliberately different tools:
 Typing in the home chat input creates a project. It stays unnamed until the
 conversation gives it a name, the way chat products name threads.
 
-The sidebar lists **projects only**. The main grid lists **documents only**.
+### Persistent sidebar information architecture
+
+On Home and Project surfaces, the sidebar has three product sections:
+
+1. **Data sources** — configured local folders, cloud drives, and private NAS
+   connections. Each source exposes a navigable file tree. Selecting a source or
+   folder filters the document browser in the centre to that scope.
+2. **Projects** — chat-like threads that can reference and modify multiple
+   documents across multiple data sources. Selecting one opens its conversation
+   in the centre and its artifacts in the separate right panel.
+3. **Workflows** — the sidebar label for scheduled routines. This section sits at
+   the bottom of the navigational content and shows each routine by name only.
+   Selecting a name opens that routine's definition, schedule, status, and run
+   history in the centre surface.
+
+Documents do not form a fourth sidebar section. They appear in the centre document
+browser and are reached through the data-source tree, search, and filters. The
+centre browser may also offer a provider filter; that is a complementary way to
+narrow the same document set, not a separate source of truth.
+
+The sidebar's fixed brand header, geometry, collapse behavior, and settings footer
+remain stable between surfaces. Its navigational content is contextual: the
+document editor uses the same shell for its editing tools, while Home and Project
+surfaces use the three sections above.
 
 ### Why the editor was built first
 
@@ -42,32 +82,115 @@ graph, the document model, and the command bus that let an agent read a document
 reason about it, and change it safely. Those are prerequisites for the project
 surface, not editor conveniences.
 
+### PowerPoint ingestion boundary
+
+`packages/pptx-ingestion` is the framework- and DOM-free PowerPoint boundary. It
+inventories and retains the complete OOXML package, runs the maintained parser,
+converts the result into Mona's canonical presentation model, produces explicit
+diagnostics, and returns a content-addressed asset set. Electron main writes the
+source archive and assets beneath the document recovery directory before sending
+the semantic `PresentationState` to the renderer. The editor canvas, thumbnails,
+read-only views, slideshow, agent previews, and library cover generation all
+continue to use the one production React render graph.
+
+`packages/pptx-writeback` is the inverse package boundary. It compares the saved
+import baseline with the desired presentation, resolves edits through immutable
+source identities, refuses unsupported mutations, and patches only the affected
+slide XML. A no-op returns the exact retained archive. The current completed
+slice writes slide-local object transforms/deletions, editable rich text and
+paragraph/run formatting, text-body layout, and solid fills/outlines. New
+objects, slide structure, connected-endpoint reassignment, bent/curved connector
+routes, inherited objects, effects and new
+relationships remain outside that capability. Existing hyperlink relationships
+survive source-run edits, while adding, removing, or retargeting hyperlinks is rejected.
+
 ## Core concepts
 
-**Document** — a single file. Today a presentation; the product intends PDFs and
-other types. A document has a type, a storage reference, and a set of capabilities
+**Data source** — one configured storage scope: for example a local folder, a
+Google Drive account or shared drive, an iCloud Drive root, a OneDrive account, or
+a private NAS share. A source has a provider, connection configuration, one or
+more roots, a hierarchical file tree, and provider-specific capabilities.
+
+**Document** — a single file inside a data source. Today a presentation; the
+product intends PDFs and other types. A document has a type, a stable storage
+reference containing its source and provider identity, and a set of capabilities
 its type supports. `presentation-core` currently models a deck specifically; a
 document-type layer above it does not yet exist.
 
 **Project** — a named collection of documents plus the chat thread that operates on
-them. Projects are the unit of collaboration.
+them. A project can reference documents from several data sources without moving
+those documents into a project-owned store. The current desktop implementation
+stores one versioned JSON record per project under Application Support, containing
+only the conversation, source-neutral document references, display metadata, and
+the opaque Claude session identity. Source paths, file bytes, and provider
+credentials do not enter that record. Projects are the unit of collaboration.
 
-**Machine identity** — Mona has no user accounts. Identity is scoped to the machine
-so that settings, provider connections, and API keys persist between sessions
-without asking the user to hand over credentials. This is a deliberate consequence
-of being open source.
+**Routine** — the domain object presented in the sidebar as a workflow. It combines
+a schedule, document-selection criteria, and one or more agent operations. A
+routine may discover new or old documents in one or more data sources and operate
+on one document or a batch on every run.
+
+**Machine identity** — Mona has no Mona account. Settings are scoped to the
+machine, and Claude authentication is a property of that machine's existing
+`claude` login rather than a credential Mona stores. This is a deliberate
+consequence of being open source and desktop-first.
 
 ## Storage: bring your own
 
-Mona connects to Google Drive, iCloud, OneDrive, a personal NAS, or local storage.
-The user chooses. **Documents are never stored by Mona.**
+Mona connects to Google Drive, iCloud Drive, OneDrive, a private NAS, or local
+folders. A provider adapter describes how Mona talks to one storage system; a data
+source is a user's configured instance and root within that provider. Users may
+configure several sources at once, and Mona presents their file trees through one
+sidebar. **The user's provider copy is the document authority.**
 
-This makes a `StorageProvider` interface a first-class core concern rather than an
-integration detail. Today's [`editor-persistence`](../apps/web/src/features/editor/editor-persistence.ts)
-is IndexedDB, which under this model becomes a **local cache in front of a provider**,
-not the store of record.
+For local files, adding a folder makes it a scanned data source. The user separately
+chooses one writable folder as the default destination for new presentations. The
+same folder can serve both roles, and changing the default does not stop any folder
+from being scanned. New presentations are portable `.mona` package files in that
+chosen folder, never unnamed records under Application Support.
 
-## Chat history, collaboration, and sharing — **OPEN**
+Mona keeps a recovery/cache directory per opened presentation:
+
+```text
+documents/<id>/
+  deck.json
+  assets/
+  data/powerpoint-packages/
+  data/sketches/
+```
+
+This directory is not shown as a library or data source. It is an operational
+mirror used for debounced editing, assets, retained PowerPoint parts, sketches and
+crash recovery. For a `.mona` document, every successful autosave atomically
+rebuilds the portable package and writes it through the owning provider adapter.
+Opening the file again hydrates the recovery mirror from the provider copy, so the
+cache cannot quietly become a second authority.
+
+The rebuildable cache index is not the authority: if it is missing or corrupt it is
+reconstructed from recovery directories and provider catalogs. Unlinked records
+from previous versions remain visible only as recovery documents with an explicit
+**Move to local files** action. Deleting a recovery copy is distinct from deleting
+a user-owned source file.
+
+The prior hard-coded `decks/working` directory is moved into the library once.
+Unscoped asset URLs are rewritten during that move, and renderer-owned IndexedDB
+records are copied into the migrated document through explicit one-time markers.
+IndexedDB is no longer an active desktop document store.
+
+Cloud and bring-your-own providers remain future implementations of the same
+ownership boundary. They will create and write the same portable package through
+provider-native object identities rather than local paths.
+
+The first external-source implementation is the local-folder adapter described
+in [`doc/DATA_SOURCE_ARCHITECTURE.md`](DATA_SOURCE_ARCHITECTURE.md). It establishes
+the provider-neutral identity, catalog, query, availability, and observation
+contract that cloud and NAS adapters must implement.
+
+## Chat history, collaboration, and sharing
+
+Local project history is **DECIDED** for the desktop product: it is stored on the
+user's machine with the project record and remains available across restarts.
+Cloud synchronization, collaboration, and sharing remain **OPEN**.
 
 Documents are settled: they live in the user's storage. Chat history is not, because
 collaboration pulls against custody.
@@ -224,13 +347,24 @@ and `presentation-renderer` is a view layer shared by the editor and playback. F
 things are misfiled — under `features/editor/` because that is where everything was
 built, not because they belong to editing.
 
-**1. The agent must be lifted out and split.**
-[`features/editor/agent/`](../apps/web/src/features/editor/agent) is bound to
-`EditorRuntime` and the deck command bus. All three surfaces need it. The split is:
+**1. The agent has been lifted out and split.**
+The Agent SDK session, authentication, streaming, workspace and tool bridge now
+live under [`apps/agent-server`](../apps/agent-server) and run inside the Electron
+main process. The renderer retains only the presentation-specific client toolset
+because rendering and committing require the live `EditorRuntime`. Project Chat
+uses a separate project-scoped SDK session with durable resume identity and a
+project toolset, rather than pretending the editor's one-live-deck snapshot is a
+multi-document workspace. Native presentations now have a desktop-owned
+document capability for project-agent read, validation, and provider writeback.
+The editor's richer live-deck preview and transaction tools remain a separate
+single-document capability:
 
-- **Agent core** — auth, provider store, loop, streaming, sandbox → app level
-- **Deck toolset** — command validator, revision, slide preview → one toolset the
-  agent loads when the target is a presentation
+- **Agent core** — auth, loop, streaming, workspace and tool dispatch → desktop
+  runtime, already complete for presentations
+- **Project presentation toolset** — multi-document filesystem workspace, exact
+  source revisions, durable jobs, and provider writeback → desktop runtime
+- **Deck client toolset** — live slide preview and transaction commit → one open
+  document, still filed under the editor
 
 **2. "Document" must stop meaning "presentation."** A document-type layer is needed
 above `presentation-core`, with per-type capabilities. Decks and PDFs are two types.
@@ -240,16 +374,19 @@ above `presentation-core`, with per-type capabilities. Decks and PDFs are two ty
 **4. Surface-to-surface imports must be forbidden.** `presentation-renderer`
 currently imports `editor-clipboard`, `editor-fonts`, `editor-persistence`, and
 `editor-table` from the editor; `screen` imports `editor-runtime`,
-`use-editor-selector`, and `EditorInspectorPrimitives`. Home and project chat will
-need fonts and persistence *without* the editor, so loading the home screen would
-otherwise pull the entire editor in. These are document services and belong in the
-core. [`scripts/check-architecture-boundaries.mjs`](../scripts/check-architecture-boundaries.mjs)
-should enforce the direction once they move.
+`use-editor-selector`, and `EditorInspectorPrimitives`. Home and Project Chat need
+document services *without* the editor, so route code is forbidden from importing
+the editor feature directly. The remaining renderer dependencies are document
+services and belong in the core.
+[`scripts/check-architecture-boundaries.mjs`](../scripts/check-architecture-boundaries.mjs)
+enforces the Project Chat → editor boundary while those extractions continue.
 
-**5. Multi-document operations need different transaction semantics.** The command
-bus is single-document with undo. "Open A, delete a page, merge with B, compress
-both" is a job with ordered steps and partial failure. That is a different model,
-not an extension of the existing bus.
+**5. Multi-document operations use different transaction semantics.** The command
+bus remains single-document with undo. Project operations create durable jobs
+with ordered per-document steps, exact source-revision preflight, cooperative
+cancellation, partial-failure reporting, and interruption recovery. A job stores
+references and outcomes only; presentation payloads stay ephemeral. See
+[`doc/DOCUMENT_JOB_ARCHITECTURE.md`](DOCUMENT_JOB_ARCHITECTURE.md).
 
 ## Open questions beyond storage
 
@@ -258,6 +395,9 @@ not an extension of the existing bus.
   library call.
 - **How does the agent *see* non-deck documents?** The render graph gives it vision
   into presentations. Each new document type needs an equivalent.
-- **Does the artifact panel share an implementation with the editor's agent dock?**
-  They are similar surfaces with different payloads — documents rather than a single
-  candidate revision.
+- **Which PPTX serializers come next?** Direct mutation now enters through a
+  framework-free source-package writer and is proven for slide-local transforms,
+  deletions, rich text, text-body layout, and solid fills/outlines. Connectors,
+  complex effects, tables/charts, new objects/assets, inherited content, slide
+  structure, and relationship/content-type allocation still need inverse
+  serializers before those edit families can be enabled.

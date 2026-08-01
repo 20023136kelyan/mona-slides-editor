@@ -36,6 +36,12 @@ asarUnpack:
 extraResources:
   - from: ../web/dist
     to: renderer
+  # The Agent SDK loads Mona's single-deck and multi-document workflows as a
+  # local plugin. The main bundle cannot inline a directory of Markdown and
+  # manifest files, so ship it beside the renderer and point
+  # MONA_AGENT_PLUGIN_DIR at it during startup.
+  - from: ../agent-server/agent-plugin
+    to: agent-plugin
 
 mac:
   category: public.app-category.productivity

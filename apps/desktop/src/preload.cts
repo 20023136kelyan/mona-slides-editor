@@ -27,9 +27,9 @@ function on<Payload>(channel: string, listener: (payload: Payload) => void): () 
   return () => { ipcRenderer.off(channel, handler) }
 }
 
-let flushListener: (() => Promise<void>) | null = null
+const flushListeners = new Set<() => Promise<void>>()
 ipcRenderer.on('mona:deck:flush', (_event, id: number) => {
-  const done = flushListener ? Promise.resolve(flushListener()) : Promise.resolve()
+  const done = Promise.all([...flushListeners].map(listener => Promise.resolve(listener())))
   void done.catch(() => {}).finally(() => ipcRenderer.send(`mona:deck:flushed:${id}`))
 })
 
@@ -57,10 +57,135 @@ contextBridge.exposeInMainWorld('mona', {
     },
   },
 
-  /** The deck and its binary, on disk. */
+  /** Durable, project-scoped conversations over several document references. */
+  projectAgent: {
+    interrupt: (projectId: string) => ipcRenderer.send('mona:project-agent:interrupt', projectId),
+    onChunk: (listener: (event: unknown) => void) => on('mona:project-agent:chunk', listener),
+    send: (prompt: {
+      effort?: string
+      model?: string
+      projectId: string
+      text: string
+    }) => ipcRenderer.send('mona:project-agent:prompt', prompt),
+  },
+
+  projectJobs: {
+    cancel: (projectId: string, jobId: string) => (
+      ipcRenderer.invoke('mona:project-jobs:cancel', projectId, jobId)
+    ),
+    list: (projectId: string) => ipcRenderer.invoke('mona:project-jobs:list', projectId),
+    onChange: (listener: (projectId: string) => void) => (
+      on('mona:project-jobs:changed', listener)
+    ),
+    read: (projectId: string, jobId: string) => (
+      ipcRenderer.invoke('mona:project-jobs:read', projectId, jobId)
+    ),
+  },
+
+  projects: {
+    addArtifact: (id: string, artifact: unknown) => (
+      ipcRenderer.invoke('mona:projects:add-artifact', id, artifact)
+    ),
+    appendMessage: (id: string, message: unknown) => (
+      ipcRenderer.invoke('mona:projects:append-message', id, message)
+    ),
+    create: (input?: unknown) => ipcRenderer.invoke('mona:projects:create', input),
+    delete: (id: string) => ipcRenderer.invoke('mona:projects:delete', id),
+    list: () => ipcRenderer.invoke('mona:projects:list'),
+    onChange: (listener: () => void) => on('mona:projects:changed', listener),
+    read: (id: string) => ipcRenderer.invoke('mona:projects:read', id),
+    removeArtifact: (id: string, artifactId: string) => (
+      ipcRenderer.invoke('mona:projects:remove-artifact', id, artifactId)
+    ),
+    rename: (id: string, title: string) => ipcRenderer.invoke('mona:projects:rename', id, title),
+  },
+
+  /** User-owned documents plus their local recovery/cache mirrors. */
+  documents: {
+    create: (presentation: unknown, sourceReference?: unknown) => (
+      ipcRenderer.invoke('mona:documents:create', presentation, sourceReference)
+    ),
+    createLocal: (presentation: unknown, sourceId: string) => (
+      ipcRenderer.invoke('mona:documents:create-local', presentation, sourceId)
+    ),
+    delete: (id: string) => ipcRenderer.invoke('mona:documents:delete', id),
+    discardRecovery: (id: string) => ipcRenderer.invoke('mona:documents:discard-recovery', id),
+    duplicate: (id: string, title?: string) => ipcRenderer.invoke('mona:documents:duplicate', id, title),
+    exportPowerPoint: (id: string, presentation: unknown, packageId?: string) => (
+      ipcRenderer.invoke('mona:documents:export-powerpoint', id, presentation, packageId)
+    ),
+    list: () => ipcRenderer.invoke('mona:documents:list'),
+    cancelPowerPoint: (operationId: string) => (
+      ipcRenderer.invoke('mona:documents:cancel-powerpoint', operationId)
+    ),
+    ingestPowerPoint: (
+      id: string,
+      bytes: ArrayBuffer,
+      request: {
+        coordinateLabels?: string[]
+        fileName: string
+        fixedViewport?: boolean
+        operationId: string
+        theme: unknown
+      },
+    ) => ipcRenderer.invoke('mona:documents:ingest-powerpoint', id, bytes, request),
+    moveToSource: (id: string, sourceId: string) => (
+      ipcRenderer.invoke('mona:documents:move-to-source', id, sourceId)
+    ),
+    openSource: (reference: unknown) => ipcRenderer.invoke('mona:documents:open-source', reference),
+    package: (id: string) => ipcRenderer.invoke('mona:documents:package', id),
+    read: (id: string) => ipcRenderer.invoke('mona:documents:read', id),
+    rename: (id: string, title: string) => ipcRenderer.invoke('mona:documents:rename', id, title),
+    write: (id: string, presentation: unknown) => ipcRenderer.invoke('mona:documents:write', id, presentation),
+    writePreview: (
+      id: string,
+      bytes: ArrayBuffer,
+      request: { expectedSavedAt: number; mediaType: string; slideId: string },
+    ) => ipcRenderer.invoke('mona:documents:write-preview', id, bytes, request),
+  },
+
+  /**
+   * User-configured storage sources.
+   *
+   * The main process retains provider credentials and filesystem paths. The
+   * renderer receives provider-neutral summaries and opaque item identities.
+   */
+  dataSources: {
+    addLocalFolder: () => ipcRenderer.invoke('mona:data-sources:add-local'),
+    chooseDefaultLocalFolder: () => ipcRenderer.invoke('mona:data-sources:choose-default-local'),
+    list: () => ipcRenderer.invoke('mona:data-sources:list'),
+    listChildren: (sourceId: string, parentItemId: string) => (
+      ipcRenderer.invoke('mona:data-sources:children', sourceId, parentItemId)
+    ),
+    listDocuments: (query?: unknown) => ipcRenderer.invoke('mona:data-sources:documents', query),
+    onChange: (listener: (event: unknown) => void) => on('mona:data-sources:changed', listener),
+    readDocument: (reference: unknown) => ipcRenderer.invoke('mona:data-sources:read', reference),
+    remove: (sourceId: string) => ipcRenderer.invoke('mona:data-sources:remove', sourceId),
+    setDefaultSaveLocation: (sourceId: string) => ipcRenderer.invoke('mona:data-sources:set-default', sourceId),
+  },
+  documentData: {
+    legacyMigration: {
+      complete: (id: string, kind: 'powerpoint-packages' | 'sketches') => ipcRenderer.invoke('mona:document-data:legacy:complete', id, kind),
+      pending: (id: string, kind: 'powerpoint-packages' | 'sketches') => ipcRenderer.invoke('mona:document-data:legacy:pending', id, kind),
+    },
+    powerpointPackages: {
+      delete: (id: string, packageId: string) => ipcRenderer.invoke('mona:document-data:pptx:delete', id, packageId),
+      listIds: (id: string) => ipcRenderer.invoke('mona:document-data:pptx:list', id),
+      read: (id: string, packageId: string) => ipcRenderer.invoke('mona:document-data:pptx:read', id, packageId),
+      write: (id: string, packageId: string, value: unknown) => ipcRenderer.invoke('mona:document-data:pptx:write', id, packageId, value),
+    },
+    sketches: {
+      delete: (id: string, slideId: string) => ipcRenderer.invoke('mona:document-data:sketches:delete', id, slideId),
+      list: (id: string) => ipcRenderer.invoke('mona:document-data:sketches:list', id),
+      write: (id: string, slideId: string, value: unknown) => ipcRenderer.invoke('mona:document-data:sketches:write', id, slideId, value),
+    },
+  },
+
   deck: {
-    clear: () => ipcRenderer.invoke('mona:deck:clear'),
-    collectGarbage: (keep: readonly string[]) => ipcRenderer.invoke('mona:deck:collect-garbage', keep),
+    collectGarbage: (id: string, keep: readonly string[]) => ipcRenderer.invoke('mona:deck:collect-garbage', id, keep),
+    flushPending: async () => {
+      await Promise.all([...flushListeners].map(listener => Promise.resolve(listener())))
+    },
     /**
      * The shell asking for unsaved work before it closes this window.
      *
@@ -69,13 +194,11 @@ contextBridge.exposeInMainWorld('mona', {
      * and the shell should not sit waiting out its timeout to learn that.
      */
     onFlushRequest: (listener: () => Promise<void>) => {
-      flushListener = listener
-      return () => { flushListener = null }
+      flushListeners.add(listener)
+      return () => { flushListeners.delete(listener) }
     },
-    read: () => ipcRenderer.invoke('mona:deck:read'),
-    write: (presentation: unknown) => ipcRenderer.invoke('mona:deck:write', presentation),
     /** Returns the `mona://asset/...` URL the deck should refer to it by. */
-    writeAsset: (name: string, bytes: ArrayBuffer) => ipcRenderer.invoke('mona:deck:write-asset', name, bytes),
+    writeAsset: (id: string, name: string, bytes: ArrayBuffer) => ipcRenderer.invoke('mona:deck:write-asset', id, name, bytes),
   },
 
   /**
@@ -106,7 +229,7 @@ contextBridge.exposeInMainWorld('mona', {
   screen: {
     closeAudience: () => ipcRenderer.invoke('mona:screen:close-audience'),
     onSync: (listener: (message: unknown) => void) => on('mona:screen:sync', listener),
-    openAudience: () => ipcRenderer.invoke('mona:screen:open-audience'),
+    openAudience: (documentPath: string) => ipcRenderer.invoke('mona:screen:open-audience', documentPath),
     sync: (message: unknown) => ipcRenderer.send('mona:screen:sync', message),
   },
 

@@ -7,7 +7,9 @@
     "./agent-sdk-session": "./src/agent-sdk-session.ts",
     "./agent-sdk-stream": "./src/agent-sdk-stream.ts",
     "./agent-tool-bridge": "./src/agent-tool-bridge.ts",
-    "./assets": "./src/assets.ts"
+    "./assets": "./src/assets.ts",
+    "./project-agent-sdk-session": "./src/project-agent-sdk-session.ts",
+    "./project-agent-workspace": "./src/project-agent-workspace.ts"
   },
   "version": "0.0.0",
   "type": "module",
@@ -18,12 +20,12 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
     "@mona/agent-protocol": "0.0.0",
-    "ai": "^7.0.37"
+    "@mona/document-jobs": "0.0.0",
+    "ai": "^7.0.37",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "24.13.2",
-    "@types/ws": "^8.18.1",
-    "tsx": "4.23.1",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   }

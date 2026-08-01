@@ -4,7 +4,7 @@ import type { PresentationState } from '@mona/presentation-core'
 
 import {
   initDeckPersistence,
-  restoreWorkingDeck,
+  restoreDocument,
   type DeckPersistenceStatus,
 } from '@/features/editor/editor-persistence'
 import { createEditorRuntime } from '@/features/editor/editor-runtime'
@@ -22,15 +22,20 @@ vi.mock('@/lib/deck-storage', () => storageMocks)
 
 /** The desktop shell's deck store, which is where persistence now lives. */
 const deck = vi.hoisted(() => ({
-  clear: vi.fn<() => Promise<void>>(),
-  collectGarbage: vi.fn<(keep: readonly string[]) => Promise<void>>(),
+  collectGarbage: vi.fn<(id: string, keep: readonly string[]) => Promise<void>>(),
+  flushPending: vi.fn<() => Promise<void>>(),
   // The shell asking for unsaved work before a window closes; nothing closes
   // one here, so this only has to exist and hand back an unsubscribe.
   onFlushRequest: vi.fn<(listener: () => Promise<void>) => () => void>(() => () => {}),
-  read: vi.fn<() => Promise<unknown>>(),
-  write: vi.fn<(presentation: unknown) => Promise<number>>(),
-  writeAsset: vi.fn<(name: string, bytes: ArrayBuffer) => Promise<string>>(),
+  writeAsset: vi.fn<(id: string, name: string, bytes: ArrayBuffer) => Promise<string>>(),
 }))
+
+const documents = vi.hoisted(() => ({
+  read: vi.fn<(id: string) => Promise<unknown>>(),
+  write: vi.fn<(id: string, presentation: unknown) => Promise<number>>(),
+}))
+
+const DOCUMENT_ID = 'document-1'
 
 const presentation: PresentationState = {
   title: 'Persistence fixture',
@@ -58,16 +63,15 @@ beforeEach(() => {
   vi.resetAllMocks()
   storageMocks.listPowerPointPackageIds.mockResolvedValue([])
   storageMocks.readPowerPointPackage.mockResolvedValue(undefined)
-  deck.read.mockResolvedValue(null)
-  deck.write.mockResolvedValue(1_700_000_000_000)
+  documents.read.mockResolvedValue(null)
+  documents.write.mockResolvedValue(1_700_000_000_000)
   deck.collectGarbage.mockResolvedValue(undefined)
-  deck.clear.mockResolvedValue(undefined)
   const windowTarget = new EventTarget() as EventTarget & {
     mona?: unknown
     onbeforeunload: null | (() => boolean | undefined)
   }
   windowTarget.onbeforeunload = null
-  windowTarget.mona = { deck }
+  windowTarget.mona = { deck, documents }
   const documentTarget = new EventTarget() as EventTarget & { visibilityState: DocumentVisibilityState }
   documentTarget.visibilityState = 'visible'
   vi.stubGlobal('window', windowTarget)
@@ -80,57 +84,53 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('restoreWorkingDeck', () => {
+describe('restoreDocument', () => {
   test('restores a deck written by this build', async () => {
-    deck.read.mockResolvedValue({ presentation, savedAt: 3, version: 5 })
+    documents.read.mockResolvedValue({ presentation, savedAt: 3, version: 5 })
 
-    await expect(restoreWorkingDeck()).resolves.toEqual(presentation)
+    await expect(restoreDocument(DOCUMENT_ID)).resolves.toEqual(presentation)
   })
 
-  test('refuses a deck from before assets were files, and clears it', async () => {
+  test('refuses a deck from before assets were files without deleting it', async () => {
     // Those versions kept binary in IndexedDB under `blob:` keys this build cannot
     // resolve, so restoring one would produce a deck with every image blank and
     // nothing to explain why. Re-importing gives a deck that works.
-    deck.read.mockResolvedValue({ presentation, savedAt: 3, version: 4 })
+    documents.read.mockResolvedValue({ presentation, savedAt: 3, version: 4 })
 
-    await expect(restoreWorkingDeck()).resolves.toBeNull()
-    expect(deck.clear).toHaveBeenCalled()
+    await expect(restoreDocument(DOCUMENT_ID)).resolves.toBeNull()
   })
 
   test('drops a record of the wrong shape rather than wedging boot', async () => {
-    deck.read.mockResolvedValue({ nonsense: true })
+    documents.read.mockResolvedValue({ nonsense: true })
 
-    await expect(restoreWorkingDeck()).resolves.toBeNull()
-    expect(deck.clear).toHaveBeenCalled()
+    await expect(restoreDocument(DOCUMENT_ID)).resolves.toBeNull()
   })
 
   test('returns nothing when there is no deck on disk', async () => {
-    deck.read.mockResolvedValue(null)
+    documents.read.mockResolvedValue(null)
 
-    await expect(restoreWorkingDeck()).resolves.toBeNull()
-    // Nothing to clear: absent is not corrupt.
-    expect(deck.clear).not.toHaveBeenCalled()
+    await expect(restoreDocument(DOCUMENT_ID)).resolves.toBeNull()
   })
 
   test('clamps a slide index that points past the end', async () => {
-    deck.read.mockResolvedValue({
+    documents.read.mockResolvedValue({
       presentation: { ...presentation, slideIndex: 9 },
       savedAt: 3,
       version: 5,
     })
 
-    await expect(restoreWorkingDeck()).resolves.toMatchObject({ slideIndex: 0 })
+    await expect(restoreDocument(DOCUMENT_ID)).resolves.toMatchObject({ slideIndex: 0 })
   })
 })
 
 describe('initDeckPersistence', () => {
   test('publishes pending, saving, and saved states around a serialized save', async () => {
     let releaseWrite: (() => void) | undefined
-    deck.write.mockImplementation(() => new Promise(resolve => {
+    documents.write.mockImplementation(() => new Promise(resolve => {
       releaseWrite = () => resolve(1_700_000_000_000)
     }))
     const runtime = createEditorRuntime(presentation)
-    const persistence = initDeckPersistence(runtime)
+    const persistence = initDeckPersistence(runtime, DOCUMENT_ID)
     const statuses: DeckPersistenceStatus[] = [persistence.getSnapshot().status]
     const unsubscribe = persistence.subscribe(() => statuses.push(persistence.getSnapshot().status))
 
@@ -161,9 +161,9 @@ describe('initDeckPersistence', () => {
   })
 
   test('retains dirty state on failure and exposes a working retry', async () => {
-    deck.write.mockRejectedValueOnce(new Error('IndexedDB quota exceeded'))
+    documents.write.mockRejectedValueOnce(new Error('Disk unavailable'))
     const runtime = createEditorRuntime(presentation)
-    const persistence = initDeckPersistence(runtime)
+    const persistence = initDeckPersistence(runtime, DOCUMENT_ID)
 
     runtime.commit('Rename', [{
       type: 'presentation.title.set',
@@ -175,11 +175,11 @@ describe('initDeckPersistence', () => {
 
     expect(persistence.getSnapshot()).toMatchObject({
       dirty: true,
-      error: 'IndexedDB quota exceeded',
+      error: 'Disk unavailable',
       status: 'error',
     })
 
-    deck.write.mockResolvedValueOnce(1_700_000_000_000)
+    documents.write.mockResolvedValueOnce(1_700_000_000_000)
     await persistence.retry()
     expect(persistence.getSnapshot()).toMatchObject({
       dirty: false,
@@ -192,7 +192,7 @@ describe('initDeckPersistence', () => {
 
   test('writes page metadata through to the deck on disk', async () => {
     const runtime = createEditorRuntime(presentation)
-    const persistence = initDeckPersistence(runtime)
+    const persistence = initDeckPersistence(runtime, DOCUMENT_ID)
     runtime.commit('Update page metadata', [{
       type: 'slide.update',
       slideId: 'slide-1',
@@ -208,7 +208,7 @@ describe('initDeckPersistence', () => {
 
     // The presentation itself, not an envelope: the version and timestamp belong
     // to the file the shell writes, not to anything the renderer assembles.
-    expect(deck.write).toHaveBeenCalledWith(expect.objectContaining({
+    expect(documents.write).toHaveBeenCalledWith(DOCUMENT_ID, expect.objectContaining({
       slides: [expect.objectContaining({
         durationMs: 7000,
         hidden: true,

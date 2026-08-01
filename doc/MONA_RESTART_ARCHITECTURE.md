@@ -1,6 +1,6 @@
 # Mona product and agent architecture
 
-Status: authoritative product architecture, updated 2026-07-22.
+Status: authoritative presentation and agent architecture, updated 2026-07-27.
 
 Mona is an open-source desktop presentation editor: an Electron shell around a
 React renderer, with no server and nothing on the network.
@@ -169,27 +169,29 @@ converting sketch objects mechanically.
 
 ## Model access
 
-Credentials belong to the user, not the repository or build-time environment.
-The first end-to-end slice uses a user-entered Google AI Studio key held in
-browser session storage by default and passed only for the active request. The
-hosted service must not log or persist it.
+Mona does not hold model credentials. The Electron main process runs the Claude
+Agent SDK with the `claude` login already present on the machine; the CLI keeps
+that credential in the operating-system keychain. The sandboxed renderer can
+ask whether the machine is signed in and can send prompts over the preload
+bridge, but it cannot read the credential.
 
-Provider adapters may later support provider-approved subscription OAuth and
-API-key flows. Refresh tokens must be encrypted at rest and credentials never
-enter the JavaScript sandbox. Authentication choices do not change the
-presentation SDK or drawing request format.
+The older hosted OpenAI/Anthropic OAuth adapters and Google AI Studio browser-key
+adapter were removed when Mona became a desktop application. Supporting another
+provider later requires a complete local agent harness with equivalent
+filesystem, visual-inspection and transaction semantics—not a second ad-hoc text
+endpoint.
 
-## Implementation order
+## Implemented execution path
 
-1. Add Excalidraw and capture scene JSON, sketch PNG, and current-slide PNG.
-2. Build an in-memory `PresentationSession` that clones a Mona deck.
-3. Implement inspect plus add/update/delete for text, shapes, and images.
-4. Run deterministic JavaScript through the sandbox and validate its output.
-5. Render before/after and connect Apply/Discard to one history transaction.
-6. Add the hosted visual agent and require a render/review cycle.
-7. Extend editing to imported decks, tables, charts, groups, alignment, themes,
-   and multi-slide context.
-8. Add persistence, jobs, quotas, and approved provider authentication.
+1. Excalidraw captures structured scene JSON and a visual preview per slide.
+2. Opening the agent creates a temporary file workspace containing the deck and
+   its assets.
+3. The Agent SDK uses ordinary filesystem and shell tools to edit that workspace.
+4. Mona-specific `look` renders slides for visual inspection.
+5. `apply` validates the workspace against the current document revision and
+   commits the result as one undoable transaction.
+6. The Electron shell owns model execution, native storage and the IPC boundary;
+   no hosted agent service participates.
 
 Collaboration remains out of scope until the single-user agent loop is robust.
 

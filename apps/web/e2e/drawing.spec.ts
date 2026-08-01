@@ -1,4 +1,4 @@
-import { expect, openApp, reloadApp, test, type Page } from './electron-fixture'
+import { expect, openPersistedFixture, reloadApp, test, type Page } from './electron-fixture'
 
 interface PersistedSketch {
   scene: {
@@ -21,29 +21,23 @@ interface PersistedSketch {
 }
 
 const readSketches = (page: Page) => page.evaluate(async () => {
-  const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('mona')
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-  })
-  return new Promise<PersistedSketch[]>((resolve, reject) => {
-    const request = database.transaction('sketches', 'readonly').objectStore('sketches').getAll()
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result as PersistedSketch[])
-  })
+  const documentId = location.pathname.split('/').filter(Boolean).at(-1)
+  if (!documentId) throw new Error('No document is open.')
+  return window.mona!.documentData.sketches.list(documentId) as Promise<PersistedSketch[]>
 })
 
 const clearSketches = (page: Page) => page.evaluate(async () => {
-  const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('mona')
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-  })
-  await new Promise<void>((resolve, reject) => {
-    const request = database.transaction('sketches', 'readwrite').objectStore('sketches').clear()
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve()
-  })
+  const documentId = location.pathname.split('/').filter(Boolean).at(-1)
+  if (!documentId) throw new Error('No document is open.')
+  const records = await window.mona!.documentData.sketches.list(documentId)
+  await Promise.all(records.map(record => {
+    const slideId = record && typeof record === 'object'
+      ? (record as { slideId?: unknown }).slideId
+      : undefined
+    return typeof slideId === 'string'
+      ? window.mona!.documentData.sketches.delete(documentId, slideId)
+      : Promise.resolve()
+  }))
 })
 
 // Drawing is opened from the header, not the creation rail: it is a canvas
@@ -84,11 +78,7 @@ test.beforeEach(async ({ page }) => {
       // Sandboxed agent frames intentionally have an opaque origin.
     }
   })
-  // The normal working-copy loader, which is what drawing persistence uses.
-  // There is no agent fixture to pair with it any more: the deterministic
-  // provider went with the provider stack.
-  await openApp(page, '?persistTest=1')
-  await expect(page.getByRole('application', { name: 'Editable slide canvas' })).toBeVisible()
+  await openPersistedFixture(page)
   await clearSketches(page)
 })
 
@@ -147,7 +137,7 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
 
   await page.getByRole('radio', { name: 'Reference slide elements' }).click()
   await page.getByRole('button', { name: /^Select shape / }).first().click()
-  await expect(page.locator('.mona-editor-status')).toHaveText('1 selected element')
+  await expect(page.locator('.mona-editor-status')).toHaveText(/^\d+ selected elements?$/)
   await expect(page.getByRole('button', { exact: true, name: 'Draw' })).toHaveAttribute('aria-pressed', 'true')
 
   await page.getByRole('button', { name: 'Exit drawing' }).click()

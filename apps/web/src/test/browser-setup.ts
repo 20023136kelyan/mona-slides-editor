@@ -5,6 +5,9 @@ import type { MonaBridge } from '@/lib/mona-bridge'
 
 configure({ reactStrictMode: true })
 
+const powerpointPackageRecords = new Map<string, unknown>()
+const sketchRecords = new Map<string, unknown>()
+
 /**
  * A stand-in for the desktop shell.
  *
@@ -25,7 +28,177 @@ const bridge: MonaBridge = {
     respondTool: () => {},
     send: () => {},
   },
+  projectAgent: {
+    interrupt: () => {},
+    onChunk: () => () => {},
+    send: () => {},
+  },
+  projectJobs: {
+    cancel: async () => {
+      throw new Error('No project job is configured in this browser test.')
+    },
+    list: async () => [],
+    onChange: () => () => {},
+    read: async () => null,
+  },
+  projects: {
+    addArtifact: async id => ({
+      artifacts: [],
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      messages: [],
+      title: '',
+      updatedAt: Date.now(),
+      version: 1,
+    }),
+    appendMessage: async id => ({
+      artifacts: [],
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      messages: [],
+      title: '',
+      updatedAt: Date.now(),
+      version: 1,
+    }),
+    create: async () => ({
+      artifacts: [],
+      createdAt: Date.now(),
+      id: 'browser-test-project',
+      lastOpenedAt: Date.now(),
+      messages: [],
+      title: '',
+      updatedAt: Date.now(),
+      version: 1,
+    }),
+    delete: async () => {},
+    list: async () => [],
+    onChange: () => () => {},
+    read: async () => null,
+    removeArtifact: async id => ({
+      artifacts: [],
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      messages: [],
+      title: '',
+      updatedAt: Date.now(),
+      version: 1,
+    }),
+    rename: async (id, title) => ({
+      artifacts: [],
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      messages: [],
+      title,
+      updatedAt: Date.now(),
+      version: 1,
+    }),
+  },
   browseMedia: async <Result>() => ({ data: [], total: 0, videos: [] }) as Result,
+  documents: {
+    cancelPowerPoint: async () => false,
+    create: async presentation => ({
+      createdAt: Date.now(),
+      id: 'browser-test-document',
+      lastOpenedAt: Date.now(),
+      slideCount: typeof presentation === 'object' && presentation && 'slides' in presentation && Array.isArray(presentation.slides)
+        ? presentation.slides.length
+        : 0,
+      title: '',
+      updatedAt: Date.now(),
+    }),
+    createLocal: async presentation => ({
+      createdAt: Date.now(),
+      id: 'browser-test-local-document',
+      lastOpenedAt: Date.now(),
+      slideCount: typeof presentation === 'object' && presentation && 'slides' in presentation && Array.isArray(presentation.slides)
+        ? presentation.slides.length
+        : 0,
+      title: '',
+      updatedAt: Date.now(),
+    }),
+    delete: async () => {},
+    discardRecovery: async () => {},
+    duplicate: async (_id, title = '') => ({
+      createdAt: Date.now(),
+      id: 'browser-test-duplicate',
+      lastOpenedAt: Date.now(),
+      slideCount: 1,
+      title,
+      updatedAt: Date.now(),
+    }),
+    exportPowerPoint: async () => {
+      throw new Error('No desktop PowerPoint writeback is configured in this browser test.')
+    },
+    ingestPowerPoint: async () => {
+      throw new Error('No desktop PowerPoint ingestion is configured in this browser test.')
+    },
+    list: async () => [],
+    moveToSource: async id => ({
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      slideCount: 1,
+      title: '',
+      updatedAt: Date.now(),
+    }),
+    openSource: async () => {
+      throw new Error('No source document is configured in this browser test.')
+    },
+    package: async () => new ArrayBuffer(0),
+    read: async () => null,
+    rename: async (id, title) => ({
+      createdAt: Date.now(),
+      id,
+      lastOpenedAt: Date.now(),
+      slideCount: 1,
+      title,
+      updatedAt: Date.now(),
+    }),
+    write: async () => Date.now(),
+    writePreview: async () => null,
+  },
+  dataSources: {
+    addLocalFolder: async () => null,
+    chooseDefaultLocalFolder: async () => null,
+    list: async () => [],
+    listChildren: async () => [],
+    listDocuments: async () => [],
+    onChange: () => () => {},
+    readDocument: async () => {
+      throw new Error('No data source document is configured in this browser test.')
+    },
+    remove: async () => {},
+    setDefaultSaveLocation: async () => {
+      throw new Error('No data source is configured in this browser test.')
+    },
+  },
+  documentData: {
+    legacyMigration: {
+      complete: async () => {},
+      pending: async () => false,
+    },
+    powerpointPackages: {
+      delete: async (_id, packageId) => { powerpointPackageRecords.delete(packageId) },
+      listIds: async () => [...powerpointPackageRecords.keys()],
+      read: async (_id, packageId) => powerpointPackageRecords.get(packageId),
+      write: async (_id, packageId, value) => {
+        powerpointPackageRecords.set(packageId, structuredClone(value))
+        return packageId
+      },
+    },
+    sketches: {
+      delete: async (_id, slideId) => { sketchRecords.delete(slideId) },
+      list: async () => [...sketchRecords.values()].map(value => structuredClone(value)),
+      write: async (_id, slideId, value) => {
+        sketchRecords.set(slideId, structuredClone(value))
+        return slideId
+      },
+    },
+  },
   /**
    * Every dialog reads as cancelled.
    *
@@ -39,13 +212,10 @@ const bridge: MonaBridge = {
     save: async () => null,
   },
   deck: {
-    clear: async () => {},
     collectGarbage: async () => {},
+    flushPending: async () => {},
     // Nothing closes a test window, so nothing ever asks for a flush.
     onFlushRequest: () => () => {},
-    // No deck on disk: every test builds the state it needs.
-    read: async () => null,
-    write: async () => Date.now(),
     /**
      * Returns something the browser can actually load.
      *
@@ -54,7 +224,7 @@ const bridge: MonaBridge = {
      * an insert that measures the image before placing it would never place it. A
      * test that cares about the *shape* of the URL stubs this itself.
      */
-    writeAsset: async (_name: string, bytes: ArrayBuffer) => URL.createObjectURL(new Blob([bytes])),
+    writeAsset: async (_id: string, _name: string, bytes: ArrayBuffer) => URL.createObjectURL(new Blob([bytes])),
   },
   models: async () => [
     { effortLevels: ['low', 'medium', 'high'], id: 'default', name: 'Default (recommended)' },

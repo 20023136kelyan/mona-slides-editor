@@ -2,6 +2,7 @@
    function named `use` to yield its value through; it is not React's `use`. */
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mkdir } from 'node:fs/promises'
 
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
 
@@ -130,6 +131,20 @@ export const stubOpenDialog = async (app: ElectronApplication, filePaths: string
   }, filePaths)
 }
 
+/** Configures an explicit user-owned folder for tests whose subject is not the picker itself. */
+export const configureLocalSaveFolder = async (
+  app: ElectronApplication,
+  page: Page,
+  folder: string,
+): Promise<void> => {
+  await mkdir(folder, { recursive: true })
+  await stubOpenDialog(app, [folder])
+  const configured = await page.evaluate(() => window.mona!.dataSources.chooseDefaultLocalFolder())
+  if (!configured?.isDefaultSaveLocation) {
+    throw new Error('The local test save folder was not configured.')
+  }
+}
+
 /** Answers the next save dialog with this path. Cancels when given nothing. */
 export const stubSaveDialog = async (app: ElectronApplication, filePath: string | null): Promise<void> => {
   await app.evaluate(({ dialog }, path) => {
@@ -154,6 +169,7 @@ const IN_WINDOW_MENU: Record<string, readonly string[]> = {
   'file.import.json': ['Import JSON'],
   'file.import.native': ['Import Mona file'],
   'file.import.pptx': ['Import PowerPoint'],
+  'file.home': ['All presentations'],
   'file.new': ['New presentation'],
 }
 
@@ -277,3 +293,27 @@ export const reloadApp = async (page: Page): Promise<void> => {
   await page.waitForLoadState('domcontentloaded')
 }
 
+/**
+ * Turns a development fixture into a real persisted document.
+ *
+ * Fidelity and drawing suites need rich deterministic slides, while document
+ * persistence must exercise the production `/documents/:id` path. Creating the
+ * document through the preload bridge gives them both without a test-only main
+ * process shortcut.
+ */
+export const openPersistedFixture = async (
+  page: Page,
+  fixture = 'editor-interactions',
+): Promise<string> => {
+  await openApp(page, `?developmentFixture=${encodeURIComponent(fixture)}`)
+  await page.getByRole('application', { name: 'Editable slide canvas' }).waitFor({ state: 'visible' })
+  const document = await page.evaluate(async () => {
+    const presentation = window.__MONA_TEST__?.getState().presentation
+    if (!presentation) throw new Error('The development presentation is not ready.')
+    return window.mona!.documents.create(presentation)
+  })
+  await page.goto(`${RENDERER_URL}/documents/${encodeURIComponent(document.id)}?persistTest=1`)
+  await page.waitForLoadState('domcontentloaded')
+  await page.getByRole('application', { name: 'Editable slide canvas' }).waitFor({ state: 'visible' })
+  return document.id
+}

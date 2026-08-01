@@ -1,17 +1,15 @@
-import { Activity, lazy, startTransition, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Activity, lazy, startTransition, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
-import { useLoaderData } from 'react-router'
+import { useLoaderData, useLocation, useNavigate, useParams } from 'react-router'
 
 import type { EditorRootState } from '@mona/editor-state'
 import type { PresentationState } from '@mona/presentation-core'
 
-import { Button } from '@/components/ui/button'
+import { clearActiveDocumentId, setActiveDocumentId } from '@/features/documents/active-document'
+import { createUserOwnedDocument } from '@/features/documents/local-document-actions'
 import { EditorDeck } from '@/features/editor/EditorDeck'
 import type { ExportType } from '@/features/editor/EditorExportPopover'
 import {
-  consumeRestoredDeckFlag,
-  discardWorkingDeck,
   initDeckPersistence,
   isPersistenceEnabled,
   type DeckPersistence,
@@ -19,6 +17,10 @@ import {
 import { preloadDeckFonts } from '@/features/editor/editor-font-preload'
 import { EditorFullscreenSpin } from '@/features/editor/EditorFullscreenSpin'
 import { useEditorImport } from '@/features/editor/editor-import'
+import {
+  createLibraryCoverPersistence,
+  type LibraryCoverPersistence,
+} from '@/features/editor/editor-library-cover'
 import { createEditorRuntime, type EditorRuntime } from '@/features/editor/editor-runtime'
 import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
 import {
@@ -30,6 +32,8 @@ import { createEditorNotificationService } from '@/features/editor/services/edit
 import { useEditorSelector } from '@/features/editor/use-editor-selector'
 import { isMobileUserAgent } from '@/features/foundation/mobile-device'
 import { MobileComingSoon } from '@/features/foundation/MobileComingSoon'
+import { createBlankPresentation } from '@/features/presentation-renderer/load-presentation'
+import { monaBridge } from '@/lib/mona-bridge'
 
 // The slideshow surface is mutually exclusive with the desktop editor.
 // Keeping it out of the editor route avoids parsing an interaction system
@@ -77,11 +81,79 @@ const createPersistenceSlot = (): PersistenceSlot => {
 
 export function FoundationPage() {
   const { t } = useTranslation()
+  const { documentId } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
   const presentation = useLoaderData() as PresentationState
-  const [runtime] = useState(() => createEditorRuntime(presentation))
+  const activeDocumentId = documentId ?? 'fixture'
+  const [runtime] = useState(() => {
+    // Fixture routes do not persist, but imports still write temporary assets.
+    // Give them an isolated owner rather than weakening the document-id contract.
+    setActiveDocumentId(activeDocumentId)
+    return createEditorRuntime(presentation)
+  })
+  useEffect(() => {
+    // StrictMode deliberately performs an effect setup/cleanup/setup cycle in
+    // development. Reassert the route identity during setup so that simulated
+    // cleanup cannot leave the still-mounted editor without an active document.
+    setActiveDocumentId(activeDocumentId)
+    return () => clearActiveDocumentId(activeDocumentId)
+  }, [activeDocumentId])
   const [notifications] = useState(createEditorNotificationService)
   preloadDeckFonts(presentation)
   const { importFiles, importing } = useEditorImport(runtime, t, notifications.notify)
+  const sourceImportRef = useRef<string | null>(null)
+  useEffect(() => {
+    const parameters = new URLSearchParams(location.search)
+    const importType = parameters.get('sourceImport')
+    const sourceId = parameters.get('sourceId')
+    const itemId = parameters.get('sourceItemId')
+    if (
+      !sourceId
+      || !itemId
+      || (importType !== 'pptx' && importType !== 'native')
+    ) return
+    const importKey = `${sourceId}:${itemId}:${documentId ?? ''}`
+    if (sourceImportRef.current === importKey) return
+    sourceImportRef.current = importKey
+
+    const clearImportParameters = async () => {
+      const next = new URLSearchParams(location.search)
+      next.delete('sourceImport')
+      next.delete('sourceId')
+      next.delete('sourceItemId')
+      await navigate({
+        pathname: location.pathname,
+        search: next.size ? `?${next}` : '',
+      }, { replace: true })
+    }
+
+    void monaBridge().dataSources.readDocument({ itemId, sourceId })
+      .then(async picked => {
+        const file = new File(
+          [picked.bytes],
+          picked.document.name,
+          { type: picked.document.mediaType },
+        )
+        await importFiles({
+          files: [file],
+          options: { cover: true },
+          type: importType,
+        })
+      })
+      .catch(() => {
+        notifications.notify({ text: t('runtime.fileParseFailed'), type: 'error' })
+      })
+      .finally(() => { void clearImportParameters() })
+  }, [
+    documentId,
+    importFiles,
+    location.pathname,
+    location.search,
+    navigate,
+    notifications,
+    t,
+  ])
   const [exportType, setExportType] = useState<ExportType | null>(null)
   const [agentDockOpen, setAgentDockOpen] = useState(false)
   const audienceMode = new URLSearchParams(window.location.search).get('mode') === 'audience'
@@ -145,30 +217,47 @@ export function FoundationPage() {
     requestAnimationFrame(() => target.focus())
   }, [screening])
 
-  // Working-copy autosave. The loader already consulted the slot before this
-  // component rendered; here we only stream changes back out and surface the
-  // one-time "restored" banner with an escape hatch.
-  const [restoredBanner, setRestoredBanner] = useState(() => consumeRestoredDeckFlag())
+  // Document autosave. The route loader opened this document before the editor
+  // rendered; this service serializes subsequent mutations back to that identity.
   const [persistenceSlot] = useState(createPersistenceSlot)
+  const coverPersistenceRef = useRef<LibraryCoverPersistence | null>(null)
   const persistence = useSyncExternalStore(
     persistenceSlot.subscribe,
     persistenceSlot.getSnapshot,
     persistenceSlot.getSnapshot,
   )
-  useEffect(() => {
-    if (!isPersistenceEnabled()) return undefined
-    const service = initDeckPersistence(runtime)
+  useLayoutEffect(() => {
+    if (!documentId || !isPersistenceEnabled()) return undefined
+    const cover = createLibraryCoverPersistence(documentId)
+    const service = initDeckPersistence(runtime, documentId, {
+      flushDerived: cover.flush,
+      onSaved: cover.schedule,
+    })
+    coverPersistenceRef.current = cover
     persistenceSlot.set(service)
+    void cover.initialize(runtime.store.getState().presentation)
     return () => {
       persistenceSlot.set(null)
+      if (coverPersistenceRef.current === cover) coverPersistenceRef.current = null
       service.stop()
+      cover.stop()
     }
-  }, [persistenceSlot, runtime])
-  const startFresh = () => {
-    void discardWorkingDeck().finally(() => {
-      window.location.replace(window.location.pathname)
-    })
-  }
+  }, [documentId, persistenceSlot, runtime])
+
+  const openDocumentLibrary = useCallback(async () => {
+    if (persistence) await persistence.flush()
+    else await monaBridge().deck.flushPending()
+    await coverPersistenceRef.current?.flush()
+    await navigate('/')
+  }, [navigate, persistence])
+  const createDocument = useCallback(async () => {
+    if (persistence) await persistence.flush()
+    else await monaBridge().deck.flushPending()
+    await coverPersistenceRef.current?.flush()
+    const document = await createUserOwnedDocument(createBlankPresentation())
+    if (!document) return
+    await navigate(`/documents/${encodeURIComponent(document.id)}`)
+  }, [navigate, persistence])
 
   // The development/test bridge lives at the page level (not inside the
   // editor tree) so it reflects the runtime store across editor, slideshow,
@@ -197,6 +286,7 @@ export function FoundationPage() {
     agentOpen: agentDockOpen,
     closeAgent,
     closeExport,
+    createDocument,
     exitPresentation,
     exportType,
     importFiles,
@@ -204,6 +294,7 @@ export function FoundationPage() {
     notifications,
     openAgent,
     openExport,
+    openDocumentLibrary,
     persistence,
     presenting: screening,
     startPresentation,
@@ -212,6 +303,7 @@ export function FoundationPage() {
     agentDockOpen,
     closeAgent,
     closeExport,
+    createDocument,
     exitPresentation,
     exportType,
     importFiles,
@@ -219,6 +311,7 @@ export function FoundationPage() {
     notifications,
     openAgent,
     openExport,
+    openDocumentLibrary,
     persistence,
     screening,
     startPresentation,
@@ -246,13 +339,7 @@ export function FoundationPage() {
               className="h-svh min-w-0 overflow-hidden bg-muted/30"
             >
               <EditorDeck
-                banner={restoredBanner ? (
-                  <output className="mona-restore-banner absolute bottom-37 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2.5 rounded-overlay border bg-popover py-1.5 pr-2.5 pl-3.5 text-sm text-foreground shadow-lg">
-                    <span>{t('foundation.restoredWorkingCopy')}</span>
-                    <Button onClick={startFresh} size="header-pill" type="button" variant="header-pill">{t('foundation.startFresh')}</Button>
-                    <Button aria-label={t('common.close')} onClick={() => setRestoredBanner(false)} size="header-icon" type="button" variant="header-pill"><X /></Button>
-                  </output>
-                ) : null}
+                banner={null}
                 presentation={presentation}
                 runtime={runtime}
               />
@@ -269,6 +356,16 @@ export function FoundationPage() {
       <EditorNotificationViewport />
     </EditorApplicationProvider>
   )
+}
+
+/**
+ * React Router can reuse a route component when only its `:documentId` changes.
+ * The editor runtime is deliberately stateful, so keying this boundary gives
+ * each presentation a clean runtime while preserving client-side navigation.
+ */
+export function DocumentEditorPage() {
+  const { documentId } = useParams()
+  return <FoundationPage key={documentId} />
 }
 
 function DocumentTitle({ runtime }: { runtime: ReturnType<typeof createEditorRuntime> }) {

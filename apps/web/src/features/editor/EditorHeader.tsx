@@ -9,6 +9,7 @@ import {
   FilePlus2,
   FileSliders,
   FileType2,
+  House,
   Laptop,
   LoaderCircle,
   Menu,
@@ -17,7 +18,6 @@ import {
   PanelsTopLeft,
   PencilLine,
   Play,
-  PanelLeftOpen,
   Redo2,
   Search,
   Settings,
@@ -31,20 +31,8 @@ import JsonIcon from '~icons/vscode-icons/file-type-json'
 import PdfIcon from '~icons/vscode-icons/file-type-pdf2'
 import PowerPointIcon from '~icons/vscode-icons/file-type-powerpoint2'
 
-import { editorActions } from '@mona/editor-state'
-import { createPresentationId } from '@mona/presentation-core'
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { ApplicationSidebarContentToggle } from '@/features/application-shell/ApplicationSidebar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -181,10 +169,12 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   const {
     agentOpen,
     closeAgent,
+    createDocument,
     exportType,
     importFiles,
     importing,
     openAgent,
+    openDocumentLibrary,
     openExport,
     persistence,
     startPresentation,
@@ -196,7 +186,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   // no panel of its own.
   const drawingActive = useEditorSelector(runtime.store, state => state.session.drawingMode || state.session.creatingCustomShape)
   const presentationTitle = useEditorSelector(runtime.store, state => state.presentation.title)
-  const presentationBackground = useEditorSelector(runtime.store, state => state.presentation.theme.backgroundColor)
   const historySnapshot = useSyncExternalStore(
     runtime.subscribeHistory,
     runtime.getHistorySnapshot,
@@ -217,7 +206,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   const [shareOpen, setShareOpen] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const [hotkeysOpen, setHotkeysOpen] = useState(false)
-  const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const resolvedLanguage = i18n.resolvedLanguage ?? ''
   const activeLocale: SupportedLocale = isSupportedLocale(resolvedLanguage) ? resolvedLanguage : 'en-US'
   const setMenuOpen = (menu: Exclude<OpenPopover, null>, open: boolean) => {
@@ -256,7 +244,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   useEffect(() => subscribeToPresentationStart(() => {
     setOpenPopover(null)
     setHotkeysOpen(false)
-    setResetDialogOpen(false)
   }), [subscribeToPresentationStart])
 
   const beginTitleEdit = () => {
@@ -287,30 +274,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
     setTitleValue(presentationTitle)
     setEditingTitle(false)
     titleInputRef.current?.blur()
-  }
-
-  const resetPresentation = () => {
-    runtime.commit('Create new presentation', [
-      {
-        type: 'presentation.title.set',
-        title: '',
-        fallbackTitle: '',
-      },
-      {
-        type: 'presentation.slides.replace',
-        slides: [{
-          id: createPresentationId(10),
-          elements: [],
-          background: { type: 'solid', color: presentationBackground },
-        }],
-      },
-      { type: 'slide.focus', index: 0 },
-    ], { historyKey: 'new-presentation' })
-    runtime.store.dispatch(editorActions.selectionChanged([]))
-    runtime.store.dispatch(editorActions.selectedSlideIndexesChanged([]))
-    setResetDialogOpen(false)
-    setOpenPopover(null)
-    requestAnimationFrame(() => fileMenuTriggerRef.current?.focus())
   }
 
   const requestScreen = (
@@ -356,7 +319,8 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
   // Only the visible variant mounts its content, so this is not duplicated DOM.
   const fileMenuItems = (
     <>
-      <HeaderMenuItem disabled={importing} icon={<FilePlus2 />} label={t('header.newPresentation')} onSelect={() => setResetDialogOpen(true)} />
+      <HeaderMenuItem icon={<House />} label={t('header.allPresentations')} onSelect={() => { void openDocumentLibrary() }} />
+      <HeaderMenuItem disabled={importing} icon={<FilePlus2 />} label={t('header.newPresentation')} onSelect={() => { void createDocument() }} />
       <DropdownMenuSeparator className="my-1.5 bg-border" />
       <HeaderMenuItem disabled={importing} icon={<FileType2 />} label={t('header.importPptx')} onSelect={() => { void requestImport('pptx') }} />
       <HeaderMenuItem disabled={importing} icon={<FileArchive />} label={t('header.importNative')} onSelect={() => { void requestImport('native') }} />
@@ -416,7 +380,8 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       'file.import.json': () => { void requestImport('json') },
       'file.import.native': () => { void requestImport('native') },
       'file.import.pptx': () => { void requestImport('pptx') },
-      'file.new': () => setResetDialogOpen(true),
+      'file.home': () => { void openDocumentLibrary() },
+      'file.new': () => { void createDocument() },
       'tools.find': () => openTaskPanel('search'),
       'tools.semantics': () => openTaskPanel('semantics'),
       'tools.shortcuts': () => setHotkeysOpen(true),
@@ -514,23 +479,11 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
 
               The negative margin cancels the row's `gap` at zero width, which
               would otherwise leave 4px of nothing where the button will be. */}
-          {macChrome ? (
-            <div
-              className={cn(
-                'mona-rail-shift flex-none overflow-hidden transition-[width,margin,opacity] duration-200 ease-out',
-                railCollapsed ? 'w-7 opacity-100' : 'w-0 -me-1 opacity-0 @max-[760px]/header:me-0',
-              )}
-              inert={!railCollapsed}
-            >
-              <Button
-                aria-label={t('foundation.editor.rail.expandSidebar')}
-                onClick={() => setRailCollapsed(false)}
-                size="header-icon"
-                title={t('foundation.editor.rail.expandSidebar')}
-                variant="header-pill"
-              ><PanelLeftOpen /></Button>
-            </div>
-          ) : null}
+          <ApplicationSidebarContentToggle
+            className="@max-[760px]/header:me-0"
+            collapsed={railCollapsed}
+            onExpand={() => setRailCollapsed(false)}
+          />
           <div aria-hidden="true" className="mx-1 h-4 w-px flex-none bg-border @max-[760px]/header:mx-0.5" />
           <Button aria-label={t('foundation.editor.canvasTool.undo')} disabled={historyCursor <= 0} onClick={() => runtime.undo()} size="header-icon" title={t('foundation.editor.canvasTool.undo')} variant="header-pill"><Undo2 /></Button>
           <Button aria-label={t('foundation.editor.canvasTool.redo')} disabled={historyCursor >= historyLength - 1} onClick={() => runtime.redo()} size="header-icon" title={t('foundation.editor.canvasTool.redo')} variant="header-pill"><Redo2 /></Button>
@@ -614,17 +567,20 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
             variant="header-pill"
           ><MessageSquare className={cn(taskPanelRoute === 'comments' && 'text-editor-selection')} /></Button>
           <DropdownMenu onOpenChange={open => setMenuOpen('screen', open)} open={openPopover === 'screen'}>
-            <div className="flex h-7 overflow-hidden rounded-action border border-border bg-background @max-[760px]/header:mx-0.5" role="group">
+            <div
+              className="flex h-7 overflow-hidden rounded-action border border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)] transition-all has-[button:active]:translate-y-px has-[button:active]:shadow-none has-[[data-state=open]]:bg-[color-mix(in_oklab,var(--foreground)_10%,var(--background))] has-[[data-state=open]]:shadow-none @max-[760px]/header:mx-0.5"
+              role="group"
+            >
               <Button
                 aria-label={t('header.startSlideshow')}
-                className="h-full gap-1 rounded-none border-0 bg-transparent px-2 text-xs font-medium text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground @max-[880px]/header:px-1.5 @max-[760px]/header:w-7 @max-[760px]/header:px-0 @max-[760px]/header:[&>span]:hidden [&_svg]:size-3.5"
+                className="h-full gap-1 rounded-none border-0 bg-transparent px-2 text-xs font-medium text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground active:translate-y-0! @max-[880px]/header:px-1.5 @max-[760px]/header:w-7 @max-[760px]/header:px-0 @max-[760px]/header:[&>span]:hidden [&_svg]:size-3.5"
                 onClick={() => requestScreen(false)}
                 size="sm"
                 title={t('header.startSlideshow')}
                 variant="ghost"
               ><MonitorPlay /><span>{t('header.present')}</span></Button>
               <DropdownMenuTrigger asChild>
-                <Button aria-label={t('header.slideshowOptions')} className="h-full w-7 shrink-0 rounded-none border-y-0 border-r-0 border-l border-border bg-transparent p-0 text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground data-[state=open]:bg-foreground/[0.06] data-[state=open]:text-foreground [&_svg]:size-3.5" size="sm" variant="ghost"><ChevronDown /></Button>
+                <Button aria-label={t('header.slideshowOptions')} className="h-full w-7 shrink-0 rounded-none border-y-0 border-r-0 border-l border-border bg-transparent p-0 text-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground active:translate-y-0! data-[state=open]:bg-transparent data-[state=open]:text-foreground [&_svg]:size-3.5" size="sm" variant="ghost"><ChevronDown /></Button>
               </DropdownMenuTrigger>
             </div>
             <DropdownMenuContent align="center" className="w-max rounded-overlay p-1 text-xs shadow-[0_10px_30px_rgb(15_23_42_/_13%),0_2px_8px_rgb(15_23_42_/_8%)]" sideOffset={8}>
@@ -666,21 +622,6 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
       </header>
       {exportType ? <Suspense fallback={null}><EditorExportFeature runtime={runtime} /></Suspense> : null}
 
-      <AlertDialog onOpenChange={open => {
-        setResetDialogOpen(open)
-        if (!open) requestAnimationFrame(() => fileMenuTriggerRef.current?.focus())
-      }} open={resetDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('header.newPresentationConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>{t('header.newPresentationConfirmDescription')}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={resetPresentation} variant="destructive">{t('header.createNewPresentation')}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <EditorHotkeyDrawer onClose={() => setHotkeysOpen(false)} open={hotkeysOpen} />
     </>
   )

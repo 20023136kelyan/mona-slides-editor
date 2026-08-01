@@ -1,5 +1,10 @@
 # Mona dependency upgrade research
 
+> Historical snapshot. Package and architecture statements below describe
+> commit `15dda24e` on 2026-07-25. In particular, `pi-ai` and its hosted provider
+> stack were removed when Mona moved to Electron; consult the current manifests
+> and `doc/RELEASE_HARDENING.md` for release decisions.
+
 ## Scope
 
 This document is the research behind the dependency upgrades, not the upgrade
@@ -39,7 +44,7 @@ release* matters more than the count of skipped versions:
 | sortablejs | 1.14.0 | 2021-07-04 | 1.15.7 | 2026-02-11 | 5.1 yr |
 | txml | 5.1.1 | 2021-12-03 | 6.0.0 | 2026-05-10 | 4.6 yr |
 | husky | 8.0.3 | 2023-01-03 | 9.1.7 | 2024-11-18 | 3.6 yr |
-| pptxgenjs | 3.12.0 | 2023-03-20 | 4.0.1 | 2025-06-26 | 3.3 yr |
+| pptxgenjs | 4.0.1 | 2025-06-26 | 4.0.1 | 2025-06-26 | 1.1 yr |
 | prosemirror-history | 1.3.2 | 2023-05-17 | 1.5.0 | 2025-11-13 | 3.2 yr |
 | @commitlint/cli | 18.6.1 | 2024-02-13 | 21.2.1 | 2026-07-08 | 2.4 yr |
 | prosemirror-view | 1.33.9 | 2024-07-18 | 1.42.2 | 2026-07-24 | 2.0 yr |
@@ -246,12 +251,12 @@ fix by hand.
 
 ---
 
-## D03 — pptxgenjs 3.12.0 → 4.0.1 (export) — **defer with the export workstream**
+## D03 — pptxgenjs 3.12.0 → 4.0.1 (export) — **complete**
 
-Already tracked as **X04** in `doc/PPTX_IMPORT_RENDERING_ARCHITECTURE.md`
-("upgrade from current PptxGenJS 3.12 after an isolated compatibility test").
-Imported at `apps/web/src/features/editor/editor-export.ts`, lazily, so it is
-outside the initial bundle.
+Tracked as **X04** in `doc/PPTX_IMPORT_RENDERING_ARCHITECTURE.md` and completed
+with the source-preserving export workstream. It remains imported through
+`apps/web/src/features/editor/editor-export.ts` in the export feature chunk, so
+it stays outside the initial bundle.
 
 What 4.0 brings:
 
@@ -267,17 +272,16 @@ What 4.0 brings:
 - `defineSlideMaster()` fixed when a config object is reused.
 - Scheme colors accepted as `dataBorder`.
 
-Cost: the `exports` field is itself the breaking change, since it forecloses
-any deep import. Ours is a plain default import, so this is likely a no-op for
-us, but it must be verified against the existing export fixtures rather than
-assumed.
+The `exports` field is the principal breaking change because it forecloses deep
+imports. Mona uses the supported default import. Type-check, production build,
+editable-generation round trip, imported-deck source writeback, and packaged
+Electron smoke all pass on 4.0.1.
 
 ### Verdict
 
-Real gains, but they are export gains, and export is a phase we have not
-started. Upgrading now buys capability we cannot yet exercise and asks the
-export fixtures to absorb a major bump twice. Keep it as X04, sequenced with
-that work.
+Completed as X04. PptxGenJS remains the Mona-native generation path; imported
+decks use the retained-package writer and therefore do not mistake generator
+coverage for source-preservation coverage.
 
 ---
 
@@ -527,9 +531,9 @@ from `readXmlFile.js`. Add a fixture for a malformed-case entity
 21, image-size 2, oxlint + tsgolint together, remaining minors. Hold
 `@types/node` at 24.
 
-Deferred deliberately: **pptxgenjs 4** (D03) to the export workstream as X04;
-**svg-pathdata 9** and **nanoid 6**'s Node implications until we choose to move
-the Node floor.
+Completed separately with the export workstream: **pptxgenjs 4** (D03/X04).
+Still deferred: **svg-pathdata 9** and **nanoid 6**'s Node implications until
+we choose to move the Node floor.
 
 Verification after each step, per the root scripts:
 
