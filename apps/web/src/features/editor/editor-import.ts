@@ -262,7 +262,11 @@ const importPptx = async (
     { type: 'presentation.source-packages.replace', sourcePackages },
     {
       type: 'presentation.theme.update',
-      props: { themeColors: ingestion.presentation.theme.themeColors },
+      // The desktop host compiles the retained DrawingML theme into Mona's
+      // editable theme. Keeping only its accent colors made the active deck
+      // disagree with the writeback baseline (notably dk1/lt1 and fonts), so a
+      // title-only export was misclassified as a native theme edit.
+      props: ingestion.presentation.theme,
     },
   ]
   if (!options.fixedViewport) {

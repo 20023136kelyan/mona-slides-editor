@@ -83,6 +83,10 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('lazy-loads the slide-coordinate drawing surface and persists its independent scene', async ({ page }) => {
+  // Excalidraw is intentionally lazy-loaded and this journey also persists,
+  // changes slides, zooms, pans, and opens a task panel. Five parallel Electron
+  // windows can legitimately push the complete desktop journey past 30s.
+  test.slow()
   const problems: string[] = []
   const drawingRequests: string[] = []
   page.on('request', request => {
@@ -169,6 +173,9 @@ test('lazy-loads the slide-coordinate drawing surface and persists its independe
 })
 
 test('hands the sketch to Mona, survives reload, and clears without touching slide content', async ({ page }) => {
+  // Covers a disk round trip and a renderer restart in addition to lazy-loading
+  // Excalidraw, so retain the full assertion set with the slow-test budget.
+  test.slow()
   await openDrawing(page)
   await drawStroke(page)
   await expect(page.getByRole('button', { name: 'Build this' })).toBeEnabled()

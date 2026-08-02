@@ -2,19 +2,25 @@ import type {
   ChartData,
   ChartOptions,
   PPTElement,
+  PPTElementEffects,
+  PPTElementShadow,
+  PPTElementThreeD,
   PPTChartElement,
   PPTElementOutline,
   PPTImageElement,
   PPTShapeElement,
   PPTLineElement,
+  PPTAnimation,
   PPTTableElement,
   PowerPointConnectorRelationships,
   PowerPointPackageManifest,
   PresentationState,
+  SlideTheme,
   SlideBackground,
   StructuredTextBody,
   TextAlignVertical,
   TextInset,
+  TurningMode,
 } from '@mona/presentation-core'
 
 export interface PowerPointWritebackIssue {
@@ -139,18 +145,53 @@ export interface PowerPointNotesPatch {
   notesPart: string
   partPath: string
   scale?: number
+  slidePart: string
   slideId: string
 }
 
-export interface PowerPointCommentTextPatch {
-  after: string
-  before: string
-  id: string
+export interface PowerPointCommentDraft {
+  content: string
+  index: number
+  key: string
+  parentKey?: string
+  position?: { x: number; y: number }
+  status?: string
+  time: number
+  user: string
 }
 
 export interface PowerPointCommentsPatch {
-  changes: PowerPointCommentTextPatch[]
+  authors: string[]
+  comments: PowerPointCommentDraft[]
+  authorsPart: string
   kind: 'comments'
+  partPath: string
+  removePartPaths?: string[]
+  slidePart: string
+  slideId: string
+}
+
+/** Map Mona's presentation-wide theme controls onto a retained OOXML theme part. */
+export interface PowerPointThemePatch {
+  after: SlideTheme
+  before: SlideTheme
+  kind: 'theme'
+  partPath: string
+}
+
+export interface PowerPointTimingPatch {
+  after: PPTAnimation[]
+  before: PPTAnimation[]
+  kind: 'timing'
+  partPath: string
+  slideId: string
+  targets: Record<string, string>
+}
+
+export interface PowerPointTransitionPatch {
+  after: { durationMs?: number; turningMode?: TurningMode }
+  before: { durationMs?: number; turningMode?: TurningMode }
+  kind: 'transition'
   partPath: string
   slideId: string
 }
@@ -199,6 +240,33 @@ export interface PowerPointShapeStylePatch {
   kind: 'style'
   objectId: string
   partPath: string
+  scale?: number
+  slideId: string
+}
+
+export interface PowerPointEffectsPatch {
+  after?: PPTElementEffects
+  afterOuterShadow?: PPTElementShadow
+  before?: PPTElementEffects
+  beforeOuterShadow?: PPTElementShadow
+  elementId: string
+  kind: 'effects'
+  objectId: string
+  partPath: string
+  /** Mona canvas units per PowerPoint point for this imported package. */
+  scale?: number
+  slideId: string
+}
+
+export interface PowerPointThreeDPatch {
+  after?: PPTElementThreeD
+  before?: PPTElementThreeD
+  elementId: string
+  kind: 'three-d'
+  materializeInherited?: boolean
+  objectId: string
+  partPath: string
+  /** Mona canvas units per PowerPoint point for this imported package. */
   scale?: number
   slideId: string
 }
@@ -325,6 +393,7 @@ export type PowerPointPatchOperation =
   | PowerPointCommentsPatch
   | PowerPointConnectorPatch
   | PowerPointDeletePatch
+  | PowerPointEffectsPatch
   | PowerPointElementInsertPatch
   | PowerPointElementReplacePatch
   | PowerPointImagePatch
@@ -335,7 +404,11 @@ export type PowerPointPatchOperation =
   | PowerPointShapeStylePatch
   | PowerPointTablePatch
   | PowerPointTextPatch
+  | PowerPointThemePatch
+  | PowerPointThreeDPatch
+  | PowerPointTimingPatch
   | PowerPointTransformPatch
+  | PowerPointTransitionPatch
   | PowerPointSlideInsertPatch
 
 export interface PowerPointWritebackPlan {

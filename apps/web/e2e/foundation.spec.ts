@@ -50,7 +50,10 @@ test('keeps one sidebar shell, collapse state, and geometry across Home and Edit
   expect(homeHeaderBox?.height).toBe(44)
 
   await homeSidebar.getByRole('button', { name: 'Collapse sidebar' }).click()
-  await expect.poll(async () => (await homeSidebar.boundingBox())?.width).toBeLessThanOrEqual(100)
+  // Wait for the shared sidebar transition to finish. Sampling only the
+  // "under 100px" threshold could capture an in-between fractional width and
+  // compare that animation frame with the settled editor shell.
+  await expect.poll(async () => (await homeSidebar.boundingBox())?.width).toBe(97)
   const collapsedHomeWidth = (await homeSidebar.boundingBox())!.width
 
   // Route-specific content changes, while the shared sidebar state remains.

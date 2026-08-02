@@ -35,9 +35,35 @@ const relationshipPartPath = (partPath: string): string => {
   return `${directory}_rels/${fileName}.rels`
 }
 
+const nextPlannedPart = (
+  used: Set<string>,
+  directory: string,
+  stem: string,
+): string => {
+  let index = 1
+  while (used.has(`${directory}/${stem}${index}.xml`)) index += 1
+  const part = `${directory}/${stem}${index}.xml`
+  used.add(part)
+  return part
+}
+
 const authoredHyperlinks = (content: string): Array<string | undefined> => (
   parseAuthoredText(content).flatMap(paragraph => paragraph.runs.map(run => run.hyperlink))
 )
+
+const outerShadowSnapshot = (element: PPTElement) => (
+  element.type === 'image'
+  || element.type === 'line'
+  || element.type === 'shape'
+  || element.type === 'text'
+    ? element.shadow
+    : undefined
+)
+
+const effectKinds = (element: PPTElement): string[] => Object.entries(element.effects ?? {})
+  .filter(([, value]) => value !== undefined)
+  .map(([kind]) => kind)
+  .sort()
 
 const chartSnapshot = (element: PPTChartElement): PowerPointChartSnapshot => ({
   ...(element.chartSpace ? { chartSpace: structuredClone(element.chartSpace) } : {}),
@@ -397,7 +423,9 @@ const compareSlideShell = (
   baseline: Slide,
   desired: Slide,
 ): PowerPointWritebackIssue[] => {
-  const ignored = new Set(['background', 'elements', 'id', 'notes', 'remark', 'source'])
+  const ignored = new Set([
+    'animations', 'background', 'durationMs', 'elements', 'id', 'notes', 'remark', 'source', 'turningMode',
+  ])
   const keys = [...new Set([
     ...Object.keys(baseline),
     ...Object.keys(desired),
@@ -459,12 +487,6 @@ const comparePresentationShell = (
       'pptx.writeback.slide-size',
       'Changing the slide size of an imported PowerPoint is not writeback-safe yet.',
       { partPath: 'ppt/presentation.xml' },
-    ))
-  }
-  if (JSON.stringify(baseline.theme) !== JSON.stringify(desired.theme)) {
-    issues.push(unsupported(
-      'pptx.writeback.theme',
-      'Theme edits cannot be written back to an imported PowerPoint yet.',
     ))
   }
   return issues
@@ -675,8 +697,58 @@ export const analyzePowerPointWriteback = (
   const operations: PowerPointPatchOperation[] = []
   const issues = comparePresentationShell(baseline, presentation)
   const sourcePackage = baseline.sourcePackages?.find(source => source.packageId === packageId)
+  const plannedParts = new Set<string>([
+    ...(sourcePackage?.slides.flatMap(slide => [
+      slide.slidePart,
+      slide.layoutPart,
+      slide.masterPart,
+      slide.notesPart,
+      slide.themePart,
+    ].filter((part): part is string => Boolean(part))) ?? []),
+    ...(sourcePackage?.hierarchy?.themes.map(theme => theme.partPath) ?? []),
+    ...(sourcePackage?.document?.notesMasters.map(master => master.partPath) ?? []),
+    ...(sourcePackage?.document?.notesSlides.map(notes => notes.partPath) ?? []),
+    ...(sourcePackage?.document?.comments.map(comment => comment.partPath) ?? []),
+  ])
+  if (changed(baseline.theme, presentation.theme)) {
+    const themeParts = [...new Set(
+      sourcePackage?.hierarchy?.themes
+        .filter(theme => !theme.isOverride)
+        .map(theme => theme.partPath) ?? [],
+    )]
+    if (!themeParts.length) {
+      issues.push(unsupported(
+        'pptx.writeback.theme-part',
+        'The imported presentation has no retained base theme part to author.',
+        { partPath: 'ppt/theme' },
+      ))
+    }
+    else {
+      for (const partPath of themeParts) {
+        operations.push({
+          after: structuredClone(presentation.theme),
+          before: structuredClone(baseline.theme),
+          kind: 'theme',
+          partPath,
+        })
+      }
+    }
+  }
   const baselineSlides = baseline.slides.filter(slide => slide.source?.packageId === packageId)
   const desiredSlides = presentation.slides.filter(slide => slide.source?.packageId === packageId)
+  const desiredCommentAuthors = [...new Set(desiredSlides.flatMap(slide => (
+    flattenNotes(slide.notes).map(note => note.user || 'Mona')
+  )))].sort((left, right) => left.localeCompare(right))
+  const commentIndexByKey = new Map<string, number>()
+  const commentIndexByAuthor = new Map<string, number>()
+  for (const slide of desiredSlides) {
+    for (const note of flattenNotes(slide.notes)) {
+      const user = note.user || 'Mona'
+      const index = (commentIndexByAuthor.get(user) ?? 0) + 1
+      commentIndexByAuthor.set(user, index)
+      commentIndexByKey.set(note.id, index)
+    }
+  }
   const desiredExactSlides = desiredSlides.filter(slide => !slide.source?.copyOnWrite)
   const desiredSlideCopies = desiredSlides.filter(slide => Boolean(slide.source?.copyOnWrite))
   const desiredByPart = new Map(desiredExactSlides.map(slide => [slidePart(slide), slide]))
@@ -825,14 +897,81 @@ export const analyzePowerPointWriteback = (
         slideId: baselineSlide.id,
       })
     }
+    if (changed(baselineSlide.animations ?? [], desiredSlide.animations ?? [])) {
+      const targets: Record<string, string> = {}
+      for (const animation of desiredSlide.animations ?? []) {
+        const element = flattenElementTree(desiredSlide.elements).find(candidate => (
+          candidate.id === animation.elId
+        ))
+        if (!element) {
+          issues.push(unsupported(
+            'pptx.writeback.animation-target',
+            `Animation ${animation.id} targets an element that is not on the slide.`,
+            { partPath, slideId: baselineSlide.id },
+          ))
+          continue
+        }
+        if (element.source?.copyOnWrite) {
+          issues.push(unsupported(
+            'pptx.writeback.animation-copy-target',
+            'Animations on newly copied native objects require their post-allocation shape identity.',
+            { elementId: element.id, partPath, slideId: baselineSlide.id },
+          ))
+          continue
+        }
+        targets[element.id] = element.source?.nativeShapeId ?? `generated:${element.id}`
+      }
+      operations.push({
+        after: structuredClone(desiredSlide.animations ?? []),
+        before: structuredClone(baselineSlide.animations ?? []),
+        kind: 'timing',
+        partPath,
+        slideId: baselineSlide.id,
+        targets,
+      })
+    }
+    if (
+      baselineSlide.turningMode !== desiredSlide.turningMode
+      || baselineSlide.durationMs !== desiredSlide.durationMs
+    ) {
+      const supportedModes = new Set(['fade', 'no', 'random', 'slideX', 'slideY'])
+      if (desiredSlide.turningMode && !supportedModes.has(desiredSlide.turningMode)) {
+        issues.push(unsupported(
+          'pptx.writeback.transition-mode',
+          `The Mona transition "${desiredSlide.turningMode}" has no exact native PowerPoint mapping.`,
+          { partPath, slideId: baselineSlide.id },
+        ))
+      }
+      else {
+        operations.push({
+          after: {
+            ...(desiredSlide.durationMs !== undefined ? { durationMs: desiredSlide.durationMs } : {}),
+            ...(desiredSlide.turningMode ? { turningMode: desiredSlide.turningMode } : {}),
+          },
+          before: {
+            ...(baselineSlide.durationMs !== undefined ? { durationMs: baselineSlide.durationMs } : {}),
+            ...(baselineSlide.turningMode ? { turningMode: baselineSlide.turningMode } : {}),
+          },
+          kind: 'transition',
+          partPath,
+          slideId: baselineSlide.id,
+        })
+      }
+    }
     if ((baselineSlide.remark ?? '') !== (desiredSlide.remark ?? '')) {
       const notesPart = sourcePackage?.slides.find(slide => slide.slidePart === partPath)?.notesPart
       if (!notesPart) {
-        issues.push(unsupported(
-          'pptx.writeback.notes-part',
-          'Adding speaker notes to a slide without a native notes part requires relationship-aware part allocation.',
-          { partPath, slideId: baselineSlide.id },
-        ))
+        const allocated = nextPlannedPart(plannedParts, 'ppt/notesSlides', 'notesSlide')
+        operations.push({
+          after: desiredSlide.remark ?? '',
+          before: baselineSlide.remark ?? '',
+          kind: 'notes',
+          notesPart: allocated,
+          partPath: allocated,
+          ...(sourcePackage?.coordinateScale ? { scale: sourcePackage.coordinateScale } : {}),
+          slideId: baselineSlide.id,
+          slidePart: partPath,
+        })
       }
       else {
         operations.push({
@@ -843,6 +982,7 @@ export const analyzePowerPointWriteback = (
           partPath: notesPart,
           ...(sourcePackage?.coordinateScale ? { scale: sourcePackage.coordinateScale } : {}),
           slideId: baselineSlide.id,
+          slidePart: partPath,
         })
       }
     }
@@ -850,58 +990,37 @@ export const analyzePowerPointWriteback = (
       const sourceComments = sourcePackage?.document?.comments.filter(comment => (
         comment.slidePart === partPath
       )) ?? []
-      const sourceNoteIds = new Set(sourceComments.map(powerPointCommentNoteId))
-      const baselineNotes = flattenNotes(baselineSlide.notes)
       const desiredNotes = flattenNotes(desiredSlide.notes)
-      const baselineByNoteId = new Map(baselineNotes.map(note => [note.id, note]))
-      const desiredByNoteId = new Map(desiredNotes.map(note => [note.id, note]))
-      const changesByPart = new Map<string, Array<{ after: string; before: string; id: string }>>()
-      for (const comment of sourceComments) {
-        const noteId = powerPointCommentNoteId(comment)
-        const beforeNote = baselineByNoteId.get(noteId)
-        const afterNote = desiredByNoteId.get(noteId)
-        if (!beforeNote || !afterNote) {
-          issues.push(unsupported(
-            'pptx.writeback.comment-structure',
-            'Adding, deleting, or reparenting imported PowerPoint comments is not writeback-safe yet.',
-            { partPath: comment.partPath, slideId: baselineSlide.id },
-          ))
-          continue
-        }
-        if (
-          beforeNote.parentId !== afterNote.parentId
-          || beforeNote.time !== afterNote.time
-          || beforeNote.user !== afterNote.user
-        ) {
-          issues.push(unsupported(
-            'pptx.writeback.comment-metadata',
-            'Changing a PowerPoint comment author, timestamp, or reply relationship is not writeback-safe yet.',
-            { partPath: comment.partPath, slideId: baselineSlide.id },
-          ))
-        }
-        if (beforeNote.content !== afterNote.content) {
-          const changes = changesByPart.get(comment.partPath) ?? []
-          changes.push({ after: afterNote.content, before: beforeNote.content, id: comment.id })
-          changesByPart.set(comment.partPath, changes)
-        }
-      }
-      const baselineLocal = baselineNotes.filter(note => !sourceNoteIds.has(note.id))
-      const desiredLocal = desiredNotes.filter(note => !sourceNoteIds.has(note.id))
-      if (JSON.stringify(baselineLocal) !== JSON.stringify(desiredLocal)) {
-        issues.push(unsupported(
-          'pptx.writeback.comment-structure',
-          'Adding or editing Mona comments inside an imported PowerPoint requires comment-author and relationship allocation.',
-          { partPath, slideId: baselineSlide.id },
-        ))
-      }
-      for (const [commentPart, changes] of changesByPart) {
-        operations.push({
-          changes,
-          kind: 'comments',
-          partPath: commentPart,
-          slideId: baselineSlide.id,
-        })
-      }
+      const sourceByNoteId = new Map(sourceComments.map(comment => (
+        [powerPointCommentNoteId(comment), comment] as const
+      )))
+      const legacyPart = sourceComments.find(comment => /^ppt\/comments\//i.test(comment.partPath))?.partPath
+      const commentPart = legacyPart
+        ?? nextPlannedPart(plannedParts, 'ppt/comments', 'comment')
+      operations.push({
+        authors: desiredCommentAuthors,
+        authorsPart: 'ppt/commentAuthors.xml',
+        comments: desiredNotes.map(note => {
+          const sourceComment = sourceByNoteId.get(note.id)
+          return {
+            content: note.content,
+            index: commentIndexByKey.get(note.id) ?? 1,
+            key: note.id,
+            ...(note.parentId ? { parentKey: note.parentId } : {}),
+            ...(sourceComment?.position ? { position: structuredClone(sourceComment.position) } : {}),
+            ...(sourceComment?.status ? { status: sourceComment.status } : {}),
+            time: note.time,
+            user: note.user || 'Mona',
+          }
+        }),
+        kind: 'comments',
+        partPath: commentPart,
+        ...(sourceComments.some(comment => comment.partPath !== commentPart)
+          ? { removePartPaths: [...new Set(sourceComments.map(comment => comment.partPath).filter(path => path !== commentPart))] }
+          : {}),
+        slideId: baselineSlide.id,
+        slidePart: partPath,
+      })
     }
     const baselineTree = collectElements(baselineSlide)
     const desiredTree = collectElements(desiredSlide)
@@ -1210,6 +1329,109 @@ export const analyzePowerPointWriteback = (
           slideId: baselineSlide.id,
         })
       }
+      const effectsChanged = changed(beforeElement.effects, afterElement.effects)
+      const effectsSupported = new Set([
+        'audio', 'group', 'image', 'line', 'shape', 'text', 'video',
+      ]).has(beforeElement.type)
+      const changesEffectDagTopology = Boolean(
+        effectsChanged
+        && source.visual?.hasEffectDag
+        && changed(effectKinds(beforeElement), effectKinds(afterElement)),
+      )
+      if (changesEffectDagTopology) {
+        issues.push(unsupported(
+          'pptx.writeback.effect-dag-topology',
+          'Adding or removing effects would change this composited DrawingML effect graph. Existing supported graph effects may be edited in place.',
+          {
+            elementId: afterElement.id,
+            objectId,
+            partPath: source.sourcePart,
+            slideId: baselineSlide.id,
+          },
+        ))
+      }
+      else if (effectsChanged && effectsSupported) {
+        const afterOuterShadow = outerShadowSnapshot(afterElement)
+        const beforeOuterShadow = outerShadowSnapshot(beforeElement)
+        operations.push({
+          ...(afterElement.effects ? { after: structuredClone(afterElement.effects) } : {}),
+          ...(afterOuterShadow ? { afterOuterShadow: structuredClone(afterOuterShadow) } : {}),
+          ...(beforeElement.effects ? { before: structuredClone(beforeElement.effects) } : {}),
+          ...(beforeOuterShadow ? { beforeOuterShadow: structuredClone(beforeOuterShadow) } : {}),
+          elementId: afterElement.id,
+          kind: 'effects',
+          objectId,
+          partPath: source.sourcePart!,
+          ...(sourcePackage?.coordinateScale
+            ? { scale: sourcePackage.coordinateScale }
+            : {}),
+          slideId: baselineSlide.id,
+        })
+      }
+      else if (effectsChanged) {
+        issues.push(unsupported(
+          'pptx.writeback.effect-target',
+          `Native advanced effects are not editable on ${beforeElement.type} objects.`,
+          {
+            elementId: afterElement.id,
+            objectId,
+            partPath: source.sourcePart,
+            slideId: baselineSlide.id,
+          },
+        ))
+      }
+      const threeDChanged = changed(beforeElement.threeD, afterElement.threeD)
+      const threeDSupported = new Set(['group', 'image', 'shape', 'text']).has(beforeElement.type)
+      const materializeInheritedThreeD = Boolean(
+        effectsChanged
+        && afterElement.threeD
+        && (source.effectReference?.index ?? 0) > 0
+        && (source.visual?.hasScene3d || source.visual?.hasShape3d),
+      )
+      if (
+        threeDChanged
+        && beforeElement.threeD
+        && !afterElement.threeD
+        && (source.effectReference?.index ?? 0) > 0
+      ) {
+        issues.push(unsupported(
+          'pptx.writeback.three-d-inherited-removal',
+          'Removing theme-inherited 3D would reveal the same theme style. Edit its values or explicitly change the source theme instead.',
+          {
+            elementId: afterElement.id,
+            objectId,
+            partPath: source.sourcePart,
+            slideId: baselineSlide.id,
+          },
+        ))
+      }
+      else if ((threeDChanged || materializeInheritedThreeD) && threeDSupported) {
+        operations.push({
+          ...(afterElement.threeD ? { after: structuredClone(afterElement.threeD) } : {}),
+          ...(beforeElement.threeD ? { before: structuredClone(beforeElement.threeD) } : {}),
+          elementId: afterElement.id,
+          kind: 'three-d',
+          ...(materializeInheritedThreeD ? { materializeInherited: true } : {}),
+          objectId,
+          partPath: source.sourcePart!,
+          ...(sourcePackage?.coordinateScale
+            ? { scale: sourcePackage.coordinateScale }
+            : {}),
+          slideId: baselineSlide.id,
+        })
+      }
+      else if (threeDChanged) {
+        issues.push(unsupported(
+          'pptx.writeback.three-d-target',
+          `Native 3D is not supported on ${beforeElement.type} objects.`,
+          {
+            elementId: afterElement.id,
+            objectId,
+            partPath: source.sourcePart,
+            slideId: baselineSlide.id,
+          },
+        ))
+      }
       if (beforeElement.type === 'line' && afterElement.type === 'line') {
         const beforeConnector = connectorSnapshot(beforeElement)
         const afterConnector = connectorSnapshot(afterElement)
@@ -1242,6 +1464,7 @@ export const analyzePowerPointWriteback = (
           'cubic',
           'curve',
           'end',
+          'effects',
           'points',
           'powerPointGeometry',
           'shadow',
@@ -1264,7 +1487,7 @@ export const analyzePowerPointWriteback = (
         if (shadowChanged) {
           issues.push(unsupported(
             'pptx.writeback.connector-effect',
-            'Connector shadow and effect writeback is not enabled yet.',
+            'Connector outer-shadow writeback is not enabled yet.',
             {
               elementId: afterElement.id,
               objectId,
@@ -1464,12 +1687,14 @@ export const analyzePowerPointWriteback = (
         const supportedImageKeys = new Set([
           'accessibility',
           'clip',
+          'effects',
           'filters',
           'opacity',
           'outline',
           'powerPointImage',
           'shadow',
           'src',
+          'threeD',
         ])
         const unsupportedImageKeys = contentKeys.filter(key => !supportedImageKeys.has(key))
         if (unsupportedImageKeys.length) {
@@ -1502,6 +1727,30 @@ export const analyzePowerPointWriteback = (
           })
         }
         if (hasTransformChange) {
+          operations.push({
+            after: after!,
+            before: before!,
+            elementId: afterElement.id,
+            kind: 'transform',
+            objectId,
+            partPath: source.sourcePart!,
+            slideId: baselineSlide.id,
+          })
+        }
+        continue
+      }
+      if (beforeElement.type === 'latex' && afterElement.type === 'latex') {
+        if (contentKeys.length) {
+          operations.push({
+            after: structuredClone(afterElement),
+            elementId: afterElement.id,
+            kind: 'replace-element',
+            objectId,
+            slideId: baselineSlide.id,
+            targetPart: source.sourcePart!,
+          })
+        }
+        else if (hasTransformChange) {
           operations.push({
             after: after!,
             before: before!,
@@ -1573,6 +1822,8 @@ export const analyzePowerPointWriteback = (
       const hasStyleChange = changed(beforeStyle, afterStyle)
       const supportedKeys = new Set<string>()
       supportedKeys.add('accessibility')
+      if (effectsSupported) supportedKeys.add('effects')
+      if (threeDSupported) supportedKeys.add('threeD')
       if (beforeElement.type === 'text') {
         for (const key of [
           'columnGap',
@@ -1718,7 +1969,15 @@ export const analyzePowerPointWriteback = (
             ]
         : operation.kind === 'chart'
       ? [operation.chartPart, ...(operation.workbookPart ? [operation.workbookPart] : [])]
-      : operation.kind === 'background' || operation.kind === 'notes' || operation.kind === 'comments'
+      : operation.kind === 'comments'
+        ? [
+            operation.partPath,
+            operation.authorsPart,
+            relationshipPartPath(operation.slidePart),
+            relationshipPartPath('ppt/presentation.xml'),
+            '[Content_Types].xml',
+          ]
+      : operation.kind === 'background' || operation.kind === 'notes' || operation.kind === 'theme' || operation.kind === 'timing' || operation.kind === 'transition'
         ? [operation.partPath]
         : operation.kind === 'text' && changed(
             authoredHyperlinks(operation.before.content),

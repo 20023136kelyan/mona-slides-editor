@@ -123,10 +123,16 @@ add source-free editable objects and media from that document's `deck/assets/`,
 replace native image payloads, author image backgrounds, and explicitly edit
 master/layout drawings through `deck/powerpoint/shared-layers.json`. The writer
 resolves exact OOXML identities, transplants generated dependencies, and checks
-the provider revision immediately before write. It still refuses forged source
-metadata, payload-free opaque objects, unsupported slide structure, theme/timing
-authoring, new notes/comment structures, and unsupported advanced effects rather
-than flattening or guessing.
+the provider revision immediately before write. It supports base theme
+colors/fonts, native OMML equations, new speaker-note/comment structures,
+internal/action run links, supported timing/transition presets, and editable flat
+DrawingML effects, including materialization of theme-inherited `effectRef`
+styles while preserving their outer shadow, and topology-preserving edits to
+existing supported `effectDag` nodes. It still refuses forged source metadata,
+payload-free opaque objects and unsupported slide structure. Common native 3D
+camera/light/bevel/extrusion/contour/material values are writable; effect-graph
+topology changes, ambiguous repeated graph nodes, full Office 3D/backdrop semantics, and
+unmapped Office animation/theme semantics rather than flattening or guessing.
 
 ## Observable UI
 

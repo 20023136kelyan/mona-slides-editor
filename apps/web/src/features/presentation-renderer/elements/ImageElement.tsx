@@ -2,6 +2,7 @@ import type { PPTImageElement } from '@mona/presentation-core/model'
 
 import {
   getFlipTransform,
+  getElementEffectsStyle,
   getImageClip,
   getImageFilter,
   getImagePosition,
@@ -41,6 +42,7 @@ function ImageOutline({ element }: { element: PPTImageElement }) {
 export function ImageElement({ element }: { element: PPTImageElement }) {
   const clip = getImageClip(element)
   const shadow = getShadowStyle(element.shadow)
+  const effectsStyle = getElementEffectsStyle(element.effects, element.threeD)
   const flip = getFlipTransform(element.flipH, element.flipV)
 
   return (
@@ -51,7 +53,7 @@ export function ImageElement({ element }: { element: PPTImageElement }) {
       style={{ top: element.top, left: element.left, width: element.width, height: element.height }}
     >
       <div className="mona-rotate-wrapper" style={{ transform: `rotate(${element.rotate}deg)` }}>
-        <div className="mona-image-element-content" style={{ filter: shadow ? `drop-shadow(${shadow})` : '', opacity: element.opacity, transform: flip }}>
+        <div className="mona-image-element-content" style={{ ...effectsStyle, filter: [shadow ? `drop-shadow(${shadow})` : '', effectsStyle.filter || ''].filter(Boolean).join(' '), opacity: element.opacity, transform: [flip, effectsStyle.transform].filter(Boolean).join(' ') }}>
           <ImageOutline element={element} />
           <div className="mona-image-content" style={{ clipPath: clip.style }}>
             <img

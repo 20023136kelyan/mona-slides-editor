@@ -294,8 +294,14 @@ const parseParagraphRuns = (paragraphNode, paragraphIndex, warpObj) => {
   return entries.flatMap(entry => {
     const runValues = attributes(entry.node)
     const runProperties = parseRunProperties(entry.node?.['a:rPr'])
-    const linkId = getTextByPathList(entry.node, ['a:rPr', 'a:hlinkClick', 'attrs', 'r:id'])
-    const hyperlink = linkId && warpObj?.slideResObj?.[linkId]?.target
+    const hyperlinkAttrs = getTextByPathList(entry.node, ['a:rPr', 'a:hlinkClick', 'attrs'])
+    const linkId = hyperlinkAttrs?.['r:id']
+    const linkResource = linkId && warpObj?.slideResObj?.[linkId]
+    const hyperlink = hyperlinkAttrs?.action && hyperlinkAttrs.action !== 'ppaction://hlinksldjump'
+      ? `pptx-action:${hyperlinkAttrs.action}`
+      : linkResource?.type === 'slide' || hyperlinkAttrs?.action === 'ppaction://hlinksldjump'
+        ? (linkResource?.target ? `pptx-slide:${linkResource.target}` : undefined)
+        : linkResource?.target
     const text = textValue(entry.node?.['a:t']) ?? textValue(getTextByPathList(entry.node, ['a:fld', 'a:t']))
     const run = {
       ...(entry.kind === 'field' && runValues.id ? { fieldId: runValues.id } : {}),

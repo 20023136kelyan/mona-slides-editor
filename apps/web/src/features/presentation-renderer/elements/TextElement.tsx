@@ -4,6 +4,7 @@ import type { PPTTextElement } from '@mona/presentation-core/model'
 
 import { ElementOutline } from '@/features/presentation-renderer/elements/ElementOutline'
 import {
+  getElementEffectsStyle,
   getShadowStyle,
   type SlideCSSProperties,
 } from '@/features/presentation-renderer/render-utils'
@@ -31,12 +32,14 @@ const verticalAlignment: Record<NonNullable<PPTTextElement['vAlign']>, CSSProper
 export function TextElement({ editor, element, thumbnail = false }: TextElementProps) {
   const inset = element.inset || [10, 10, 10, 10]
   const shadow = getShadowStyle(element.shadow)
+  const effectsStyle = getElementEffectsStyle(element.effects, element.threeD)
   const fitEnabled = autofitEnabled(element.structuredText?.bodyProperties?.autoFit)
   const { attachContent, attachFrame, scale: fitScale } = useTextAutofit(
     fitEnabled,
     `${element.width}|${element.height}|${element.lineHeight}|${element.content}`,
   )
   const contentStyle: SlideCSSProperties = {
+    ...effectsStyle,
     width: element.vertical && !element.fixedHeight ? 'auto' : `${element.width}px`,
     height: !element.vertical && !element.fixedHeight ? 'auto' : `${element.height}px`,
     backgroundColor: element.fill,

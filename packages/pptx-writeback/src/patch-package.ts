@@ -15,6 +15,7 @@ import type {
   PowerPointCommentsPatch,
   PowerPointElementInsertPatch,
   PowerPointElementReplacePatch,
+  PowerPointEffectsPatch,
   PowerPointImagePatch,
   PowerPointNotesPatch,
   PowerPointObjectInsertPatch,
@@ -24,6 +25,10 @@ import type {
   PowerPointShapeGeometryPatch,
   PowerPointTablePatch,
   PowerPointTextPatch,
+  PowerPointThemePatch,
+  PowerPointThreeDPatch,
+  PowerPointTimingPatch,
+  PowerPointTransitionPatch,
   PowerPointTransformPatch,
   PowerPointWritebackIssue,
   PowerPointAssetResolver,
@@ -39,11 +44,13 @@ import { patchNativeChart } from './chart-writeback'
 import {
   generateElementDonorPackage,
   generatedElementMarker,
+  generateNotesDonorPackage,
 } from './generated-object'
+import { latexToOmml } from './native-math'
 
 type OrderedXmlNode = Record<string, unknown>
 type PowerPointObjectPatchOperation = Exclude<PowerPointPatchOperation, {
-  kind: 'background' | 'comments' | 'inherited-visibility' | 'insert-element' | 'insert-object' | 'insert-slide' | 'notes' | 'replace-element'
+  kind: 'background' | 'comments' | 'inherited-visibility' | 'insert-element' | 'insert-object' | 'insert-slide' | 'notes' | 'replace-element' | 'theme' | 'timing' | 'transition'
 }>
 
 interface ConnectorCoordinateContext {
@@ -65,6 +72,7 @@ interface HyperlinkRelationshipEditor {
 }
 
 const drawingObjectTags = new Set([
+  'AlternateContent',
   'contentPart',
   'cxnSp',
   'graphicFrame',
@@ -279,6 +287,29 @@ const relationshipIdsInTree = (nodes: readonly OrderedXmlNode[]): Set<string> =>
   return ids
 }
 
+const rewriteHyperlinkReference = (
+  nodes: readonly OrderedXmlNode[],
+  relationshipId: string,
+  action: string,
+  keepRelationship: boolean,
+): void => {
+  const visit = (current: readonly OrderedXmlNode[]): void => {
+    for (const node of current) {
+      for (const [tag, children] of nodeEntries(node)) {
+        if (localName(tag) === 'hlinkClick') {
+          const attributes = nodeAttributes(node)
+          if (attributes['r:id'] === relationshipId) {
+            attributes.action = action
+            if (!keepRelationship) delete attributes['r:id']
+          }
+        }
+        visit(children)
+      }
+    }
+  }
+  visit(nodes)
+}
+
 const replaceRelationshipIds = (
   nodes: readonly OrderedXmlNode[],
   replacements: ReadonlyMap<string, string>,
@@ -465,7 +496,9 @@ const allocateDrawingIds = (
           const allocated = String(nextId++)
           if (previous && !replacements.has(previous)) replacements.set(previous, allocated)
           attributes.id = allocated
-          if (attributes.name) attributes.name = `${attributes.name} Copy`
+          if (attributes.name && !attributes.name.startsWith('mona-generated:')) {
+            attributes.name = `${attributes.name} Copy`
+          }
         }
         visit(children)
       }
@@ -555,6 +588,69 @@ const cloneContentTypeOverride = async (
     zip.file(path, xmlBuilder.build(nodes) as string)
   }
   return []
+}
+
+const ensureContentTypeOverride = async (
+  zip: JSZip,
+  partPath: string,
+  contentType: string,
+): Promise<PowerPointWritebackIssue[]> => {
+  const manifestPath = '[Content_Types].xml'
+  const entry = zip.file(manifestPath)
+  if (!entry) return [{
+    code: 'pptx.writeback.content-types-missing',
+    message: 'The package has no content-types manifest.',
+    partPath: manifestPath,
+  }]
+  const nodes = parseXml(await entry.async('text'), manifestPath)
+  const types = findNode(nodes, 'Types')
+  if (!types) return [{
+    code: 'pptx.writeback.content-types-invalid',
+    message: 'The package content-types manifest has no Types root.',
+    partPath: manifestPath,
+  }]
+  const children = ownChildren(types)
+  const partName = `/${partPath}`
+  const existing = directNodes(children, 'Override').find(node => (
+    nodeAttributes(node).PartName === partName
+  ))
+  if (existing) nodeAttributes(existing).ContentType = contentType
+  else children.push(xmlNode('Override', [], { ContentType: contentType, PartName: partName }))
+  zip.file(manifestPath, xmlBuilder.build(nodes) as string)
+  return []
+}
+
+const ensureInternalRelationship = async (
+  zip: JSZip,
+  ownerPart: string,
+  type: string,
+  targetPart: string,
+): Promise<string> => {
+  const relationshipPath = relationshipPartPath(ownerPart)
+  const entry = zip.file(relationshipPath)
+  const relationships = relationshipDocument(
+    entry ? await entry.async('text') : undefined,
+    ownerPart,
+  )
+  for (const [id, relationship] of relationships.byId) {
+    const attributes = nodeAttributes(relationship)
+    if (
+      attributes.Type === type
+      && attributes.TargetMode !== 'External'
+      && attributes.Target
+      && internalRelationshipTarget(ownerPart, attributes.Target) === targetPart
+    ) return id
+  }
+  const id = nextRelationshipId(relationships)
+  const relationship = xmlNode('Relationship', [], {
+    Id: id,
+    Target: relativeRelationshipTarget(ownerPart, targetPart),
+    Type: type,
+  })
+  relationships.children.push(relationship)
+  relationships.byId.set(id, relationship)
+  zip.file(relationshipPath, serializeRelationshipDocument(relationships))
+  return id
 }
 
 const copyDonorContentType = async (
@@ -1104,19 +1200,63 @@ const createHyperlinkRelationshipEditor = (
         }
         return undefined
       }
-      if (!/^(?:https?:|mailto:|tel:)/i.test(target)) {
+      const internalSlide = target.startsWith('pptx-slide:')
+        ? target.slice('pptx-slide:'.length)
+        : undefined
+      const actionAliases: Record<string, string> = {
+        end: 'ppaction://hlinkshowjump?jump=endshow',
+        first: 'ppaction://hlinkshowjump?jump=firstslide',
+        last: 'ppaction://hlinkshowjump?jump=lastslide',
+        next: 'ppaction://hlinkshowjump?jump=nextslide',
+        previous: 'ppaction://hlinkshowjump?jump=previousslide',
+      }
+      const actionValue = target.startsWith('pptx-action:')
+        ? target.slice('pptx-action:'.length)
+        : undefined
+      const action = actionValue ? actionAliases[actionValue] ?? actionValue : undefined
+      const external = /^(?:https?:|mailto:|tel:)/i.test(target)
+      if (!external && !internalSlide && !action) {
         return {
           code: 'pptx.writeback.hyperlink-target',
           elementId: operation.elementId,
-          message: 'Only external web, email, and telephone run hyperlinks can be changed safely in this writeback slice.',
+          message: 'A run link must be an external URL, pptx-slide:<part>, or pptx-action:<action>.',
           objectId: operation.objectId,
           partPath: operation.partPath,
           slideId: operation.slideId,
         }
       }
-      if (relationshipId) {
-        const relationship = byId.get(relationshipId)
-        if (!relationship) {
+      if (internalSlide && !/^ppt\/slides\/slide\d+\.xml$/i.test(internalSlide)) {
+        return {
+          code: 'pptx.writeback.hyperlink-slide-target',
+          elementId: operation.elementId,
+          message: 'The internal link does not resolve to a retained PowerPoint slide part.',
+          objectId: operation.objectId,
+          partPath: operation.partPath,
+          slideId: operation.slideId,
+        }
+      }
+      if (action && !/^ppaction:\/\/[a-z0-9/?=&._-]+$/i.test(action)) {
+        return {
+          code: 'pptx.writeback.hyperlink-action',
+          elementId: operation.elementId,
+          message: 'The PowerPoint action URI is invalid.',
+          objectId: operation.objectId,
+          partPath: operation.partPath,
+          slideId: operation.slideId,
+        }
+      }
+      const hyperlinkNode = hyperlink ?? xmlNode('a:hlinkClick')
+      if (!hyperlink) insertBeforeHyperlinks(propertyChildren, hyperlinkNode)
+      const hyperlinkAttributes = nodeAttributes(hyperlinkNode)
+      if (action) {
+        delete hyperlinkAttributes['r:id']
+        hyperlinkAttributes.action = action
+        editor.dirty = true
+        return undefined
+      }
+      delete hyperlinkAttributes.action
+      let relationship = relationshipId ? byId.get(relationshipId) : undefined
+      if (relationshipId && !relationship) {
           return {
             code: 'pptx.writeback.hyperlink-relationship',
             elementId: operation.elementId,
@@ -1125,35 +1265,28 @@ const createHyperlinkRelationshipEditor = (
             partPath: operation.partPath,
             slideId: operation.slideId,
           }
-        }
-        const attributes = nodeAttributes(relationship)
-        if (!/\/hyperlink$/i.test(attributes.Type ?? '')) {
-          return {
-            code: 'pptx.writeback.hyperlink-relationship',
-            elementId: operation.elementId,
-            message: `Relationship ${relationshipId} is not a native PowerPoint hyperlink.`,
-            objectId: operation.objectId,
-            partPath: operation.partPath,
-            slideId: operation.slideId,
-          }
-        }
+      }
+      if (!relationship) {
+        let numericId = 1
+        while (byId.has(`rId${numericId}`)) numericId += 1
+        const id = `rId${numericId}`
+        relationship = xmlNode('Relationship', [], { Id: id })
+        relationships.push(relationship)
+        byId.set(id, relationship)
+        hyperlinkAttributes['r:id'] = id
+      }
+      const attributes = nodeAttributes(relationship)
+      if (internalSlide) {
+        attributes.Target = relativeRelationshipTarget(partPath, internalSlide)
+        delete attributes.TargetMode
+        attributes.Type = SLIDE_RELATIONSHIP
+        hyperlinkAttributes.action = 'ppaction://hlinksldjump'
+      }
+      else {
         attributes.Target = target
         attributes.TargetMode = 'External'
-        editor.dirty = true
-        return undefined
+        attributes.Type = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink'
       }
-      let numericId = 1
-      while (byId.has(`rId${numericId}`)) numericId += 1
-      const id = `rId${numericId}`
-      const relationship = xmlNode('Relationship', [], {
-        Id: id,
-        Target: target,
-        TargetMode: 'External',
-        Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
-      })
-      relationships.push(relationship)
-      byId.set(id, relationship)
-      insertBeforeHyperlinks(propertyChildren, xmlNode('a:hlinkClick', [], { 'r:id': id }))
       editor.dirty = true
       return undefined
     },
@@ -1207,6 +1340,98 @@ const findNotesTextBody = (
     }
   }
   return undefined
+}
+
+const NOTES_MASTER_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster'
+const NOTES_SLIDE_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide'
+const SLIDE_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide'
+const THEME_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme'
+
+const ensureNotesMaster = async (
+  zip: JSZip,
+  manifest: PowerPointPackageManifest,
+  donor: JSZip,
+): Promise<{ issues: PowerPointWritebackIssue[]; partPath?: string }> => {
+  const existing = Object.keys(zip.files).find(path => /^ppt\/notesMasters\/notesMaster\d+\.xml$/i.test(path))
+  if (existing) return { issues: [], partPath: existing }
+  const donorEntry = donor.file('ppt/notesMasters/notesMaster1.xml')
+  if (!donorEntry) return { issues: [{
+    code: 'pptx.writeback.notes-master-donor',
+    message: 'The canonical notes donor has no notes master.',
+    partPath: 'ppt/notesMasters/notesMaster1.xml',
+  }] }
+  const partPath = allocateSiblingPart(zip, 'ppt/notesMasters/notesMaster1.xml')
+  zip.file(partPath, await donorEntry.async('uint8array'))
+  const issues = await ensureContentTypeOverride(
+    zip,
+    partPath,
+    'application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml',
+  )
+  const themePart = manifest.parts.find(part => part.kind === 'theme' && !/themeOverride/i.test(part.path))?.path
+  if (themePart) await ensureInternalRelationship(zip, partPath, THEME_RELATIONSHIP, themePart)
+  const presentationPart = 'ppt/presentation.xml'
+  const presentationEntry = zip.file(presentationPart)
+  if (!presentationEntry) return { issues: [...issues, {
+    code: 'pptx.writeback.presentation-part-missing',
+    message: 'The package has no presentation part for registering the notes master.',
+    partPath: presentationPart,
+  }] }
+  const relationshipId = await ensureInternalRelationship(
+    zip,
+    presentationPart,
+    NOTES_MASTER_RELATIONSHIP,
+    partPath,
+  )
+  const presentationNodes = parseXml(await presentationEntry.async('text'), presentationPart)
+  const presentation = findNode(presentationNodes, 'presentation')
+  if (!presentation) return { issues: [...issues, {
+    code: 'pptx.writeback.presentation-root-missing',
+    message: 'The package presentation part has no presentation root.',
+    partPath: presentationPart,
+  }] }
+  const children = ownChildren(presentation)
+  const list = ensureDirectNode(
+    children,
+    'notesMasterIdLst',
+    'p:notesMasterIdLst',
+    Math.max(0, children.findIndex(node => localName(nodeTag(node) ?? '') === 'sldIdLst')),
+  )
+  const listChildren = ownChildren(list)
+  if (!listChildren.some(node => nodeAttributes(node)['r:id'] === relationshipId)) {
+    listChildren.push(xmlNode('p:notesMasterId', [], { 'r:id': relationshipId }))
+  }
+  zip.file(presentationPart, xmlBuilder.build(presentationNodes) as string)
+  return { issues, partPath }
+}
+
+const createNotesPart = async (
+  zip: JSZip,
+  manifest: PowerPointPackageManifest,
+  operation: PowerPointNotesPatch,
+): Promise<PowerPointWritebackIssue[]> => {
+  const donor = await JSZip.loadAsync(await generateNotesDonorPackage(operation.after))
+  const notesEntry = donor.file('ppt/notesSlides/notesSlide1.xml')
+  if (!notesEntry) return [{
+    code: 'pptx.writeback.notes-slide-donor',
+    message: 'The canonical notes donor has no notes slide.',
+    partPath: operation.notesPart,
+    slideId: operation.slideId,
+  }]
+  const master = await ensureNotesMaster(zip, manifest, donor)
+  if (!master.partPath || master.issues.length) return master.issues.map(issue => ({
+    ...issue,
+    slideId: operation.slideId,
+  }))
+  zip.file(operation.notesPart, await notesEntry.async('uint8array'))
+  const issues = await ensureContentTypeOverride(
+    zip,
+    operation.notesPart,
+    'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
+  )
+  await ensureInternalRelationship(zip, operation.notesPart, NOTES_MASTER_RELATIONSHIP, master.partPath)
+  await ensureInternalRelationship(zip, operation.notesPart, SLIDE_RELATIONSHIP, operation.slidePart)
+  await ensureInternalRelationship(zip, operation.slidePart, NOTES_SLIDE_RELATIONSHIP, operation.notesPart)
+  return issues
 }
 
 const patchNotesPart = (
@@ -1287,55 +1512,164 @@ const patchNotesPart = (
       }
 }
 
-const patchCommentsPart = (
-  xml: string,
-  operation: PowerPointCommentsPatch,
-): { issues: PowerPointWritebackIssue[]; xml: string } => {
-  const nodes = parseXml(xml, operation.partPath)
-  const pending = new Map(operation.changes.map(change => [change.id, change]))
-  const visit = (current: readonly OrderedXmlNode[]): void => {
-    for (const node of current) {
-      for (const [tag, children] of nodeEntries(node)) {
-        if (localName(tag) === 'cm') {
-          const attributes = nodeAttributes(node)
-          const id = attributes.idx ?? attributes.id
-          const change = id ? pending.get(id) : undefined
-          if (change) {
-            const textNode = findNode(children, 'text')
-            if (textNode) {
-              const textChildren = ownChildren(textNode)
-              const value = textChildren.find(child => '#text' in child)
-              if (value) value['#text'] = escapeXmlText(change.after)
-              else textChildren.push({ '#text': escapeXmlText(change.after) })
-              pending.delete(id!)
-            }
-          }
-        }
-        visit(children)
-      }
+const COMMENTS_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments'
+const COMMENT_AUTHORS_RELATIONSHIP = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors'
+const COMMENT_THREADING_EXTENSION = '{C676402C-5697-4E1C-873F-D02D1690AC5C}'
+
+const removeInternalRelationship = async (
+  zip: JSZip,
+  ownerPart: string,
+  targetPart: string,
+): Promise<void> => {
+  const path = relationshipPartPath(ownerPart)
+  const entry = zip.file(path)
+  if (!entry) return
+  const relationships = relationshipDocument(await entry.async('text'), ownerPart)
+  for (let index = relationships.children.length - 1; index >= 0; index -= 1) {
+    const relationship = relationships.children[index]!
+    const attributes = nodeAttributes(relationship)
+    if (
+      attributes.TargetMode !== 'External'
+      && attributes.Target
+      && internalRelationshipTarget(ownerPart, attributes.Target) === targetPart
+    ) {
+      relationships.children.splice(index, 1)
+      if (attributes.Id) relationships.byId.delete(attributes.Id)
     }
   }
-  visit(nodes)
-  const issues: PowerPointWritebackIssue[] = [...pending.values()].map(change => ({
-    code: 'pptx.writeback.comment-missing',
-    message: `The retained comments part no longer contains comment ${change.id}.`,
-    partPath: operation.partPath,
-    slideId: operation.slideId,
-  }))
-  if (issues.length) return { issues, xml }
-  const patchedXml = xmlBuilder.build(nodes) as string
-  const validation = XMLValidator.validate(patchedXml, { allowBooleanAttributes: false })
-  return validation === true
-    ? { issues: [], xml: patchedXml }
-    : {
-        issues: [{
-          code: 'pptx.writeback.invalid-comments-output',
-          message: `Comment writeback produced invalid XML: ${validation.err.msg}`,
-          partPath: operation.partPath,
-          slideId: operation.slideId,
-        }],
-        xml,
+  zip.file(path, serializeRelationshipDocument(relationships))
+}
+
+const removeContentTypeOverride = async (zip: JSZip, partPath: string): Promise<void> => {
+  const path = '[Content_Types].xml'
+  const entry = zip.file(path)
+  if (!entry) return
+  const nodes = parseXml(await entry.async('text'), path)
+  const types = findNode(nodes, 'Types')
+  if (!types) return
+  const children = ownChildren(types)
+  for (let index = children.length - 1; index >= 0; index -= 1) {
+    if (
+      localName(nodeTag(children[index]!) ?? '') === 'Override'
+      && nodeAttributes(children[index]!).PartName === `/${partPath}`
+    ) children.splice(index, 1)
+  }
+  zip.file(path, xmlBuilder.build(nodes) as string)
+}
+
+const commentInitials = (name: string): string => name
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean)
+  .slice(0, 2)
+  .map(part => part[0]!.toUpperCase())
+  .join('') || 'M'
+
+const commentDate = (time: number): string => (
+  new Date(Number.isFinite(time) && time > 0 ? time : 0).toISOString()
+)
+
+const patchCommentsStructure = async (
+  zip: JSZip,
+  operation: PowerPointCommentsPatch,
+): Promise<PowerPointWritebackIssue[]> => {
+  for (const removedPart of operation.removePartPaths ?? []) {
+    await removeInternalRelationship(zip, operation.slidePart, removedPart)
+    await removeContentTypeOverride(zip, removedPart)
+    zip.remove(removedPart)
+    zip.remove(relationshipPartPath(removedPart))
+  }
+  if (!operation.comments.length) {
+    await removeInternalRelationship(zip, operation.slidePart, operation.partPath)
+    await removeContentTypeOverride(zip, operation.partPath)
+    zip.remove(operation.partPath)
+    zip.remove(relationshipPartPath(operation.partPath))
+  }
+  else {
+    const authorsByName = new Map(operation.authors.map((author, index) => [author, String(index)]))
+    const byKey = new Map(operation.comments.map(comment => [comment.key, comment]))
+    const commentNodes = operation.comments.map(comment => {
+      const authorId = authorsByName.get(comment.user) ?? '0'
+      const children: OrderedXmlNode[] = [
+        xmlNode('p:pos', [], {
+          x: String(Math.round(comment.position?.x ?? 0)),
+          y: String(Math.round(comment.position?.y ?? 0)),
+        }),
+        xmlNode('p:text', [{ '#text': escapeXmlText(comment.content) }]),
+      ]
+      const parent = comment.parentKey ? byKey.get(comment.parentKey) : undefined
+      if (parent) {
+        children.push(xmlNode('p:extLst', [
+          xmlNode('p:ext', [
+            xmlNode('p15:threadingInfo', [
+              xmlNode('p15:parentCm', [], {
+                authorId: authorsByName.get(parent.user) ?? '0',
+                idx: String(parent.index),
+              }),
+            ], {
+              'xmlns:p15': 'http://schemas.microsoft.com/office/powerpoint/2012/main',
+              timeZoneBias: '0',
+            }),
+          ], { uri: COMMENT_THREADING_EXTENSION }),
+        ]))
       }
+      return xmlNode('p:cm', children, {
+        authorId,
+        dt: commentDate(comment.time),
+        idx: String(comment.index),
+      })
+    })
+    const commentsXml = xmlBuilder.build([
+      xmlNode('p:cmLst', commentNodes, {
+        'xmlns:p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
+      }),
+    ]) as string
+    const validation = XMLValidator.validate(commentsXml, { allowBooleanAttributes: false })
+    if (validation !== true) return [{
+      code: 'pptx.writeback.invalid-comments-output',
+      message: `Comment structure authoring produced invalid XML: ${validation.err.msg}`,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }]
+    zip.file(operation.partPath, commentsXml)
+    await ensureContentTypeOverride(
+      zip,
+      operation.partPath,
+      'application/vnd.openxmlformats-officedocument.presentationml.comments+xml',
+    )
+    await ensureInternalRelationship(zip, operation.slidePart, COMMENTS_RELATIONSHIP, operation.partPath)
+  }
+
+  if (operation.authors.length) {
+    const maxIndexByAuthor = new Map<string, number>()
+    for (const comment of operation.comments) {
+      maxIndexByAuthor.set(comment.user, Math.max(maxIndexByAuthor.get(comment.user) ?? 0, comment.index))
+    }
+    const authorXml = xmlBuilder.build([
+      xmlNode('p:cmAuthorLst', operation.authors.map((author, index) => (
+        xmlNode('p:cmAuthor', [], {
+          clrIdx: String(index),
+          id: String(index),
+          initials: commentInitials(author),
+          lastIdx: String(maxIndexByAuthor.get(author) ?? 0),
+          name: author,
+        })
+      )), { 'xmlns:p': 'http://schemas.openxmlformats.org/presentationml/2006/main' }),
+    ]) as string
+    zip.file(operation.authorsPart, authorXml)
+    await ensureContentTypeOverride(
+      zip,
+      operation.authorsPart,
+      'application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml',
+    )
+    await ensureInternalRelationship(
+      zip,
+      'ppt/presentation.xml',
+      COMMENT_AUTHORS_RELATIONSHIP,
+      operation.authorsPart,
+    )
+  }
+  return []
 }
 
 const backgroundFillNode = (
@@ -1498,6 +1832,265 @@ const normalizeColor = (value: string | undefined): string | undefined => {
   return rgb.slice(1, 4).map(entry => (
     Math.max(0, Math.min(255, Math.round(Number(entry)))).toString(16).padStart(2, '0')
   )).join('').toUpperCase()
+}
+
+const patchThemePart = (
+  xml: string,
+  operation: PowerPointThemePatch,
+): { issues: PowerPointWritebackIssue[]; xml: string } => {
+  const nodes = parseXml(xml, operation.partPath)
+  const colorScheme = findNode(nodes, 'clrScheme')
+  const fontScheme = findNode(nodes, 'fontScheme')
+  if (!colorScheme || !fontScheme) {
+    return {
+      issues: [{
+        code: 'pptx.writeback.theme-structure',
+        message: 'The retained theme is missing its color or font scheme.',
+        partPath: operation.partPath,
+      }],
+      xml,
+    }
+  }
+  const colors = new Map<string, string | undefined>([
+    ['dk1', normalizeColor(operation.after.fontColor)],
+    ['lt1', normalizeColor(operation.after.backgroundColor)],
+    ...operation.after.themeColors.slice(0, 6).map((color, index) => (
+      [`accent${index + 1}`, normalizeColor(color)] as [string, string | undefined]
+    )),
+  ])
+  for (const [slot, color] of colors) {
+    if (!color) continue
+    const slotNode = directNode(ownChildren(colorScheme), slot)
+    if (!slotNode) continue
+    const children = ownChildren(slotNode)
+    children.splice(0, children.length, xmlNode('a:srgbClr', [], { val: color }))
+  }
+  const fontName = normalizeFontFamily(operation.after.fontName)
+  if (fontName) {
+    for (const family of ['majorFont', 'minorFont']) {
+      const familyNode = findNode(ownChildren(fontScheme), family)
+      const latin = familyNode ? directNode(ownChildren(familyNode), 'latin') : undefined
+      if (latin) nodeAttributes(latin).typeface = fontName
+    }
+  }
+  const output = xmlBuilder.build(nodes) as string
+  const validation = XMLValidator.validate(output, { allowBooleanAttributes: false })
+  return validation === true
+    ? { issues: [], xml: output }
+    : {
+        issues: [{
+          code: 'pptx.writeback.invalid-theme-output',
+          message: `Theme authoring produced invalid XML: ${validation.err.msg}`,
+          partPath: operation.partPath,
+        }],
+        xml,
+      }
+}
+
+const timingPreset = (
+  animation: PowerPointTimingPatch['after'][number],
+): { filter: string; presetClass: string; presetId: string } => {
+  const presetClass = animation.type === 'in' ? 'entr' : animation.type === 'out' ? 'exit' : 'emph'
+  const effect = animation.effect.toLowerCase()
+  if (animation.type === 'attention') {
+    return { filter: effect.includes('swing') ? 'spin' : 'pulse', presetClass, presetId: effect.includes('swing') ? '8' : '6' }
+  }
+  if (effect.includes('zoom')) return { filter: 'zoom', presetClass, presetId: '23' }
+  if (effect.includes('rotate')) return { filter: 'wheel(1)', presetClass, presetId: '19' }
+  if (effect.includes('slide') || effect.includes('light') || effect.includes('back')) {
+    const direction = effect.includes('right')
+      ? 'right'
+      : effect.includes('up')
+        ? 'up'
+        : effect.includes('down')
+          ? 'down'
+          : 'left'
+    return { filter: `wipe(${direction})`, presetClass, presetId: '2' }
+  }
+  return { filter: 'fade', presetClass, presetId: '10' }
+}
+
+const generatedNativeShapeId = (
+  nodes: readonly OrderedXmlNode[],
+  elementId: string,
+): string | undefined => {
+  const marker = generatedElementMarker(elementId)
+  let result: string | undefined
+  const visit = (current: readonly OrderedXmlNode[]): void => {
+    for (const node of current) {
+      for (const [tag, children] of nodeEntries(node)) {
+        if (localName(tag) === 'cNvPr') {
+          const attributes = nodeAttributes(node)
+          if (attributes.name === marker || attributes.title === marker) result = attributes.id
+        }
+        if (!result) visit(children)
+      }
+      if (result) return
+    }
+  }
+  visit(nodes)
+  return result
+}
+
+const patchTimingPart = (
+  xml: string,
+  operation: PowerPointTimingPatch,
+): { issues: PowerPointWritebackIssue[]; xml: string } => {
+  const nodes = parseXml(xml, operation.partPath)
+  const slide = findNode(nodes, 'sld')
+  if (!slide) return { issues: [{
+    code: 'pptx.writeback.timing-slide-root',
+    message: 'The target slide has no root for animation timing.',
+    partPath: operation.partPath,
+    slideId: operation.slideId,
+  }], xml }
+  const children = ownChildren(slide)
+  removeDirectNodes(children, new Set(['timing']))
+  if (!operation.after.length) return { issues: [], xml: xmlBuilder.build(nodes) as string }
+  const issues: PowerPointWritebackIssue[] = []
+  let nextId = 1
+  const effectNodes = operation.after.flatMap(animation => {
+    const targetReference = operation.targets[animation.elId]
+    const targetShapeId = targetReference?.startsWith('generated:')
+      ? generatedNativeShapeId(nodes, targetReference.slice('generated:'.length))
+      : targetReference
+    if (!targetShapeId) {
+      issues.push({
+        code: 'pptx.writeback.animation-target',
+        elementId: animation.elId,
+        message: 'The animation target has no allocated native PowerPoint shape ID.',
+        partPath: operation.partPath,
+        slideId: operation.slideId,
+      })
+      return []
+    }
+    const preset = timingPreset(animation)
+    const effectId = String(nextId++)
+    const behaviorId = String(nextId++)
+    return [xmlNode('p:par', [
+      xmlNode('p:cTn', [
+        xmlNode('p:stCondLst', [xmlNode('p:cond', [], {
+          delay: '0',
+        })]),
+        xmlNode('p:childTnLst', [
+          xmlNode('p:animEffect', [
+            xmlNode('p:cBhvr', [
+              xmlNode('p:cTn', [], {
+                dur: String(Math.max(1, Math.round(animation.duration))),
+                fill: 'hold',
+                id: behaviorId,
+              }),
+              xmlNode('p:tgtEl', [xmlNode('p:spTgt', [], { spid: targetShapeId })]),
+            ]),
+          ], {
+            filter: preset.filter,
+            transition: animation.type === 'out' ? 'out' : 'in',
+          }),
+        ]),
+      ], {
+        fill: 'hold',
+        id: effectId,
+        nodeType: animation.trigger === 'meantime'
+          ? 'withEffect'
+          : animation.trigger === 'auto'
+            ? 'afterEffect'
+            : 'clickEffect',
+        presetClass: preset.presetClass,
+        presetID: preset.presetId,
+        presetSubtype: '0',
+      }),
+    ])]
+  })
+  if (issues.length) return { issues, xml }
+  const rootId = String(nextId++)
+  const sequenceId = String(nextId++)
+  const timing = xmlNode('p:timing', [
+    xmlNode('p:tnLst', [
+      xmlNode('p:par', [
+        xmlNode('p:cTn', [
+          xmlNode('p:childTnLst', [
+            xmlNode('p:seq', [
+              xmlNode('p:cTn', [xmlNode('p:childTnLst', effectNodes)], {
+                dur: 'indefinite',
+                id: sequenceId,
+                nodeType: 'mainSeq',
+              }),
+            ], { concurrent: '1', nextAc: 'seek' }),
+          ]),
+        ], { dur: 'indefinite', id: rootId, nodeType: 'tmRoot', restart: 'never' }),
+      ]),
+    ]),
+    xmlNode('p:bldLst', [...new Set(Object.values(operation.targets))].flatMap(target => {
+      const targetShapeId = target.startsWith('generated:')
+        ? generatedNativeShapeId(nodes, target.slice('generated:'.length))
+        : target
+      return targetShapeId
+        ? [xmlNode('p:bldP', [], { build: 'all', grpId: '0', spid: targetShapeId })]
+        : []
+    })),
+  ])
+  const extensionIndex = children.findIndex(node => localName(nodeTag(node) ?? '') === 'extLst')
+  children.splice(extensionIndex < 0 ? children.length : extensionIndex, 0, timing)
+  const output = xmlBuilder.build(nodes) as string
+  const validation = XMLValidator.validate(output, { allowBooleanAttributes: false })
+  return validation === true ? { issues: [], xml: output } : {
+    issues: [{
+      code: 'pptx.writeback.invalid-timing-output',
+      message: `Animation timing authoring produced invalid XML: ${validation.err.msg}`,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }],
+    xml,
+  }
+}
+
+const patchTransitionPart = (
+  xml: string,
+  operation: PowerPointTransitionPatch,
+): { issues: PowerPointWritebackIssue[]; xml: string } => {
+  const nodes = parseXml(xml, operation.partPath)
+  const slide = findNode(nodes, 'sld')
+  if (!slide) return { issues: [{
+    code: 'pptx.writeback.transition-slide-root',
+    message: 'The target slide has no root for transition authoring.',
+    partPath: operation.partPath,
+    slideId: operation.slideId,
+  }], xml }
+  const children = ownChildren(slide)
+  let transition = directNode(children, 'transition')
+  if (operation.after.turningMode === 'no' && operation.after.durationMs === undefined) {
+    removeDirectNodes(children, new Set(['transition']))
+    return { issues: [], xml: xmlBuilder.build(nodes) as string }
+  }
+  transition ??= xmlNode('p:transition')
+  if (!children.includes(transition)) {
+    const timingIndex = children.findIndex(node => localName(nodeTag(node) ?? '') === 'timing')
+    children.splice(timingIndex < 0 ? children.length : timingIndex, 0, transition)
+  }
+  const attributes = nodeAttributes(transition)
+  if (operation.after.durationMs !== undefined) {
+    attributes.advTm = String(Math.max(0, Math.round(operation.after.durationMs)))
+    attributes.advClick = '0'
+  }
+  else {
+    delete attributes.advTm
+    delete attributes.advClick
+  }
+  const transitionChildren = ownChildren(transition)
+  const preserved = transitionChildren.filter(node => ['extLst', 'sndAc'].includes(
+    localName(nodeTag(node) ?? ''),
+  ))
+  const effect = operation.after.turningMode === 'fade'
+    ? xmlNode('p:fade')
+    : operation.after.turningMode === 'slideX'
+      ? xmlNode('p:push', [], { dir: 'l' })
+      : operation.after.turningMode === 'slideY'
+        ? xmlNode('p:push', [], { dir: 'u' })
+        : operation.after.turningMode === 'random'
+          ? xmlNode('p:random')
+          : undefined
+  transitionChildren.splice(0, transitionChildren.length, ...(effect ? [effect] : []), ...preserved)
+  return { issues: [], xml: xmlBuilder.build(nodes) as string }
 }
 
 const styleValue = (style: AuthoredTextStyle, property: string): string | undefined => (
@@ -2572,6 +3165,334 @@ const patchImageShadow = (
   return []
 }
 
+const effectColorNode = (color: string, opacity: number): OrderedXmlNode => {
+  const alpha = Math.max(0, Math.min(100_000, Math.round(opacity * 100_000)))
+  return xmlNode('a:srgbClr', alpha < 100_000
+    ? [xmlNode('a:alpha', [], { val: String(alpha) })]
+    : [], { val: normalizeColor(color) ?? '000000' })
+}
+
+const cssColorOpacity = (color: string): number => {
+  const hexAlpha = color.trim().match(/^#[0-9a-f]{6}([0-9a-f]{2})$/i)?.[1]
+  if (hexAlpha) return Number.parseInt(hexAlpha, 16) / 255
+  const rgbaAlpha = color.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)$/i)?.[1]
+  const parsed = rgbaAlpha === undefined ? 1 : Number(rgbaAlpha)
+  return Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 1
+}
+
+const editableEffectNodes = (
+  effects: PowerPointEffectsPatch['after'],
+  scale: number,
+  outerShadow?: PowerPointEffectsPatch['afterOuterShadow'],
+): OrderedXmlNode[] => {
+  const nodes: OrderedXmlNode[] = []
+  if (effects?.glow) {
+    nodes.push(xmlNode('a:glow', [
+      effectColorNode(effects.glow.color, effects.glow.opacity),
+    ], { rad: String(Math.max(0, Math.round(effects.glow.radius / scale * 12_700))) }))
+  }
+  if (effects?.innerShadow) {
+    const shadow = effects.innerShadow
+    const distance = Math.hypot(shadow.h, shadow.v)
+    const direction = ((Math.atan2(shadow.v, shadow.h) * 180 / Math.PI) + 360) % 360
+    nodes.push(xmlNode('a:innerShdw', [
+      effectColorNode(shadow.color, shadow.opacity),
+    ], {
+      blurRad: String(Math.max(0, Math.round(shadow.blur / scale * 12_700))),
+      dir: String(Math.round(direction * 60_000)),
+      dist: String(Math.max(0, Math.round(distance / scale * 12_700))),
+    }))
+  }
+  if (outerShadow) {
+    const distance = Math.hypot(outerShadow.h, outerShadow.v)
+    const direction = ((Math.atan2(outerShadow.v, outerShadow.h) * 180 / Math.PI) + 360) % 360
+    nodes.push(xmlNode('a:outerShdw', [
+      effectColorNode(outerShadow.color, cssColorOpacity(outerShadow.color)),
+    ], {
+      blurRad: String(Math.max(0, Math.round(outerShadow.blur / scale * 12_700))),
+      dir: String(Math.round(direction * 60_000)),
+      dist: String(Math.max(0, Math.round(distance / scale * 12_700))),
+      rotWithShape: '0',
+    }))
+  }
+  if (effects?.reflection) {
+    const reflection = effects.reflection
+    nodes.push(xmlNode('a:reflection', [], {
+      blurRad: String(Math.max(0, Math.round(reflection.blur / scale * 12_700))),
+      dir: String(Math.round(reflection.direction * 60_000)),
+      dist: String(Math.max(0, Math.round(reflection.distance / scale * 12_700))),
+      endA: '0',
+      endPos: '100000',
+      stA: String(Math.max(0, Math.min(100_000, Math.round(reflection.opacity * 100_000)))),
+      stPos: '0',
+      sy: String(Math.round(reflection.scaleY * 100_000)),
+    }))
+  }
+  if (effects?.softEdge) {
+    nodes.push(xmlNode('a:softEdge', [], {
+      rad: String(Math.max(0, Math.round(effects.softEdge.radius / scale * 12_700))),
+    }))
+  }
+  return nodes
+}
+
+const nestedNodes = (
+  nodes: readonly OrderedXmlNode[],
+  expected: string,
+): OrderedXmlNode[] => nodes.flatMap(node => nodeEntries(node).flatMap(([tag, children]) => [
+  ...(localName(tag) === expected ? [node] : []),
+  ...nestedNodes(children, expected),
+]))
+
+const replaceEffectNode = (
+  existing: OrderedXmlNode,
+  replacement: OrderedXmlNode,
+): void => {
+  const tag = nodeTag(existing) ?? nodeTag(replacement) ?? 'a:effect'
+  const attributes = {
+    ...nodeAttributes(existing),
+    ...nodeAttributes(replacement),
+  }
+  for (const key of Object.keys(existing)) delete existing[key]
+  Object.assign(existing, xmlNode(tag, ownChildren(replacement), attributes))
+}
+
+const patchEffectList = (
+  shapeProperties: OrderedXmlNode,
+  effects: PowerPointEffectsPatch['after'],
+  scale: number,
+  outerShadow?: PowerPointEffectsPatch['afterOuterShadow'],
+  beforeEffects?: PowerPointEffectsPatch['before'],
+  beforeOuterShadow?: PowerPointEffectsPatch['beforeOuterShadow'],
+): PowerPointWritebackIssue[] => {
+  const properties = ownChildren(shapeProperties)
+  const effectDag = directNode(properties, 'effectDag')
+  const authored = editableEffectNodes(effects, scale, outerShadow)
+  if (effectDag) {
+    const beforeTypes = new Set(editableEffectNodes(
+      beforeEffects,
+      scale,
+      beforeOuterShadow,
+    ).map(node => localName(nodeTag(node) ?? '')))
+    const afterTypes = new Set(authored.map(node => localName(nodeTag(node) ?? '')))
+    if (
+      beforeTypes.size !== afterTypes.size
+      || [...beforeTypes].some(type => !afterTypes.has(type))
+    ) {
+      return [{
+        code: 'pptx.writeback.effect-dag-topology',
+        message: 'Adding or removing effects would change this composited DrawingML effect graph. Existing supported graph effects may be edited in place.',
+      }]
+    }
+    for (const replacement of authored) {
+      const type = localName(nodeTag(replacement) ?? '')
+      const matches = nestedNodes(ownChildren(effectDag), type)
+      if (matches.length !== 1) {
+        return [{
+          code: 'pptx.writeback.effect-dag-target',
+          message: `The composited DrawingML effect graph contains ${matches.length} ${type} nodes; Mona cannot select one without changing graph semantics.`,
+        }]
+      }
+      replaceEffectNode(matches[0]!, replacement)
+    }
+    return []
+  }
+  let effectList = directNode(properties, 'effectLst')
+  if (!effectList && !effects && !outerShadow) return []
+  effectList ??= ensureDirectNode(properties, 'effectLst', 'a:effectLst')
+  const children = ownChildren(effectList)
+  removeDirectNodes(children, new Set(['glow', 'innerShdw', 'outerShdw', 'reflection', 'softEdge']))
+  children.push(...authored)
+  const order = new Map([
+    ['blur', 0], ['fillOverlay', 1], ['glow', 2], ['innerShdw', 3],
+    ['outerShdw', 4], ['prstShdw', 5], ['reflection', 6], ['softEdge', 7],
+  ])
+  children.sort((left, right) => (
+    (order.get(localName(nodeTag(left) ?? '')) ?? 100)
+    - (order.get(localName(nodeTag(right) ?? '')) ?? 100)
+  ))
+  if (!children.length) properties.splice(properties.indexOf(effectList), 1)
+  return []
+}
+
+const patchAdvancedEffects = (
+  children: OrderedXmlNode[],
+  operation: PowerPointEffectsPatch,
+): PowerPointWritebackIssue[] => {
+  if (JSON.stringify(operation.before) === JSON.stringify(operation.after)) return []
+  if (!operation.scale || operation.scale <= 0) {
+    return [{
+      code: 'pptx.writeback.effect-scale',
+      elementId: operation.elementId,
+      message: 'The retained object has no exact canvas-to-PowerPoint scale for its advanced effects.',
+      objectId: operation.objectId,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }]
+  }
+  const properties = findNode(children, 'spPr') ?? findNode(children, 'grpSpPr')
+  if (!properties) {
+    return [{
+      code: 'pptx.writeback.effect-structure',
+      elementId: operation.elementId,
+      message: 'The retained object has no native visual-properties container for advanced effects.',
+      objectId: operation.objectId,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }]
+  }
+  return patchEffectList(
+    properties,
+    operation.after,
+    operation.scale,
+    operation.afterOuterShadow,
+    operation.before,
+    operation.beforeOuterShadow,
+  ).map(issue => ({
+    ...issue,
+    elementId: operation.elementId,
+    objectId: operation.objectId,
+    partPath: operation.partPath,
+    slideId: operation.slideId,
+  }))
+}
+
+const updateThreeDRotation = (
+  children: OrderedXmlNode[],
+  rotation: { latitude: number; longitude: number; revolution: number } | undefined,
+): void => {
+  const existing = directNode(children, 'rot')
+  if (!rotation) {
+    if (existing) children.splice(children.indexOf(existing), 1)
+    return
+  }
+  const node = existing ?? ensureDirectNode(children, 'rot', 'a:rot')
+  Object.assign(nodeAttributes(node), {
+    lat: String(Math.round(rotation.latitude * 60_000)),
+    lon: String(Math.round(rotation.longitude * 60_000)),
+    rev: String(Math.round(rotation.revolution * 60_000)),
+  })
+}
+
+const patchThreeDProperties = (
+  shapeProperties: OrderedXmlNode,
+  threeD: PowerPointThreeDPatch['after'],
+  scale: number,
+): void => {
+  const properties = ownChildren(shapeProperties)
+  const existingScene = directNode(properties, 'scene3d')
+  const existingShape = directNode(properties, 'sp3d')
+  const hasScene = Boolean(threeD?.camera || threeD?.light)
+  if (!hasScene) {
+    if (existingScene) properties.splice(properties.indexOf(existingScene), 1)
+  }
+  else {
+    const insertAt = properties.findIndex(node => (
+      ['sp3d', 'extLst'].includes(localName(nodeTag(node) ?? ''))
+    ))
+    const scene = existingScene ?? ensureDirectNode(
+      properties,
+      'scene3d',
+      'a:scene3d',
+      insertAt < 0 ? properties.length : insertAt,
+    )
+    const sceneChildren = ownChildren(scene)
+    const camera = ensureDirectNode(sceneChildren, 'camera', 'a:camera', 0)
+    const cameraValue = threeD?.camera ?? { preset: 'orthographicFront' }
+    const cameraAttributes = nodeAttributes(camera)
+    cameraAttributes.prst = cameraValue.preset
+    if (cameraValue.zoom === undefined) delete cameraAttributes.zoom
+    else cameraAttributes.zoom = String(Math.round(cameraValue.zoom * 100_000))
+    updateThreeDRotation(ownChildren(camera), cameraValue.rotation)
+
+    const light = ensureDirectNode(sceneChildren, 'lightRig', 'a:lightRig')
+    const lightValue = threeD?.light ?? { direction: 't', rig: 'threePt' }
+    Object.assign(nodeAttributes(light), {
+      dir: lightValue.direction,
+      rig: lightValue.rig,
+    })
+    updateThreeDRotation(ownChildren(light), lightValue.rotation)
+  }
+
+  if (!threeD?.shape) {
+    if (existingShape) properties.splice(properties.indexOf(existingShape), 1)
+    return
+  }
+  const extIndex = properties.findIndex(node => localName(nodeTag(node) ?? '') === 'extLst')
+  const shape = existingShape ?? ensureDirectNode(
+    properties,
+    'sp3d',
+    'a:sp3d',
+    extIndex < 0 ? properties.length : extIndex,
+  )
+  const attributes = nodeAttributes(shape)
+  for (const name of ['contourW', 'extrusionH', 'prstMaterial', 'z']) delete attributes[name]
+  const nativeLength = (value: number): string => String(Math.round(value / scale * 12_700))
+  if (threeD.shape.contourWidth !== undefined) attributes.contourW = nativeLength(threeD.shape.contourWidth)
+  if (threeD.shape.extrusionHeight !== undefined) attributes.extrusionH = nativeLength(threeD.shape.extrusionHeight)
+  if (threeD.shape.material) attributes.prstMaterial = threeD.shape.material
+  if (threeD.shape.z !== undefined) attributes.z = nativeLength(threeD.shape.z)
+  const shapeChildren = ownChildren(shape)
+  removeDirectNodes(shapeChildren, new Set(['bevelB', 'bevelT', 'contourClr', 'extrusionClr']))
+  const bevelNode = (
+    tag: 'a:bevelB' | 'a:bevelT',
+    bevel: NonNullable<NonNullable<PowerPointThreeDPatch['after']>['shape']>['bevelTop'],
+  ) => bevel
+    ? xmlNode(tag, [], {
+        h: nativeLength(bevel.height),
+        prst: bevel.preset,
+        w: nativeLength(bevel.width),
+      })
+    : undefined
+  const bevelTop = bevelNode('a:bevelT', threeD.shape.bevelTop)
+  const bevelBottom = bevelNode('a:bevelB', threeD.shape.bevelBottom)
+  if (bevelTop) shapeChildren.push(bevelTop)
+  if (bevelBottom) shapeChildren.push(bevelBottom)
+  if (threeD.shape.extrusionColor) {
+    shapeChildren.push(xmlNode('a:extrusionClr', [
+      effectColorNode(threeD.shape.extrusionColor, 1),
+    ]))
+  }
+  if (threeD.shape.contourColor) {
+    shapeChildren.push(xmlNode('a:contourClr', [
+      effectColorNode(threeD.shape.contourColor, 1),
+    ]))
+  }
+}
+
+const patchThreeD = (
+  children: OrderedXmlNode[],
+  operation: PowerPointThreeDPatch,
+): PowerPointWritebackIssue[] => {
+  if (
+    !operation.materializeInherited
+    && JSON.stringify(operation.before) === JSON.stringify(operation.after)
+  ) return []
+  if (!operation.scale || operation.scale <= 0) {
+    return [{
+      code: 'pptx.writeback.three-d-scale',
+      elementId: operation.elementId,
+      message: 'The retained object has no exact canvas-to-PowerPoint scale for its 3D geometry.',
+      objectId: operation.objectId,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }]
+  }
+  const properties = findNode(children, 'spPr') ?? findNode(children, 'grpSpPr')
+  if (!properties) {
+    return [{
+      code: 'pptx.writeback.three-d-structure',
+      elementId: operation.elementId,
+      message: 'The retained object has no native visual-properties container for 3D geometry.',
+      objectId: operation.objectId,
+      partPath: operation.partPath,
+      slideId: operation.slideId,
+    }]
+  }
+  patchThreeDProperties(properties, operation.after, operation.scale)
+  return []
+}
+
 const patchImage = (
   children: OrderedXmlNode[],
   operation: PowerPointImagePatch,
@@ -3495,6 +4416,7 @@ const generatedGroupNode = (
       xmlNode('p:cNvPr', [], {
         id: '0',
         name: element.name || generatedElementMarker(element.id),
+        ...(element.name ? { title: generatedElementMarker(element.id) } : {}),
       }),
       xmlNode('p:cNvGrpSpPr'),
       xmlNode('p:nvPr'),
@@ -3630,7 +4552,11 @@ const generatedConnectorNode = (
   }
   return xmlNode('p:cxnSp', [
     xmlNode('p:nvCxnSpPr', [
-      xmlNode('p:cNvPr', [], { id: '0', name: element.name || generatedElementMarker(element.id) }),
+      xmlNode('p:cNvPr', [], {
+        id: '0',
+        name: element.name || generatedElementMarker(element.id),
+        ...(element.name ? { title: generatedElementMarker(element.id) } : {}),
+      }),
       xmlNode('p:cNvCxnSpPr', connectorRelationships),
       xmlNode('p:nvPr'),
     ]),
@@ -3666,6 +4592,58 @@ const assembleGeneratedDrawing = (
   const location = generatedDrawingByMarker(donorNodes, generatedElementMarker(element.id))
   if (!location) return undefined
   const clone = structuredClone(location.node)
+  if (element.type === 'latex') {
+    const pictureProperties = findNode(ownChildren(clone), 'spPr')
+    const pictureFill = findNode(ownChildren(clone), 'blipFill')
+    if (!pictureProperties || !pictureFill) return undefined
+    const choiceProperties = structuredClone(pictureProperties)
+    removeDirectNodes(ownChildren(choiceProperties), new Set([
+      'blipFill', 'gradFill', 'grpFill', 'noFill', 'pattFill', 'solidFill',
+    ]))
+    ownChildren(choiceProperties).splice(1, 0, xmlNode('a:noFill'))
+    const fallbackProperties = structuredClone(pictureProperties)
+    removeDirectNodes(ownChildren(fallbackProperties), new Set([
+      'blipFill', 'gradFill', 'grpFill', 'noFill', 'pattFill', 'solidFill',
+    ]))
+    ownChildren(fallbackProperties).splice(1, 0, xmlNode(
+      'a:blipFill',
+      structuredClone(ownChildren(pictureFill)),
+      { ...nodeAttributes(pictureFill) },
+    ))
+    const nonVisual = findNode(ownChildren(clone), 'cNvPr')
+    const name = element.name || `Mona equation ${element.id}`
+    const ommlNodes = parseXml(latexToOmml(element.latex), `equation:${element.id}`)
+    const equation = findNode(ommlNodes, 'oMath')
+    if (!equation) return undefined
+    const shapeNonVisual = (): OrderedXmlNode => xmlNode('p:nvSpPr', [
+      xmlNode('p:cNvPr', [], {
+        id: nodeAttributes(nonVisual ?? xmlNode('p:cNvPr')).id ?? '0',
+        name,
+      }),
+      xmlNode('p:cNvSpPr', [], { txBox: '1' }),
+      xmlNode('p:nvPr'),
+    ])
+    const choice = xmlNode('p:sp', [
+      shapeNonVisual(),
+      choiceProperties,
+      xmlNode('p:txBody', [
+        xmlNode('a:bodyPr'),
+        xmlNode('a:lstStyle'),
+        xmlNode('a:p', [
+          xmlNode('a14:m', [structuredClone(equation)]),
+          xmlNode('a:endParaRPr', [], { lang: 'en-US' }),
+        ]),
+      ]),
+    ])
+    const fallback = xmlNode('p:sp', [
+      shapeNonVisual(),
+      fallbackProperties,
+    ])
+    return xmlNode('mc:AlternateContent', [
+      xmlNode('mc:Choice', [choice], { Requires: 'a14' }),
+      xmlNode('mc:Fallback', [fallback]),
+    ])
+  }
   if (element.type === 'shape' && element.text) {
     const textLocation = generatedDrawingByMarker(
       donorNodes,
@@ -3757,6 +4735,7 @@ const assembleGeneratedDrawing = (
   if (nonVisual) {
     const attributes = nodeAttributes(nonVisual)
     attributes.name = element.name || attributes.name || `Mona ${element.type}`
+    if (element.name) attributes.title = attributes.title || generatedElementMarker(element.id)
   }
   return clone
 }
@@ -3806,9 +4785,32 @@ const copyGeneratedRelationships = async ({
     }
     const attributes = nodeAttributes(relationship)
     if (!attributes.Target) continue
+    const actionValue = attributes.Target.startsWith('pptx-action:')
+      ? attributes.Target.slice('pptx-action:'.length)
+      : undefined
+    if (actionValue) {
+      const aliases: Record<string, string> = {
+        end: 'ppaction://hlinkshowjump?jump=endshow',
+        first: 'ppaction://hlinkshowjump?jump=firstslide',
+        last: 'ppaction://hlinkshowjump?jump=lastslide',
+        next: 'ppaction://hlinkshowjump?jump=nextslide',
+        previous: 'ppaction://hlinkshowjump?jump=previousslide',
+      }
+      rewriteHyperlinkReference([clone], donorId, aliases[actionValue] ?? actionValue, false)
+      continue
+    }
     const targetId = nextRelationshipId(target)
     const copiedAttributes: Record<string, string> = { ...attributes, Id: targetId }
-    if (attributes.TargetMode !== 'External') {
+    const internalSlide = attributes.Target.startsWith('pptx-slide:')
+      ? attributes.Target.slice('pptx-slide:'.length)
+      : undefined
+    if (internalSlide) {
+      copiedAttributes.Target = relativeRelationshipTarget(targetPart, internalSlide)
+      copiedAttributes.Type = SLIDE_RELATIONSHIP
+      delete copiedAttributes.TargetMode
+      rewriteHyperlinkReference([clone], donorId, 'ppaction://hlinksldjump', true)
+    }
+    else if (attributes.TargetMode !== 'External') {
       const dependency = internalRelationshipTarget(donorPart, attributes.Target)
       const copied = await copyDonorPart(targetZip, donorZip, dependency, partMap)
       issues.push(...copied.issues)
@@ -3973,11 +4975,23 @@ const patchGeneratedElement = async (
     }]
   }
   const donorNodes = parseXml(await donorSlide.async('text'), 'ppt/slides/slide1.xml')
-  const clone = assembleGeneratedDrawing(
-    operation.after,
-    donorNodes,
-    manifest.coordinateScale ?? 96 / 72,
-  )
+  let clone: OrderedXmlNode | undefined
+  try {
+    clone = assembleGeneratedDrawing(
+      operation.after,
+      donorNodes,
+      manifest.coordinateScale ?? 96 / 72,
+    )
+  }
+  catch (error) {
+    return [{
+      code: 'pptx.writeback.generated-object-conversion',
+      elementId: operation.elementId,
+      message: error instanceof Error ? error.message : 'The generated object could not be converted to native PowerPoint markup.',
+      partPath: operation.targetPart,
+      slideId: operation.slideId,
+    }]
+  }
   if (!clone) {
     return [{
       code: 'pptx.writeback.generated-object-missing',
@@ -3986,6 +5000,37 @@ const patchGeneratedElement = async (
       partPath: operation.targetPart,
       slideId: operation.slideId,
     }]
+  }
+  if (operation.after.effects || operation.after.threeD) {
+    const cloneChildren = ownChildren(clone)
+    const properties = directNode(cloneChildren, 'spPr')
+      ?? directNode(cloneChildren, 'grpSpPr')
+      ?? findNode(cloneChildren, 'spPr')
+      ?? findNode(cloneChildren, 'grpSpPr')
+    if (!properties) {
+      return [{
+        code: 'pptx.writeback.generated-effect-structure',
+        elementId: operation.elementId,
+        message: 'The generated object has no native visual-properties container for its advanced effects.',
+        partPath: operation.targetPart,
+        slideId: operation.slideId,
+      }]
+    }
+    const scale = manifest.coordinateScale ?? 96 / 72
+    if (operation.after.effects) {
+      const effectIssues = patchEffectList(
+        properties,
+        operation.after.effects,
+        scale,
+      )
+      if (effectIssues.length) return effectIssues.map(issue => ({
+        ...issue,
+        elementId: operation.elementId,
+        partPath: operation.targetPart,
+        slideId: operation.slideId,
+      }))
+    }
+    if (operation.after.threeD) patchThreeDProperties(properties, operation.after.threeD, scale)
   }
   const relationshipIssues = await copyGeneratedRelationships({
     clone,
@@ -3999,6 +5044,26 @@ const patchGeneratedElement = async (
     slideId: operation.slideId,
   }))
   const targetNodes = parseXml(await targetEntry.async('text'), operation.targetPart)
+  if (operation.after.type === 'latex') {
+    const root = findNode(targetNodes, 'sld')
+    if (!root) {
+      return [{
+        code: 'pptx.writeback.equation-slide-root',
+        elementId: operation.elementId,
+        message: 'The target slide has no root on which native equation namespaces can be declared.',
+        partPath: operation.targetPart,
+        slideId: operation.slideId,
+      }]
+    }
+    const attributes = nodeAttributes(root)
+    attributes['xmlns:a14'] = attributes['xmlns:a14']
+      ?? 'http://schemas.microsoft.com/office/drawing/2010/main'
+    attributes['xmlns:mc'] = attributes['xmlns:mc']
+      ?? 'http://schemas.openxmlformats.org/markup-compatibility/2006'
+    const ignorable = new Set((attributes['mc:Ignorable'] ?? '').split(/\s+/).filter(Boolean))
+    ignorable.add('a14')
+    attributes['mc:Ignorable'] = [...ignorable].join(' ')
+  }
   if (operation.kind === 'replace-element') {
     const existing = findDrawingNode(
       targetNodes,
@@ -4575,6 +5640,7 @@ const insertNativeSlide = async (
       partPath: targetNotes,
       ...(manifest.coordinateScale ? { scale: manifest.coordinateScale } : {}),
       slideId: operation.slideId,
+      slidePart: targetPart,
     })
     issues.push(...patched.issues)
     if (!patched.issues.length) zip.file(targetNotes, patched.xml)
@@ -4673,6 +5739,12 @@ const patchPart = (
             if (operation.kind === 'accessibility') {
               issues.push(...patchAccessibility(children, operation))
             }
+            else if (operation.kind === 'effects') {
+              issues.push(...patchAdvancedEffects(children, operation))
+            }
+            else if (operation.kind === 'three-d') {
+              issues.push(...patchThreeD(children, operation))
+            }
             else if (operation.kind === 'transform') {
               if (!xfrm) {
                 issues.push({
@@ -4767,6 +5839,9 @@ export const patchPowerPointPackage = async ({
       && operation.kind !== 'insert-slide'
       && operation.kind !== 'notes'
       && operation.kind !== 'replace-element'
+      && operation.kind !== 'theme'
+      && operation.kind !== 'timing'
+      && operation.kind !== 'transition'
     ),
   )
   const unknown = objectOperations.filter(operation => !knownObjects.has(operation.objectId))
@@ -4869,34 +5944,51 @@ export const patchPowerPointPackage = async ({
       if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
     }
     if (operation.kind === 'comments') {
-      const entry = zip.file(operation.partPath)
-      if (!entry) {
-        issues.push({
-          code: 'pptx.writeback.comments-part-missing',
-          message: 'The retained native comments part is missing.',
-          partPath: operation.partPath,
-          slideId: operation.slideId,
-        })
-        continue
-      }
-      const patched = patchCommentsPart(await entry.async('text'), operation)
-      issues.push(...patched.issues)
-      if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
+      issues.push(...await patchCommentsStructure(zip, operation))
     }
     if (operation.kind === 'notes') {
       const entry = zip.file(operation.notesPart)
       if (!entry) {
-        issues.push({
-          code: 'pptx.writeback.notes-part-missing',
-          message: 'The retained native notes part is missing.',
-          partPath: operation.notesPart,
-          slideId: operation.slideId,
-        })
+        issues.push(...await createNotesPart(zip, manifest, operation))
         continue
       }
       const patched = patchNotesPart(await entry.async('text'), operation)
       issues.push(...patched.issues)
       if (!patched.issues.length) zip.file(operation.notesPart, patched.xml)
+    }
+    if (operation.kind === 'theme') {
+      const entry = zip.file(operation.partPath)
+      if (!entry) {
+        issues.push({
+          code: 'pptx.writeback.theme-part-missing',
+          message: 'The retained native theme part is missing.',
+          partPath: operation.partPath,
+        })
+        continue
+      }
+      const patched = patchThemePart(await entry.async('text'), operation)
+      issues.push(...patched.issues)
+      if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
+    }
+    if (operation.kind === 'timing' || operation.kind === 'transition') {
+      const entry = zip.file(operation.partPath)
+      if (!entry) {
+        issues.push({
+          code: operation.kind === 'timing'
+            ? 'pptx.writeback.timing-part-missing'
+            : 'pptx.writeback.transition-part-missing',
+          message: 'The retained native slide part is missing.',
+          partPath: operation.partPath,
+          slideId: operation.slideId,
+        })
+        continue
+      }
+      const xml = await entry.async('text')
+      const patched = operation.kind === 'timing'
+        ? patchTimingPart(xml, operation)
+        : patchTransitionPart(xml, operation)
+      issues.push(...patched.issues)
+      if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
     }
   }
   const byPart = new Map<string, PowerPointObjectPatchOperation[]>()

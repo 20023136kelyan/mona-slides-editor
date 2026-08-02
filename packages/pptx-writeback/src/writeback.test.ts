@@ -90,6 +90,57 @@ const sourceWithNotes = async () => {
   }
 }
 
+const sourceWithThemeEffects = async () => {
+  const fileName = 'corpus-02-shapes-lines.pptx'
+  const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public', fileName))
+  const zip = await JSZip.loadAsync(bytes)
+  const slidePath = 'ppt/slides/slide1.xml'
+  const slideXml = await zip.file(slidePath)!.async('text')
+  const effectReference = '<p:style>'
+    + '<a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef>'
+    + '<a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef>'
+    + '<a:effectRef idx="1"><a:schemeClr val="accent2"/></a:effectRef>'
+    + '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>'
+    + '</p:style>'
+  zip.file(slidePath, slideXml.replace('</p:spPr>', `</p:spPr>${effectReference}`))
+  const themePath = 'ppt/theme/theme1.xml'
+  const themeXml = await zip.file(themePath)!.async('text')
+  zip.file(themePath, themeXml.replace(
+    '<a:effectStyle><a:effectLst/></a:effectStyle>',
+    '<a:effectStyle><a:effectLst>'
+      + '<a:glow rad="127000"><a:schemeClr val="phClr"><a:alpha val="50000"/></a:schemeClr></a:glow>'
+      + '<a:outerShdw blurRad="63500" dist="127000" dir="5400000" rotWithShape="0"><a:schemeClr val="phClr"><a:alpha val="40000"/></a:schemeClr></a:outerShdw>'
+      + '</a:effectLst>'
+      + '<a:scene3d><a:camera prst="perspectiveContrastingRightFacing" zoom="110000"><a:rot lat="720000" lon="1080000" rev="180000"/></a:camera><a:lightRig rig="threePt" dir="tr"><a:rot lat="0" lon="0" rev="1200000"/></a:lightRig></a:scene3d>'
+      + '<a:sp3d z="12700" extrusionH="127000" contourW="25400" prstMaterial="warmMatte"><a:bevelT w="76200" h="38100" prst="circle"/><a:extrusionClr><a:schemeClr val="phClr"/></a:extrusionClr><a:contourClr><a:srgbClr val="334155"/></a:contourClr></a:sp3d>'
+      + '</a:effectStyle>',
+  ))
+  const archive = await zip.generateAsync({ type: 'arraybuffer' })
+  return {
+    bytes: archive,
+    ingested: await ingestPowerPoint(archive, { fileName: 'theme-effects.pptx', theme }),
+  }
+}
+
+const sourceWithEffectDag = async () => {
+  const fileName = 'corpus-02-shapes-lines.pptx'
+  const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public', fileName))
+  const zip = await JSZip.loadAsync(bytes)
+  const slidePath = 'ppt/slides/slide1.xml'
+  const slideXml = await zip.file(slidePath)!.async('text')
+  const effectDag = '<a:effectDag name="monaDag"><a:cont name="monaContainer" type="tree">'
+    + '<a:glow name="editableGlow" rad="127000"><a:srgbClr val="ED7D31"><a:alpha val="50000"/></a:srgbClr></a:glow>'
+    + '<a:blur name="preservedBlur" rad="38100" grow="1"/>'
+    + '<a:softEdge name="editableSoftEdge" rad="25400"/>'
+    + '</a:cont></a:effectDag>'
+  zip.file(slidePath, slideXml.replace('</p:spPr>', `${effectDag}</p:spPr>`))
+  const archive = await zip.generateAsync({ type: 'arraybuffer' })
+  return {
+    bytes: archive,
+    ingested: await ingestPowerPoint(archive, { fileName: 'effect-dag.pptx', theme }),
+  }
+}
+
 const patchableElement = (
   presentation: Awaited<ReturnType<typeof source>>['ingested']['presentation'],
 ): Exclude<PPTElement, { type: 'line' }> => {
@@ -543,7 +594,7 @@ describe('PowerPoint source-package writeback', () => {
     ))).toBe(true)
   })
 
-  it('serializes generated picture-filled shapes, vector formulas, audio, and video dependencies', async () => {
+  it('serializes generated picture-filled shapes, native formulas, audio, and video dependencies', async () => {
     const fixture = await source()
     const desired = structuredClone(fixture.ingested.presentation)
     const slide = desired.slides[0]!
@@ -552,6 +603,12 @@ describe('PowerPoint source-package writeback', () => {
     const audioReference = 'mona-test://sound.mp3'
     const posterReference = 'mona-test://poster.png'
     const shape: Extract<PPTElement, { type: 'shape' }> = {
+      effects: {
+        glow: { color: '#F16F3A', opacity: 0.65, radius: 8 },
+        innerShadow: { blur: 5, color: '#111827', h: 3, opacity: 0.4, v: 4 },
+        reflection: { blur: 2, direction: 90, distance: 6, opacity: 0.45, scaleY: -0.8 },
+        softEdge: { radius: 3 },
+      },
       fill: '#FFFFFF',
       fixedRatio: false,
       height: 90,
@@ -561,6 +618,23 @@ describe('PowerPoint source-package writeback', () => {
       pattern: pictureReference,
       patternFit: { mode: 'tile', scaleX: 0.5, scaleY: 0.5 },
       rotate: 0,
+      threeD: {
+        camera: {
+          preset: 'perspectiveContrastingRightFacing',
+          rotation: { latitude: 12, longitude: 18, revolution: 3 },
+          zoom: 1.1,
+        },
+        light: { direction: 'tr', rig: 'threePt' },
+        shape: {
+          bevelTop: { height: 4, preset: 'circle', width: 8 },
+          contourColor: '#334155',
+          contourWidth: 2,
+          extrusionColor: '#0F172A',
+          extrusionHeight: 10,
+          material: 'warmMatte',
+          z: 1,
+        },
+      },
       top: 30,
       type: 'shape',
       viewBox: [100, 100],
@@ -580,6 +654,19 @@ describe('PowerPoint source-package writeback', () => {
       type: 'latex',
       viewBox: [24, 30],
       width: 90,
+    }
+    const linkedText: Extract<PPTElement, { type: 'text' }> = {
+      content: '<p><a href="pptx-slide:ppt/slides/slide1.xml"><span>Generated jump</span></a></p>',
+      defaultColor: '#111827',
+      defaultFontName: 'Aptos',
+      height: 35,
+      id: 'generated-internal-link',
+      left: 200,
+      lineHeight: 1.2,
+      rotate: 0,
+      top: 105,
+      type: 'text',
+      width: 160,
     }
     const video: Extract<PPTElement, { type: 'video' }> = {
       autoplay: false,
@@ -609,7 +696,15 @@ describe('PowerPoint source-package writeback', () => {
       type: 'audio',
       width: 48,
     }
-    slide.elements.push(shape, formula, video, audio)
+    slide.elements.push(shape, formula, linkedText, video, audio)
+    slide.animations = [{
+      duration: 650,
+      effect: 'zoomIn',
+      elId: shape.id,
+      id: 'generated-shape-animation',
+      trigger: 'click',
+      type: 'in',
+    }]
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
       'base64',
@@ -632,10 +727,24 @@ describe('PowerPoint source-package writeback', () => {
       resolveAsset: async reference => assets.get(reference),
     })
     expect(result.plan.unsupported).toEqual([])
+    await writeReferenceArtifact('generated-rich-media.pptx', result.bytes)
     const zip = await JSZip.loadAsync(result.bytes)
     expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.mp4$/i.test(path))).toBe(true)
     expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.mp3$/i.test(path))).toBe(true)
     expect(Object.keys(zip.files).some(path => /^ppt\/media\/.+\.svg$/i.test(path))).toBe(true)
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('text')
+    expect(slideXml).toContain('<a14:m>')
+    expect(slideXml).toContain('<m:oMath')
+    expect(slideXml).toContain('<m:sSup>')
+    expect(slideXml).toContain('<a:glow')
+    expect(slideXml).toContain('<a:innerShdw')
+    expect(slideXml).toContain('<a:reflection')
+    expect(slideXml).toContain('<a:softEdge')
+    expect(slideXml).toContain('<a:scene3d>')
+    expect(slideXml).toContain('<a:sp3d')
+    expect(slideXml).toContain('<a:bevelT')
+    expect(slideXml).toContain('<p:timing>')
+    expect(slideXml).toContain('filter="zoom"')
 
     const reimported = await ingestPowerPoint(result.bytes, {
       fileName: 'generated-rich-media-roundtrip.pptx',
@@ -648,14 +757,192 @@ describe('PowerPoint source-package writeback', () => {
       && Boolean(element.pattern)
     ))
     expect(pictureShape?.type).toBe('shape')
-    if (pictureShape?.type === 'shape') expect(pictureShape.patternFit?.mode).toBe('tile')
+    if (pictureShape?.type === 'shape') {
+      expect(pictureShape.patternFit?.mode).toBe('tile')
+      expect(pictureShape.effects?.glow?.color.toUpperCase()).toBe('#F16F3A')
+      expect(pictureShape.effects?.glow?.opacity).toBeCloseTo(0.65, 2)
+      expect(pictureShape.effects?.glow?.radius).toBeCloseTo(8, 1)
+      expect(pictureShape.effects?.innerShadow?.h).toBeCloseTo(3, 1)
+      expect(pictureShape.effects?.innerShadow?.v).toBeCloseTo(4, 1)
+      expect(pictureShape.effects?.reflection?.opacity).toBeCloseTo(0.45, 2)
+      expect(pictureShape.effects?.softEdge?.radius).toBeCloseTo(3, 1)
+      expect(pictureShape.threeD?.camera?.rotation).toMatchObject({
+        latitude: 12,
+        longitude: 18,
+        revolution: 3,
+      })
+      expect(pictureShape.threeD?.shape).toMatchObject({
+        bevelTop: { height: 4, preset: 'circle', width: 8 },
+        contourColor: '#334155',
+        extrusionColor: '#0F172A',
+        material: 'warmMatte',
+      })
+      expect(reimported.presentation.slides[0]!.animations).toContainEqual(expect.objectContaining({
+        duration: 650,
+        effect: 'zoomIn',
+        elId: pictureShape.id,
+        trigger: 'click',
+        type: 'in',
+      }))
+    }
     expect(elements.some(element => element.type === 'video')).toBe(true)
     expect(elements.some(element => element.type === 'audio')).toBe(true)
-    expect(elements.some(element => (
-      element.type === 'image'
+    const generatedLink = elements.find(element => (
+      (element.type === 'text' || element.type === 'shape')
+      && Math.abs(element.left - linkedText.left) < 0.1
+      && Math.abs(element.top - linkedText.top) < 0.1
+    ))
+    expect(['shape', 'text']).toContain(generatedLink?.type)
+    if (generatedLink?.type === 'text' || generatedLink?.type === 'shape') {
+      const body = generatedLink.type === 'text'
+        ? generatedLink.structuredText
+        : generatedLink.text?.structuredText
+      expect(body?.paragraphs.flatMap(paragraph => paragraph.runs)
+        .some(run => run.hyperlink === 'pptx-slide:ppt/slides/slide1.xml')).toBe(true)
+    }
+    const reimportedFormula = elements.find(element => (
+      element.type === 'latex'
       && Math.abs(element.left - formula.left) < 0.1
       && Math.abs(element.top - formula.top) < 0.1
-    ))).toBe(true)
+    ))
+    expect(reimportedFormula?.type).toBe('latex')
+    if (reimportedFormula?.type === 'latex') {
+      expect(reimportedFormula.latex).toContain('x^{2}')
+      expect(reimportedFormula.powerPointMath?.omml).toBeDefined()
+    }
+  })
+
+  it('authors presentation colors and Latin fonts into every retained base theme', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    desired.theme = {
+      ...desired.theme,
+      backgroundColor: '#FAFAF7',
+      fontColor: '#1F2937',
+      fontName: 'Aptos',
+      themeColors: ['#D14424', '#F16F3A', '#315C8A', '#5D8A66', '#9B6AA0', '#D5A63C'],
+    }
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const themeOperations = result.plan.operations.filter(operation => operation.kind === 'theme')
+    expect(themeOperations.length).toBeGreaterThan(0)
+    const zip = await JSZip.loadAsync(result.bytes)
+    for (const operation of themeOperations) {
+      if (operation.kind !== 'theme') continue
+      const xml = await zip.file(operation.partPath)!.async('text')
+      expect(xml).toMatch(/<a:dk1><a:srgbClr val="1F2937">/)
+      expect(xml).toMatch(/<a:lt1><a:srgbClr val="FAFAF7">/)
+      expect(xml).toMatch(/<a:accent1><a:srgbClr val="D14424">/)
+      expect(xml).toContain('<a:latin typeface="Aptos"')
+    }
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'theme-authoring-roundtrip.pptx',
+      theme,
+    })
+    expect(reimported.presentation.theme.fontName).toBe('Aptos')
+    expect(reimported.presentation.theme.fontColor.toUpperCase()).toBe('#1F2937')
+    expect(reimported.presentation.theme.backgroundColor.toUpperCase()).toBe('#FAFAF7')
+    expect(reimported.presentation.theme.themeColors.slice(0, 6).map(color => color.toUpperCase()))
+      .toEqual(desired.theme.themeColors)
+  })
+
+  it('authors native PowerPoint timing and slide transitions and reimports them semantically', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const slide = desired.slides[0]!
+    const target = patchableElement(desired)
+    slide.animations = [
+      {
+        duration: 750,
+        effect: 'fadeIn',
+        elId: target.id,
+        id: 'mona-animation-fade',
+        trigger: 'click',
+        type: 'in',
+      },
+      {
+        duration: 400,
+        effect: 'pulse',
+        elId: target.id,
+        id: 'mona-animation-pulse',
+        trigger: 'auto',
+        type: 'attention',
+      },
+    ]
+    slide.durationMs = 5_500
+    slide.turningMode = 'fade'
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations.some(operation => operation.kind === 'timing')).toBe(true)
+    expect(result.plan.operations.some(operation => operation.kind === 'transition')).toBe(true)
+
+    const zip = await JSZip.loadAsync(result.bytes)
+    const slideXml = await zip.file(target.source!.slidePart)!.async('text')
+    expect(slideXml).toContain('<p:timing>')
+    expect(slideXml).toContain('presetClass="entr"')
+    expect(slideXml).toContain('presetClass="emph"')
+    expect(slideXml).toContain('nodeType="clickEffect"')
+    expect(slideXml).toContain('nodeType="afterEffect"')
+    expect(slideXml).toContain(`spid="${target.source!.nativeShapeId}"`)
+    expect(slideXml).toMatch(/<p:transition[^>]*advTm="5500"[^>]*><p:fade/)
+
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'timing-authoring-roundtrip.pptx',
+      theme,
+    })
+    const reimportedSlide = reimported.presentation.slides[0]!
+    expect(reimportedSlide.durationMs).toBe(5_500)
+    expect(reimportedSlide.turningMode).toBe('fade')
+    expect(reimportedSlide.animations).toHaveLength(2)
+    expect(reimportedSlide.animations?.map(animation => ({
+      duration: animation.duration,
+      effect: animation.effect,
+      trigger: animation.trigger,
+      type: animation.type,
+    }))).toEqual([
+      { duration: 750, effect: 'fadeIn', trigger: 'click', type: 'in' },
+      { duration: 400, effect: 'pulse', trigger: 'auto', type: 'attention' },
+    ])
+  })
+
+  it('allocates a native notes slide and notes master for new speaker notes', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    desired.slides[0]!.remark = 'New speaker notes\nSecond paragraph'
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const notesOperation = result.plan.operations.find(operation => operation.kind === 'notes')
+    expect(notesOperation?.kind).toBe('notes')
+    if (notesOperation?.kind !== 'notes') throw new Error('Expected a notes operation.')
+    const zip = await JSZip.loadAsync(result.bytes)
+    expect(zip.file(notesOperation.notesPart)).not.toBeNull()
+    expect(Object.keys(zip.files).some(path => /^ppt\/notesMasters\/notesMaster\d+\.xml$/.test(path))).toBe(true)
+    const slideRelationships = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('text')
+    expect(slideRelationships).toContain('/relationships/notesSlide')
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'new-notes-roundtrip.pptx',
+      theme,
+    })
+    expect(reimported.presentation.slides[0]!.remark).toContain('New speaker notes')
+    expect(reimported.presentation.slides[0]!.remark).toContain('Second paragraph')
+    expect(reimported.backing.reference.document?.notesSlides).toHaveLength(1)
+    expect(reimported.backing.reference.document?.notesMasters).toHaveLength(1)
   })
 
   it('replaces retained native image media with document-owned bytes', async () => {
@@ -878,13 +1165,56 @@ describe('PowerPoint source-package writeback', () => {
       manifest: fixture.ingested.backing.manifest,
       presentation,
     })
-    expect(result.plan).toMatchObject({
-      mode: 'patch',
-      touchedParts: ['ppt/comments/comment1.xml'],
-      unsupported: [],
-    })
+    expect(result.plan.mode).toBe('patch')
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.touchedParts).toContain('ppt/comments/comment1.xml')
+    expect(result.plan.touchedParts).toContain('ppt/commentAuthors.xml')
     const reimported = await ingestPowerPoint(result.bytes, { fileName: 'comments.pptx', theme })
     expect(reimported.presentation.slides[0]?.notes?.[0]?.content).toBe('Updated review comment')
+  })
+
+  it('creates native comment authors, comments, and threaded replies', async () => {
+    const fixture = await source()
+    const presentation = structuredClone(fixture.ingested.presentation)
+    presentation.slides[0]!.notes = [{
+      content: 'Please revise this chart.',
+      id: 'review-1',
+      replies: [{
+        content: 'Done in the latest revision.',
+        id: 'review-1-reply',
+        time: Date.UTC(2026, 7, 2, 9, 30),
+        user: 'Mona',
+      }],
+      time: Date.UTC(2026, 7, 2, 9, 0),
+      user: 'Ada Lovelace',
+    }]
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const operation = result.plan.operations.find(candidate => candidate.kind === 'comments')
+    if (operation?.kind !== 'comments') throw new Error('Expected a comments operation.')
+    const zip = await JSZip.loadAsync(result.bytes)
+    const commentsXml = await zip.file(operation.partPath)!.async('text')
+    const authorsXml = await zip.file(operation.authorsPart)!.async('text')
+    expect(commentsXml).toContain('<p15:threadingInfo')
+    expect(commentsXml).toContain('<p15:parentCm')
+    expect(authorsXml).toContain('name="Ada Lovelace"')
+    expect(authorsXml).toContain('name="Mona"')
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'new-comments-roundtrip.pptx',
+      theme,
+    })
+    expect(reimported.presentation.slides[0]!.notes).toHaveLength(1)
+    expect(reimported.presentation.slides[0]!.notes?.[0]?.content).toBe('Please revise this chart.')
+    expect(reimported.presentation.slides[0]!.notes?.[0]?.user).toBe('Ada Lovelace')
+    expect(reimported.presentation.slides[0]!.notes?.[0]?.replies?.[0]).toMatchObject({
+      content: 'Done in the latest revision.',
+      user: 'Mona',
+    })
   })
 
   it('patches geometry on the exact native object and preserves every untouched part', async () => {
@@ -1104,6 +1434,247 @@ describe('PowerPoint source-package writeback', () => {
     expect(roundTripped.outline?.color?.toLowerCase()).toBe('#abcdef')
     expect(roundTripped.outline?.style).toBe('dashed')
     expect(roundTripped.outline?.width).toBeCloseTo(4, 1)
+  })
+
+  it('round-trips editable glow, inner shadow, reflection, and soft-edge effects', async () => {
+    const bytes = await readFile(join(REPO_ROOT, 'tests/corpus/public/corpus-02-shapes-lines.pptx'))
+    const archive = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer
+    const ingested = await ingestPowerPoint(archive, {
+      fileName: 'corpus-02-shapes-lines.pptx',
+      theme,
+    })
+    const desired = structuredClone(ingested.presentation)
+    const target = desired.slides.flatMap(slide => flattenElementTree(slide.elements)).find(
+      (element): element is Extract<PPTElement, { type: 'shape' }> => (
+        element.type === 'shape'
+        && element.source?.sourceLayer === 'slide'
+        && element.source.sourcePart === element.source.slidePart
+      ),
+    )
+    if (!target) throw new Error('Shape corpus has no source-local shape.')
+    target.effects = {
+      glow: { color: '#D14424', opacity: 0.6, radius: 9 },
+      innerShadow: { blur: 7, color: '#172033', h: -4, opacity: 0.35, v: 5 },
+      reflection: { blur: 3, direction: 90, distance: 8, opacity: 0.5, scaleY: -0.75 },
+      softEdge: { radius: 4 },
+    }
+
+    const result = await writeBackPowerPoint({
+      baseline: ingested.presentation,
+      bytes: archive,
+      manifest: ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'effects',
+      objectId: target.source?.sourceObjectId,
+    }))
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'advanced-effects-round-trip.pptx',
+      theme,
+    })
+    const roundTripped = elementBySource(reimported.presentation, target)
+    expect(roundTripped?.effects?.glow?.color.toUpperCase()).toBe('#D14424')
+    expect(roundTripped?.effects?.glow?.opacity).toBeCloseTo(0.6, 2)
+    expect(roundTripped?.effects?.glow?.radius).toBeCloseTo(9, 1)
+    expect(roundTripped?.effects?.innerShadow?.h).toBeCloseTo(-4, 1)
+    expect(roundTripped?.effects?.innerShadow?.v).toBeCloseTo(5, 1)
+    expect(roundTripped?.effects?.reflection?.distance).toBeCloseTo(8, 1)
+    expect(roundTripped?.effects?.softEdge?.radius).toBeCloseTo(4, 1)
+  })
+
+  it('materializes inherited theme effects without dropping the inherited outer shadow', async () => {
+    const fixture = await sourceWithThemeEffects()
+    const baselineTarget = fixture.ingested.presentation.slides
+      .flatMap(slide => flattenElementTree(slide.elements))
+      .find((element): element is Extract<PPTElement, { type: 'shape' }> => (
+        element.type === 'shape'
+        && element.source?.effectReference?.index === 1
+      ))
+    if (!baselineTarget) throw new Error('Theme-effect fixture has no referenced shape.')
+    expect(baselineTarget.shadow?.color).toContain('0.4')
+
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = elementBySource(desired, baselineTarget)
+    if (target?.type !== 'shape') throw new Error('Theme-effect target did not survive cloning.')
+    target.effects = {
+      ...target.effects,
+      glow: { color: '#D14424', opacity: 0.75, radius: 12 },
+    }
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'three-d',
+      materializeInherited: true,
+      objectId: target.source?.sourceObjectId,
+    }))
+    await writeReferenceArtifact('theme-effects-materialized.pptx', result.bytes)
+    const resultZip = await JSZip.loadAsync(result.bytes)
+    const slideXml = await resultZip.file('ppt/slides/slide1.xml')!.async('text')
+    expect(slideXml).toContain('<a:glow')
+    expect(slideXml).toContain('<a:outerShdw')
+    expect(slideXml).toContain('<a:alpha val="40000"')
+    expect(slideXml).toContain('<a:scene3d>')
+    expect(slideXml).toContain('<a:sp3d')
+
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'theme-effects-materialized.pptx',
+      theme,
+    })
+    const roundTripped = elementBySource(reimported.presentation, target)
+    expect(roundTripped?.effects?.glow?.color.toUpperCase()).toBe('#D14424')
+    expect(roundTripped?.effects?.glow?.opacity).toBeCloseTo(0.75, 2)
+    if (roundTripped?.type !== 'shape') throw new Error('Round-tripped target is not a shape.')
+    expect(roundTripped.shadow?.color.toLowerCase()).toMatch(/66$/)
+    expect(roundTripped.shadow?.v).toBeCloseTo(40 / 3, 1)
+    expect(roundTripped.threeD?.camera?.rotation).toMatchObject({
+      latitude: 12,
+      longitude: 18,
+      revolution: 3,
+    })
+    expect(roundTripped.threeD?.shape?.bevelTop).toMatchObject({
+      height: 4,
+      preset: 'circle',
+      width: 8,
+    })
+  })
+
+  it('round-trips editable inherited camera, lighting, bevel, extrusion, and material values', async () => {
+    const fixture = await sourceWithThemeEffects()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = desired.slides.flatMap(slide => flattenElementTree(slide.elements)).find(
+      (element): element is Extract<PPTElement, { type: 'shape' }> => (
+        element.type === 'shape'
+        && element.source?.effectReference?.index === 1
+      ),
+    )
+    if (!target?.threeD?.camera || !target.threeD.light || !target.threeD.shape) {
+      throw new Error('Theme-effect fixture has no editable 3D shape.')
+    }
+    target.threeD.camera.rotation = { latitude: -8, longitude: 24, revolution: 6 }
+    target.threeD.camera.zoom = 1.25
+    target.threeD.light.direction = 'bl'
+    target.threeD.light.rig = 'balanced'
+    target.threeD.shape.bevelTop = { height: 6, preset: 'relaxedInset', width: 10 }
+    target.threeD.shape.contourColor = '#475569'
+    target.threeD.shape.contourWidth = 3
+    target.threeD.shape.extrusionColor = '#0F172A'
+    target.threeD.shape.extrusionHeight = 14
+    target.threeD.shape.material = 'metal'
+    target.threeD.shape.z = 2
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      kind: 'three-d',
+      objectId: target.source?.sourceObjectId,
+    }))
+    await writeReferenceArtifact('three-d-edited.pptx', result.bytes)
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'three-d-edited.pptx',
+      theme,
+    })
+    const roundTripped = elementBySource(reimported.presentation, target)
+    expect(roundTripped?.threeD?.camera).toMatchObject({
+      rotation: { latitude: -8, longitude: 24, revolution: 6 },
+      zoom: 1.25,
+    })
+    expect(roundTripped?.threeD?.light).toMatchObject({ direction: 'bl', rig: 'balanced' })
+    expect(roundTripped?.threeD?.shape).toMatchObject({
+      bevelTop: { height: 6, preset: 'relaxedInset', width: 10 },
+      contourColor: '#475569',
+      contourWidth: 3,
+      extrusionColor: '#0F172A',
+      extrusionHeight: 14,
+      material: 'metal',
+      z: 2,
+    })
+  })
+
+  it('edits existing supported effectDag nodes without flattening the graph', async () => {
+    const fixture = await sourceWithEffectDag()
+    const baselineTarget = fixture.ingested.presentation.slides
+      .flatMap(slide => flattenElementTree(slide.elements))
+      .find((element): element is Extract<PPTElement, { type: 'shape' }> => (
+        element.type === 'shape'
+        && element.source?.visual?.hasEffectDag === true
+      ))
+    if (!baselineTarget) throw new Error('Effect graph fixture has no source shape.')
+    expect(baselineTarget.effects?.glow?.opacity).toBeCloseTo(0.5, 2)
+    expect(baselineTarget.effects?.softEdge?.radius).toBeCloseTo(8 / 3, 2)
+
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = elementBySource(desired, baselineTarget)
+    if (target?.type !== 'shape' || !target.effects?.glow) {
+      throw new Error('Effect graph target did not survive cloning.')
+    }
+    target.effects.glow = { color: '#D14424', opacity: 0.8, radius: 11 }
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    await writeReferenceArtifact('effect-dag-edited.pptx', result.bytes)
+    const resultZip = await JSZip.loadAsync(result.bytes)
+    const slideXml = await resultZip.file('ppt/slides/slide1.xml')!.async('text')
+    expect(slideXml).toContain('<a:effectDag name="monaDag"')
+    expect(slideXml).toContain('<a:cont name="monaContainer" type="tree"')
+    expect(slideXml).toContain('<a:glow name="editableGlow"')
+    expect(slideXml).toContain('<a:blur name="preservedBlur" rad="38100" grow="1"')
+    expect(slideXml).toContain('<a:softEdge name="editableSoftEdge"')
+    expect(slideXml).not.toContain('<a:effectLst>')
+
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'effect-dag-edited.pptx',
+      theme,
+    })
+    const roundTripped = elementBySource(reimported.presentation, target)
+    expect(roundTripped?.source?.visual?.hasEffectDag).toBe(true)
+    expect(roundTripped?.effects?.glow?.color.toUpperCase()).toBe('#D14424')
+    expect(roundTripped?.effects?.glow?.opacity).toBeCloseTo(0.8, 2)
+    expect(roundTripped?.effects?.glow?.radius).toBeCloseTo(11, 1)
+  })
+
+  it('rejects effectDag topology changes before package mutation', async () => {
+    const fixture = await sourceWithEffectDag()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = desired.slides.flatMap(slide => flattenElementTree(slide.elements)).find(
+      (element): element is Extract<PPTElement, { type: 'shape' }> => (
+        element.type === 'shape'
+        && element.source?.visual?.hasEffectDag === true
+      ),
+    )
+    if (!target) throw new Error('Effect graph fixture has no source shape.')
+    target.effects = {
+      ...target.effects,
+      reflection: { blur: 2, direction: 90, distance: 5, opacity: 0.4, scaleY: -1 },
+    }
+    const plan = analyzePowerPointWriteback(
+      fixture.ingested.presentation,
+      desired,
+      fixture.ingested.backing.manifest.packageId,
+    )
+    expect(plan.mode).toBe('unsupported')
+    expect(plan.unsupported).toContainEqual(expect.objectContaining({
+      code: 'pptx.writeback.effect-dag-topology',
+      objectId: target.source?.sourceObjectId,
+    }))
   })
 
   it('round-trips native preset geometry adjustments without replacing the shape path', async () => {
@@ -1855,6 +2426,47 @@ describe('PowerPoint source-package writeback', () => {
     expect(body?.paragraphs.flatMap(paragraph => paragraph.runs).some(
       run => run.hyperlink === 'https://example.com/new',
     )).toBe(true)
+  })
+
+  it('authors internal slide jumps and relationship-free PowerPoint actions', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = editableTextElement(desired)
+    const text = target.type === 'text' ? target : target.text!
+    text.content = '<p><a href="pptx-slide:ppt/slides/slide1.xml"><span>Jump to slide</span></a></p><p><a href="pptx-action:next"><span>Next slide</span></a></p>'
+    delete text.structuredText
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(result.plan.unsupported).toEqual([])
+    const zip = await JSZip.loadAsync(result.bytes)
+    const slideXml = await zip.file(target.source!.sourcePart!)!.async('text')
+    const relationshipPath = target.source!.sourcePart!.replace(/\/([^/]+)$/, '/_rels/$1.rels')
+    const relationships = await zip.file(relationshipPath)!.async('text')
+    expect(slideXml).toContain('action="ppaction://hlinksldjump"')
+    expect(slideXml).toContain('action="ppaction://hlinkshowjump?jump=nextslide"')
+    expect(relationships).toContain('/relationships/slide"')
+    expect(relationships).not.toContain('Target="pptx-slide:')
+
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'internal-action-links.pptx',
+      theme,
+    })
+    const roundTripped = elementBySource(reimported.presentation, target)
+    const body = roundTripped?.type === 'text'
+      ? roundTripped.structuredText
+      : roundTripped?.type === 'shape'
+        ? roundTripped.text?.structuredText
+        : undefined
+    const links = body?.paragraphs.flatMap(paragraph => paragraph.runs)
+      .map(run => run.hyperlink)
+      .filter(Boolean)
+    expect(links).toContain('pptx-slide:ppt/slides/slide1.xml')
+    expect(links).toContain('pptx-action:ppaction://hlinkshowjump?jump=nextslide')
   })
 
   it('preserves an existing hyperlink relationship while editing its source run text', async () => {

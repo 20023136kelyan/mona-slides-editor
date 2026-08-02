@@ -11,12 +11,14 @@
     "type-check": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mona/presentation-core": "0.0.0",
     "@mona/pptx-ingestion": "0.0.0",
+    "@mona/presentation-core": "0.0.0",
     "fast-xml-parser": "5.10.1",
     "jszip": "3.10.1",
+    "mathml2omml": "^0.5.0",
     "pptxgenjs": "4.0.1",
-    "svg-pathdata": "^8.0.0"
+    "svg-pathdata": "^8.0.0",
+    "temml": "^0.13.4"
   },
   "devDependencies": {
     "@types/node": "24.13.2",

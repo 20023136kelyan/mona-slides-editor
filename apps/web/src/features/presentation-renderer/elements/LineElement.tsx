@@ -4,6 +4,7 @@ import type { LinePoint, PPTLineElement } from '@mona/presentation-core/model'
 
 import {
   getLineDashArray,
+  getElementEffectsStyle,
   getLinePath,
   getLineRenderPath,
   getShadowStyle,
@@ -45,6 +46,7 @@ export function LineElement({ element }: { element: PPTLineElement }) {
   const width = Math.max(Math.abs(element.start[0] - element.end[0]), 24)
   const height = Math.max(Math.abs(element.start[1] - element.end[1]), 24)
   const shadow = getShadowStyle(element.shadow)
+  const effectsStyle = getElementEffectsStyle(element.effects, element.threeD)
 
   return (
     <div
@@ -53,7 +55,7 @@ export function LineElement({ element }: { element: PPTLineElement }) {
       data-element-type="line"
       style={{ top: element.top, left: element.left }}
     >
-      <div className="mona-line-content" style={{ filter: shadow ? `drop-shadow(${shadow})` : '' }}>
+      <div className="mona-line-content" style={{ ...effectsStyle, filter: [shadow ? `drop-shadow(${shadow})` : '', effectsStyle.filter || ''].filter(Boolean).join(' ') }}>
         <svg aria-hidden="true" height={height} overflow="visible" width={width}>
           <defs>
             {element.points[0] ? <LineMarker baseSize={element.width} color={element.color} elementId={svgId} position="start" type={element.points[0]} /> : null}

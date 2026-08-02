@@ -63,6 +63,7 @@ export interface PowerPointSourceObjectIdentity {
   creationId?: string
   decorative?: boolean
   description?: string
+  effectReference?: PowerPointEffectReference
   hidden?: boolean
   kind: PowerPointSourceObjectKind
   locks?: Record<string, boolean>
@@ -81,13 +82,47 @@ export interface PowerPointSourceObjectIdentity {
 
 export interface PowerPointVisualEffect {
   attributes: Record<string, string>
+  color?: PowerPointThemeColor & { alpha?: number }
   type: string
 }
 
 export interface PowerPointVisualMetadata {
   effects: PowerPointVisualEffect[]
+  hasEffectDag: boolean
+  hasEffectList: boolean
   hasScene3d: boolean
   hasShape3d: boolean
+  scene3d?: PowerPointScene3d
+  shape3d?: PowerPointShape3d
+}
+
+export interface PowerPointThreeDRotation {
+  attributes: Record<string, string>
+}
+
+export interface PowerPointScene3d {
+  camera?: {
+    attributes: Record<string, string>
+    rotation?: PowerPointThreeDRotation
+  }
+  lightRig?: {
+    attributes: Record<string, string>
+    rotation?: PowerPointThreeDRotation
+  }
+}
+
+export interface PowerPointShape3d {
+  attributes: Record<string, string>
+  bevelBottom?: Record<string, string>
+  bevelTop?: Record<string, string>
+  contourColor?: PowerPointThemeColor
+  extrusionColor?: PowerPointThemeColor
+}
+
+/** A 1-based reference into the theme format scheme's effect-style matrix. */
+export interface PowerPointEffectReference {
+  color?: PowerPointThemeColor
+  index: number
 }
 
 export interface PowerPointPresentationProperties {
@@ -254,6 +289,7 @@ export interface PowerPointThemeStyleEntry {
   colors: PowerPointThemeColor[]
   index: number
   kind: string
+  visual?: PowerPointVisualMetadata
 }
 
 export interface PowerPointColorScheme {
@@ -560,6 +596,7 @@ export interface PowerPointElementSource {
   copyOnWrite?: PowerPointCopyOnWriteSource
   decorative?: boolean
   description?: string
+  effectReference?: PowerPointEffectReference
   hidden?: boolean
   kind: 'pptx'
   locks?: Record<string, boolean>

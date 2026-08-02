@@ -553,3 +553,11 @@ export const generateElementDonorPackage = async ({
   await addElement(slide, pptx, element, unitsPerInch, unitsPerPoint, resolveAsset)
   return await pptx.write({ outputType: 'arraybuffer' }) as ArrayBuffer
 }
+
+/** Generate canonical notes-slide/master markup without depending on Office. */
+export const generateNotesDonorPackage = async (notes: string): Promise<ArrayBuffer> => {
+  const pptx = new PptxGenJS()
+  const slide = pptx.addSlide()
+  slide.addNotes(notes)
+  return await pptx.write({ outputType: 'arraybuffer' }) as ArrayBuffer
+}

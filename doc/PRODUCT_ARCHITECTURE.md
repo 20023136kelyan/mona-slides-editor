@@ -98,14 +98,21 @@ import baseline with the desired presentation, resolves edits through immutable
 source identities, refuses unsupported mutations, and patches only affected
 OOXML parts. A no-op returns the exact retained archive. Existing source-backed
 objects use exact in-place serializers or native copy-on-write. Source-free
-text, shapes, images, connectors, charts/workbooks, tables, groups, vector
-formula pictures and media are generated in a small donor package and transplanted with collision-free
+text, shapes, images, connectors, charts/workbooks, tables, groups, native OMML
+equations and media are generated in a small donor package and transplanted with collision-free
 relationships and content types. Image replacement/backgrounds resolve only
 document-owned assets. Slide-local inherited edits remain private; explicit
 master/layout authoring is isolated in `deck/powerpoint/shared-layers.json` and
-records the exact shared parts allowed to change. Native OMML equation authoring,
-theme authoring, new comment/notes structures, timing authoring and some advanced
-effects remain explicit boundaries.
+records the exact shared parts allowed to change. Base theme font/color authoring,
+new speaker-note/comment structures, external/internal/action run links, supported
+native timing/transition presets, and flat DrawingML glow/inner-shadow/reflection/
+soft-edge effects are writable, including effects inherited through a theme
+`effectRef`; inherited edits materialize locally without losing the inherited
+outer shadow. Existing supported nodes in complex effect graphs are edited in
+place without flattening. Common native camera/light/bevel/extrusion/contour/
+material 3D is editable and writes back natively; graph topology authoring,
+ambiguous graphs, full Office 3D/backdrop semantics, and the full Office
+animation catalog, and unsupported theme matrices remain explicit boundaries.
 
 ## Core concepts
 

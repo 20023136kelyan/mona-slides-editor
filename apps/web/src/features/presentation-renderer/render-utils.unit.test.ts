@@ -4,6 +4,7 @@ import type { PPTImageElement, PPTLineElement, TableCell } from '@mona/presentat
 
 import {
   formatTableText,
+  getElementEffectsStyle,
   getHiddenTableCells,
   getImageClip,
   getImagePosition,
@@ -72,6 +73,44 @@ describe('slide renderer geometry', () => {
     expect(getLinePath(line)).toBe('M0,0 Q50,20 100,100')
     expect(getLineRenderPath(line)).toBe('M3.7139067635410368,1.4855627054164147 Q50,20 98.94000211999364,98.30400339198982')
     expect(getLineDashArray(line)).toBe('20 10')
+  })
+
+  test('maps editable DrawingML effects to Electron rendering styles', () => {
+    const style = getElementEffectsStyle({
+      glow: { color: '#ff0000', opacity: 0.5, radius: 9 },
+      innerShadow: { blur: 6, color: '#000000', h: 2, opacity: 0.4, v: 3 },
+      reflection: { blur: 2, direction: 90, distance: 7, opacity: 0.45, scaleY: -0.8 },
+      softEdge: { radius: 3 },
+    })
+    expect(style.filter).toContain('drop-shadow(0 0 9px rgba(255, 0, 0, 0.5))')
+    expect(style.filter).toContain('blur(1px)')
+    expect(style.boxShadow).toBe('inset 2px 3px 6px rgba(0, 0, 0, 0.4)')
+    expect(style.WebkitBoxReflect).toContain('below 7px')
+  })
+
+  test('maps native bevel and scene 3D semantics to a non-raster Electron approximation', () => {
+    const style = getElementEffectsStyle(undefined, {
+      camera: {
+        preset: 'perspectiveContrastingRightFacing',
+        rotation: { latitude: 12, longitude: 18, revolution: 3 },
+        zoom: 1.1,
+      },
+      light: { direction: 'tr', rig: 'threePt' },
+      shape: {
+        bevelTop: { height: 4, preset: 'circle', width: 8 },
+        contourColor: '#334155',
+        contourWidth: 2,
+        extrusionColor: '#0f172a',
+        extrusionHeight: 10,
+      },
+    })
+    expect(style.filter).toContain('drop-shadow(0 0 2px #334155)')
+    expect(style.filter).toContain('drop-shadow(10px -10px 0 #0f172a)')
+    expect(style.transform).toContain('perspective(1200px)')
+    expect(style.transform).toContain('rotateX(-12deg)')
+    expect(style.transform).toContain('rotateY(18deg)')
+    expect(style.transform).toContain('rotateZ(3deg)')
+    expect(style.transform).toContain('scale(1.1)')
   })
 })
 

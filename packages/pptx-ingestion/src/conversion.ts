@@ -16,11 +16,15 @@ import {
   type PowerPointImportDispositionCounts,
   type PowerPointImportIssue,
   type PowerPointImportReport,
+  type PowerPointEffectReference,
   type PowerPointElementSource,
   type PowerPointElementSourceLayer,
   type PowerPointHierarchy,
   type PowerPointPackageManifest,
   type PowerPointPackageReference,
+  type PowerPointTheme as PowerPointSourceTheme,
+  type PowerPointVisualEffect,
+  type PowerPointVisualMetadata,
 } from '@mona/presentation-core'
 import type {
   ChartOptions,
@@ -29,6 +33,9 @@ import type {
   LinePoint,
   Note,
   PPTElement,
+  PPTElementEffects,
+  PPTElementShadow,
+  PPTElementThreeD,
   PPTGroupElement,
   PPTImageElement,
   PPTLatexElement,
@@ -55,6 +62,228 @@ import type {
 } from './types'
 
 export type { ParsedPptxPresentation } from './types'
+
+const nativeEffectNumber = (
+  effect: PowerPointVisualEffect,
+  name: string,
+  fallback = 0,
+): number => {
+  const value = Number(effect.attributes[name])
+  return Number.isFinite(value) ? value : fallback
+}
+
+const nativeEffectColor = (
+  effect: PowerPointVisualEffect,
+  sourceTheme: PowerPointSourceTheme | undefined,
+  placeholderColor?: PowerPointEffectReference['color'],
+): { color: string; opacity: number } => {
+  const source = effect.color?.type === 'scheme' && effect.color.value === 'phClr'
+    ? placeholderColor
+    : effect.color
+  let value = source?.value
+  if (source?.type === 'scheme') {
+    value = sourceTheme?.colors.find(color => color.name === source.value)?.value ?? value
+  }
+  if (source?.type === 'preset' && value && tinycolor(value).isValid()) {
+    value = tinycolor(value).toHex()
+  }
+  const color = value && /^[0-9a-f]{6}$/i.test(value) ? `#${value}` : '#000000'
+  return { color, opacity: effect.color?.alpha ?? 1 }
+}
+
+const nativeVisualColor = (
+  source: PowerPointVisualEffect['color'] | undefined,
+  sourceTheme: PowerPointSourceTheme | undefined,
+  placeholderColor?: PowerPointEffectReference['color'],
+): string | undefined => {
+  const resolved = source?.type === 'scheme' && source.value === 'phClr'
+    ? placeholderColor
+    : source
+  let value = resolved?.value
+  if (resolved?.type === 'scheme') {
+    value = sourceTheme?.colors.find(color => color.name === resolved.value)?.value ?? value
+  }
+  if (resolved?.type === 'preset' && value && tinycolor(value).isValid()) {
+    value = tinycolor(value).toHex()
+  }
+  return value && /^[0-9a-f]{6}$/i.test(value) ? `#${value}` : undefined
+}
+
+const importedPowerPointEffects = (
+  visual: PowerPointVisualMetadata | undefined,
+  sourceTheme: PowerPointSourceTheme | undefined,
+  scale: number,
+  placeholderColor?: PowerPointEffectReference['color'],
+): PPTElementEffects | undefined => {
+  if (!visual) return undefined
+  const result: PPTElementEffects = {}
+  const emu = (value: number): number => value / 12_700 * scale
+  for (const effect of visual.effects) {
+    if (effect.type === 'glow') {
+      result.glow = {
+        ...nativeEffectColor(effect, sourceTheme, placeholderColor),
+        radius: emu(nativeEffectNumber(effect, 'rad')),
+      }
+    }
+    if (effect.type === 'innerShdw') {
+      const distance = emu(nativeEffectNumber(effect, 'dist'))
+      const direction = nativeEffectNumber(effect, 'dir') / 60_000
+      result.innerShadow = {
+        blur: emu(nativeEffectNumber(effect, 'blurRad')),
+        ...nativeEffectColor(effect, sourceTheme, placeholderColor),
+        h: distance * Math.cos(direction * Math.PI / 180),
+        v: distance * Math.sin(direction * Math.PI / 180),
+      }
+    }
+    if (effect.type === 'reflection') {
+      result.reflection = {
+        blur: emu(nativeEffectNumber(effect, 'blurRad')),
+        direction: nativeEffectNumber(effect, 'dir') / 60_000,
+        distance: emu(nativeEffectNumber(effect, 'dist')),
+        opacity: Math.max(0, Math.min(1, nativeEffectNumber(effect, 'stA', 50_000) / 100_000)),
+        scaleY: nativeEffectNumber(effect, 'sy', -100_000) / 100_000,
+      }
+    }
+    if (effect.type === 'softEdge') {
+      result.softEdge = { radius: emu(nativeEffectNumber(effect, 'rad')) }
+    }
+  }
+  return Object.keys(result).length ? result : undefined
+}
+
+const effectivePowerPointVisual = (
+  direct: PowerPointVisualMetadata | undefined,
+  reference: PowerPointEffectReference | undefined,
+  sourceTheme: PowerPointSourceTheme | undefined,
+): PowerPointVisualMetadata | undefined => {
+  const inherited = reference && reference.index > 0
+    ? sourceTheme?.effectStyles?.[reference.index - 1]?.visual
+    : undefined
+  if (!direct) return inherited ? structuredClone(inherited) : undefined
+  if (!inherited) return direct
+  const hasDirectEffectContainer = direct.hasEffectDag || direct.hasEffectList
+  return {
+    effects: hasDirectEffectContainer
+      ? direct.effects
+      : inherited.effects,
+    hasEffectDag: hasDirectEffectContainer
+      ? direct.hasEffectDag
+      : inherited.hasEffectDag,
+    hasEffectList: hasDirectEffectContainer
+      ? direct.hasEffectList
+      : inherited.hasEffectList,
+    hasScene3d: direct.hasScene3d || inherited.hasScene3d,
+    hasShape3d: direct.hasShape3d || inherited.hasShape3d,
+    ...(direct.scene3d || inherited.scene3d
+      ? { scene3d: structuredClone(direct.scene3d ?? inherited.scene3d!) }
+      : {}),
+    ...(direct.shape3d || inherited.shape3d
+      ? { shape3d: structuredClone(direct.shape3d ?? inherited.shape3d!) }
+      : {}),
+  }
+}
+
+const importedPowerPointOuterShadow = (
+  visual: PowerPointVisualMetadata | undefined,
+  sourceTheme: PowerPointSourceTheme | undefined,
+  scale: number,
+  placeholderColor?: PowerPointEffectReference['color'],
+): PPTElementShadow | undefined => {
+  const effect = visual?.effects.find(candidate => candidate.type === 'outerShdw')
+  if (!effect) return undefined
+  const distance = nativeEffectNumber(effect, 'dist') / 12_700 * scale
+  const direction = nativeEffectNumber(effect, 'dir') / 60_000
+  const color = nativeEffectColor(effect, sourceTheme, placeholderColor)
+  return {
+    blur: nativeEffectNumber(effect, 'blurRad') / 12_700 * scale,
+    color: tinycolor(color.color).setAlpha(color.opacity).toRgbString(),
+    h: distance * Math.cos(direction * Math.PI / 180),
+    v: distance * Math.sin(direction * Math.PI / 180),
+  }
+}
+
+const importedPowerPointThreeD = (
+  visual: PowerPointVisualMetadata | undefined,
+  sourceTheme: PowerPointSourceTheme | undefined,
+  scale: number,
+  placeholderColor?: PowerPointEffectReference['color'],
+): PPTElementThreeD | undefined => {
+  if (!visual?.scene3d && !visual?.shape3d) return undefined
+  const degrees = (value: string | undefined): number => {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric / 60_000 : 0
+  }
+  const rotation = (value: { attributes: Record<string, string> } | undefined) => (
+    value
+      ? {
+          latitude: degrees(value.attributes.lat),
+          longitude: degrees(value.attributes.lon),
+          revolution: degrees(value.attributes.rev),
+        }
+      : undefined
+  )
+  const emu = (value: string | undefined): number | undefined => {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric / 12_700 * scale : undefined
+  }
+  const scene = visual.scene3d
+  const shape = visual.shape3d
+  const bevel = (value: Record<string, string> | undefined) => {
+    if (!value) return undefined
+    return {
+      height: emu(value.h) ?? 0,
+      preset: value.prst ?? 'circle',
+      width: emu(value.w) ?? 0,
+    }
+  }
+  const contourColor = nativeVisualColor(shape?.contourColor, sourceTheme, placeholderColor)
+  const extrusionColor = nativeVisualColor(shape?.extrusionColor, sourceTheme, placeholderColor)
+  const bevelBottom = bevel(shape?.bevelBottom)
+  const bevelTop = bevel(shape?.bevelTop)
+  const contourWidth = emu(shape?.attributes.contourW)
+  const extrusionHeight = emu(shape?.attributes.extrusionH)
+  const z = emu(shape?.attributes.z)
+  return {
+    ...(scene?.camera
+      ? {
+          camera: {
+            preset: scene.camera.attributes.prst ?? 'orthographicFront',
+            ...(rotation(scene.camera.rotation)
+              ? { rotation: rotation(scene.camera.rotation) }
+              : {}),
+            ...(Number.isFinite(Number(scene.camera.attributes.zoom))
+              ? { zoom: Number(scene.camera.attributes.zoom) / 100_000 }
+              : {}),
+          },
+        }
+      : {}),
+    ...(scene?.lightRig
+      ? {
+          light: {
+            direction: scene.lightRig.attributes.dir ?? 't',
+            rig: scene.lightRig.attributes.rig ?? 'threePt',
+            ...(rotation(scene.lightRig.rotation)
+              ? { rotation: rotation(scene.lightRig.rotation) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(shape
+      ? {
+          shape: {
+            ...(bevelBottom ? { bevelBottom } : {}),
+            ...(bevelTop ? { bevelTop } : {}),
+            ...(contourColor ? { contourColor } : {}),
+            ...(contourWidth !== undefined ? { contourWidth } : {}),
+            ...(extrusionColor ? { extrusionColor } : {}),
+            ...(extrusionHeight !== undefined ? { extrusionHeight } : {}),
+            ...(shape.attributes.prstMaterial ? { material: shape.attributes.prstMaterial } : {}),
+            ...(z !== undefined ? { z } : {}),
+          },
+        }
+      : {}),
+  }
+}
 
 const importedPowerPointNotes = (
   sourcePackage: PowerPointPackageReference | undefined,
@@ -93,6 +322,86 @@ const importedPowerPointNotes = (
     time: toTimestamp(comment.createdAt),
     user: userName(comment.authorId),
   }))
+}
+
+const flattenTimingNodes = (
+  roots: readonly import('@mona/presentation-core').PowerPointTimingNode[],
+): import('@mona/presentation-core').PowerPointTimingNode[] => roots.flatMap(node => [
+  node,
+  ...flattenTimingNodes(node.children),
+])
+
+const importedAnimationEffect = (
+  type: 'attention' | 'in' | 'out',
+  node: import('@mona/presentation-core').PowerPointTimingNode,
+): string => {
+  const descendants = flattenTimingNodes([node])
+  const effect = descendants.find(candidate => candidate.nodeType === 'animEffect')
+  const filter = `${effect?.attributes.filter ?? ''}`.toLowerCase()
+  const presetId = node.attributes.presetID ?? node.attributes.presetId
+  const suffix = type === 'out' ? 'Out' : 'In'
+  if (type === 'attention') return presetId === '8' ? 'swing' : 'pulse'
+  if (presetId === '23' || filter.includes('zoom')) return `zoom${suffix}`
+  if (presetId === '19' || filter.includes('wheel') || filter.includes('rotate')) return `rotate${suffix}`
+  if (presetId === '2' || filter.includes('wipe') || filter.includes('slide')) {
+    const direction = filter.includes('right')
+      ? 'Right'
+      : filter.includes('up') || filter.includes('top')
+        ? 'Up'
+        : filter.includes('down') || filter.includes('bottom')
+          ? 'Down'
+          : 'Left'
+    return `slide${suffix}${direction}`
+  }
+  return `fade${suffix}`
+}
+
+const importedPowerPointAnimations = (
+  timing: import('@mona/presentation-core').PowerPointSlideTiming | undefined,
+  elements: readonly PPTElement[],
+): import('@mona/presentation-core').PPTAnimation[] | undefined => {
+  if (!timing) return undefined
+  const elementsByObject = new Map(flattenElementTree(elements).flatMap(element => (
+    element.source?.sourceObjectId ? [[element.source.sourceObjectId, element] as const] : []
+  )))
+  const animations = flattenTimingNodes(timing.roots).flatMap((node, index) => {
+    const presetClass = node.attributes.presetClass
+    const type = presetClass === 'entr'
+      ? 'in'
+      : presetClass === 'exit'
+        ? 'out'
+        : presetClass === 'emph'
+          ? 'attention'
+          : undefined
+    const target = node.targetObjectId ? elementsByObject.get(node.targetObjectId) : undefined
+    if (!type || !target) return []
+    const durationNode = flattenTimingNodes([node]).find(candidate => (
+      candidate.attributes.dur && Number.isFinite(Number(candidate.attributes.dur))
+    ))
+    const duration = Number(durationNode?.attributes.dur)
+    const trigger = node.attributes.nodeType === 'withEffect'
+      ? 'meantime'
+      : node.attributes.nodeType === 'afterEffect'
+        ? 'auto'
+        : 'click'
+    return [{
+      duration: Number.isFinite(duration) && duration > 0 ? duration : 1000,
+      effect: importedAnimationEffect(type, node),
+      elId: target.id,
+      id: `pptx-animation:${timing.slidePart}:${node.id ?? index}`,
+      powerPointTiming: {
+        ...(node.id ? { nodeId: node.id } : {}),
+        ...(presetClass ? { presetClass } : {}),
+        ...(node.attributes.presetID || node.attributes.presetId
+          ? { presetId: node.attributes.presetID ?? node.attributes.presetId }
+          : {}),
+        ...(node.targetObjectId ? { sourceObjectId: node.targetObjectId } : {}),
+      },
+      trigger,
+      type,
+    } satisfies import('@mona/presentation-core').PPTAnimation]
+  })
+  return animations.length ? animations : undefined
 }
 
 const vAlignMap: Record<string, TextAlignVertical> = { down: 'bottom', mid: 'middle', up: 'top' }
@@ -606,6 +915,11 @@ export const convertParsedPptxPresentation = ({
           : sourceIdentity?.partPath === sourceDependency?.masterPart
             ? 'master'
             : sourceLayer
+        const sourceVisual = effectivePowerPointVisual(
+          sourceIdentity?.visual,
+          sourceIdentity?.effectReference,
+          sourceTheme,
+        )
         if (sourcePackage && sourceManifest && !sourceIdentity) {
           issues.push({
             code: element.native ? 'pptx.identity.not-in-manifest' : 'pptx.identity.missing',
@@ -642,6 +956,36 @@ export const convertParsedPptxPresentation = ({
             || sourceIdentity?.locks?.noMove
             || sourceIdentity?.locks?.noResize
           ) destination.lock = true
+          const effects = importedPowerPointEffects(
+            sourceVisual,
+            sourceTheme,
+            ratio,
+            sourceIdentity?.effectReference?.color,
+          )
+          if (effects) destination.effects = effects
+          const threeD = importedPowerPointThreeD(
+            sourceVisual,
+            sourceTheme,
+            ratio,
+            sourceIdentity?.effectReference?.color,
+          )
+          if (threeD) destination.threeD = threeD
+          const inheritedShadow = importedPowerPointOuterShadow(
+            sourceVisual,
+            sourceTheme,
+            ratio,
+            sourceIdentity?.effectReference?.color,
+          )
+          if (
+            inheritedShadow
+            && (
+              destination.type === 'image'
+              || destination.type === 'line'
+              || destination.type === 'shape'
+              || destination.type === 'text'
+            )
+            && !destination.shadow
+          ) destination.shadow = inheritedShadow
           if (sourcePackage && sourceDependency && sourceIdentity) {
             destination.source = {
               ...(sourceIdentity.connector
@@ -651,6 +995,9 @@ export const convertParsedPptxPresentation = ({
                 ? { decorative: sourceIdentity.decorative }
                 : {}),
               ...(sourceIdentity.description ? { description: sourceIdentity.description } : {}),
+              ...(sourceIdentity.effectReference
+                ? { effectReference: structuredClone(sourceIdentity.effectReference) }
+                : {}),
               ...(sourceIdentity.hidden !== undefined ? { hidden: sourceIdentity.hidden } : {}),
               kind: 'pptx',
               ...(sourceIdentity.locks ? { locks: structuredClone(sourceIdentity.locks) } : {}),
@@ -668,8 +1015,8 @@ export const convertParsedPptxPresentation = ({
               sourcePart: sourceIdentity.partPath,
               stableId: sourceIdentity.stableId,
               ...(sourceIdentity.title ? { title: sourceIdentity.title } : {}),
-              ...(sourceIdentity.visual
-                ? { visual: structuredClone(sourceIdentity.visual) }
+              ...(sourceVisual
+                ? { visual: structuredClone(sourceVisual) }
                 : {}),
             }
           }
@@ -1245,20 +1592,33 @@ export const convertParsedPptxPresentation = ({
             message: `Unsupported PowerPoint element type: ${element.type}`,
           }
         }
-        const unsupportedEffects = sourceIdentity?.visual?.effects.filter(effect => (
-          !['outerShdw', 'solidFill'].includes(effect.type)
+        const unsupportedEffects = sourceVisual?.effects.filter(effect => (
+          ![
+            'glow',
+            'innerShdw',
+            'outerShdw',
+            'reflection',
+            'softEdge',
+            'solidFill',
+          ].includes(effect.type)
         )) ?? []
         if (
           !issue
-          && sourceIdentity?.visual
-          && (unsupportedEffects.length || sourceIdentity.visual.hasScene3d || sourceIdentity.visual.hasShape3d)
+          && sourceVisual
+          && (
+            unsupportedEffects.length
+            || sourceVisual.hasEffectDag
+            || sourceVisual.hasScene3d
+            || sourceVisual.hasShape3d
+          )
         ) {
           issue = {
             code: 'pptx.visual.approximated-effects',
-            message: `Native visual effects are retained but not fully rendered: ${[
+            message: `Native visual semantics are retained and use an editable approximation where supported: ${[
               ...new Set(unsupportedEffects.map(effect => effect.type)),
-              ...(sourceIdentity.visual.hasScene3d ? ['scene3d'] : []),
-              ...(sourceIdentity.visual.hasShape3d ? ['sp3d'] : []),
+              ...(sourceVisual.hasEffectDag ? ['effectDag'] : []),
+              ...(sourceVisual.hasScene3d ? ['scene3d'] : []),
+              ...(sourceVisual.hasShape3d ? ['sp3d'] : []),
             ].join(', ')}`,
           }
         }
@@ -1288,6 +1648,11 @@ export const convertParsedPptxPresentation = ({
       )
     }
     parseElements(item.elements, 'slide')
+    const retainedTiming = sourcePackage?.document?.timings.find(candidate => (
+      candidate.slidePart === sourceDependency?.slidePart
+    ))
+    const animations = importedPowerPointAnimations(retainedTiming, slide.elements)
+    if (animations) slide.animations = animations
     slides.push(slide)
     slideReports.push({
       capabilities: [...capabilityCounts.values()].sort((left, right) => left.sourceType.localeCompare(right.sourceType)),

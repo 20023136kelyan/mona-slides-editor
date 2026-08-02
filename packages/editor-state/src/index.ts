@@ -275,8 +275,11 @@ export const createEditorStore = (options: CreateEditorStoreOptions) => {
     preloadedState,
     devTools: false,
     middleware: getDefaultMiddleware => getDefaultMiddleware({
-      immutableCheck: devChecks,
-      serializableCheck: devChecks,
+      immutableCheck: devChecks ? { warnAfter: 128 } : false,
+      // Real PowerPoint decks legitimately carry large retained hierarchies.
+      // Keep the development safety check, but use a desktop-scale warning
+      // threshold instead of Redux Toolkit's small-form default.
+      serializableCheck: devChecks ? { warnAfter: 128 } : false,
     }),
   })
 }

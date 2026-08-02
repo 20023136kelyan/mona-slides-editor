@@ -105,6 +105,83 @@ describe('desktop-safe PowerPoint ingestion', () => {
     expect(nativeTheme?.fillStyles?.some(style => style.colors.length > 0)).toBe(true)
   })
 
+  it('resolves theme effect references into editable rendered effects', async () => {
+    const zip = await JSZip.loadAsync(await arrayBuffer('corpus-02-shapes-lines.pptx'))
+    const slidePath = 'ppt/slides/slide1.xml'
+    const slideXml = await zip.file(slidePath)!.async('text')
+    const effectReference = '<p:style>'
+      + '<a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef>'
+      + '<a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef>'
+      + '<a:effectRef idx="1"><a:schemeClr val="accent2"/></a:effectRef>'
+      + '<a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>'
+      + '</p:style>'
+    zip.file(slidePath, slideXml.replace('</p:spPr>', `</p:spPr>${effectReference}`))
+
+    const themePath = 'ppt/theme/theme1.xml'
+    const themeXml = await zip.file(themePath)!.async('text')
+    const inheritedEffects = '<a:effectStyle><a:effectLst>'
+      + '<a:glow rad="127000"><a:schemeClr val="phClr"><a:alpha val="50000"/></a:schemeClr></a:glow>'
+      + '<a:outerShdw blurRad="63500" dist="127000" dir="5400000" rotWithShape="0"><a:schemeClr val="phClr"><a:alpha val="40000"/></a:schemeClr></a:outerShdw>'
+      + '</a:effectLst>'
+      + '<a:scene3d><a:camera prst="perspectiveContrastingRightFacing" zoom="110000"><a:rot lat="720000" lon="1080000" rev="180000"/></a:camera><a:lightRig rig="threePt" dir="tr"><a:rot lat="0" lon="0" rev="1200000"/></a:lightRig></a:scene3d>'
+      + '<a:sp3d z="12700" extrusionH="127000" contourW="25400" prstMaterial="warmMatte"><a:bevelT w="76200" h="38100" prst="circle"/><a:extrusionClr><a:schemeClr val="phClr"/></a:extrusionClr><a:contourClr><a:srgbClr val="334155"/></a:contourClr></a:sp3d>'
+      + '</a:effectStyle>'
+    zip.file(themePath, themeXml.replace(
+      '<a:effectStyle><a:effectLst/></a:effectStyle>',
+      inheritedEffects,
+    ))
+
+    const archive = await zip.generateAsync({ type: 'arraybuffer' })
+    const result = await ingestPowerPoint(archive, { fileName: 'theme-effects.pptx', theme })
+    const element = result.presentation.slides
+      .flatMap(slide => flattenElementTree(slide.elements))
+      .find(candidate => candidate.source?.effectReference?.index === 1)
+
+    expect(element?.source?.effectReference).toMatchObject({
+      color: { type: 'scheme' },
+      index: 1,
+    })
+    expect(element?.source?.visual).toMatchObject({
+      hasEffectList: true,
+      hasScene3d: true,
+      hasShape3d: true,
+    })
+    expect(element?.effects?.glow?.opacity).toBeCloseTo(0.5, 5)
+    expect(element?.effects?.glow?.radius).toBeCloseTo(40 / 3, 5)
+    expect(element?.effects?.glow?.color).not.toBe('#000000')
+    if (
+      element?.type !== 'image'
+      && element?.type !== 'line'
+      && element?.type !== 'shape'
+      && element?.type !== 'text'
+    ) throw new Error('Theme effect reference did not resolve to a shadow-capable element')
+    expect(element.shadow?.blur).toBeCloseTo(20 / 3, 5)
+    expect(element.shadow?.h).toBeCloseTo(0, 5)
+    expect(element.shadow?.v).toBeCloseTo(40 / 3, 5)
+    expect(element.shadow?.color).toContain('0.4')
+    expect(element?.threeD).toMatchObject({
+      camera: {
+        preset: 'perspectiveContrastingRightFacing',
+        rotation: { latitude: 12, longitude: 18, revolution: 3 },
+        zoom: 1.1,
+      },
+      light: { direction: 'tr', rig: 'threePt' },
+      shape: {
+        bevelTop: { height: 4, preset: 'circle', width: 8 },
+        contourColor: '#334155',
+        material: 'warmMatte',
+      },
+    })
+    expect(element?.threeD?.shape?.contourWidth).toBeCloseTo(8 / 3, 5)
+    expect(element?.threeD?.shape?.extrusionHeight).toBeCloseTo(40 / 3, 5)
+    expect(element?.threeD?.shape?.z).toBeCloseTo(4 / 3, 5)
+    expect(result.report.slides.flatMap(slide => slide.issues).filter(issue => (
+      issue.code === 'pptx.visual.approximated-effects'
+    ))).toContainEqual(expect.objectContaining({
+      message: expect.stringContaining('scene3d'),
+    }))
+  })
+
   it('records the exact coordinate scale used by fixed-viewport imports', async () => {
     const source = await arrayBuffer('corpus-02-shapes-lines.pptx')
     const result = await ingestPowerPoint(source, {
@@ -166,7 +243,7 @@ describe('desktop-safe PowerPoint ingestion', () => {
     expect(document?.commentAuthors[0]).toMatchObject({ id: '0', initials: 'AL', name: 'Ada' })
     expect(document?.comments[0]).toMatchObject({
       authorId: '0',
-      id: '5',
+      id: '0:5',
       position: { x: 120, y: 240 },
       slidePart: slidePath,
       text: 'Review this wording',

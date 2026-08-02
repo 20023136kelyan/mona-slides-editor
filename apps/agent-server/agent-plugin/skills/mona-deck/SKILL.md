@@ -78,6 +78,59 @@ copy is `content`, a plain string field, and it has no `text`.)
 Text content is HTML. Wrap paragraphs in `<p>`; `<strong>` and `<em>` work. One
 `<p>` per line — a newline in a string is not a line break.
 
+## PowerPoint-native semantics
+
+The JSON is the full editing surface; do not reduce a request to a fixed command
+vocabulary. On an imported `.pptx`, keep every `source` object unchanged and edit
+the semantic fields around it. Supported edits are serialized back into the
+retained package instead of rebuilding or flattening the slide.
+
+- `deck/deck.json.theme` controls the base theme. `fontName`, `fontColor`,
+  `backgroundColor`, and the first six `themeColors` write into retained base
+  theme parts.
+- `slide.remark` is speaker notes. `slide.notes` is the comment-thread list
+  (`id`, `user`, `time`, `content`, optional `elId` and `replies`). Mona allocates
+  missing native notes/comment parts and authors.
+- `slide.turningMode` supports native `no`, `fade`, `random`, `slideX`, and
+  `slideY`; `durationMs` is the automatic advance interval.
+- `slide.animations` is an ordered list of
+  `{ id, elId, effect, type, duration, trigger }`. `type` is `in`, `out`, or
+  `attention`; `trigger` is `click`, `meantime`, or `auto`. Fade, zoom, rotate,
+  directional slide, pulse, and swing map to native PowerPoint timing presets.
+- A `latex` element's `latex` string writes as native editable OMML with a visual
+  fallback. Editing an imported equation replaces its native equation object.
+- Rich-text run links use ordinary `<a href="…">` markup. For retained
+  PowerPoint semantics, `pptx-slide:ppt/slides/slideN.xml` is an internal slide
+  jump and `pptx-action:next`, `previous`, `first`, `last`, or `end` is a
+  relationship-free slideshow action. External HTTPS links remain external.
+- Text, shape, image, line, group, audio, and video elements may carry editable
+  `effects`: `glow`, `innerShadow`, `reflection`, and `softEdge`. Measurements
+  are canvas units, angles are degrees, and opacity is 0..1. These write as
+  native DrawingML effects. Keep any retained `source.visual` payload unchanged;
+  theme-inherited effects are already exposed through the element's semantic
+  `effects`/`shadow` values and can be edited there. Keep `source.effectReference`
+  unchanged; Mona materializes the edited effect locally. Existing supported
+  `effectDag` nodes may be value-edited, but do not add/remove graph effects or
+  modify graph provenance.
+- Shape, text, image, and group elements may carry editable `threeD` with
+  `camera`, `light`, and `shape` records. Camera/light rotations are degrees,
+  zoom is a multiplier, and bevel/contour/extrusion measurements are canvas
+  units. These serialize as native `scene3d`/`sp3d`; keep `source.visual`
+  provenance unchanged.
+
+Example:
+
+```json
+{
+  "effects": {
+    "glow": { "color": "#F16F3A", "opacity": 0.6, "radius": 8 },
+    "innerShadow": { "color": "#111827", "opacity": 0.35, "h": 3, "v": 4, "blur": 6 },
+    "reflection": { "opacity": 0.45, "distance": 6, "blur": 2, "direction": 90, "scaleY": -0.8 },
+    "softEdge": { "radius": 3 }
+  }
+}
+```
+
 ## Assets
 
 Reference images by relative path (`assets/name.png`). To add one, write the file

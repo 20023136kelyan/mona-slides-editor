@@ -121,6 +121,74 @@ export interface PPTElementLink {
   target: string
 }
 
+/**
+ * Editable effects which have native DrawingML equivalents. Measurements use
+ * Mona canvas units; angles use degrees and opacity is normalized to 0..1.
+ * The retained source payload still carries unsupported effect-graph data.
+ */
+export interface PPTElementEffects {
+  glow?: {
+    color: string
+    opacity: number
+    radius: number
+  }
+  innerShadow?: PPTElementShadow & {
+    opacity: number
+  }
+  reflection?: {
+    blur: number
+    direction: number
+    distance: number
+    opacity: number
+    scaleY: number
+  }
+  softEdge?: {
+    radius: number
+  }
+}
+
+export interface PPTElementThreeDRotation {
+  latitude: number
+  longitude: number
+  revolution: number
+}
+
+/**
+ * Editable DrawingML scene/shape 3D semantics. Measurements use Mona canvas
+ * units and rotations use degrees. Unknown native attributes remain retained
+ * in the immutable PowerPoint source package.
+ */
+export interface PPTElementThreeD {
+  camera?: {
+    preset: string
+    rotation?: PPTElementThreeDRotation
+    zoom?: number
+  }
+  light?: {
+    direction: string
+    rig: string
+    rotation?: PPTElementThreeDRotation
+  }
+  shape?: {
+    bevelBottom?: {
+      height: number
+      preset: string
+      width: number
+    }
+    bevelTop?: {
+      height: number
+      preset: string
+      width: number
+    }
+    contourColor?: string
+    contourWidth?: number
+    extrusionColor?: string
+    extrusionHeight?: number
+    material?: string
+    z?: number
+  }
+}
+
 export type TextAlign = 'left' | 'center' | 'right' | 'justify'
 
 export type TextAlignVertical = 'top' | 'middle' | 'bottom'
@@ -166,6 +234,8 @@ export interface PPTBaseElement {
   rotate: number
   link?: PPTElementLink
   name?: string
+  effects?: PPTElementEffects
+  threeD?: PPTElementThreeD
   source?: PowerPointElementSource
 }
 
@@ -1127,6 +1197,13 @@ export interface PPTAnimation {
   type: AnimationType
   duration: number
   trigger: AnimationTrigger
+  /** Retained native timing identity used for lossless PowerPoint round trips. */
+  powerPointTiming?: {
+    nodeId?: string
+    presetClass?: string
+    presetId?: string
+    sourceObjectId?: string
+  }
 }
 
 export type SlideBackgroundType = 'solid' | 'image' | 'gradient' | 'pattern'

@@ -153,4 +153,36 @@ describe('semantic element trees', () => {
     expect(validateImportedSlides(state.slides)).toMatchObject({ valid: true })
     expect(validatePresentationState(state)).toMatchObject({ valid: true })
   })
+
+  it('validates agent-editable effects, 3D, and animation timing values', () => {
+    const element = text('effects-text')
+    element.effects = {
+      glow: { color: '#ff6600', opacity: 1.5, radius: 8 },
+      softEdge: { radius: -2 },
+    }
+    element.threeD = {
+      camera: { preset: '', zoom: 0 },
+      shape: {
+        bevelTop: { height: -1, preset: '', width: Number.NaN },
+        extrusionColor: '',
+      },
+    }
+    const state = presentation([element])
+    state.slides[0]!.animations = [{
+      duration: Number.NaN,
+      effect: 'fadeIn',
+      elId: element.id,
+      id: 'bad-animation',
+      trigger: 'click',
+      type: 'in',
+    }]
+    const validation = validatePresentationState(state)
+    expect(validation.valid).toBe(false)
+    expect(validation.issues.map(issue => issue.code)).toEqual(expect.arrayContaining([
+      'animation.invalid',
+      'element.effects.invalid-number',
+      'element.three-d.invalid-number',
+      'element.three-d.invalid-string',
+    ]))
+  })
 })

@@ -37,6 +37,17 @@ OOXML writeback. On existing slide-local source-backed non-line elements you may
   `outline` (`color`, `width`, and `solid`/`dashed`/`dotted` style). Remove an
   existing shape's `gradient`, `pattern`, `patternFit`, and `powerPointPattern`
   fields when intentionally replacing that complex fill with a solid fill.
+- edit native `glow`, `innerShadow`, `reflection`, and `softEdge` through the
+  element's semantic `effects` object; keep retained `source.visual` unchanged;
+- edit native camera/light/bevel/extrusion/contour/material properties through
+  semantic `threeD`; keep `source.visual` and `source.effectReference` unchanged;
+- edit a `latex` element's source as native OMML, add/retarget external,
+  internal-slide, or slideshow-action links in rich-text runs, and edit slide
+  `animations`, `turningMode`, `durationMs`, speaker-note `remark`, and comment
+  `notes`; and
+- edit base theme fonts/colors in `deck/deck.json`. Theme-matrix structure,
+  effect-graph topology, full Office 3D/backdrop semantics, and unsupported
+  animation presets remain retained source boundaries and must not be guessed.
 
 On existing slide-local source-backed `line` elements you may change `color`,
 `width`, `style` (`solid`, `dashed`, or `dotted`), and `points` (start/end

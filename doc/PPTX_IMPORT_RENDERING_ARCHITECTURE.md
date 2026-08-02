@@ -263,15 +263,16 @@ The first compatibility foundation now exists:
     titles, legends, labels, external-data provenance, theme overrides, and
     embedded workbook addresses. Supported edits patch caches and their
     declared embedded-workbook ranges together.
-42. Existing speaker-notes and comments parts are modeled, shown through Mona's
-    notes/comment surfaces, and receive source-preserving text edits. Creating
-    new parts, authors, and threads remains relationship-allocation work.
+42. Speaker-notes and comments are modeled and shown through Mona's
+    notes/comment surfaces. Existing parts receive source-preserving edits, and
+    missing notes slides/masters plus legacy comment authors, threads, and
+    replies are allocated with relationships and content types.
 43. Alt text, accessibility title, decorative state, and hidden state are
     editable semantic properties and write back through native nonvisual
     drawing properties.
-44. External run hyperlinks can be added, removed, or retargeted with
-    collision-free relationship IDs. Unsupported internal/action links still
-    fail explicitly.
+44. External and internal-slide run hyperlinks can be added, removed, or
+    retargeted with collision-free relationship IDs. Relationship-free
+    slideshow actions remain distinct and round-trip as `ppaction` values.
 45. Solid, gradient, and pattern slide-local backgrounds can be written over an
     inherited background without modifying the shared layout or master.
 46. The dirty journal records the actual owner parts for chart/workbook,
@@ -344,7 +345,7 @@ Status in this table refers to Mona today:
 
 | ID | Capability | Status | Action | Acceptance gate |
 | --- | --- | --- | --- | --- |
-| B01 | First-class themes | Partial | Color/font schemes, typed fill/line/effect/background matrices, extra color schemes, theme overrides, and color-map overrides are retained; add explicit theme editing and dependency invalidation | A theme-only change updates dependent slides without rewriting their objects |
+| B01 | First-class themes | Partial | Color/font schemes, typed fill/line/effect/background matrices, extra color schemes, theme overrides, and color-map overrides are retained. Shape `effectRef` indices now resolve through the active theme effect matrix, including `phClr`, and presentation font/background/foreground/accent edits patch every retained base theme; complete matrix editing and dependency invalidation remain | A theme-only change updates dependent slides without rewriting their objects |
 | B02 | Slide masters | Partial | Master background, shape tree, text-style levels, color map, placeholders, header/footer policy, and theme reference are stored once; complete structured style/effect inheritance | Master objects are stored once and used by every dependent layout |
 | B03 | Slide layouts | Partial | Layout records retain master reference, matching name/type, authored background, placeholder tree, visibility flags, and color-map overrides; remove the remaining parser compatibility adapter | Slides reference a layout instead of owning copied `layoutElements` |
 | B04 | Slide-to-layout-to-master graph | Done | Replace candidate paths with typed IDs and validated references; recover gracefully from broken relationships | Corpus slides resolve the same hierarchy as the OOXML relationship graph |
@@ -353,8 +354,8 @@ Status in this table refers to Mona today:
 | B07 | Slide backgrounds | Done for imported static backgrounds | Preserve authored solid, gradient, pattern, and picture backgrounds independently at slide/layout/master layers and resolve one effective background | Backgrounds render without converting patterns to white or losing transforms |
 | B08 | Presentation and slide properties | Partial | Model slide size, order, hidden state, sections, names, default text styles, custom shows, tags, and presentation/view properties | Nonvisual deck structure matches the source manifest |
 | B09 | Headers, footers, date, and slide numbers | Partial | Master policy and layout field placeholders render in inherited positions; add typed field content/date formats and explicit per-slide field editing | Dynamic/static footer fields display in the correct inherited position |
-| B10 | Notes hierarchy | Done for preservation/model; partial editing | Notes masters/slides, relationships, placeholders, paragraphs/runs, and the editor remark adapter are retained; existing native notes bodies accept text edits | Speaker notes and notes-page objects survive independently |
-| B11 | Comments and authors | Partial | Modern/legacy comment records, authors, replies, positions, timestamps, and relationships are modeled; existing comment text is editable, while new authors/threads still require allocation | Comment threads retain identity and slide/object anchoring |
+| B10 | Notes hierarchy | Done for speaker-note authoring | Notes masters/slides, relationships, placeholders, paragraphs/runs, and the editor remark adapter are retained; missing notes slide/master structures are allocated natively | Speaker notes and notes-page objects survive independently |
+| B11 | Comments and authors | Partial | Modern/legacy comment records, authors, replies, positions, timestamps, and relationships are modeled. Existing records edit in place; new legacy authors, threads, and threaded replies are allocated. Complete modern-comment authoring remains | Comment threads retain identity and slide/object anchoring |
 
 The hierarchy model begins with:
 
@@ -382,8 +383,8 @@ only as a migration adapter while the renderer moves to the derived hierarchy.
 | C06 | Connectors | Done for supported native routes; partial breadth | Endpoint IDs/sites, explicit attach/detach, straight/bent/curved route controls, rotation/flip canonicalization, width, dash, color, and arrowheads write back natively; uncommon custom/effect cases remain explicit | Style edits retain connections; implicit endpoint detachment fails; supported routes round-trip |
 | C07 | Fills | Partial | Solid, native gradients, preset patterns, and retained picture-fill tile/stretch are modeled and write back; complete scheme transforms and picture-media replacement | No gradient is averaged and no pattern is replaced with white |
 | C08 | Lines | Partial | Model per-line width, dash, compound, cap, join, alignment, head/tail type and size, transparency, and theme references | Line styles match reference output at normal and zoomed scales |
-| C09 | Effects and 3D | Partial | Model shadows, glow, soft edges, reflection, bevel, scene/shape 3D, and effect inheritance; use explicit fallback for unsupported effects | Supported effects render; unsupported ones show a diagnostic/preview |
-| C10 | Hyperlinks and actions | Partial | External run hyperlinks are preserved and support relationship-aware add/remove/retarget; complete internal slide links, element actions, hover actions, and sounds | Internal slide links and external links remain distinguishable |
+| C09 | Effects and 3D | Partial | Outer shadow plus editable glow, inner shadow, reflection, and soft edge import, render, validate, and write as DrawingML effects. Direct effects and theme-inherited `effectRef` styles resolve into the same semantic render state; editing an inherited effect materializes a local native effect list without dropping inherited shadow, alpha, or 3D. Existing supported nodes inside an `effectDag` are edited in place without flattening or disturbing names/compositors; topology changes and ambiguous repeated nodes are refused. Camera/light rotations and presets plus top/bottom bevel, extrusion, contour, material, and z-depth import into editable `threeD`, render with a non-raster Electron approximation, and write as native `scene3d`/`sp3d`. Remaining breadth is complex graph topology, 3D backdrop/transform details, color transforms, and pixel-identical Office lighting | Supported effects render; unsupported ones show a diagnostic/preview |
+| C10 | Hyperlinks and actions | Partial | External and internal-slide run hyperlinks support relationship-aware add/remove/retarget; slideshow actions remain relationship-free. Complete element/hover actions and sounds | Internal slide links and external links remain distinguishable |
 | C11 | Images and SVG | Partial | Source media part/relationship, crop/mask, opacity, luminance/saturation, outline, and outer shadow are retained and editable; complete media replacement, SVG fallback switching, and remaining transforms | Cropped/rotated/transformed images match source without destructive re-encoding |
 | C12 | Audio and video | Partial | Preserve media relationship, poster frame, trims, volume, looping, autoplay, and external media references | Static poster and supported playback metadata survive import |
 | C13 | OLE, ActiveX, 3D models, and unsupported objects | Partial | OLE previews and opaque graphic frames now retain identity, relationships, bounds, placeholder, and diagnostics; add typed coverage for ActiveX, 3D, and content parts | Unsupported objects remain visible and survive later export untouched |
@@ -416,7 +417,7 @@ structured model directly. It is not the PowerPoint source of truth.
 | E05 | Chart rendering | Partial | The adapter renders supported combo series and primary/secondary value axes without collapsing assignments; uncommon families/options remain explicit fallbacks | Native bar/line/pie and multi-series fixtures visually match reference output |
 | E06 | Embedded workbooks | Done for supported chart ranges | Workbook bytes remain untouched on no-op export; edited chart data updates the declared worksheet ranges, dimensions, caches, and series headers together | An unedited workbook remains byte-identical and an edited chart updates its declared range |
 | E07 | SmartArt/diagrams | Partial | Diagram data/layout/style/color/drawing part addresses and relationships plus parsed semantic data are retained; drawing children render as a semantic group | SmartArt is not silently converted into unrelated flat shapes |
-| E08 | Equations | Partial | OMML is retained as a semantic tree beside the generated editable preview; native OMML editing remains future work | Equation source and visual preview both survive |
+| E08 | Equations | Done for supported LaTeX/OMML authoring | OMML is retained as a semantic tree beside the editable preview. LaTeX is converted to native editable OMML inside `mc:AlternateContent`, with a visual fallback; imported equation edits replace the native equation object | Equation source and visual preview both survive |
 | E09 | Embedded/linked objects | Partial | Embedded graphic frames without a semantic renderer are opaque objects with relationship provenance; add payload metadata and linked-state UI | Embedded content survives and external-link state is visible |
 
 ### F. Rendering, recalculation, and fidelity validation
@@ -426,11 +427,11 @@ structured model directly. It is not the PowerPoint source of truth.
 | F01 | Derived render graph | Done | Resolve effective theme/master/layout/slide nodes without mutating or duplicating source objects | Canvas receives a deterministic ordered render graph |
 | F02 | Dependency-aware invalidation | Missing | Add dirty flags/caches for theme, master, layout, slide, shape, text, chart, and asset dependencies | A theme/master edit recalculates only dependent objects |
 | F03 | Unified render geometry | Partial | Use the same transforms, bounds, clipping, and text metrics for canvas, thumbnails, read-only view, selection, snapping, and export previews | No selection jump or thumbnail/editor geometry divergence |
-| F04 | Static transitions and timing retention | Done for preservation/model; playback pending | Slide/layout/master transition inheritance, builds, timing nodes, conditions, triggers, targets, and static end-state content are retained | Animation-bearing decks retain all static content and report retained playback data |
+| F04 | Transitions and timing | Partial | Slide/layout/master transition inheritance, builds, timing nodes, conditions, triggers, and targets are retained. Mona's fade/zoom/rotate/directional-slide/pulse/swing effects and fade/push/random transitions author native timing and play through the existing semantic animation surface; complete Office preset/condition breadth remains | Supported effects reimport with target, trigger, type, and duration intact |
 | F05 | Accessibility and nonvisual data | Partial | Reading order, alt text/title/description, language, decorative/hidden state, and locks are retained; object accessibility edits write back. Add table-header authoring and a dedicated inspector | Accessibility metadata survives and reading order follows the shape tree |
 | F06 | Diagnostics and visible fallback | Partial | Opaque graphic frames render a bounded preview or neutral placeholder and expose their reason in the import report; extend the fallback to every unsupported object family | No referenced slide object disappears without a visible/reportable explanation |
 | F07 | Performance and memory | Partial | Keep parsing and conversion in the Electron main process; add lazy part decoding, asset deduplication, render caching, slide virtualization, and backing-store lifecycle | The 30+ slide stress deck stays within agreed import time/memory/interaction budgets without putting parser work in the renderer |
-| F08 | Reference rendering harness | Partial | Mona screenshot/structural baselines and round-trip PPTX artifacts are deterministic; `pptx:reference-open` ZIP-validates them and converts through LibreOffice when a working executable is installed | Every compatibility slice adds deterministic visual and structural baselines |
+| F08 | Reference rendering harness | Partial | Mona screenshot/structural baselines and round-trip PPTX artifacts are deterministic; `pptx:reference-open` ZIP-validates them, converts every slide through LibreOffice when available, and otherwise requires macOS Quick Look to open and render a system thumbnail | Every compatibility slice adds deterministic visual and structural baselines |
 | F09 | Corpus coverage | Partial | Maintain native PowerPoint, Google Slides export, Keynote export, corporate master, design-heavy, tables/text, SmartArt, equations, RTL/CJK, 4:3, and stress fixtures | The matrix maps each row to at least one public or private fixture |
 
 ### G. Editing semantics required before export
@@ -461,12 +462,12 @@ content-type overrides. Slide-owned mutable dependencies — notes, comments,
 charts, embedded workbooks, SmartArt data, OLE payloads and chart user shapes —
 are recursively cloned, while immutable layouts/themes and media bytes remain
 shared. Generated text, shapes, picture fills, images, native connectors,
-charts/workbooks, tables, groups, formulas and audio/video are built in a small
+charts/workbooks, tables, groups, native OMML equations and audio/video are built in a small
 standards-compliant donor package and transplanted into the retained package;
 image replacement and image backgrounds use the same document-owned asset
-resolver. Mona formula paths export as editable vector picture objects rather
-than native OMML equations; native equation authoring remains a separate
-boundary. Opaque objects still require retained native payloads.
+resolver. Mona formula sources export as editable native OMML in
+`mc:AlternateContent` with an SVG fallback. Opaque objects still require
+retained native payloads.
 
 ## Export architecture after import and rendering
 
@@ -487,10 +488,10 @@ Mona therefore needs two export paths:
 | --- | --- | --- | --- | --- |
 | X01 | Hybrid export coordinator | Partial | Full-deck, single-source standard export uses retained-package writeback; Mona-native and partial/raster exports use generation | Export path is explicit and testable |
 | X02 | Package patch writer | Partial | Exact no-ops return the retained archive; dirty slide XML is patched by source identity and every untouched package part remains byte-identical | Untouched parts remain byte-identical |
-| X03 | Semantic serializers | Partial | Implemented: solid/gradient/pattern and image backgrounds; transforms/deletions; retained native object and slide cloning; private hierarchy overrides/hides; explicit master/layout drawing authoring; source-free text/shapes/picture fills/images/connectors/charts/tables/groups/vector-formula pictures/audio/video; image replacement; rich text/text body; hyperlinks; picture crop/filters/outline/shadow; accessibility; tables; chart caches/workbooks; existing and cloned notes/comments. Remaining: native OMML equation authoring, theme authoring, timing playback authoring, new notes/comment structures, and advanced effects | Each completed import/model slice gains an inverse serializer |
+| X03 | Semantic serializers | Partial | Implemented: backgrounds; transforms/deletions; retained object/slide cloning; private hierarchy overrides/hides; explicit master/layout drawing authoring; source-free text/shapes/picture fills/images/connectors/charts/tables/groups/native OMML equations/audio/video; image replacement; rich text/text body; external/internal/action links; picture crop/filters/outline/outer shadow; direct, theme-inherited, and topology-preserving `effectDag` edits for glow/inner shadow/reflection/soft edge; common native camera/light/bevel/extrusion/contour/material 3D; accessibility; chart caches/workbooks; theme colors/fonts; supported timing/transitions; existing and new speaker notes/comments. Remaining: effect-graph topology authoring/ambiguous graphs, full Office 3D/backdrop semantics, complete Office animation/theme semantics, modern-comment creation, and other matrix rows still marked partial | Each completed import/model slice gains an inverse serializer |
 | X04 | PptxGenJS upgrade and adapter | Complete | Mona-native generation uses PptxGenJS 4.0.1; imported decks never rely on it for source preservation | Existing export fixtures remain valid and new supported features improve |
 | X05 | Relationship/content-type repair | Done for current serializers | External run hyperlinks and generated assets allocate collision-free relationship IDs. Copied/generated objects and slides allocate relationships and content types, recursively clone or transplant chart/workbook/diagram/OLE/notes/comment/media dependencies, register slides/private masters, and retarget every internal relationship relative to its new owner part | PowerPoint opens output without repair warnings |
-| X06 | Round-trip harness | Partial | Public/private exact no-op tests and serializer re-import tests cover the supported edit matrix; round-trip artifacts receive ZIP integrity checks and optional LibreOffice reference-open conversion. Add installed Office/LibreOffice visual comparison in CI | No-op export preserves untouched parts and edited output remains stable |
+| X06 | Round-trip harness | Partial | Public/private exact no-op tests and serializer re-import tests cover the supported edit matrix; round-trip artifacts receive ZIP integrity checks plus LibreOffice full-deck or macOS Quick Look first-slide reference-open rendering. Add installed Office/LibreOffice visual comparison in CI | No-op export preserves untouched parts and edited output remains stable |
 
 ## Implementation order and release gates
 
@@ -587,21 +588,23 @@ The August 1, 2026 verification pass establishes the following:
   picture treatments, complex shape fills, preset geometry, connectors, and
   slide-local backgrounds. Generated-object round trips additionally cover
   text, images, picture-filled shapes, semantic groups/connectors, native
-  tables, charts with independent workbooks, vector formula pictures, audio,
+  tables, charts with independent workbooks, native OMML equations, audio,
   video, image replacement, image backgrounds, and explicit master/layout
   drawing edits.
 - `MONA_WRITE_PPTX_ROUNDTRIP_ARTIFACTS=1` emits deterministic edited decks to
   `.artifacts/pptx-roundtrip/`. `npm run pptx:reference-open` validates their ZIP
-  packages and uses LibreOffice for PDF reference-open checks when a working
-  executable is installed. This workstation currently has only a broken
-  Homebrew launcher, so the LibreOffice conversion portion was reported as
-  skipped rather than counted as evidence.
+  packages and uses LibreOffice for full-deck PDF reference-open checks when a
+  working executable is installed. On macOS without LibreOffice, it uses Quick
+  Look as an independent system open/render check for the first slide of every
+  artifact. Quick Look is smoke evidence only; it is not counted as a
+  pixel-identical, all-slide comparison.
 
 This is a strong static-rendering result for the current corpus, not a claim
 that the entire ECMA-376 presentation specification is complete. The remaining
 high-value compatibility work is still explicit in the matrix: deterministic
-PowerPoint text measurement/fitting, advanced text/effect/3D rendering, opaque
+PowerPoint text measurement/fitting, advanced text and pixel-identical complex
+effect/3D rendering, opaque
 coverage beyond graphic frames, typed header/footer/date field content,
-dependency-aware recalculation, native OMML equation authoring, theme authoring,
-new notes/comment structures, full animation playback/editing, internal/action
-links, and installed reference-engine visual comparison.
+dependency-aware recalculation, full theme-matrix editing, modern-comment
+creation, complete Office animation playback/editing, element/hover action
+sounds, and installed reference-engine visual comparison.

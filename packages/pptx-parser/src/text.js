@@ -219,13 +219,19 @@ export function getSpanStyleInfo(node, pNode, textBodyNode, pFontStyle, slideLay
   if (subscript) styleText += `vertical-align: ${subscript};`
   if (shadow) styleText += `text-shadow: ${shadow};`
 
-  const linkID = getTextByPathList(node, ['a:rPr', 'a:hlinkClick', 'attrs', 'r:id'])
-  const hasLink = linkID && warpObj['slideResObj'][linkID]
+  const linkAttrs = getTextByPathList(node, ['a:rPr', 'a:hlinkClick', 'attrs'])
+  const linkID = linkAttrs?.['r:id']
+  const linkResource = linkID && warpObj['slideResObj'][linkID]
+  const linkURL = linkAttrs?.action && linkAttrs.action !== 'ppaction://hlinksldjump'
+    ? `pptx-action:${linkAttrs.action}`
+    : linkResource?.type === 'slide' || linkAttrs?.action === 'ppaction://hlinksldjump'
+      ? (linkResource?.target ? `pptx-slide:${linkResource.target}` : null)
+      : linkResource?.target ?? null
 
   return {
     styleText,
     text,
-    hasLink,
-    linkURL: hasLink ? warpObj['slideResObj'][linkID]['target'] : null
+    hasLink: Boolean(linkURL),
+    linkURL,
   }
 }

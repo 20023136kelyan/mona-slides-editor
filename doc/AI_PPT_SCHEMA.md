@@ -71,6 +71,60 @@
 | `blur` | `number` | 建议 | 模糊半径 |
 | `color` | `string` | 建议 | 阴影颜色 |
 
+#### PowerPoint 高级效果 `effects`
+
+`effects` 是可编辑的语义 JSON，不是图片滤镜。它可用于文本、形状、图片、
+线条、组和媒体元素；导入的 PowerPoint 会写回原生 DrawingML。
+
+```json
+{
+  "glow": { "color": "#F16F3A", "opacity": 0.6, "radius": 8 },
+  "innerShadow": { "color": "#111827", "opacity": 0.35, "h": 3, "v": 4, "blur": 6 },
+  "reflection": { "opacity": 0.45, "distance": 6, "blur": 2, "direction": 90, "scaleY": -0.8 },
+  "softEdge": { "radius": 3 }
+}
+```
+
+- `opacity` 的范围是 `0~1`。
+- `direction` 使用角度；其他尺寸使用页面坐标单位。
+- 支持 `glow`、`innerShadow`、`reflection`、`softEdge`。
+- 主题 `effectRef` 继承的效果也会出现在元素的 `effects`/`shadow` 中；直接
+  修改这些语义属性即可，Mona 会在写回时建立局部原生效果覆盖。
+- 不要修改导入元素的 `source.visual` 或 `source.effectReference`。现有
+  `effectDag` 节点可以通过语义效果修改数值，但不能增删图节点或修改图结构。
+  未建模的效果图数据由 Mona 原样保留，不能用这个扁平效果对象伪造；
+  可编辑的倒角和 3D 请使用下面的 `threeD`。
+
+#### PowerPoint 3D `threeD`
+
+`threeD` 用于可编辑的原生 DrawingML 摄像机、光照、倒角、轮廓和挤出语义。
+
+```json
+{
+  "camera": {
+    "preset": "perspectiveContrastingRightFacing",
+    "rotation": { "latitude": 12, "longitude": 18, "revolution": 3 },
+    "zoom": 1.1
+  },
+  "light": { "rig": "threePt", "direction": "tr" },
+  "shape": {
+    "bevelTop": { "preset": "circle", "width": 8, "height": 4 },
+    "extrusionHeight": 10,
+    "extrusionColor": "#0F172A",
+    "contourWidth": 2,
+    "contourColor": "#334155",
+    "material": "warmMatte",
+    "z": 1
+  }
+}
+```
+
+- 旋转使用角度，`zoom` 使用倍率，其他尺寸使用页面坐标单位。
+- 导入的主题 3D 样式会解析到 `threeD`；修改语义值时 Mona 会创建局部
+  `scene3d`/`sp3d`，而不会改写共享主题。
+- Electron 使用保留对象可编辑性的 CSS 近似渲染；PPTX 写回仍是原生 3D。
+- 不要修改 `source.visual.scene3d`、`source.visual.shape3d` 或其他来源数据。
+
 #### 渐变 `gradient`
 
 ```json
@@ -173,6 +227,28 @@
 | `id` | `string` | 必须 | 页面唯一 ID |
 | `background` | `object` | 建议 | 页面背景，支持纯色背景和渐变背景 |
 | `elements` | `array` | 必须 | 本页元素数组，数组顺序即层级顺序，后面的元素会盖在前面元素上 |
+| `remark` | `string` | 可选 | 演讲者备注；PowerPoint 导入/导出使用原生 notes slide |
+| `notes` | `Note[]` | 可选 | 评论线程，不等同于演讲者备注 |
+| `durationMs` | `number` | 可选 | 自动翻页等待时间，范围 `1000~3600000` 毫秒 |
+| `turningMode` | `"no" \| "fade" \| "random" \| "slideX" \| "slideY"` | 可选 | 可写回 PowerPoint 的页面切换类型 |
+| `animations` | `PPTAnimation[]` | 可选 | 有序元素动画列表 |
+
+动画项格式：
+
+```json
+{
+  "id": "anim_01",
+  "elId": "P01_el_title_01",
+  "effect": "fadeIn",
+  "type": "in",
+  "duration": 750,
+  "trigger": "click"
+}
+```
+
+`type` 为 `in`、`out` 或 `attention`；`trigger` 为 `click`、`meantime`
+或 `auto`。当前 PowerPoint 原生写回覆盖淡入淡出、缩放、旋转、方向滑入、
+脉冲和摇摆；不要伪造未知的 Office preset ID。
 
 #### 纯色背景
 

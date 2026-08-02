@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import type { PPTElement, SlideTheme } from '@mona/presentation-core/model'
 
 import { EditorErrorBoundary } from '@/features/editor/EditorErrorBoundary'
+import { getElementEffectsStyle } from '@/features/presentation-renderer/render-utils'
 
 import { ImageElement } from '@/features/presentation-renderer/elements/ImageElement'
 import { LatexElement } from '@/features/presentation-renderer/elements/LatexElement'
@@ -43,6 +44,7 @@ export function ElementRenderer({ element, mediaEditor, mediaScreen, shapeEditor
       const coordinateHeight = Math.max(element.coordinateHeight || element.height, 0.001)
       const flipX = element.flipH ? -1 : 1
       const flipY = element.flipV ? -1 : 1
+      const visualStyle = getElementEffectsStyle(element.effects, element.threeD)
       return (
         <section
           aria-label={element.name || (element.semanticType === 'diagram' ? 'PowerPoint diagram' : 'PowerPoint group')}
@@ -50,10 +52,14 @@ export function ElementRenderer({ element, mediaEditor, mediaScreen, shapeEditor
           data-element-id={element.id}
           data-element-type="group"
           style={{
+            ...visualStyle,
             height: element.height,
             left: element.left,
             top: element.top,
-            transform: `rotate(${element.rotate}deg) scale(${flipX}, ${flipY})`,
+            transform: [
+              `rotate(${element.rotate}deg) scale(${flipX}, ${flipY})`,
+              visualStyle.transform,
+            ].filter(Boolean).join(' '),
             width: element.width,
           }}
         >

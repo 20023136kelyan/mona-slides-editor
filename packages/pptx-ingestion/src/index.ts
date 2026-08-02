@@ -1,5 +1,6 @@
 import { parse } from '@mona/pptx-parser'
 import {
+  compileSlideTheme,
   DEFAULT_TEMPLATE_CATALOG,
   type PresentationState,
 } from '@mona/presentation-core'
@@ -59,12 +60,28 @@ export const ingestPowerPoint = async (
   if (options.signal?.aborted) throw abortError()
   options.onProgress?.('convert')
   const ratio = options.fixedViewport ? 1000 / parsed.size.width : 96 / 72
-  const theme = {
+  const parsedTheme = {
     ...options.theme,
     themeColors: parsed.themeColors.length
       ? parsed.themeColors
       : options.theme.themeColors,
   }
+  const firstDependency = backing.reference.slides[0]
+  const retainedTheme = backing.reference.hierarchy?.themes.find(candidate => (
+    candidate.partPath === firstDependency?.themePart
+  )) ?? backing.reference.hierarchy?.themes.find(candidate => !candidate.isOverride)
+  const retainedMaster = backing.reference.hierarchy?.masters.find(candidate => (
+    candidate.partPath === firstDependency?.masterPart
+  ))
+  const retainedLayout = backing.reference.hierarchy?.layouts.find(candidate => (
+    candidate.partPath === firstDependency?.layoutPart
+  ))
+  const theme = compileSlideTheme(
+    parsedTheme,
+    retainedTheme,
+    retainedMaster,
+    retainedLayout,
+  )
   const conversion = convertParsedPptxPresentation({
     assetUrl: options.assetUrl,
     coordinateLabel: options.coordinateLabel ?? (index => `Series ${index}`),

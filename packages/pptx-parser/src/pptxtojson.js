@@ -517,15 +517,20 @@ function getHyperlinkFromCNvPr(cNvPr, warpObj) {
   if (!hlinkClick) return null
 
   const linkId = hlinkClick['r:id']
+  if (hlinkClick.action && hlinkClick.action !== 'ppaction://hlinksldjump') {
+    return `pptx-action:${hlinkClick.action}`
+  }
   if (!linkId) return null
 
   const res = warpObj['slideResObj'][linkId]
   if (!res) return null
 
-  if (res['type'] !== 'hyperlink') return null
-
   const target = res['target']
-  if (!target || !/^https?:\/\//.test(target)) return null
+  if (!target) return null
+  if (res['type'] === 'slide' || hlinkClick.action === 'ppaction://hlinksldjump') {
+    return `pptx-slide:${target}`
+  }
+  if (res['type'] !== 'hyperlink') return null
 
   return target
 }

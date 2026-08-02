@@ -170,7 +170,11 @@ export function parseOMath(oMath) {
     if (key === 'm:borderBox') return parseBox(value)
     if (key === 'm:m') return parseMatrix(value)
     if (key === 'm:r') return parseOMath(value)
-    if (key === 'm:t') return value
+    if (key === 'm:t') {
+      if (typeof value === 'string') return value
+      if (value && typeof value === 'object' && typeof value.value === 'string') return value.value
+      return ''
+    }
     return ''
   }).join('')
 }

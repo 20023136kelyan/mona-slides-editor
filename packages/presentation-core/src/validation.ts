@@ -1,4 +1,11 @@
-import type { PPTElement, Slide, StructuredTextBody } from './model'
+import type {
+  PPTElement,
+  PPTElementEffects,
+  PPTElementThreeD,
+  PPTElementThreeDRotation,
+  Slide,
+  StructuredTextBody,
+} from './model'
 import type { PresentationState } from './state'
 import { collectElementTreeIds } from './elements'
 
@@ -118,6 +125,117 @@ const structuredTextIssues = (
   return issues
 }
 
+const elementEffectsIssues = (
+  effects: PPTElementEffects | undefined,
+  path: string,
+): PresentationValidationIssue[] => {
+  if (!effects) return []
+  const issues: PresentationValidationIssue[] = []
+  const finite = (value: unknown, field: string, minimum = -100_000, maximum = 100_000) => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+      issues.push({
+        code: 'element.effects.invalid-number',
+        message: `${field} must be a finite number between ${minimum} and ${maximum}`,
+        path: `${path}.${field}`,
+        severity: 'error',
+      })
+    }
+  }
+  const color = (value: unknown, field: string) => {
+    if (typeof value !== 'string' || !value.trim()) {
+      issues.push({
+        code: 'element.effects.invalid-color',
+        message: `${field} must be a non-empty color string`,
+        path: `${path}.${field}`,
+        severity: 'error',
+      })
+    }
+  }
+  if (effects.glow) {
+    color(effects.glow.color, 'glow.color')
+    finite(effects.glow.opacity, 'glow.opacity', 0, 1)
+    finite(effects.glow.radius, 'glow.radius', 0)
+  }
+  if (effects.innerShadow) {
+    color(effects.innerShadow.color, 'innerShadow.color')
+    finite(effects.innerShadow.opacity, 'innerShadow.opacity', 0, 1)
+    finite(effects.innerShadow.blur, 'innerShadow.blur', 0)
+    finite(effects.innerShadow.h, 'innerShadow.h')
+    finite(effects.innerShadow.v, 'innerShadow.v')
+  }
+  if (effects.reflection) {
+    finite(effects.reflection.blur, 'reflection.blur', 0)
+    finite(effects.reflection.direction, 'reflection.direction', -360_000, 360_000)
+    finite(effects.reflection.distance, 'reflection.distance', 0)
+    finite(effects.reflection.opacity, 'reflection.opacity', 0, 1)
+    finite(effects.reflection.scaleY, 'reflection.scaleY', -10, 10)
+  }
+  if (effects.softEdge) finite(effects.softEdge.radius, 'softEdge.radius', 0)
+  return issues
+}
+
+const elementThreeDIssues = (
+  threeD: PPTElementThreeD | undefined,
+  path: string,
+): PresentationValidationIssue[] => {
+  if (!threeD) return []
+  const issues: PresentationValidationIssue[] = []
+  const finite = (value: unknown, field: string, minimum = -100_000, maximum = 100_000) => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum) {
+      issues.push({
+        code: 'element.three-d.invalid-number',
+        message: `${field} must be a finite number between ${minimum} and ${maximum}`,
+        path: `${path}.${field}`,
+        severity: 'error',
+      })
+    }
+  }
+  const text = (value: unknown, field: string) => {
+    if (typeof value !== 'string' || !value.trim()) {
+      issues.push({
+        code: 'element.three-d.invalid-string',
+        message: `${field} must be a non-empty string`,
+        path: `${path}.${field}`,
+        severity: 'error',
+      })
+    }
+  }
+  const rotation = (value: PPTElementThreeDRotation | undefined, field: string) => {
+    if (!value) return
+    finite(value.latitude, `${field}.latitude`, -360_000, 360_000)
+    finite(value.longitude, `${field}.longitude`, -360_000, 360_000)
+    finite(value.revolution, `${field}.revolution`, -360_000, 360_000)
+  }
+  if (threeD.camera) {
+    text(threeD.camera.preset, 'camera.preset')
+    if (threeD.camera.zoom !== undefined) finite(threeD.camera.zoom, 'camera.zoom', 0.01, 100)
+    rotation(threeD.camera.rotation, 'camera.rotation')
+  }
+  if (threeD.light) {
+    text(threeD.light.direction, 'light.direction')
+    text(threeD.light.rig, 'light.rig')
+    rotation(threeD.light.rotation, 'light.rotation')
+  }
+  if (threeD.shape) {
+    for (const [name, bevel] of [
+      ['bevelBottom', threeD.shape.bevelBottom],
+      ['bevelTop', threeD.shape.bevelTop],
+    ] as const) {
+      if (!bevel) continue
+      finite(bevel.height, `shape.${name}.height`, 0)
+      text(bevel.preset, `shape.${name}.preset`)
+      finite(bevel.width, `shape.${name}.width`, 0)
+    }
+    if (threeD.shape.contourColor !== undefined) text(threeD.shape.contourColor, 'shape.contourColor')
+    if (threeD.shape.contourWidth !== undefined) finite(threeD.shape.contourWidth, 'shape.contourWidth', 0)
+    if (threeD.shape.extrusionColor !== undefined) text(threeD.shape.extrusionColor, 'shape.extrusionColor')
+    if (threeD.shape.extrusionHeight !== undefined) finite(threeD.shape.extrusionHeight, 'shape.extrusionHeight', 0)
+    if (threeD.shape.material !== undefined) text(threeD.shape.material, 'shape.material')
+    if (threeD.shape.z !== undefined) finite(threeD.shape.z, 'shape.z')
+  }
+  return issues
+}
+
 const validateSlide = (
   slide: Slide,
   slideIndex: number,
@@ -180,6 +298,8 @@ const validateSlide = (
     }
     seenElementIds.add(element.id)
     issues.push(...finiteGeometryIssues(element, elementPath))
+    issues.push(...elementEffectsIssues(element.effects, `${elementPath}.effects`))
+    issues.push(...elementThreeDIssues(element.threeD, `${elementPath}.threeD`))
     if (element.type === 'text') {
       issues.push(...structuredTextIssues(element.structuredText, `${elementPath}.structuredText`))
     }
@@ -206,11 +326,28 @@ const validateSlide = (
   })
 
   slide.animations?.forEach((animation, animationIndex) => {
+    const animationPath = `${slidePath}.animations[${animationIndex}]`
+    if (
+      !animation.id
+      || !animation.effect
+      || !['attention', 'in', 'out'].includes(animation.type)
+      || !['auto', 'click', 'meantime'].includes(animation.trigger)
+      || !Number.isFinite(animation.duration)
+      || animation.duration <= 0
+      || animation.duration > 3_600_000
+    ) {
+      issues.push({
+        code: 'animation.invalid',
+        message: 'Animation requires IDs, an effect, a supported type/trigger, and a positive finite duration',
+        path: animationPath,
+        severity: 'error',
+      })
+    }
     if (!localElementIds.has(animation.elId)) {
       issues.push({
         code: 'animation.missing-element',
         message: `Animation target does not exist on its slide: ${animation.elId}`,
-        path: `${slidePath}.animations[${animationIndex}].elId`,
+        path: `${animationPath}.elId`,
         severity: 'warning',
       })
     }
@@ -252,6 +389,14 @@ const validateHierarchyElements = (
       return
     }
     issues.push(...finiteGeometryIssues(candidate as PPTElement, elementPath))
+    issues.push(...elementEffectsIssues(
+      (candidate as PPTElement).effects,
+      `${elementPath}.effects`,
+    ))
+    issues.push(...elementThreeDIssues(
+      (candidate as PPTElement).threeD,
+      `${elementPath}.threeD`,
+    ))
     if (candidate.type === 'text') {
       issues.push(...structuredTextIssues(
         (candidate as Extract<PPTElement, { type: 'text' }>).structuredText,

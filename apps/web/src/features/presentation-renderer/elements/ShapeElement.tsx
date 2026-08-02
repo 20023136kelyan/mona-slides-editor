@@ -4,6 +4,7 @@ import type { PatternFill, PPTShapeElement, ShapeText, SlideTheme } from '@mona/
 
 import {
   getFlipTransform,
+  getElementEffectsStyle,
   getOutlineRenderStyle,
   getShadowStyle,
   type SlideCSSProperties,
@@ -134,6 +135,7 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
   const svgId = useId().replace(/:/g, '')
   const outline = getOutlineRenderStyle(element.outline)
   const shadow = getShadowStyle(element.shadow)
+  const effectsStyle = getElementEffectsStyle(element.effects, element.threeD)
   const flip = getFlipTransform(element.flipH, element.flipV)
   const text: ShapeText = element.text || {
     content: '',
@@ -179,9 +181,10 @@ export function ShapeElement({ editor, element, theme }: ShapeElementProps) {
           onPointerUp={editor?.onPointerUp}
           role={editor ? 'button' : undefined}
           style={{
+            ...effectsStyle,
             opacity: element.opacity,
-            filter: shadow ? `drop-shadow(${shadow})` : '',
-            transform: flip,
+            filter: [shadow ? `drop-shadow(${shadow})` : '', effectsStyle.filter || ''].filter(Boolean).join(' '),
+            transform: [flip, effectsStyle.transform].filter(Boolean).join(' '),
             color: text.defaultColor,
             fontFamily: text.defaultFontName,
           }}

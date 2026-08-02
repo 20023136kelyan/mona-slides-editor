@@ -4,7 +4,9 @@ import tinycolor from 'tinycolor2'
 import type {
   ImageElementFilters,
   PPTElementOutline,
+  PPTElementEffects,
   PPTElementShadow,
+  PPTElementThreeD,
   PPTImageElement,
   PPTLineElement,
   PatternFill,
@@ -97,6 +99,87 @@ export function getPatternBackgroundStyle({
 export function getShadowStyle(shadow?: PPTElementShadow): string {
   if (!shadow) return ''
   return `${shadow.h}px ${shadow.v}px ${shadow.blur}px ${shadow.color}`
+}
+
+const effectColor = (color: string, opacity: number): string => (
+  tinycolor(color).setAlpha(Math.max(0, Math.min(1, opacity))).toRgbString()
+)
+
+/**
+ * Chromium-native approximations for DrawingML effects. The semantic values
+ * remain editable and the PowerPoint writer emits native effectLst markup;
+ * these styles make the editor and Electron playback visually useful without
+ * rasterizing the object.
+ */
+export function getElementEffectsStyle(
+  effects?: PPTElementEffects,
+  threeD?: PPTElementThreeD,
+): CSSProperties {
+  if (!effects && !threeD) return {}
+  const filters: string[] = []
+  if (effects?.glow) {
+    filters.push(`drop-shadow(0 0 ${effects.glow.radius}px ${effectColor(effects.glow.color, effects.glow.opacity)})`)
+  }
+  if (effects?.softEdge?.radius) {
+    filters.push(`blur(${Math.max(0, effects.softEdge.radius / 3)}px)`)
+  }
+  const inner = effects?.innerShadow
+  const normalizedDirection = effects?.reflection
+    ? ((effects.reflection.direction % 360) + 360) % 360
+    : 90
+  const reflectionSide = normalizedDirection >= 315 || normalizedDirection < 45
+    ? 'right'
+    : normalizedDirection < 135
+      ? 'below'
+      : normalizedDirection < 225
+        ? 'left'
+        : 'above'
+  const directionOffsets: Record<string, [number, number]> = {
+    b: [0, 1], bl: [-1, 1], br: [1, 1], l: [-1, 0], r: [1, 0],
+    t: [0, -1], tl: [-1, -1], tr: [1, -1],
+  }
+  const lightOffset = directionOffsets[threeD?.light?.direction ?? 't'] ?? [0, -1]
+  const shape3d = threeD?.shape
+  if (shape3d?.contourColor && shape3d.contourWidth) {
+    filters.push(`drop-shadow(0 0 ${Math.max(0, shape3d.contourWidth)}px ${shape3d.contourColor})`)
+  }
+  if (shape3d?.extrusionColor && shape3d.extrusionHeight) {
+    const depth = Math.max(0, Math.min(80, shape3d.extrusionHeight))
+    filters.push(`drop-shadow(${lightOffset[0] * depth}px ${lightOffset[1] * depth}px 0 ${shape3d.extrusionColor})`)
+  }
+  const bevel = shape3d?.bevelTop
+  if (bevel && (bevel.width || bevel.height)) {
+    const depth = Math.max(0.5, Math.min(12, Math.max(bevel.width, bevel.height) / 2))
+    filters.push(`drop-shadow(${lightOffset[0] * -depth}px ${lightOffset[1] * -depth}px ${depth}px rgba(255, 255, 255, 0.5))`)
+    filters.push(`drop-shadow(${lightOffset[0] * depth}px ${lightOffset[1] * depth}px ${depth}px rgba(0, 0, 0, 0.3))`)
+  }
+  const rotation = threeD?.camera?.rotation
+  const transforms: string[] = []
+  if (rotation && (rotation.latitude || rotation.longitude || rotation.revolution)) {
+    transforms.push('perspective(1200px)')
+    if (rotation.latitude) transforms.push(`rotateX(${-rotation.latitude}deg)`)
+    if (rotation.longitude) transforms.push(`rotateY(${rotation.longitude}deg)`)
+    if (rotation.revolution) transforms.push(`rotateZ(${rotation.revolution}deg)`)
+  }
+  if (threeD?.camera?.zoom && threeD.camera.zoom !== 1) {
+    transforms.push(`scale(${Math.max(0.01, threeD.camera.zoom)})`)
+  }
+  return {
+    ...(filters.length ? { filter: filters.join(' ') } : {}),
+    ...(inner
+      ? {
+          boxShadow: `inset ${inner.h}px ${inner.v}px ${inner.blur}px ${effectColor(inner.color, inner.opacity)}`,
+        }
+      : {}),
+    ...(effects?.reflection
+      ? {
+          WebkitBoxReflect: `${reflectionSide} ${Math.max(0, effects.reflection.distance)}px linear-gradient(transparent, rgba(0, 0, 0, ${Math.max(0, Math.min(1, effects.reflection.opacity))}))`,
+        }
+      : {}),
+    ...(transforms.length
+      ? { transform: transforms.join(' '), transformOrigin: 'center', transformStyle: 'preserve-3d' }
+      : {}),
+  }
 }
 
 export function getFlipTransform(flipH?: boolean, flipV?: boolean): string {

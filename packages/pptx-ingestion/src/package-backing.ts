@@ -36,6 +36,8 @@ import type {
   PowerPointThemeColor,
   PowerPointThemeFont,
   PowerPointThemeStyleEntry,
+  PowerPointVisualEffect,
+  PowerPointVisualMetadata,
   StructuredTextParagraphProperties,
   StructuredTextRunProperties,
 } from '@mona/presentation-core'
@@ -314,6 +316,111 @@ const childNodes = (
   ))
 }
 
+const visualEffectKinds = new Set([
+  'alphaBiLevel', 'alphaCeiling', 'alphaFloor', 'alphaInv', 'alphaMod',
+  'alphaModFix', 'alphaOutset', 'alphaRepl', 'biLevel', 'blend', 'blur',
+  'clrChange', 'clrRepl', 'duotone', 'fill', 'fillOverlay', 'glow',
+  'grayscl', 'innerShdw', 'lum', 'outerShdw', 'prstShdw', 'reflection',
+  'relOff', 'softEdge', 'solidFill', 'tint', 'xfrm',
+])
+
+const parseVisualMetadata = (
+  visualChildren: OrderedXmlNode[],
+): PowerPointVisualMetadata | undefined => {
+  const effectContainer = findDirectNode(visualChildren, ['effectDag', 'effectLst'])
+  const effects: PowerPointVisualEffect[] = []
+  if (effectContainer) {
+    walkXml(childNodes(effectContainer), (effectTag, effectNode) => {
+      if (!visualEffectKinds.has(effectTag)) return
+      const color = parseThemeColorNode(effectNode, effectTag)
+      const alphaNode = findFirstNode(childNodes(effectNode), 'alpha')
+      const alphaValue = alphaNode ? Number(nodeAttributes(alphaNode).val) : Number.NaN
+      effects.push({
+        attributes: { ...nodeAttributes(effectNode) },
+        ...(color
+          ? {
+              color: {
+                ...color,
+                ...(Number.isFinite(alphaValue)
+                  ? { alpha: Math.max(0, Math.min(1, alphaValue / 100_000)) }
+                  : {}),
+              },
+            }
+          : {}),
+        type: effectTag,
+      })
+    })
+  }
+  const hasEffectDag = Boolean(findDirectNode(visualChildren, ['effectDag']))
+  const hasEffectList = Boolean(findDirectNode(visualChildren, ['effectLst']))
+  const scene3dNode = findDirectNode(visualChildren, ['scene3d'])
+  const sceneChildren = childNodes(scene3dNode)
+  const cameraNode = findDirectNode(sceneChildren, ['camera'])
+  const lightRigNode = findDirectNode(sceneChildren, ['lightRig'])
+  const cameraRotation = cameraNode
+    ? findDirectNode(childNodes(cameraNode), ['rot'])
+    : undefined
+  const lightRotation = lightRigNode
+    ? findDirectNode(childNodes(lightRigNode), ['rot'])
+    : undefined
+  const scene3d = scene3dNode
+    ? {
+        ...(cameraNode
+          ? {
+              camera: {
+                attributes: { ...nodeAttributes(cameraNode) },
+                ...(cameraRotation
+                  ? { rotation: { attributes: { ...nodeAttributes(cameraRotation) } } }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(lightRigNode
+          ? {
+              lightRig: {
+                attributes: { ...nodeAttributes(lightRigNode) },
+                ...(lightRotation
+                  ? { rotation: { attributes: { ...nodeAttributes(lightRotation) } } }
+                  : {}),
+              },
+            }
+          : {}),
+      }
+    : undefined
+  const shape3dNode = findDirectNode(visualChildren, ['sp3d'])
+  const shapeChildren = childNodes(shape3dNode)
+  const bevelTopNode = findDirectNode(shapeChildren, ['bevelT'])
+  const bevelBottomNode = findDirectNode(shapeChildren, ['bevelB'])
+  const contourColorNode = findDirectNode(shapeChildren, ['contourClr'])
+  const extrusionColorNode = findDirectNode(shapeChildren, ['extrusionClr'])
+  const shape3d = shape3dNode
+    ? {
+        attributes: { ...nodeAttributes(shape3dNode) },
+        ...(bevelBottomNode ? { bevelBottom: { ...nodeAttributes(bevelBottomNode) } } : {}),
+        ...(bevelTopNode ? { bevelTop: { ...nodeAttributes(bevelTopNode) } } : {}),
+        ...(contourColorNode && parseThemeColorNode(contourColorNode, 'contourClr')
+          ? { contourColor: parseThemeColorNode(contourColorNode, 'contourClr') }
+          : {}),
+        ...(extrusionColorNode && parseThemeColorNode(extrusionColorNode, 'extrusionClr')
+          ? { extrusionColor: parseThemeColorNode(extrusionColorNode, 'extrusionClr') }
+          : {}),
+      }
+    : undefined
+  const hasScene3d = Boolean(scene3dNode)
+  const hasShape3d = Boolean(shape3dNode)
+  return effects.length || hasEffectDag || hasEffectList || hasScene3d || hasShape3d
+    ? {
+        effects,
+        hasEffectDag,
+        hasEffectList,
+        hasScene3d,
+        hasShape3d,
+        ...(scene3d ? { scene3d } : {}),
+        ...(shape3d ? { shape3d } : {}),
+      }
+    : undefined
+}
+
 const collectSourceObjects = (
   xml: string,
   partPath: string,
@@ -395,24 +502,18 @@ const collectSourceObjects = (
         const connectorEnd = connectorEndpoint('endCxn')
         const visualProperties = findDirectNode(children, ['grpSpPr', 'spPr'])
         const visualChildren = visualProperties ? childNodes(visualProperties) : []
-        const effectContainer = findDirectNode(visualChildren, ['effectDag', 'effectLst'])
-        const effectKinds = new Set([
-          'alphaBiLevel', 'alphaCeiling', 'alphaFloor', 'alphaInv', 'alphaMod',
-          'alphaModFix', 'alphaOutset', 'alphaRepl', 'biLevel', 'blend', 'blur',
-          'clrChange', 'clrRepl', 'duotone', 'fill', 'fillOverlay', 'glow',
-          'grayscl', 'innerShdw', 'lum', 'outerShdw', 'prstShdw', 'reflection',
-          'relOff', 'softEdge', 'solidFill', 'tint', 'xfrm',
-        ])
-        const effects: Array<{ attributes: Record<string, string>; type: string }> = []
-        if (effectContainer) {
-          walkXml(childNodes(effectContainer), (effectTag, effectNode) => {
-            if (effectKinds.has(effectTag)) {
-              effects.push({ attributes: { ...nodeAttributes(effectNode) }, type: effectTag })
-            }
-          })
-        }
-        const hasScene3d = Boolean(findDirectNode(visualChildren, ['scene3d']))
-        const hasShape3d = Boolean(findDirectNode(visualChildren, ['sp3d']))
+        const visual = parseVisualMetadata(visualChildren)
+        const style = findDirectNode(children, ['style'])
+        const effectReferenceNode = style
+          ? findDirectNode(childNodes(style), ['effectRef'])
+          : undefined
+        const effectReferenceAttributes = effectReferenceNode
+          ? nodeAttributes(effectReferenceNode)
+          : {}
+        const effectReferenceIndex = Number(effectReferenceAttributes.idx)
+        const effectReferenceColor = effectReferenceNode
+          ? parseThemeColorNode(effectReferenceNode, 'effectRef')
+          : undefined
         const relationshipIds = new Set<string>()
         walkXml(children, (_childTag, childNode) => {
           for (const [name, value] of Object.entries(nodeAttributes(childNode))) {
@@ -433,6 +534,14 @@ const collectSourceObjects = (
               }
             : {}),
           ...(values.descr ? { description: values.descr } : {}),
+          ...(Number.isFinite(effectReferenceIndex) && effectReferenceIndex >= 0
+            ? {
+                effectReference: {
+                  ...(effectReferenceColor ? { color: effectReferenceColor } : {}),
+                  index: effectReferenceIndex,
+                },
+              }
+            : {}),
           ...(values.hidden !== undefined
             ? { hidden: values.hidden !== '0' && values.hidden !== 'false' }
             : {}),
@@ -448,9 +557,7 @@ const collectSourceObjects = (
           sourceIndex,
           stableId,
           ...(values.title ? { title: values.title } : {}),
-          ...(effects.length || hasScene3d || hasShape3d
-            ? { visual: { effects, hasScene3d, hasShape3d } }
-            : {}),
+          ...(visual ? { visual } : {}),
         })
         sourceIndex += 1
         visit(children, stableId)
@@ -545,12 +652,16 @@ const parseThemeStyleList = (
         const value = type === 'system' ? values.lastClr ?? values.val : values.val ?? values.lastClr
         if (value) colors.push({ name: tag, type, value })
       })
+      const visual = listTag === 'effectStyleLst'
+        ? parseVisualMetadata(children)
+        : undefined
       styles.push({
         attributes: nodeAttributes(child),
         childTypes: children.flatMap(node => nodeEntries(node).map(([tag]) => localName(tag))),
         colors,
         index: styles.length,
         kind: localName(sourceTag),
+        ...(visual ? { visual } : {}),
       })
     }
   }
@@ -1337,28 +1448,54 @@ const buildDocumentSemantics = async ({
       && relationship.target === part.path
       && relationshipKind(relationship).toLowerCase().includes('comment')
     ))?.sourcePart
+    const parsedComments: Array<{
+      children: OrderedXmlNode[]
+      values: Record<string, string>
+    }> = []
     walkXml(nodes, (tag, node, children) => {
       if (!['cm', 'comment'].includes(tag)) return
       const values = nodeAttributes(node)
-      const id = values.id ?? values.idx
+      const id = values.id ?? (values.authorId && values.idx
+        ? `${values.authorId}:${values.idx}`
+        : values.idx)
       if (!id) return
+      parsedComments.push({ children, values })
+    })
+    const idByAuthorAndIndex = new Map(parsedComments.flatMap(({ values }) => {
+      const id = values.id ?? (values.authorId && values.idx
+        ? `${values.authorId}:${values.idx}`
+        : values.idx)
+      return values.authorId && values.idx && id
+        ? [[`${values.authorId}\0${values.idx}`, id] as const]
+        : []
+    }))
+    for (const { children, values } of parsedComments) {
+      const id = values.id ?? (values.authorId && values.idx
+        ? `${values.authorId}:${values.idx}`
+        : values.idx)
+      if (!id) continue
       const position = findFirstNode(children, 'pos')
       const positionValues = position ? nodeAttributes(position) : {}
       const x = Number(positionValues.x)
       const y = Number(positionValues.y)
       const textNode = findFirstNode(children, 'text') ?? findFirstNode(children, 't')
+      const parent = findFirstNode(children, 'parentCm')
+      const parentValues = parent ? nodeAttributes(parent) : {}
+      const threadedParentId = parentValues.authorId && parentValues.idx
+        ? idByAuthorAndIndex.get(`${parentValues.authorId}\0${parentValues.idx}`)
+        : undefined
       comments.push({
         ...(values.authorId ? { authorId: values.authorId } : {}),
         ...(values.dt || values.created ? { createdAt: values.dt ?? values.created } : {}),
         id,
-        ...(values.parentId ? { parentId: values.parentId } : {}),
+        ...(values.parentId || threadedParentId ? { parentId: values.parentId ?? threadedParentId } : {}),
         partPath: part.path,
         ...(Number.isFinite(x) && Number.isFinite(y) ? { position: { x, y } } : {}),
         ...(slidePart ? { slidePart } : {}),
         ...(values.status ? { status: values.status } : {}),
         text: textNode ? descendantText(childNodes(textNode)) : descendantText(children),
       })
-    })
+    }
   }
 
   const timings: PowerPointSlideTiming[] = []
