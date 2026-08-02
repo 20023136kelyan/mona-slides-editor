@@ -1,7 +1,7 @@
 import { copyFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { ElectronApplication, Page } from '@playwright/test'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 
 import {
   expect,
@@ -37,6 +37,20 @@ const createProject = async (page: Page): Promise<void> => {
   await expect(page.getByRole('region', { name: 'Project conversation' })).toBeVisible()
 }
 
+const expectVerticallyCentered = async (container: Locator) => {
+  const centers = await container.evaluate(element => {
+    const containerBox = element.getBoundingClientRect()
+    const contentBoxes = Array.from(element.children, child => child.getBoundingClientRect())
+    const contentTop = Math.min(...contentBoxes.map(box => box.top))
+    const contentBottom = Math.max(...contentBoxes.map(box => box.bottom))
+    return {
+      container: containerBox.top + containerBox.height / 2,
+      content: contentTop + (contentBottom - contentTop) / 2,
+    }
+  })
+  expect(Math.abs(centers.container - centers.content)).toBeLessThanOrEqual(1)
+}
+
 test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
   await stubSignedInAccount(app)
@@ -48,6 +62,19 @@ test('creates a durable three-panel project conversation', async ({ app, page },
   await expect(page.getByRole('navigation', { name: 'Mona navigation' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Artifacts' })).toBeVisible()
   await expect(page.getByText('What are we working on?')).toBeVisible()
+  const surfaceBars = page.locator('.mona-application-surface-bar')
+  await expect(surfaceBars).toHaveCount(2)
+  await expect(surfaceBars.first()).toHaveCSS('height', '44px')
+  await expect(surfaceBars.first()).toHaveCSS('border-bottom-width', '0px')
+  await expect(surfaceBars.last()).toHaveCSS('height', '44px')
+  await expect(surfaceBars.last()).toHaveCSS('border-bottom-width', '0px')
+  await expect(page.getByText('ci@example.com')).toHaveCount(0)
+  const conversationEmpty = page.getByRole('region', { name: 'Project conversation' })
+    .locator('[data-slot="empty"]')
+  const artifactEmpty = page.getByRole('complementary', { name: 'Artifacts' })
+    .locator('[data-slot="empty"]')
+  await expectVerticallyCentered(conversationEmpty)
+  await expectVerticallyCentered(artifactEmpty)
 
   await stubProjectAgentTurn(app, 'I mapped the requested changes across the attached documents.')
   await page.getByRole('textbox', { name: 'Message Mona' }).fill('Refresh the launch narrative')

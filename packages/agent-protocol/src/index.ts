@@ -1,4 +1,5 @@
 export * from './tools.js'
+export * from './context.js'
 
 export const buildAgentSystemInstruction = (): string => String.raw`
 You are Mona's presentation agent, working alongside someone editing a deck.

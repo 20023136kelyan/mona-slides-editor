@@ -45,6 +45,13 @@ export interface ResolvedSlideRenderState extends PowerPointSlideRenderHierarchy
   placeholders: ResolvedPowerPointPlaceholder[]
 }
 
+export interface PowerPointFieldRenderOptions {
+  /** Deterministic evaluation instant for reserved date/time fields. */
+  dateTime?: Date
+  locale?: string
+  timeZone?: string
+}
+
 /**
  * Materialize one inherited hierarchy object as a slide-local copy-on-write
  * override. The shared layout/master records remain untouched.
@@ -255,6 +262,8 @@ const materializeTableText = (
   element: PPTTableElement,
   hierarchy: PowerPointSlideRenderHierarchy,
   slide: Slide,
+  slideNumber: number,
+  fieldOptions: PowerPointFieldRenderOptions,
 ): PPTTableElement => {
   const { layout, master, sourcePackage, theme } = hierarchy
   const colorMap = slide.source?.colorMapOverride ?? layout?.colorMapOverride ?? master?.colorMap
@@ -267,7 +276,10 @@ const materializeTableText = (
       defaultTextStyle: sourcePackage?.hierarchy?.defaultTextStyle,
       fallbackColor: cell.style?.color ?? '#000000',
       fallbackFontName: cell.style?.fontname ?? '',
-      slideNumber: 1,
+      ...(fieldOptions.dateTime ? { fieldDateTime: fieldOptions.dateTime } : {}),
+      ...(fieldOptions.locale ? { fieldLocale: fieldOptions.locale } : {}),
+      ...(fieldOptions.timeZone ? { fieldTimeZone: fieldOptions.timeZone } : {}),
+      slideNumber,
       textStyleKind: 'other',
       theme,
     })
@@ -285,8 +297,15 @@ const materializeStructuredText = (
   hierarchy: PowerPointSlideRenderHierarchy,
   slide: Slide,
   slideNumber: number,
+  fieldOptions: PowerPointFieldRenderOptions,
 ): PPTElement => {
-  if (element.type === 'table') return materializeTableText(element, hierarchy, slide)
+  if (element.type === 'table') return materializeTableText(
+    element,
+    hierarchy,
+    slide,
+    slideNumber,
+    fieldOptions,
+  )
   // A group's children are ordinary bodies that happen to sit in a nested
   // coordinate space. Skipping them leaves their imported HTML compatibility
   // markup on screen while every ungrouped body renders compiled text, so the
@@ -295,7 +314,7 @@ const materializeStructuredText = (
     return {
       ...element,
       elements: element.elements.map(child => (
-        materializeStructuredText(child, hierarchy, slide, slideNumber)
+        materializeStructuredText(child, hierarchy, slide, slideNumber, fieldOptions)
       )),
     }
   }
@@ -325,6 +344,9 @@ const materializeStructuredText = (
       : element.type === 'shape'
         ? element.text?.defaultFontName ?? ''
         : '',
+    ...(fieldOptions.dateTime ? { fieldDateTime: fieldOptions.dateTime } : {}),
+    ...(fieldOptions.locale ? { fieldLocale: fieldOptions.locale } : {}),
+    ...(fieldOptions.timeZone ? { fieldTimeZone: fieldOptions.timeZone } : {}),
     layoutBody: layoutElement ? elementStructuredText(layoutElement) : undefined,
     masterBody: masterElement ? elementStructuredText(masterElement) : undefined,
     masterTextStyles: master?.textStyles,
@@ -450,7 +472,12 @@ export const compileSlideTheme = (
 export const resolveSlideRenderState = (
   slide: Slide,
   sourcePackages: readonly PowerPointPackageReference[] = [],
+  fieldOptions: PowerPointFieldRenderOptions = {},
 ): ResolvedSlideRenderState => {
+  const resolvedFieldOptions: PowerPointFieldRenderOptions = {
+    ...fieldOptions,
+    dateTime: fieldOptions.dateTime ?? new Date(),
+  }
   const hierarchy = resolvePowerPointSlideRenderHierarchy(slide, sourcePackages)
   const { layout, master, sourcePackage } = hierarchy
   const headerFooterPolicy = master?.headerFooter ?? defaultHeaderFooterPolicy
@@ -470,12 +497,14 @@ export const resolveSlideRenderState = (
     if (!objectId) return true
     return !overriddenObjectIds.has(objectId) && !hiddenObjectIds.has(objectId)
   })
-  const slideNumber = sourcePackage && slide.source
-    ? Math.max(1, sourcePackage.slides.findIndex(candidate => candidate.slidePart === slide.source!.slidePart) + 1)
-    : 1
+  const sourceSlideIndex = sourcePackage && slide.source
+    ? sourcePackage.slides.findIndex(candidate => candidate.slidePart === slide.source!.slidePart)
+    : -1
+  const firstSlideNumber = sourcePackage?.document?.properties.firstSlideNumber ?? 1
+  const slideNumber = firstSlideNumber + Math.max(0, sourceSlideIndex)
   const materializedInherited = inherited.map(node => ({
     ...node,
-    element: materializeStructuredText(node.element, hierarchy, slide, slideNumber),
+    element: materializeStructuredText(node.element, hierarchy, slide, slideNumber, resolvedFieldOptions),
   }))
   const inheritedStableIds = new Set(materializedInherited.map(node => node.element.source?.stableId).filter(Boolean))
   const local = slide.elements
@@ -486,7 +515,7 @@ export const resolveSlideRenderState = (
       !isHeaderFooterPlaceholder(element) || headerFooterVisible(element, headerFooterPolicy)
     ))
     .map((element, sourceIndex) => ({
-      element: materializeStructuredText(element, hierarchy, slide, slideNumber),
+      element: materializeStructuredText(element, hierarchy, slide, slideNumber, resolvedFieldOptions),
       layer: element.source?.sourceLayer ?? 'slide',
       sourceIndex,
       zIndex: 0,

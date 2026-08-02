@@ -14,12 +14,14 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.220",
+    "@mona/agent-protocol": "0.0.0",
     "@mona/data-source": "0.0.0",
     "@mona/document-jobs": "0.0.0",
     "@mona/pptx-ingestion": "0.0.0",
     "@mona/pptx-writeback": "0.0.0",
     "@mona/presentation-core": "0.0.0",
     "@mona/project-core": "0.0.0",
+    "@openai/codex": "^0.146.0",
     "fast-xml-parser": "5.10.1",
     "hfmath": "^0.0.2",
     "jszip": "3.10.1",
@@ -27,12 +29,12 @@
     "tinycolor2": "1.6.0"
   },
   "devDependencies": {
+    "@mona/test-fixtures": "0.0.0",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.1",
-    "@mona/test-fixtures": "0.0.0",
     "vitest": "4.1.10"
   },
-  "description": "Mona \u2014 a desktop presentation editor with a drawing-first agent.",
+  "description": "Mona — a desktop presentation editor with a drawing-first agent.",
   "author": "Mona contributors"
 }

@@ -47,6 +47,13 @@ export class AgentStreamTranslator {
   #started = false
   #toolCallIds = new Map<number, string>()
 
+  /** Begin one visible assistant reply with the renderer's durable identity. */
+  startTurn(messageId?: string): UIMessageChunk {
+    this.#resetTurn()
+    this.#started = true
+    return { ...(messageId ? { messageId } : {}), type: 'start' }
+  }
+
   /** The chunks one SDK message becomes. */
   translate(message: SDKMessage): UIMessageChunk[] {
     const chunks: UIMessageChunk[] = []
@@ -226,11 +233,21 @@ export class AgentStreamTranslator {
    */
   #result(message: Extract<SDKMessage, { type: 'result' }>): UIMessageChunk[] {
     const failed = message.subtype !== 'success' || (message as { is_error?: boolean }).is_error === true
-    if (!failed) return [{ type: 'finish' }]
-    return [
+    const chunks: UIMessageChunk[] = !failed ? [{ type: 'finish' }] : [
       { errorText: readResultError(message), type: 'error' },
       { type: 'finish' },
     ]
+    this.#resetTurn()
+    return chunks
+  }
+
+  #resetTurn(): void {
+    this.#kinds.clear()
+    this.#partIds.clear()
+    this.#toolNames.clear()
+    this.#toolCallIds.clear()
+    this.#sawPartials = false
+    this.#started = false
   }
 }
 

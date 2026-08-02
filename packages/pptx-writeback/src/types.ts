@@ -13,6 +13,7 @@ import type {
   PPTAnimation,
   PPTTableElement,
   PowerPointConnectorRelationships,
+  PowerPointHeaderFooterPolicy,
   PowerPointPackageManifest,
   PresentationState,
   SlideTheme,
@@ -176,6 +177,14 @@ export interface PowerPointThemePatch {
   after: SlideTheme
   before: SlideTheme
   kind: 'theme'
+  partPath: string
+}
+
+/** Author the slide-master switches controlling native header/footer families. */
+export interface PowerPointHeaderFooterPatch {
+  after?: PowerPointHeaderFooterPolicy
+  before?: PowerPointHeaderFooterPolicy
+  kind: 'header-footer'
   partPath: string
 }
 
@@ -394,6 +403,7 @@ export type PowerPointPatchOperation =
   | PowerPointConnectorPatch
   | PowerPointDeletePatch
   | PowerPointEffectsPatch
+  | PowerPointHeaderFooterPatch
   | PowerPointElementInsertPatch
   | PowerPointElementReplacePatch
   | PowerPointImagePatch

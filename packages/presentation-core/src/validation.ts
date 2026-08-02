@@ -103,10 +103,11 @@ const structuredTextIssues = (
         !run.sourceId
         || !['break', 'field', 'tab', 'text'].includes(run.kind)
         || (run.text !== undefined && typeof run.text !== 'string')
+        || (run.kind === 'field' && !run.fieldType?.trim())
       ) {
         issues.push({
           code: 'element.structured-text.run',
-          message: 'Structured runs require a source ID, supported kind, and optional string text',
+          message: 'Structured runs require a source ID, supported kind, optional string text, and a field type for fields',
           path: runPath,
           severity: 'error',
         })

@@ -5,6 +5,7 @@ import { effortLevelsFor, type AgentModel } from '@/features/agent/agent-model-c
 const model = (overrides: Partial<AgentModel>): AgentModel => ({
   id: 'sonnet',
   name: 'Sonnet',
+  providerId: 'anthropic',
   ...overrides,
 })
 

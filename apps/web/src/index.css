@@ -271,26 +271,112 @@ a {
 }
 
 @layer components {
-  .mona-project-markdown > * + * {
-    margin-top: 0.75rem;
+  /* Shared agent transcript presentation. These rules live at application
+     scope because the editor, projects and Home all render the same atoms. */
+  .mona-agent-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--muted-foreground) 0%,
+      var(--foreground) 45%,
+      var(--muted-foreground) 90%
+    );
+    background-size: 220% 100%;
+    background-clip: text;
+    color: transparent;
+    animation: mona-agent-shimmer-sweep 1.9s linear infinite;
   }
 
-  .mona-project-markdown :is(ul, ol) {
-    padding-inline-start: 1.25rem;
+  .mona-agent-prose > :first-child { margin-top: 0; }
+  .mona-agent-prose > :last-child { margin-bottom: 0; }
+
+  .mona-agent-prose p,
+  .mona-agent-prose ul,
+  .mona-agent-prose ol,
+  .mona-agent-prose pre {
+    margin: 0 0 0.5em;
   }
 
-  .mona-project-markdown ul {
-    list-style: disc;
+  .mona-agent-prose h1,
+  .mona-agent-prose h2,
+  .mona-agent-prose h3,
+  .mona-agent-prose h4 {
+    margin: 0.75em 0 0.3em;
+    font-size: 1em;
+    font-weight: 620;
+    line-height: 1.35;
   }
 
-  .mona-project-markdown ol {
-    list-style: decimal;
+  .mona-agent-prose ul,
+  .mona-agent-prose ol { padding-left: 1.15em; }
+  .mona-agent-prose li { margin-bottom: 0.15em; }
+  .mona-agent-prose li::marker { color: var(--muted-foreground); }
+
+  .mona-agent-prose a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
-  .mona-project-markdown code {
+  .mona-agent-prose code {
+    padding: 0.1em 0.3em;
     border-radius: var(--radius-detail);
-    background: color-mix(in oklab, var(--foreground) 6%, transparent);
-    padding: 0.08rem 0.25rem;
+    background: color-mix(in oklab, var(--foreground) 7%, transparent);
     font-size: 0.9em;
   }
+
+  .mona-agent-prose pre {
+    overflow-x: auto;
+    padding: 0.6em 0.7em;
+    border-radius: var(--radius-control);
+    background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+
+  .mona-agent-prose pre code {
+    padding: 0;
+    background: none;
+  }
+
+  .mona-agent-prose blockquote {
+    margin: 0 0 0.5em;
+    padding-left: 0.7em;
+    border-left: 2px solid var(--border);
+    color: var(--muted-foreground);
+  }
+
+  .mona-agent-prose table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 0 0 0.5em;
+  }
+
+  .mona-agent-prose th,
+  .mona-agent-prose td {
+    padding: 0.25em 0.5em;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+
+  .mona-agent-pulse {
+    animation: mona-agent-pulse-breathe 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes mona-agent-shimmer-sweep {
+  to { background-position: -220% 0; }
+}
+
+@keyframes mona-agent-pulse-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mona-agent-shimmer {
+    animation: none;
+    color: var(--muted-foreground);
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .mona-agent-pulse { animation: none; opacity: 0.8; }
 }

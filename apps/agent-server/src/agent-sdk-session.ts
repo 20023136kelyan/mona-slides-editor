@@ -17,8 +17,8 @@ import {
 
 import { monaAgentEnv } from './agent-sdk-env.js'
 import { AgentToolBridge } from './agent-tool-bridge.js'
-import { AgentWorkspace, type FetchAsset } from './agent-workspace-disk.js'
-import type { AssetBytes, DeckSnapshot } from './agent-workspace.js'
+import type { AgentToolResult } from './agent-tool-runtime.js'
+import { EditorAgentRuntime } from './editor-agent-runtime.js'
 
 /**
  * How many model turns one prompt may take before the SDK stops it.
@@ -71,12 +71,6 @@ const pluginPath = (): string => (
  */
 const SKILLS = ['mona-deck']
 
-interface LookImage {
-  base64: string
-  mediaType: string
-  slideId: string
-}
-
 /**
  * A prompt stream the caller can push into after the turn has started.
  *
@@ -124,11 +118,6 @@ class PromptQueue {
   }
 }
 
-/** What the browser returns for a `snapshot` request. */
-interface SnapshotOutput extends DeckSnapshot {
-  revision: string
-}
-
 export interface AgentSdkSessionOptions {
   bridge: AgentToolBridge
   /**
@@ -143,6 +132,8 @@ export interface AgentSdkSessionOptions {
    */
   executablePath?: string
   modelId: string
+  onSessionId?: (sessionId: string) => void
+  resumeSessionId?: string
 }
 
 /**
@@ -157,26 +148,38 @@ export class AgentSdkSession {
   readonly #effort?: EffortLevel
   readonly #executablePath?: string
   readonly #modelId: string
+  readonly #onSessionId?: (sessionId: string) => void
   readonly #queue = new PromptQueue()
+  readonly #resumeSessionId?: string
   #query?: Query
-  #workspace?: AgentWorkspace
+  #reportedSessionId?: string
+  #runtime?: EditorAgentRuntime
 
-  constructor({ bridge, effort, executablePath, modelId }: AgentSdkSessionOptions) {
+  constructor({
+    bridge,
+    effort,
+    executablePath,
+    modelId,
+    onSessionId,
+    resumeSessionId,
+  }: AgentSdkSessionOptions) {
     this.#bridge = bridge
     this.#effort = effort
     this.#executablePath = executablePath
     this.#modelId = modelId
+    this.#onSessionId = onSessionId
+    this.#resumeSessionId = resumeSessionId
   }
 
   /** Start the turn and stream everything the SDK emits. */
   async *run(): AsyncGenerator<SDKMessage> {
-    const workspace = await this.#openWorkspace()
+    const runtime = await this.#openRuntime()
     const running = query({
       options: {
         allowedTools: ['mcp__mona__*', ...BUILT_IN_TOOLS],
         // The deck's own directory, so `Read deck/slides/02.json` is what the
         // model writes and `Grep` searches the deck rather than the machine.
-        cwd: workspace.root,
+        cwd: runtime.root,
         // Only sent when chosen: a model that supports no levels rejects one, and
         // omitting it keeps the SDK's own default.
         ...(this.#effort ? { effort: this.#effort } : {}),
@@ -199,6 +202,7 @@ export class AgentSdkSession {
         },
         model: this.#modelId,
         plugins: [{ path: pluginPath(), skipMcpDiscovery: true, type: 'local' }],
+        ...(this.#resumeSessionId ? { resume: this.#resumeSessionId } : {}),
         // Isolation mode: do not read this machine's ~/.claude, project settings
         // or CLAUDE.md. The skill arrives as a plugin instead, by absolute path.
         settingSources: [],
@@ -209,7 +213,18 @@ export class AgentSdkSession {
       prompt: this.#queue.stream(),
     })
     this.#query = running
-    yield* running
+    for await (const message of running) {
+      const sessionId = (message as { session_id?: unknown }).session_id
+      if (
+        typeof sessionId === 'string'
+        && sessionId
+        && sessionId !== this.#reportedSessionId
+      ) {
+        this.#reportedSessionId = sessionId
+        this.#onSessionId?.(sessionId)
+      }
+      yield message
+    }
   }
 
   /** Queue a message. Mid-run this is steering; before the run it is the prompt. */
@@ -226,38 +241,17 @@ export class AgentSdkSession {
     this.#bridge.closeAll('The editor disconnected.')
     // Fire and forget: the socket is already going away, and a temp directory left
     // behind is a leak worth logging rather than something to block a close on.
-    void this.#workspace?.dispose().catch(() => undefined)
-    this.#workspace = undefined
+    void this.#runtime?.dispose().catch(() => undefined)
+    this.#runtime = undefined
   }
 
-  async #openWorkspace(): Promise<AgentWorkspace> {
-    const existing = this.#workspace
+  async #openRuntime(): Promise<EditorAgentRuntime> {
+    const existing = this.#runtime
     if (existing) return existing
-    const snapshot = await this.#snapshot()
-    const workspace = await AgentWorkspace.create({
-      fetchAsset: this.#fetchAsset,
-      revision: snapshot.revision,
-      snapshot,
-    })
-    this.#workspace = workspace
-    return workspace
+    const runtime = await EditorAgentRuntime.create(this.#bridge)
+    this.#runtime = runtime
+    return runtime
   }
-
-  async #snapshot(): Promise<SnapshotOutput> {
-    return await this.#bridge.request('snapshot', {}) as SnapshotOutput
-  }
-
-  /**
-   * One asset, one round trip.
-   *
-   * They cannot travel with the snapshot: one real deck's images came to 342 MB
-   * of base64 in a single frame, against a 100 MiB socket limit, which closed the
-   * connection before the agent had begun. Per-asset keeps every frame small and
-   * costs only latency we are already paying for the render.
-   */
-  readonly #fetchAsset: FetchAsset = async url => (
-    await this.#bridge.request('asset', { url }) as AssetBytes | undefined
-  )
 
   /**
    * The tools a filesystem cannot provide.
@@ -268,107 +262,39 @@ export class AgentSdkSession {
    * from the browser is phrased for it.
    */
   #monaTools() {
+    const run = async (name: string, args: unknown) => (
+      toClaudeToolResult(await (await this.#openRuntime()).execute(name, args))
+    )
     return [
-      /**
-       * Raw base64 becomes image content, because the point is that the model
-       * actually sees the slide rather than reading a string about it. Images
-       * below a few pixels are rejected upstream with "Could not process image";
-       * real renders are never that small.
-       */
       tool(
         'look',
         agentToolDescriptions.look,
         agentToolSchemas.look.shape,
-        async args => {
-          const output = await this.#bridge.request('look', args)
-          const images = (output as { images?: LookImage[] } | undefined)?.images ?? []
-          if (!images.length) {
-            return { content: [{ text: 'No slides could be rendered.', type: 'text' as const }] }
-          }
-          return {
-            content: images.flatMap(image => [
-              { text: `Slide ${image.slideId}:`, type: 'text' as const },
-              { data: image.base64, mimeType: image.mediaType, type: 'image' as const },
-            ]),
-          }
-        },
+        async args => run('look', args),
         { annotations: { readOnlyHint: true } },
       ),
-
-      /**
-       * The commit boundary. Not marked read-only, so it is never batched
-       * alongside another call: two of these racing would each read a workspace
-       * the other was still writing.
-       */
       tool(
         'apply',
         agentToolDescriptions.apply,
         agentToolSchemas.apply.shape,
-        async args => {
-          const workspace = await this.#openWorkspace()
-          const deck = await workspace.read()
-          if (deck.invalid.length) {
-            // Named, because the model can fix a file it knows is broken.
-            throw new Error(
-              `These files are not valid JSON, so nothing was applied: ${deck.invalid.join(', ')}. Fix them and apply again.`,
-            )
-          }
-
-          // Bytes for anything the agent created, so the browser can ingest it.
-          const addedAssets: Record<string, { base64: string; mediaType: string }> = {}
-          const missing: string[] = []
-          for (const path of deck.addedAssets) {
-            const asset = await workspace.addedAsset(path)
-            if (asset) addedAssets[path] = asset
-            else missing.push(path)
-          }
-          if (missing.length) {
-            throw new Error(
-              `These assets are referenced but not in deck/assets/: ${missing.join(', ')}. Write the file, then apply again.`,
-            )
-          }
-
-          const output = await this.#bridge.request('apply', {
-            addedAssets,
-            expectedRevision: workspace.revision,
-            explanation: args.explanation,
-            powerPointSharedLayers: deck.powerPointSharedLayers,
-            slides: deck.slides,
-            theme: deck.theme,
-            title: deck.title,
-          })
-          const { slideCount } = (output ?? {}) as { slideCount?: number }
-          // Re-taken so the workspace matches what was just committed: the deck's
-          // revision has moved, and a second apply against the old one would be
-          // refused as stale even though nothing else changed.
-          const snapshot = await this.#snapshot()
-          await workspace.take({ fetchAsset: this.#fetchAsset, revision: snapshot.revision, snapshot })
-          return {
-            content: [{
-              text: `Applied to the deck${slideCount ? ` (${slideCount} slides)` : ''}. The change is committed and visible to the user.`,
-              type: 'text' as const,
-            }],
-          }
-        },
+        async args => run('apply', args),
       ),
-
-      /** The recovery path when the user has edited the deck mid-run. */
       tool(
         'sync',
         agentToolDescriptions.sync,
         agentToolSchemas.sync.shape,
-        async () => {
-          const workspace = await this.#openWorkspace()
-          const snapshot = await this.#snapshot()
-          await workspace.take({ fetchAsset: this.#fetchAsset, revision: snapshot.revision, snapshot })
-          return {
-            content: [{
-              text: `Re-read the deck: ${snapshot.slides.length} slides in deck/slides/. Any file changes you had not applied are gone.`,
-              type: 'text' as const,
-            }],
-          }
-        },
+        async args => run('sync', args),
       ),
     ]
   }
 }
+
+const toClaudeToolResult = (result: AgentToolResult) => ({
+  content: result.content.map(content => content.type === 'text'
+    ? { text: content.text, type: 'text' as const }
+    : {
+        data: content.data,
+        mimeType: content.mediaType,
+        type: 'image' as const,
+      }),
+})

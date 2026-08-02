@@ -9,17 +9,13 @@ import {
   type SDKMessage,
   type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type {
-  DocumentJobRecord,
-  PresentationDocumentChange,
-} from '@mona/document-jobs'
-import { z } from 'zod'
-
 import { monaAgentEnv } from './agent-sdk-env.js'
+import type { ProjectAgentExecutor } from './project-agent-contract.js'
+import type { AgentToolResult } from './agent-tool-runtime.js'
 import {
-  ProjectAgentWorkspace,
-  type ProjectWorkspaceDocument,
-} from './project-agent-workspace.js'
+  ProjectAgentRuntime,
+  projectAgentToolSchemas,
+} from './project-agent-runtime.js'
 
 const MAX_TURNS = 25
 const BUILT_IN_TOOLS = [
@@ -32,7 +28,7 @@ const pluginPath = (): string => (
   ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'agent-plugin')
 )
 
-const SYSTEM_INSTRUCTION = `You are Mona's project agent. A project is a durable
+export const PROJECT_AGENT_SYSTEM_INSTRUCTION = `You are Mona's project agent. A project is a durable
 conversation over references to user-owned documents that may live in several data
 sources. The current project context is included with every user turn.
 
@@ -47,13 +43,7 @@ apply_changes reports that its step succeeded. If a document is read-only, state
 that plainly instead of inventing a result. Do not expose internal storage
 identifiers unless the user explicitly asks for diagnostics.`
 
-export interface ProjectAgentExecutor {
-  apply: (
-    explanation: string,
-    changes: PresentationDocumentChange[],
-  ) => Promise<DocumentJobRecord>
-  prepare: () => Promise<ProjectWorkspaceDocument[]>
-}
+export type { ProjectAgentExecutor } from './project-agent-contract.js'
 
 class PromptQueue {
   #closed = false
@@ -121,7 +111,7 @@ export class ProjectAgentSdkSession {
   readonly #resumeSessionId?: string
   #query?: Query
   #reportedSessionId?: string
-  #workspace?: ProjectAgentWorkspace
+  #runtime?: ProjectAgentRuntime
 
   constructor({
     effort,
@@ -140,11 +130,11 @@ export class ProjectAgentSdkSession {
   }
 
   async *run(): AsyncGenerator<SDKMessage> {
-    const workspace = await this.#openWorkspace()
+    const runtime = await this.#openRuntime()
     const running = query({
       options: {
         allowedTools: ['mcp__mona_project__*', ...BUILT_IN_TOOLS],
-        cwd: workspace.root,
+        cwd: runtime.root,
         ...(this.#effort ? { effort: this.#effort } : {}),
         env: monaAgentEnv(),
         extraArgs: { 'thinking-display': 'summarized' },
@@ -163,7 +153,7 @@ export class ProjectAgentSdkSession {
         ...(this.#resumeSessionId ? { resume: this.#resumeSessionId } : {}),
         settingSources: [],
         skills: SKILLS,
-        systemPrompt: SYSTEM_INSTRUCTION,
+        systemPrompt: PROJECT_AGENT_SYSTEM_INSTRUCTION,
         tools: BUILT_IN_TOOLS,
       },
       prompt: this.#queue.stream(),
@@ -193,85 +183,51 @@ export class ProjectAgentSdkSession {
 
   close(): void {
     this.#queue.close()
-    void this.#workspace?.dispose().catch(() => undefined)
-    this.#workspace = undefined
+    void this.#runtime?.dispose().catch(() => undefined)
+    this.#runtime = undefined
   }
 
-  async #openWorkspace(): Promise<ProjectAgentWorkspace> {
-    if (this.#workspace) return this.#workspace
-    const workspace = await ProjectAgentWorkspace.create(await this.#executor.prepare())
-    this.#workspace = workspace
-    return workspace
+  async #openRuntime(): Promise<ProjectAgentRuntime> {
+    if (this.#runtime) return this.#runtime
+    const runtime = await ProjectAgentRuntime.create(this.#executor)
+    this.#runtime = runtime
+    return runtime
   }
 
   #projectTools() {
+    const run = async (name: string, args: unknown) => (
+      toClaudeToolResult(await (await this.#openRuntime()).execute(name, args))
+    )
     return [
       tool(
         'project_documents',
         'List the project documents, their workspace paths, and whether they can be edited.',
-        z.object({}).shape,
-        async () => {
-          const workspace = await this.#openWorkspace()
-          return {
-            content: [{
-              text: JSON.stringify(workspace.describe(), null, 2),
-              type: 'text' as const,
-            }],
-          }
-        },
+        projectAgentToolSchemas.project_documents.shape,
+        async args => run('project_documents', args),
         { annotations: { readOnlyHint: true } },
       ),
       tool(
         'apply_changes',
         'Validate and durably write changed presentation workspaces back to their data sources as one ordered job.',
-        z.object({
-          documentIds: z.array(z.string()).optional()
-            .describe('Artifact ids to apply. Omit to apply every changed editable document.'),
-          explanation: z.string()
-            .describe('One short sentence describing the multi-document change for the user.'),
-        }).shape,
-        async args => {
-          const workspace = await this.#openWorkspace()
-          const changes = await workspace.changes(args.documentIds)
-          if (!changes.length) {
-            return {
-              content: [{
-                text: 'No changed editable documents were found, so no job was created.',
-                type: 'text' as const,
-              }],
-            }
-          }
-          const job = await this.#executor.apply(args.explanation, changes)
-          await workspace.take(await this.#executor.prepare())
-          const succeeded = job.steps.filter(step => step.status === 'succeeded')
-          const failed = job.steps.filter(step => step.status === 'failed')
-          return {
-            content: [{
-              text: [
-                `Document job ${job.status}.`,
-                `${succeeded.length} of ${job.steps.length} document steps succeeded.`,
-                ...failed.map(step => `${step.name}: ${step.error ?? 'failed'}`),
-              ].join('\n'),
-              type: 'text' as const,
-            }],
-          }
-        },
+        projectAgentToolSchemas.apply_changes.shape,
+        async args => run('apply_changes', args),
       ),
       tool(
         'sync_documents',
         'Discard uncommitted workspace changes and reload every attached document from its source.',
-        z.object({}).shape,
-        async () => {
-          const workspace = await this.#openWorkspace()
-          await workspace.take(await this.#executor.prepare())
-          return {
-            content: [{
-              text: 'The project workspace now matches the current source documents.',
-              type: 'text' as const,
-            }],
-          }
-        },
+        projectAgentToolSchemas.sync_documents.shape,
+        async args => run('sync_documents', args),
       ),
     ]
   }
 }
+
+const toClaudeToolResult = (result: AgentToolResult) => ({
+  content: result.content.map(content => content.type === 'text'
+    ? { text: content.text, type: 'text' as const }
+    : {
+        data: content.data,
+        mimeType: content.mediaType,
+        type: 'image' as const,
+      }),
+})

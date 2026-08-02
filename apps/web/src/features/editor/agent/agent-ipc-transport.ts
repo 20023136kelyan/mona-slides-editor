@@ -1,5 +1,10 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
+import type { AgentProviderId } from '@mona/agent-protocol'
 
+import {
+  agentContextFromUiMessages,
+  newestUserMessage,
+} from '@/features/agent/agent-context'
 import { runClientTool } from '@/features/editor/agent/agent-tools-client'
 import type { EditorRuntime } from '@/features/editor/editor-runtime'
 import { monaBridge } from '@/lib/mona-bridge'
@@ -18,21 +23,45 @@ import { monaBridge } from '@/lib/mona-bridge'
  * interruption. IPC to your own main process has no such state.
  */
 export class AgentIpcTransport implements ChatTransport<UIMessage> {
-  readonly #effort: () => string | undefined
-  readonly #model: () => string
+  #effort?: string
+  #model: string
+  #providerId: AgentProviderId
   readonly #runtime: EditorRuntime
   /** Detaches the tool listener when the dock unmounts. */
   #stopTools?: () => void
 
-  constructor({ effort, model, runtime }: {
-    effort: () => string | undefined
-    model: () => string
+  constructor({ effort, model, providerId, runtime }: {
+    effort?: string
+    model: string
+    providerId: AgentProviderId
     runtime: EditorRuntime
   }) {
     this.#effort = effort
     this.#model = model
+    this.#providerId = providerId
     this.#runtime = runtime
-    this.#stopTools = monaBridge().agent.onToolRequest(request => void this.#fulfil(request))
+  }
+
+  /**
+   * Mount the renderer-side tool bridge.
+   *
+   * Kept out of the constructor because React development mode deliberately
+   * replays effect setup/cleanup. `open` is idempotent, so the second setup
+   * correctly reattaches after the replay cleanup instead of leaving the agent
+   * waiting forever on a tool result.
+   */
+  open(): void {
+    this.#stopTools ??= monaBridge().agent.onToolRequest(request => void this.#fulfil(request))
+  }
+
+  updateSelection(selection: {
+    effort?: string
+    model: string
+    providerId: AgentProviderId
+  }): void {
+    this.#effort = selection.effort
+    this.#model = selection.model
+    this.#providerId = selection.providerId
   }
 
   async sendMessages({
@@ -42,8 +71,9 @@ export class AgentIpcTransport implements ChatTransport<UIMessage> {
     abortSignal: AbortSignal | undefined
     messages: UIMessage[]
   }): Promise<ReadableStream<UIMessageChunk>> {
-    const text = lastUserText(messages)
-    if (!text) throw new Error('There is nothing to send.')
+    this.open()
+    const user = newestUserMessage(messages)
+    if (!user) throw new Error('There is nothing to send.')
 
     const bridge = monaBridge()
     // Steering: a prompt sent mid-turn is queued onto the same conversation in the
@@ -59,7 +89,14 @@ export class AgentIpcTransport implements ChatTransport<UIMessage> {
           stop()
           controller.close()
         })
-        bridge.agent.send({ effort: this.#effort(), model: this.#model(), text })
+        bridge.agent.send({
+          context: agentContextFromUiMessages(messages),
+          effort: this.#effort,
+          model: this.#model,
+          providerId: this.#providerId,
+          text: user.text,
+          userMessageId: user.id,
+        })
       },
     })
   }
@@ -93,18 +130,4 @@ export class AgentIpcTransport implements ChatTransport<UIMessage> {
     this.#stopTools?.()
     this.#stopTools = undefined
   }
-}
-
-/** The text of the newest user message - what this turn is actually asking. */
-const lastUserText = (messages: UIMessage[]): string => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role !== 'user') continue
-    return message.parts
-      .filter(part => part.type === 'text')
-      .map(part => (part as { text: string }).text)
-      .join('\n')
-      .trim()
-  }
-  return ''
 }

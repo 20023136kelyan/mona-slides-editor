@@ -2,9 +2,9 @@
 #
 # Two things here are load-bearing and easy to get wrong.
 #
-# `asarUnpack` keeps the Agent SDK's platform binary as a real file. An asar is
-# a single archive, and a subprocess cannot be exec'd out of one, so the package
-# named here has to stay the same one `claude-binary.ts` looks for.
+# `asarUnpack` keeps the Claude and Codex platform binaries as real files. An asar
+# is a single archive, and a subprocess cannot be exec'd out of one, so these
+# packages must stay aligned with `claude-binary.ts` and `codex-binary.ts`.
 #
 # `extraResources` puts the built renderer at `resources/renderer`, which is
 # where `main.ts` serves `mona://app` from once packaged. In development it
@@ -32,6 +32,7 @@ files:
 
 asarUnpack:
   - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+  - node_modules/@openai/codex-*/**
 
 extraResources:
   - from: ../web/dist

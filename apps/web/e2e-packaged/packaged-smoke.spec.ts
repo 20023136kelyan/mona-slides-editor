@@ -81,9 +81,9 @@ test('the packaged application loads its own renderer and completes native deskt
   const bridge = await page.evaluate(async () => {
     const value = window.mona
     if (!value) return null
-    const account = await value.account()
+    const accounts = await value.accounts.list()
     return {
-      accountConnected: typeof account.connected === 'boolean',
+      accountProviders: accounts.map(account => account.providerId).sort(),
       hasAgent: typeof value.agent.send === 'function',
       hasDocumentData: typeof value.documentData.sketches.write === 'function',
       hasDocuments: typeof value.documents.write === 'function',
@@ -98,7 +98,7 @@ test('the packaged application loads its own renderer and completes native deskt
     }
   })
   expect(bridge).toMatchObject({
-    accountConnected: true,
+    accountProviders: ['anthropic', 'openai'],
     hasAgent: true,
     hasDocumentData: true,
     hasDocuments: true,

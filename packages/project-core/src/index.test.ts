@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   PROJECT_STORAGE_VERSION,
   isProjectRecord,
+  migrateProjectRecord,
   projectTitleFromPrompt,
 } from './index'
 
@@ -64,5 +65,28 @@ describe('project domain', () => {
     expect(projectTitleFromPrompt('Update the launch deck. Keep the current structure.'))
       .toBe('Update the launch deck')
     expect(projectTitleFromPrompt('x'.repeat(80))).toHaveLength(56)
+  })
+
+  it('migrates the original Claude session into a provider binding', () => {
+    const migrated = migrateProjectRecord({
+      agentSessionId: '01234567-89ab-cdef-0123-456789abcdef',
+      artifacts: [],
+      createdAt: 1,
+      id: 'project-1',
+      lastOpenedAt: 1,
+      messages: [],
+      title: '',
+      updatedAt: 1,
+      version: 1,
+    })
+    expect(migrated).toMatchObject({
+      agentSessions: {
+        anthropic: {
+          modelId: 'default',
+          sessionId: '01234567-89ab-cdef-0123-456789abcdef',
+        },
+      },
+      version: PROJECT_STORAGE_VERSION,
+    })
   })
 })

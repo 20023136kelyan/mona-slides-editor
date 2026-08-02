@@ -22,6 +22,12 @@ import type {
   ProjectRecord,
   ProjectSummary,
 } from '@mona/project-core'
+import type {
+  AgentAccountDescriptor,
+  AgentContextMessage,
+  AgentModelDescriptor,
+  AgentProviderId,
+} from '@mona/agent-protocol'
 
 /**
  * The desktop shell, as the renderer sees it.
@@ -34,16 +40,16 @@ import type {
  * Typed here rather than in the preload so the renderer's own type-check enforces
  * the contract; the two must be changed together.
  */
-export interface MonaAccount {
-  accountLabel?: string
-  connected: boolean
-  planLabel?: string
-}
+export type MonaAccount = AgentAccountDescriptor
+export type MonaModel = AgentModelDescriptor
 
-export interface MonaModel {
-  effortLevels?: readonly string[]
-  id: string
-  name: string
+export interface MonaAgentPrompt {
+  context: AgentContextMessage[]
+  effort?: string
+  model: string
+  providerId: AgentProviderId
+  text: string
+  userMessageId: string
 }
 
 export interface MonaToolRequest {
@@ -101,14 +107,17 @@ export interface MonaPowerPointWriteback {
 }
 
 export interface MonaBridge {
-  account: () => Promise<MonaAccount>
+  accounts: {
+    connect: (providerId: AgentProviderId) => Promise<MonaAccount>
+    list: () => Promise<MonaAccount[]>
+  }
   agent: {
     interrupt: () => void
     /** Returns an unsubscribe, because a dock can be opened and closed repeatedly. */
     onChunk: (listener: (chunk: unknown) => void) => () => void
     onToolRequest: (listener: (request: MonaToolRequest) => void) => () => void
     respondTool: (id: string, outcome: { errorText?: string; output?: unknown }) => void
-    send: (prompt: { effort?: string; model?: string; text: string }) => void
+    send: (prompt: MonaAgentPrompt) => void
   }
   projectAgent: {
     interrupt: (projectId: string) => void
@@ -116,11 +125,8 @@ export interface MonaBridge {
       chunk: unknown
       projectId: string
     }) => void) => () => void
-    send: (prompt: {
-      effort?: string
-      model?: string
+    send: (prompt: MonaAgentPrompt & {
       projectId: string
-      text: string
     }) => void
   }
   projectJobs: {

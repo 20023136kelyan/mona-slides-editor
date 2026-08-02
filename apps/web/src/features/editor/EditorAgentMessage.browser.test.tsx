@@ -2,7 +2,14 @@ import { beforeAll, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 
-import { EditorAgentActivity, EditorAgentMessage, messageAnswerText, messageHasLiveBlock } from '@/features/editor/EditorAgentMessage'
+import {
+  AgentActivity as EditorAgentActivity,
+  AgentMessage as EditorAgentMessage,
+} from '@/features/agent/AgentMessage'
+import {
+  agentMessageHasLiveBlock as messageHasLiveBlock,
+  agentMessageText as messageAnswerText,
+} from '@/features/agent/agent-message-parts'
 import { initializeI18n, setLocale } from '@/i18n'
 
 beforeAll(async () => {

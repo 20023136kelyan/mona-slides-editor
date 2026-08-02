@@ -27,21 +27,45 @@ const DESKTOP_DIR = join(HERE, '../../desktop')
 const REPO_ROOT = join(HERE, '../../..')
 
 /**
- * Presents the machine as signed in to Claude.
+ * Presents the machine as signed in to both native providers.
  *
- * A runner has no Claude login, and a signed-out dock replaces its composer with
+ * A runner has no provider login, and a signed-out dock replaces its composer with
  * an invitation to go and sign in — so there is no message to send and no button
  * to send it with. The account is what decides that, and it is a separate
  * question from whether a turn can run, which every agent journey stubs anyway.
  */
 export const stubSignedInAccount = async (app: ElectronApplication): Promise<void> => {
   await app.evaluate(({ ipcMain }) => {
-    ipcMain.removeHandler('mona:account')
-    ipcMain.handle('mona:account', () => ({
-      accountLabel: 'ci@example.com',
-      connected: true,
-      planLabel: 'Claude Max',
-    }))
+    ipcMain.removeHandler('mona:accounts')
+    ipcMain.removeHandler('mona:account:connect')
+    ipcMain.removeHandler('mona:models')
+    const accounts = [
+      {
+        accountLabel: 'claude-ci@example.com',
+        connected: true,
+        planLabel: 'Claude Max',
+        providerId: 'anthropic',
+      },
+      {
+        accountLabel: 'codex-ci@example.com',
+        connected: true,
+        planLabel: 'ChatGPT Plus',
+        providerId: 'openai',
+      },
+    ]
+    ipcMain.handle('mona:accounts', () => accounts)
+    ipcMain.handle('mona:account:connect', (_event, providerId) => (
+      accounts.find(account => account.providerId === providerId)
+    ))
+    ipcMain.handle('mona:models', () => [
+      { id: 'default', name: 'Claude', providerId: 'anthropic' },
+      {
+        effortLevels: ['low', 'medium', 'high'],
+        id: 'gpt-test',
+        name: 'Codex Test',
+        providerId: 'openai',
+      },
+    ])
   })
 }
 

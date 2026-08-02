@@ -5,10 +5,11 @@ import { app } from 'electron'
 
 import {
   PROJECT_STORAGE_VERSION,
-  isProjectAgentSessionId,
+  isProjectAgentSessionBinding,
   isProjectArtifact,
   isProjectId,
   isProjectRecord,
+  migrateProjectRecord,
   projectSummary,
   projectTitleFromPrompt,
   type AddProjectArtifactInput,
@@ -19,6 +20,10 @@ import {
   type ProjectRecord,
   type ProjectSummary,
 } from '@mona/project-core'
+import type {
+  AgentProviderId,
+  AgentProviderSessionBinding,
+} from '@mona/agent-protocol'
 
 const projectsRoot = (): string => join(app.getPath('userData'), 'projects')
 export const projectRoot = (id: string): string => join(projectsRoot(), id)
@@ -34,7 +39,10 @@ const readProjectUnsafe = async (id: string): Promise<ProjectRecord | null> => {
   if (!isProjectId(id)) return null
   try {
     const parsed: unknown = JSON.parse(await readFile(projectFile(id), 'utf8'))
-    return isProjectRecord(parsed) && parsed.id === id ? parsed : null
+    const project = migrateProjectRecord(parsed)
+    if (!project || project.id !== id) return null
+    if (!isProjectRecord(parsed)) await atomicJsonWrite(projectFile(id), project)
+    return project
   }
   catch {
     return null
@@ -231,15 +239,27 @@ export class ProjectStore {
     })
   }
 
-  setAgentSessionId(id: string, agentSessionId: string): Promise<ProjectRecord> {
-    if (!isProjectAgentSessionId(agentSessionId)) {
-      return Promise.reject(new Error('Invalid agent session id.'))
+  setAgentSessionBinding(
+    id: string,
+    providerId: AgentProviderId,
+    binding: AgentProviderSessionBinding,
+  ): Promise<ProjectRecord> {
+    if (!isProjectAgentSessionBinding(binding)) {
+      return Promise.reject(new Error('Invalid agent session binding.'))
     }
-    return this.#mutate(id, project => (
-      project.agentSessionId === agentSessionId
-        ? project
-        : { ...project, agentSessionId, updatedAt: Date.now() }
-    ), false)
+    return this.#mutate(id, project => {
+      const current = project.agentSessions?.[providerId]
+      if (
+        current?.sessionId === binding.sessionId
+        && current.modelId === binding.modelId
+        && current.synchronizedThroughMessageId === binding.synchronizedThroughMessageId
+      ) return project
+      return {
+        ...project,
+        agentSessions: { ...project.agentSessions, [providerId]: binding },
+        updatedAt: Date.now(),
+      }
+    }, false)
   }
 
   delete(id: string): Promise<void> {

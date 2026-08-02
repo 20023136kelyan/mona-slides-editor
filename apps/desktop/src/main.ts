@@ -23,10 +23,10 @@ import { guardNavigation } from './window-guards.js'
 /**
  * Mona's desktop shell.
  *
- * The agent host runs *in this process*. That is the point of the move: the Claude
- * Agent SDK spawns a subprocess, and as a website that subprocess had to live on
- * Mona's machine, processing other people's decks. Here it runs on the user's own
- * machine under the Claude login they already have.
+ * The agent host runs *in this process*. That is the point of the move: Claude
+ * Agent SDK and Codex app-server spawn native subprocesses, which a website could
+ * only run on Mona's infrastructure. Here they run on the user's own machine under
+ * provider logins that user already owns.
  *
  * Nothing listens on a TCP port. The renderer reaches the host through a sandboxed
  * preload over IPC, which is why the CORS layer, the Origin gate, the session

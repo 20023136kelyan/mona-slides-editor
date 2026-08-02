@@ -7,6 +7,7 @@ import {
   type PPTElement,
   type PPTElementOutline,
   type PPTLineElement,
+  type PowerPointHeaderFooterPolicy,
   type PresentationState,
   type ShapeText,
   type Slide,
@@ -542,7 +543,16 @@ const layerShell = (layer: Record<string, unknown>): Record<string, unknown> => 
   const clone = structuredClone(layer)
   delete clone.background
   delete clone.elements
+  delete clone.headerFooter
   return clone
+}
+
+const validHeaderFooterPolicy = (value: unknown): value is PowerPointHeaderFooterPolicy => {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return ['dateTime', 'footer', 'header', 'slideNumber'].every(key => (
+    typeof candidate[key] === 'boolean'
+  ))
 }
 
 const asSlideLocalLayerElements = (
@@ -625,6 +635,7 @@ const sharedLayerAnalysis = (
   }
 
   const explicitlyAuthored = new Set(desiredPackage.sharedAuthoring?.partPaths ?? [])
+  const masterParts = new Set(baselinePackage.hierarchy.masters.map(master => master.partPath))
   for (const [partPath, baselineLayer] of baselineByPart) {
     const desiredLayer = desiredByPart.get(partPath)
     if (!desiredLayer || !changed(baselineLayer, desiredLayer)) continue
@@ -639,10 +650,47 @@ const sharedLayerAnalysis = (
     if (changed(layerShell(baselineLayer), layerShell(desiredLayer))) {
       sharedIssues.push(unsupported(
         'pptx.writeback.shared-layer-identity',
-        'PowerPoint master/layout identity fields are immutable; only their background and drawing elements are authorable.',
+        'PowerPoint master/layout identity fields are immutable; only backgrounds, drawing elements, and master header/footer policy are authorable.',
         { partPath },
       ))
       continue
+    }
+    if (changed(baselineLayer.headerFooter, desiredLayer.headerFooter)) {
+      if (!masterParts.has(partPath)) {
+        sharedIssues.push(unsupported(
+          'pptx.writeback.header-footer-layer',
+          'Header/footer policy can only be authored on a PowerPoint slide master.',
+          { partPath },
+        ))
+        continue
+      }
+      if (
+        desiredLayer.headerFooter !== undefined
+        && !validHeaderFooterPolicy(desiredLayer.headerFooter)
+      ) {
+        sharedIssues.push(unsupported(
+          'pptx.writeback.header-footer-policy',
+          'Header/footer policy requires boolean dateTime, footer, header, and slideNumber values.',
+          { partPath },
+        ))
+        continue
+      }
+      const beforePolicy = validHeaderFooterPolicy(baselineLayer.headerFooter)
+        ? baselineLayer.headerFooter
+        : undefined
+      const afterPolicy = validHeaderFooterPolicy(desiredLayer.headerFooter)
+        ? desiredLayer.headerFooter
+        : undefined
+      operations.push({
+        ...(afterPolicy
+          ? { after: structuredClone(afterPolicy) }
+          : {}),
+        ...(beforePolicy
+          ? { before: structuredClone(beforePolicy) }
+          : {}),
+        kind: 'header-footer',
+        partPath,
+      })
     }
     const baselineElements = Array.isArray(baselineLayer.elements)
       ? baselineLayer.elements as PPTElement[]

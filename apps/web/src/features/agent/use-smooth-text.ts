@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 
-/** Slowest reveal, so short bursts still feel like typing rather than a stamp. */
+/** Slowest reveal, so short bursts still feel like a stream rather than a stamp. */
 const MIN_CHARS_PER_SECOND = 60
 /** How aggressively a backlog is worked off: bigger backlog reveals faster. */
 const CATCH_UP_DIVISOR = 6
 
 /**
- * Reveals text character by character, independently of how it arrives.
+ * Reveals text character by character, independently of how provider chunks arrive.
  *
- * Providers deliver tokens in uneven bursts - a clause, a pause, a paragraph -
- * so painting each chunk on arrival reads as stamping. This keeps a cursor into
- * the text received so far and advances it on a steady clock, catching up in
- * proportion to how far behind it is, so it never drifts noticeably late.
- *
- * Purely presentational: nothing here changes what was received, and when the
- * stream ends the full text is shown immediately.
+ * This is shared by every Mona conversation surface. Keeping the pacing at the
+ * message-renderer boundary means switching transports or providers cannot make
+ * one chat feel smoother than another.
  */
 export const useSmoothText = (target: string, active: boolean): string => {
   const [revealed, setRevealed] = useState(active ? '' : target)
@@ -23,14 +19,12 @@ export const useSmoothText = (target: string, active: boolean): string => {
   const lastTickRef = useRef(0)
 
   useEffect(() => {
-    // Settled text is shown whole: a finished message should never animate.
     if (!active) {
       lengthRef.current = target.length
       setRevealed(target)
       return undefined
     }
 
-    // A shorter target means a new message; restart rather than run backwards.
     if (target.length < lengthRef.current) lengthRef.current = 0
 
     const step = (now: number) => {

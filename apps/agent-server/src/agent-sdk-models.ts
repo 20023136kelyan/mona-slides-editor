@@ -39,11 +39,13 @@ export const toAgentSdkModel = (info: ModelInfo): AgentSdkModel => ({
 
 export const readAnthropicModels = async (
   now = Date.now(),
+  executablePath?: string,
 ): Promise<AgentSdkModel[]> => {
   if (cached && now - cached.at < CACHE_MS) return cached.models
   const running = query({
     options: {
       env: monaAgentEnv(),
+      ...(executablePath ? { pathToClaudeCodeExecutable: executablePath } : {}),
       // Nothing should load: this session exists only to be asked a question.
       settingSources: [],
       tools: [],

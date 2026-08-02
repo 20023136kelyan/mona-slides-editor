@@ -34,8 +34,11 @@ ipcRenderer.on('mona:deck:flush', (_event, id: number) => {
 })
 
 contextBridge.exposeInMainWorld('mona', {
-  /** Whether this machine is signed in to Claude, and as whom. */
-  account: () => ipcRenderer.invoke('mona:account'),
+  /** Provider accounts remain in their native CLIs; only status crosses IPC. */
+  accounts: {
+    connect: (providerId: string) => ipcRenderer.invoke('mona:account:connect', providerId),
+    list: () => ipcRenderer.invoke('mona:accounts'),
+  },
 
   agent: {
     /** Stop the running turn. */
@@ -52,7 +55,14 @@ contextBridge.exposeInMainWorld('mona', {
       ipcRenderer.send('mona:agent:tool-result', { id, ...outcome })
     },
     /** Begin a turn, or steer one already running. */
-    send: (prompt: { effort?: string; model?: string; text: string }) => {
+    send: (prompt: {
+      context: unknown[]
+      effort?: string
+      model: string
+      providerId: string
+      text: string
+      userMessageId: string
+    }) => {
       ipcRenderer.send('mona:agent:prompt', prompt)
     },
   },
@@ -62,10 +72,13 @@ contextBridge.exposeInMainWorld('mona', {
     interrupt: (projectId: string) => ipcRenderer.send('mona:project-agent:interrupt', projectId),
     onChunk: (listener: (event: unknown) => void) => on('mona:project-agent:chunk', listener),
     send: (prompt: {
+      context: unknown[]
       effort?: string
-      model?: string
+      model: string
       projectId: string
+      providerId: string
       text: string
+      userMessageId: string
     }) => ipcRenderer.send('mona:project-agent:prompt', prompt),
   },
 

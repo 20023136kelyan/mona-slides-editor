@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 
-import { useSmoothText } from '@/features/editor/agent/use-smooth-text'
+import { useSmoothText } from '@/features/agent/use-smooth-text'
 
 function Probe({ active, value }: { active: boolean; value: string }) {
   return <p data-testid="out">{useSmoothText(value, active)}</p>

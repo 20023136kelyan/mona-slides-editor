@@ -50,6 +50,28 @@ export const assertPackagedResources = (resourcesPath: string): void => {
   )
   accessSync(claude, process.platform === 'win32' ? constants.F_OK : constants.X_OK)
 
+  const codexTargets: Record<string, string> = {
+    'darwin-arm64': 'aarch64-apple-darwin',
+    'darwin-x64': 'x86_64-apple-darwin',
+    'linux-arm64': 'aarch64-unknown-linux-gnu',
+    'linux-x64': 'x86_64-unknown-linux-musl',
+    'win32-arm64': 'aarch64-pc-windows-msvc',
+    'win32-x64': 'x86_64-pc-windows-msvc',
+  }
+  const codexTarget = codexTargets[`${process.platform}-${process.arch}`]
+  expect(codexTarget).toBeTruthy()
+  const codex = join(
+    resourcesPath,
+    'app.asar.unpacked',
+    'node_modules',
+    `@openai/codex-${process.platform}-${process.arch}`,
+    'vendor',
+    codexTarget!,
+    'bin',
+    process.platform === 'win32' ? 'codex.exe' : 'codex',
+  )
+  accessSync(codex, process.platform === 'win32' ? constants.F_OK : constants.X_OK)
+
   const appAsar = join(resourcesPath, 'app.asar')
   expect(statSync(appAsar).size).toBeGreaterThan(1_000)
   expect(existsSync(join(resourcesPath, 'renderer', 'index.html'))).toBe(true)

@@ -1,6 +1,7 @@
 import { useChat } from '@ai-sdk/react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { UIMessage } from 'ai'
+import type { AgentProviderId } from '@mona/agent-protocol'
 
 import type { ProjectRecord } from '@mona/project-core'
 
@@ -29,18 +30,23 @@ export const useProjectAgentChat = ({
   model,
   onProjectChange,
   project,
+  providerId,
 }: {
   effort?: string
   model: string
   onProjectChange: (project: ProjectRecord) => void
   project: ProjectRecord
+  providerId: AgentProviderId
 }) => {
   const transport = useMemo(() => new ProjectAgentIpcTransport({
-    effort: () => effort,
-    model: () => model,
+    model: '',
     projectId: project.id,
-  }), [effort, model, project.id])
+    providerId: 'anthropic',
+  }), [project.id])
 
+  useEffect(() => {
+    transport.updateSelection({ effort, model, providerId })
+  }, [effort, model, providerId, transport])
   return useChat({
     id: `project:${project.id}`,
     messages: initialMessages(project),

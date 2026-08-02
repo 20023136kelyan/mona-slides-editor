@@ -2,8 +2,13 @@ import type {
   DataSourceDocumentReference,
   DataSourceDocumentType,
 } from '@mona/data-source'
+import {
+  isAgentProviderId,
+  type AgentProviderId,
+  type AgentProviderSessionBinding,
+} from '@mona/agent-protocol'
 
-export const PROJECT_STORAGE_VERSION = 1
+export const PROJECT_STORAGE_VERSION = 2
 
 export type ProjectMessageRole = 'assistant' | 'user'
 export type ProjectMessageStatus = 'complete' | 'error' | 'interrupted'
@@ -43,7 +48,8 @@ export interface ProjectSummary {
 }
 
 export interface ProjectRecord {
-  agentSessionId?: string
+  /** Native provider sessions retained behind one canonical conversation. */
+  agentSessions?: Partial<Record<AgentProviderId, AgentProviderSessionBinding>>
   artifacts: ProjectArtifact[]
   createdAt: number
   id: string
@@ -74,7 +80,7 @@ export interface AppendProjectMessageInput {
 }
 
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/
-const SESSION_ID = /^[0-9a-fA-F-]{16,128}$/
+const SESSION_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{7,255}$/
 
 export const isProjectId = (value: unknown): value is string => (
   typeof value === 'string' && ID.test(value)
@@ -83,6 +89,31 @@ export const isProjectId = (value: unknown): value is string => (
 export const isProjectAgentSessionId = (value: unknown): value is string => (
   typeof value === 'string' && SESSION_ID.test(value)
 )
+
+export const isProjectAgentSessionBinding = (
+  value: unknown,
+): value is AgentProviderSessionBinding => {
+  if (!value || typeof value !== 'object') return false
+  const binding = value as Partial<AgentProviderSessionBinding>
+  return (
+    isProjectAgentSessionId(binding.sessionId)
+    && typeof binding.modelId === 'string'
+    && binding.modelId.length > 0
+    && binding.modelId.length <= 256
+    && (binding.synchronizedThroughMessageId === undefined
+      || isProjectId(binding.synchronizedThroughMessageId))
+  )
+}
+
+const isAgentSessions = (
+  value: unknown,
+): value is Partial<Record<AgentProviderId, AgentProviderSessionBinding>> => {
+  if (value === undefined) return true
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  return Object.entries(value).every(([providerId, binding]) => (
+    isAgentProviderId(providerId) && isProjectAgentSessionBinding(binding)
+  ))
+}
 
 const isFiniteTimestamp = (value: unknown): value is number => (
   typeof value === 'number' && Number.isFinite(value) && value >= 0
@@ -148,7 +179,7 @@ export const isProjectRecord = (value: unknown): value is ProjectRecord => {
     && isFiniteTimestamp(project.lastOpenedAt)
     && project.updatedAt >= project.createdAt
     && project.lastOpenedAt >= project.createdAt
-    && (project.agentSessionId === undefined || isProjectAgentSessionId(project.agentSessionId))
+    && isAgentSessions(project.agentSessions)
     && Array.isArray(project.messages)
     && project.messages.every(isProjectMessage)
     && new Set(project.messages.map(message => message.id)).size === project.messages.length
@@ -159,6 +190,32 @@ export const isProjectRecord = (value: unknown): value is ProjectRecord => {
       `${artifact.reference.sourceId}:${artifact.reference.itemId}`
     ))).size === project.artifacts.length
   )
+}
+
+/**
+ * Upgrade the only previous on-disk shape without discarding its Claude thread.
+ * Future readers only accept the current record after this boundary.
+ */
+export const migrateProjectRecord = (value: unknown): ProjectRecord | null => {
+  if (isProjectRecord(value)) return value
+  if (!value || typeof value !== 'object') return null
+  const legacy = value as Record<string, unknown>
+  if (legacy.version !== 1) return null
+
+  const { agentSessionId, ...content } = legacy
+  const migrated: Record<string, unknown> = {
+    ...content,
+    version: PROJECT_STORAGE_VERSION,
+  }
+  if (isProjectAgentSessionId(agentSessionId)) {
+    migrated.agentSessions = {
+      anthropic: {
+        modelId: 'default',
+        sessionId: agentSessionId,
+      },
+    }
+  }
+  return isProjectRecord(migrated) ? migrated : null
 }
 
 export const projectSummary = (project: ProjectRecord): ProjectSummary => ({

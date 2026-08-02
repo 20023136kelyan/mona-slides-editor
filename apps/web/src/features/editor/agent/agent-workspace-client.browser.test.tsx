@@ -522,6 +522,53 @@ describe('validateAgentSlides', () => {
     expect(command.sourcePackages[0]?.hierarchy?.layouts[0]?.elements?.[1]?.source).toBeUndefined()
   })
 
+  it('accepts a semantic slide-master header/footer policy edit', async () => {
+    const imported = importedPresentation()
+    const sourcePackage = imported.sourcePackages![0]!
+    sourcePackage.hierarchy!.masters.push({
+      headerFooter: {
+        dateTime: true,
+        footer: true,
+        header: true,
+        slideNumber: true,
+      },
+      id: 'master-1',
+      layoutIds: [],
+      objectIds: [],
+      packageId: sourcePackage.packageId,
+      partPath: 'ppt/slideMasters/slideMaster1.xml',
+      preserve: false,
+    })
+    const snapshot = await buildDeckSnapshot(imported)
+    snapshot.powerPointSharedLayers!.packages[0]!.masters[0]!.headerFooter = {
+      dateTime: false,
+      footer: true,
+      header: false,
+      slideNumber: true,
+    }
+
+    const transaction = validateAgentSlides(imported, {
+      powerPointSharedLayers: snapshot.powerPointSharedLayers,
+      slides: snapshot.slides,
+    })
+    const command = transaction.commands.find(candidate => (
+      candidate.type === 'presentation.source-packages.replace'
+    )) as Extract<
+      typeof transaction.commands[number],
+      { type: 'presentation.source-packages.replace' }
+    >
+    expect(command.sourcePackages[0]?.sharedAuthoring).toEqual({
+      partPaths: ['ppt/slideMasters/slideMaster1.xml'],
+      revision: 1,
+    })
+    expect(command.sourcePackages[0]?.hierarchy?.masters[0]?.headerFooter).toEqual({
+      dateTime: false,
+      footer: true,
+      header: false,
+      slideNumber: true,
+    })
+  })
+
   it('rejects shared-layer mutations that change retained part identity', async () => {
     const imported = importedPresentation()
     const snapshot = await buildDeckSnapshot(imported)

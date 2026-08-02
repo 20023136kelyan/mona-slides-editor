@@ -1,43 +1,47 @@
 import { useSyncExternalStore } from 'react'
 
+import type { AgentProviderId } from '@mona/agent-protocol'
+
 import { monaBridge } from '@/lib/mona-bridge'
 
-/**
- * Whether this machine is signed in to Claude, shared by every agent surface.
- *
- * Not a credential Mona holds. The Agent SDK authenticates from the user's own
- * `claude` login, so this reports a fact about the machine — which is why there is
- * nothing here to connect, disconnect, or store.
- *
- * It replaces a 223-line client that drove OAuth flows for three providers as
- * pollable REST resources, kept per-provider status, and offered an API-key field.
- * All of it fed a vault whose credentials no code path ever turned into a running
- * turn: the only provider that works is Claude, and it never consulted the vault.
- */
+import { refreshAgentModels } from './agent-model-catalog'
+
 export interface AgentAccount {
   accountLabel?: string
   connected: boolean
+  connecting: boolean
   loading: boolean
   planLabel?: string
+  providerId: AgentProviderId
 }
 
-const DISCONNECTED: AgentAccount = { connected: false, loading: true }
+const EMPTY: readonly AgentAccount[] = [
+  { connected: false, connecting: false, loading: true, providerId: 'anthropic' },
+  { connected: false, connecting: false, loading: true, providerId: 'openai' },
+]
 
-let account: AgentAccount = DISCONNECTED
+let accounts: readonly AgentAccount[] = EMPTY
 let inflight: Promise<void> | null = null
 const listeners = new Set<() => void>()
 
 const emit = () => listeners.forEach(listener => listener())
 
-export const refreshAgentAccount = (): Promise<void> => {
-  inflight ??= monaBridge().account()
+export const refreshAgentAccounts = (): Promise<void> => {
+  inflight ??= monaBridge().accounts.list()
     .then(payload => {
-      account = { ...payload, loading: false }
+      accounts = (['anthropic', 'openai'] as const).map(providerId => {
+        const account = payload.find(candidate => candidate.providerId === providerId)
+        return {
+          ...account,
+          connected: account?.connected ?? false,
+          connecting: false,
+          loading: false,
+          providerId,
+        }
+      })
     })
     .catch(() => {
-      // Signed out looks the same as unreachable from here, and both mean the
-      // dock should offer to sign in rather than pretend a turn will work.
-      account = { connected: false, loading: false }
+      accounts = EMPTY.map(account => ({ ...account, loading: false }))
     })
     .finally(() => {
       inflight = null
@@ -46,14 +50,43 @@ export const refreshAgentAccount = (): Promise<void> => {
   return inflight
 }
 
+/** Retained as the singular action used by existing surface effects. */
+export const refreshAgentAccount = refreshAgentAccounts
+
+export const connectAgentAccount = async (providerId: AgentProviderId): Promise<void> => {
+  accounts = accounts.map(account => account.providerId === providerId
+    ? { ...account, connecting: true }
+    : account)
+  emit()
+  try {
+    const connected = await monaBridge().accounts.connect(providerId)
+    accounts = accounts.map(account => account.providerId === providerId
+      ? { ...connected, connecting: false, loading: false }
+      : account)
+    await refreshAgentModels()
+  }
+  finally {
+    accounts = accounts.map(account => account.providerId === providerId
+      ? { ...account, connecting: false, loading: false }
+      : account)
+    emit()
+  }
+}
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
-  // On first subscription rather than at module load, so nothing is fetched for a
-  // window that never opens the dock.
-  if (account.loading) void refreshAgentAccount()
+  if (accounts.some(account => account.loading)) void refreshAgentAccounts()
   return () => listeners.delete(listener)
 }
 
-export const useAgentAccount = (): AgentAccount => (
-  useSyncExternalStore(subscribe, () => account, () => DISCONNECTED)
+export const useAgentAccounts = (): readonly AgentAccount[] => (
+  useSyncExternalStore(subscribe, () => accounts, () => EMPTY)
 )
+
+export const useAgentAccount = (
+  providerId: AgentProviderId = 'anthropic',
+): AgentAccount => {
+  const snapshot = useAgentAccounts()
+  return snapshot.find(account => account.providerId === providerId)
+    ?? { connected: false, connecting: false, loading: false, providerId }
+}

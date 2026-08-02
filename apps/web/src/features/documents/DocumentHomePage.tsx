@@ -3,8 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import {
   ArrowDownUp,
-  ArrowUp,
-  Bot,
   CalendarDays,
   Copy,
   FilePlus2,
@@ -80,16 +78,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Toaster } from '@/components/ui/sonner'
-import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { AgentComposer } from '@/features/agent/AgentComposer'
 import {
   ApplicationSidebar,
   ApplicationSidebarContentToggle,
 } from '@/features/application-shell/ApplicationSidebar'
 import { useOptionalApplicationSidebarState } from '@/features/application-shell/application-sidebar-context'
+import {
+  applicationSurfaceBarClass,
+  applicationSurfaceControlClass,
+} from '@/features/application-shell/application-surface-styles'
 import { createBlankPresentation } from '@/features/presentation-renderer/load-presentation'
 import { isSupportedLocale, type SupportedLocale } from '@/i18n'
 import { monaBridge, type MonaDocumentSummary } from '@/lib/mona-bridge'
+import { cn } from '@/lib/utils'
 
 import { DocumentDataSourceSidebar } from './DocumentDataSourceSidebar'
 import {
@@ -602,68 +605,60 @@ export function DocumentHomePage({ initialData }: DocumentHomePageProps) {
           onExpand={() => setSidebarCollapsed(false)}
         />
 
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4 ps-12">
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
-            {t('documents.heading')}
-          </h1>
-          <InputGroup className="hidden w-64 shrink-0 bg-background md:flex">
-            <InputGroupAddon>
+        <div
+          aria-label={t('documents.heading')}
+          className={cn(applicationSurfaceBarClass, '@container/library-bar flex gap-2 ps-12')}
+          role="toolbar"
+        >
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+            <h1 className="m-0 truncate text-control font-medium">
+              {t('documents.heading')}
+            </h1>
+            <Select
+              onValueChange={value => {
+                if (value === 'all') {
+                  sourceBrowser.setScope({ kind: 'all' })
+                  return
+                }
+                const sourceId = value.replace(/^source:/, '')
+                const source = sourceBrowser.sourceById.get(sourceId)
+                if (source) {
+                  sourceBrowser.setScope({
+                    itemId: source.rootItemId,
+                    kind: 'source',
+                    sourceId,
+                  })
+                }
+              }}
+              value={locationFilterValue}
+            >
+              <SelectTrigger
+                aria-label={t('documents.locationFilter')}
+                className={cn(applicationSurfaceControlClass, 'max-w-36 px-2')}
+                size="sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">{t('documents.allSources')}</SelectItem>
+                  {sourceBrowser.sources.map(source => (
+                    <SelectItem key={source.id} value={`source:${source.id}`}>
+                      {source.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <InputGroup className="mx-auto h-7 min-w-32 max-w-72 flex-1 border-transparent bg-transparent shadow-none hover:border-input focus-within:bg-background">
+            <InputGroupAddon className="ps-2 pe-1">
               <Search />
             </InputGroupAddon>
             <InputGroupInput
               aria-label={t('documents.searchLabel')}
-              onChange={event => setQuery(event.target.value)}
-              placeholder={t('documents.searchPlaceholder')}
-              type="search"
-              value={query}
-            />
-          </InputGroup>
-          <Button disabled={creating} onClick={() => { void createPresentation() }}>
-            <FilePlus2 data-icon="inline-start" />
-            {creating ? t('documents.creating') : t('header.newPresentation')}
-          </Button>
-        </div>
-
-        <div className="flex min-h-13 shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
-          <Select
-            onValueChange={value => {
-              if (value === 'all') {
-                sourceBrowser.setScope({ kind: 'all' })
-                return
-              }
-              const sourceId = value.replace(/^source:/, '')
-              const source = sourceBrowser.sourceById.get(sourceId)
-              if (source) {
-                sourceBrowser.setScope({
-                  itemId: source.rootItemId,
-                  kind: 'source',
-                  sourceId,
-                })
-              }
-            }}
-            value={locationFilterValue}
-          >
-            <SelectTrigger aria-label={t('documents.locationFilter')} className="w-44 bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">{t('documents.allSources')}</SelectItem>
-                {sourceBrowser.sources.map(source => (
-                  <SelectItem key={source.id} value={`source:${source.id}`}>
-                    {source.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <InputGroup className="min-w-44 flex-1 bg-background md:hidden">
-            <InputGroupAddon>
-              <Search />
-            </InputGroupAddon>
-            <InputGroupInput
-              aria-label={t('documents.searchLabel')}
+              className="h-7 text-xs"
               onChange={event => setQuery(event.target.value)}
               placeholder={t('documents.searchPlaceholder')}
               type="search"
@@ -671,12 +666,16 @@ export function DocumentHomePage({ initialData }: DocumentHomePageProps) {
             />
           </InputGroup>
 
-          <div className="ms-auto flex items-center gap-2">
+          <div className="ms-auto flex shrink-0 items-center gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
+                <Button
+                  aria-label={t('documents.group')}
+                  size="header-icon"
+                  title={t('documents.group')}
+                  variant="header-pill"
+                >
                   <CalendarDays />
-                  <span className="hidden xl:inline">{t('documents.group')}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -696,9 +695,13 @@ export function DocumentHomePage({ initialData }: DocumentHomePageProps) {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
+                <Button
+                  aria-label={t('documents.sort')}
+                  size="header-icon"
+                  title={t('documents.sort')}
+                  variant="header-pill"
+                >
                   <ArrowDownUp />
-                  <span className="hidden xl:inline">{t('documents.sort')}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -721,76 +724,72 @@ export function DocumentHomePage({ initialData }: DocumentHomePageProps) {
 
             <ToggleGroup
               aria-label={t('documents.viewLabel')}
-              className="rounded-control border bg-background p-0.5"
+              className="h-7 overflow-hidden rounded-action border border-border bg-[color-mix(in_oklab,var(--foreground)_3%,var(--background))] shadow-[0_1px_2px_0_color-mix(in_oklab,var(--foreground)_12%,transparent)]"
               onValueChange={value => {
                 const nextView = value as DocumentLibraryView
                 if (!nextView) return
                 setView(nextView)
                 localStorage.setItem('mona:document-library-view', nextView)
               }}
+              size="sm"
               spacing={0}
               type="single"
               value={view}
             >
               <ToggleGroupItem
                 aria-label={t('documents.viewGrid')}
-                className="size-7 rounded-[calc(var(--radius-control)-2px)] px-0"
+                className="size-7 rounded-none px-0 data-[state=on]:bg-foreground/8"
                 value="grid"
               >
                 <Grid2X2 />
               </ToggleGroupItem>
               <ToggleGroupItem
                 aria-label={t('documents.viewList')}
-                className="size-7 rounded-[calc(var(--radius-control)-2px)] px-0"
+                className="size-7 rounded-none px-0 data-[state=on]:bg-foreground/8"
                 value="list"
               >
                 <List />
               </ToggleGroupItem>
             </ToggleGroup>
+
+            <Button
+              aria-label={creating ? t('documents.creating') : t('header.newPresentation')}
+              disabled={creating}
+              onClick={() => { void createPresentation() }}
+              size="header-pill"
+              title={t('header.newPresentation')}
+              variant="header-pill"
+            >
+              <FilePlus2 data-icon="inline-start" />
+              <span className="@max-[980px]/library-bar:hidden">
+                {creating ? t('documents.creating') : t('header.newPresentation')}
+              </span>
+            </Button>
           </div>
         </div>
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-5 py-6 lg:px-7">
-          <form
-            aria-label={t('projects.homeComposerLabel')}
-            className="mx-auto mb-7 flex max-w-3xl items-end gap-2 border-b border-border pb-3"
-            onSubmit={event => {
-              event.preventDefault()
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 lg:px-7">
+          <AgentComposer
+            ariaLabel={t('projects.homeComposerLabel')}
+            busy={creatingProject}
+            className="mx-auto mb-7 max-w-3xl"
+            disabled={creatingProject}
+            onSubmit={() => {
               const prompt = projectDraft.trim()
               if (prompt) void createProject(prompt)
             }}
-          >
-            <Bot className="mb-2.5 size-4 shrink-0 text-muted-foreground" />
-            <Textarea
-              aria-label={t('projects.homeComposerLabel')}
-              className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
-              disabled={creatingProject}
-              onChange={event => setProjectDraft(event.target.value)}
-              onKeyDown={event => {
-                if (event.key !== 'Enter' || event.shiftKey) return
-                event.preventDefault()
-                const prompt = projectDraft.trim()
-                if (prompt) void createProject(prompt)
-              }}
-              placeholder={t('projects.homeComposerPlaceholder')}
-              rows={1}
-              value={projectDraft}
-            />
-            <Button
-              aria-label={t('projects.startProject')}
-              disabled={creatingProject || !projectDraft.trim()}
-              size="icon-sm"
-              type="submit"
-            >
-              <ArrowUp />
-            </Button>
-          </form>
+            onValueChange={setProjectDraft}
+            placeholder={t('projects.homeComposerPlaceholder')}
+            requireConnection={false}
+            sendLabel={t('projects.startProject')}
+            value={projectDraft}
+          />
           {libraryPresentations.length === 0
             && !deferredQuery
             && sourceBrowser.scope.kind === 'all' ? (
             <EmptyLibrary creating={creating} onCreate={createPresentation} />
           ) : libraryPresentations.length === 0 ? (
-            <Empty className="min-h-52 bg-transparent">
+            <Empty className="min-h-0 bg-transparent">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Search /></EmptyMedia>
                 <EmptyTitle>{t('documents.noSearchResults')}</EmptyTitle>
@@ -945,7 +944,7 @@ function EmptyLibrary({
 }) {
   const { t } = useTranslation()
   return (
-    <Empty className="min-h-80 bg-transparent">
+    <Empty className="min-h-0 bg-transparent">
       <EmptyHeader>
         <EmptyMedia className="size-11 rounded-xl" variant="icon">
           <Presentation className="size-5 text-muted-foreground" />

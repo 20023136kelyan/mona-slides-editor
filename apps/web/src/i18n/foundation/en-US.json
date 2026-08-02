@@ -408,8 +408,13 @@
       "toolSyncing": "Re-reading the deck",
       "toolWebSearching": "Searching the web for {{query}}",
       "toolWriting": "Writing {{scope}}",
-      "checkingAccount": "Checking your Claude account…",
-      "signedOutHint": "Not signed in to Claude. Run `claude` in a terminal to sign in."
+      "checkingAccount": "Checking your account…",
+      "connected": "Connected",
+      "connecting": "Connecting…",
+      "signIn": "Sign in",
+      "signInFailed": "Could not sign in",
+      "signedOutHint": "Not signed in.",
+      "signedOutProviderHint": "Not signed in to {{provider}}. Choose the model menu to sign in."
     },
     "drawing": {
       "layer": "Drawing layer",

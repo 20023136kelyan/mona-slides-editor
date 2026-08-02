@@ -1,10 +1,13 @@
 import { XMLBuilder, XMLParser, XMLValidator } from 'fast-xml-parser'
 import JSZip from 'jszip'
+import { createHash } from 'node:crypto'
 import { posix } from 'node:path'
 
 import type {
   PPTElement,
   PowerPointPackageManifest,
+  StructuredTextParagraphProperties,
+  StructuredTextRunProperties,
 } from '@mona/presentation-core'
 import { flattenElementTree } from '@mona/presentation-core'
 
@@ -17,6 +20,7 @@ import type {
   PowerPointElementReplacePatch,
   PowerPointEffectsPatch,
   PowerPointImagePatch,
+  PowerPointHeaderFooterPatch,
   PowerPointNotesPatch,
   PowerPointObjectInsertPatch,
   PowerPointPatchOperation,
@@ -50,7 +54,7 @@ import { latexToOmml } from './native-math'
 
 type OrderedXmlNode = Record<string, unknown>
 type PowerPointObjectPatchOperation = Exclude<PowerPointPatchOperation, {
-  kind: 'background' | 'comments' | 'inherited-visibility' | 'insert-element' | 'insert-object' | 'insert-slide' | 'notes' | 'replace-element' | 'theme' | 'timing' | 'transition'
+  kind: 'background' | 'comments' | 'header-footer' | 'inherited-visibility' | 'insert-element' | 'insert-object' | 'insert-slide' | 'notes' | 'replace-element' | 'theme' | 'timing' | 'transition'
 }>
 
 interface ConnectorCoordinateContext {
@@ -1887,6 +1891,55 @@ const patchThemePart = (
       }
 }
 
+const patchHeaderFooterPart = (
+  xml: string,
+  operation: PowerPointHeaderFooterPatch,
+): { issues: PowerPointWritebackIssue[]; xml: string } => {
+  const nodes = parseXml(xml, operation.partPath)
+  const master = findNode(nodes, 'sldMaster')
+  if (!master) {
+    return {
+      issues: [{
+        code: 'pptx.writeback.header-footer-master',
+        message: 'The retained part is not a PowerPoint slide master.',
+        partPath: operation.partPath,
+      }],
+      xml,
+    }
+  }
+  const children = ownChildren(master)
+  if (!operation.after) {
+    removeDirectNodes(children, new Set(['hf']))
+  }
+  else {
+    let headerFooter = directNode(children, 'hf')
+    if (!headerFooter) {
+      headerFooter = xmlNode('p:hf')
+      const insertBefore = children.findIndex(child => (
+        ['extLst', 'txStyles'].includes(localName(nodeTag(child) ?? ''))
+      ))
+      children.splice(insertBefore < 0 ? children.length : insertBefore, 0, headerFooter)
+    }
+    const attributes = nodeAttributes(headerFooter)
+    attributes.dt = operation.after.dateTime ? '1' : '0'
+    attributes.ftr = operation.after.footer ? '1' : '0'
+    attributes.hdr = operation.after.header ? '1' : '0'
+    attributes.sldNum = operation.after.slideNumber ? '1' : '0'
+  }
+  const output = xmlBuilder.build(nodes) as string
+  const validation = XMLValidator.validate(output, { allowBooleanAttributes: false })
+  return validation === true
+    ? { issues: [], xml: output }
+    : {
+        issues: [{
+          code: 'pptx.writeback.invalid-header-footer-output',
+          message: `Header/footer writeback produced invalid XML: ${validation.err.msg}`,
+          partPath: operation.partPath,
+        }],
+        xml,
+      }
+}
+
 const timingPreset = (
   animation: PowerPointTimingPatch['after'][number],
 ): { filter: string; presetClass: string; presetId: string } => {
@@ -2228,6 +2281,127 @@ const runKind = (node: OrderedXmlNode): AuthoredTextRun['kind'] => {
   return tag === 'br' ? 'break' : tag === 'tab' ? 'tab' : tag === 'fld' ? 'field' : 'text'
 }
 
+const structuredRunStyle = (
+  properties: StructuredTextRunProperties | undefined,
+  scale: number,
+): AuthoredTextStyle => {
+  if (!properties) return {}
+  const decoration = [
+    properties.underline && properties.underline !== 'none' ? 'underline' : undefined,
+    properties.strike && properties.strike !== 'noStrike' ? 'line-through' : undefined,
+  ].filter(Boolean).join(' ')
+  const color = properties.color?.type === 'srgb'
+    ? properties.color.value.startsWith('#')
+      ? properties.color.value
+      : `#${properties.color.value}`
+    : undefined
+  return {
+    ...(properties.baseline !== undefined
+      ? { 'vertical-align': properties.baseline > 0 ? 'super' : properties.baseline < 0 ? 'sub' : 'baseline' }
+      : {}),
+    ...(properties.bold !== undefined ? { 'font-weight': properties.bold ? '700' : '400' } : {}),
+    ...(properties.capitalization !== undefined
+      ? { 'text-transform': properties.capitalization === 'all' ? 'uppercase' : 'none' }
+      : {}),
+    ...(color ? { color } : {}),
+    ...(properties.fontFamily ? { 'font-family': JSON.stringify(properties.fontFamily) } : {}),
+    ...(properties.fontSize !== undefined ? { 'font-size': `${properties.fontSize * scale}px` } : {}),
+    ...(properties.italic !== undefined ? { 'font-style': properties.italic ? 'italic' : 'normal' } : {}),
+    ...(properties.spacing !== undefined ? { 'letter-spacing': `${properties.spacing * scale}px` } : {}),
+    ...(decoration ? { 'text-decoration-line': decoration } : {}),
+  }
+}
+
+const structuredParagraphStyle = (
+  properties: StructuredTextParagraphProperties | undefined,
+  scale: number,
+): AuthoredTextStyle => {
+  if (!properties) return {}
+  const alignment = properties.alignment === 'ctr'
+    ? 'center'
+    : properties.alignment === 'r'
+      ? 'right'
+      : properties.alignment === 'just' || properties.alignment === 'dist'
+        ? 'justify'
+        : properties.alignment
+          ? 'left'
+          : undefined
+  return {
+    ...(alignment ? { 'text-align': alignment } : {}),
+    ...(properties.indent !== undefined ? { 'text-indent': `${properties.indent * scale}px` } : {}),
+    ...(properties.lineSpacing?.unit === 'percent'
+      ? { 'line-height': String(properties.lineSpacing.value / 100) }
+      : {}),
+    ...(properties.marginLeft !== undefined ? { 'padding-left': `${properties.marginLeft * scale}px` } : {}),
+    ...(properties.rightToLeft !== undefined ? { direction: properties.rightToLeft ? 'rtl' : 'ltr' } : {}),
+    ...(properties.spaceAfter?.unit === 'points'
+      ? { 'margin-bottom': `${properties.spaceAfter.value * scale}px` }
+      : {}),
+    ...(properties.spaceBefore?.unit === 'points'
+      ? { 'margin-top': `${properties.spaceBefore.value * scale}px` }
+      : {}),
+    ...structuredRunStyle(properties.defaultRun, scale),
+  }
+}
+
+/**
+ * The editor still carries HTML as an adapter, while the agent edits the
+ * structured JSON directly. Overlay the semantic paragraphs/runs onto the
+ * adapter so a structured-only field edit reaches native writeback without
+ * requiring the agent to keep two representations in sync.
+ */
+const authoredTextFromSnapshot = (
+  snapshot: PowerPointTextPatch['before'] | PowerPointTextPatch['after'],
+): AuthoredTextParagraph[] => {
+  const authored = parseAuthoredText(snapshot.content)
+  const structured = snapshot.structuredText
+  if (!structured) return authored
+  const paragraphsBySource = new Map(authored.flatMap(paragraph => (
+    paragraph.sourceId ? [[paragraph.sourceId, paragraph] as const] : []
+  )))
+  return structured.paragraphs.map((paragraph, paragraphIndex) => {
+    const adapter = paragraphsBySource.get(paragraph.sourceId) ?? authored[paragraphIndex]
+    const runsBySource = new Map((adapter?.runs ?? []).flatMap(run => (
+      run.sourceId ? [[run.sourceId, run] as const] : []
+    )))
+    return {
+      level: paragraph.level,
+      ...(paragraph.properties?.bullet?.type === 'auto-number'
+        ? { list: {
+            ...(paragraph.properties.bullet.startAt
+              ? { startAt: paragraph.properties.bullet.startAt }
+              : {}),
+            type: 'number' as const,
+          } }
+        : paragraph.properties?.bullet?.type === 'character'
+          ? { list: { type: 'bullet' as const } }
+          : adapter?.list
+            ? { list: adapter.list }
+            : {}),
+      runs: paragraph.runs.map((run, runIndex) => {
+        const adapterRun = runsBySource.get(run.sourceId) ?? adapter?.runs[runIndex]
+        return {
+          ...(run.fieldId ? { fieldId: run.fieldId } : {}),
+          ...(run.fieldType ? { fieldType: run.fieldType } : {}),
+          ...(run.hyperlink ? { hyperlink: run.hyperlink } : {}),
+          kind: run.kind,
+          sourceId: run.sourceId,
+          style: {
+            ...(adapterRun?.style ?? {}),
+            ...structuredRunStyle(run.properties, structured.scale),
+          },
+          text: run.text ?? adapterRun?.text ?? '',
+        }
+      }),
+      sourceId: paragraph.sourceId,
+      style: {
+        ...(adapter?.style ?? {}),
+        ...structuredParagraphStyle(paragraph.properties, structured.scale),
+      },
+    }
+  })
+}
+
 const plainRunFrom = (
   template: OrderedXmlNode | undefined,
   kind: AuthoredTextRun['kind'],
@@ -2240,8 +2414,38 @@ const plainRunFrom = (
     removeDirectNodes(ownChildren(clonedRPr), new Set(['hlinkClick', 'hlinkMouseOver']))
   }
   const children = clonedRPr ? [clonedRPr] : []
+  if (kind === 'field') children.push(xmlNode('a:pPr'))
   children.push(xmlNode('a:t'))
-  return xmlNode('a:r', children)
+  return xmlNode(kind === 'field' ? 'a:fld' : 'a:r', children)
+}
+
+const validFieldId = (value: string | undefined): value is string => (
+  Boolean(value && /^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/i.test(value))
+)
+
+const allocatedFieldId = (seed: string): string => {
+  const hex = createHash('sha256').update(seed).digest('hex').slice(0, 32).split('')
+  hex[12] = '5'
+  hex[16] = ((Number.parseInt(hex[16]!, 16) & 0x3) | 0x8).toString(16)
+  const value = hex.join('').toUpperCase()
+  return `{${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}}`
+}
+
+const patchFieldDefinition = (
+  node: OrderedXmlNode,
+  run: AuthoredTextRun,
+  baseline: AuthoredTextRun | undefined,
+  seed: string,
+): void => {
+  const attributes = nodeAttributes(node)
+  attributes.id = baseline?.fieldId
+    ?? (validFieldId(run.fieldId) ? run.fieldId : allocatedFieldId(seed))
+  attributes.type = run.fieldType!.trim()
+  const children = ownChildren(node)
+  if (!directNode(children, 'pPr')) {
+    const textIndex = children.findIndex(child => localName(nodeTag(child) ?? '') === 't')
+    children.splice(textIndex < 0 ? children.length : textIndex, 0, xmlNode('a:pPr'))
+  }
 }
 
 interface RunTemplate {
@@ -2479,7 +2683,11 @@ const patchText = (
     }]
   }
   const beforeAuthored = parseAuthoredText(operation.before.content)
-  const afterAuthored = parseAuthoredText(operation.after.content)
+  const structuredTextChanged = JSON.stringify(operation.before.structuredText)
+    !== JSON.stringify(operation.after.structuredText)
+  const afterAuthored = structuredTextChanged
+    ? authoredTextFromSnapshot(operation.after)
+    : parseAuthoredText(operation.after.content)
   const baselineRuns = new Map<string, AuthoredTextRun>()
   for (let paragraphIndex = 0; paragraphIndex < beforeAuthored.length; paragraphIndex += 1) {
     const authoredParagraph = beforeAuthored[paragraphIndex]
@@ -2521,26 +2729,26 @@ const patchText = (
           slideId: operation.slideId,
         })
       }
-      if (run.kind === 'field' && !baseline) {
+      if (run.kind === 'field' && !run.fieldType?.trim()) {
         issues.push({
           code: 'pptx.writeback.field',
           elementId: operation.elementId,
-          message: 'Creating a PowerPoint field requires a typed field serializer.',
+          message: 'A PowerPoint field requires a non-empty field type.',
           objectId: operation.objectId,
           partPath: operation.partPath,
           slideId: operation.slideId,
         })
       }
-      if (baseline?.kind === 'field' && (
-        run.kind !== 'field'
-        || run.fieldId !== baseline.fieldId
-        || run.fieldType !== baseline.fieldType
-        || run.text !== baseline.text
-      )) {
+      if (
+        baseline?.kind === 'field'
+        && run.kind === 'field'
+        && run.fieldId
+        && run.fieldId !== baseline.fieldId
+      ) {
         issues.push({
           code: 'pptx.writeback.field',
           elementId: operation.elementId,
-          message: 'PowerPoint fields are preserved, but their definition or materialized value cannot be edited yet.',
+          message: 'An existing PowerPoint field ID is immutable; edit its type or cached value instead.',
           objectId: operation.objectId,
           partPath: operation.partPath,
           slideId: operation.slideId,
@@ -2598,7 +2806,14 @@ const patchText = (
       let runNode = exact && runKind(exact.node) === run.kind
         ? structuredClone(exact.node)
         : plainRunFrom(exact?.node ?? xmlRunNodes(template?.node ?? xmlNode('a:p'))[0], run.kind)
-      if (run.kind === 'field' && exact) runNode = structuredClone(exact.node)
+      if (run.kind === 'field') {
+        patchFieldDefinition(
+          runNode,
+          run,
+          baseline,
+          `${operation.partPath}:${operation.elementId}:${paragraph.sourceId ?? paragraphIndex}:${run.sourceId ?? ''}`,
+        )
+      }
       if (run.kind === 'text' || run.kind === 'field') setTextNode(runNode, run.text)
       if (run.kind !== 'tab') {
         patchRunProperties({
@@ -4574,14 +4789,52 @@ const generatedConnectorNode = (
   ])
 }
 
+const structuredFieldBody = (element: PPTElement) => {
+  if (element.type === 'text') return element.structuredText
+  if (element.type === 'shape') return element.text?.structuredText
+  return undefined
+}
+
+const patchGeneratedFields = (
+  clone: OrderedXmlNode,
+  element: PPTElement,
+  scale: number,
+  partPath: string,
+  slideId: string,
+): void => {
+  const body = structuredFieldBody(element)
+  if (!body?.paragraphs.some(paragraph => paragraph.runs.some(run => run.kind === 'field'))) return
+  const after = insertedTextSnapshot(element)
+  if (!after) return
+  const before = structuredClone(after)
+  delete before.structuredText
+  const children = ownChildren(clone)
+  const properties = directNode(children, 'spPr') ?? findNode(children, 'spPr')
+  const xfrm = properties ? findNode(ownChildren(properties), 'xfrm') : undefined
+  const issues = patchText(children, xfrm, {
+    after,
+    before,
+    beforeWidth: element.type === 'line' ? 0 : element.width,
+    elementId: element.id,
+    kind: 'text',
+    objectId: element.id,
+    partPath,
+    scale,
+    slideId,
+  })
+  if (issues.length) throw new Error(issues.map(issue => issue.message).join(' '))
+}
+
 const assembleGeneratedDrawing = (
   element: PPTElement,
   donorNodes: OrderedXmlNode[],
   scale: number,
+  partPath: string,
+  slideId: string,
 ): OrderedXmlNode | undefined => {
   if (element.type === 'group') {
     const children = element.elements.flatMap(child => {
-      const node = assembleGeneratedDrawing(child, donorNodes, scale)
+      const node = assembleGeneratedDrawing(child, donorNodes, scale, partPath, slideId)
       return node ? [node] : []
     })
     return children.length === element.elements.length
@@ -4651,6 +4904,7 @@ const assembleGeneratedDrawing = (
     )
     if (textLocation) replaceShapeTextBody(clone, textLocation.node)
   }
+  patchGeneratedFields(clone, element, scale, partPath, slideId)
   if (element.type === 'shape') {
     const properties = findNode(ownChildren(clone), 'spPr')
     if (properties) {
@@ -4981,6 +5235,8 @@ const patchGeneratedElement = async (
       operation.after,
       donorNodes,
       manifest.coordinateScale ?? 96 / 72,
+      operation.targetPart,
+      operation.slideId,
     )
   }
   catch (error) {
@@ -5833,6 +6089,7 @@ export const patchPowerPointPackage = async ({
     (operation): operation is PowerPointObjectPatchOperation => (
       operation.kind !== 'background'
       && operation.kind !== 'comments'
+      && operation.kind !== 'header-footer'
       && operation.kind !== 'inherited-visibility'
       && operation.kind !== 'insert-element'
       && operation.kind !== 'insert-object'
@@ -5945,6 +6202,20 @@ export const patchPowerPointPackage = async ({
     }
     if (operation.kind === 'comments') {
       issues.push(...await patchCommentsStructure(zip, operation))
+    }
+    if (operation.kind === 'header-footer') {
+      const entry = zip.file(operation.partPath)
+      if (!entry) {
+        issues.push({
+          code: 'pptx.writeback.header-footer-part-missing',
+          message: 'The retained PowerPoint slide-master part is missing.',
+          partPath: operation.partPath,
+        })
+        continue
+      }
+      const patched = patchHeaderFooterPart(await entry.async('text'), operation)
+      issues.push(...patched.issues)
+      if (!patched.issues.length) zip.file(operation.partPath, patched.xml)
     }
     if (operation.kind === 'notes') {
       const entry = zip.file(operation.notesPart)

@@ -1,26 +1,30 @@
 import { useSyncExternalStore } from 'react'
+import type { AgentModelDescriptor, AgentProviderId } from '@mona/agent-protocol'
 
 import { monaBridge } from '@/lib/mona-bridge'
 
-export interface AgentModel {
+export interface AgentModel extends AgentModelDescriptor {
   /**
    * Reasoning depths this model accepts, in the order to offer them. Absent means
    * no such control exists; empty means the model refuses one, which is not the
    * same thing.
    */
   effortLevels?: readonly string[]
-  id: string
-  name: string
+  providerId: AgentProviderId
 }
 
 /**
  * What every agent surface shows before the host answers, and if it never does.
  *
- * The real catalog belongs to the signed-in plan, so it can only come from the
- * Agent SDK. This is the floor: a failed read leaves a usable picker rather than an
- * empty one, and `default` is what the SDK resolves for the plan.
+ * The real catalogs belong to the signed-in provider plans and are discovered by
+ * their native harnesses. This is the floor: a failed read leaves a usable picker
+ * rather than an empty one, and `default` is what Claude resolves for its plan.
  */
-const DECLARED: readonly AgentModel[] = [{ id: 'default', name: 'Claude' }]
+const DECLARED: readonly AgentModel[] = [{
+  id: 'default',
+  name: 'Claude',
+  providerId: 'anthropic',
+}]
 
 let models: readonly AgentModel[] = DECLARED
 let inflight: Promise<void> | null = null
@@ -46,6 +50,11 @@ export const loadAgentModels = (): Promise<void> => {
       inflight = null
     })
   return inflight
+}
+
+export const refreshAgentModels = (): Promise<void> => {
+  inflight = null
+  return loadAgentModels()
 }
 
 export const useAgentModels = (): readonly AgentModel[] => (

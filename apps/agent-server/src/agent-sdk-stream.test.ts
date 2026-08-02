@@ -32,6 +32,14 @@ const translateAll = (translator: AgentStreamTranslator, messages: unknown[]) =>
   messages.flatMap(message => translator.translate(message as never))
 
 describe('agent SDK stream translation', () => {
+  it('starts a visible turn with its durable assistant message id', () => {
+    const translator = new AgentStreamTranslator()
+    expect(translator.startTurn('assistant-1')).toEqual({
+      messageId: 'assistant-1',
+      type: 'start',
+    })
+  })
+
   it('opens the stream once, however many messages arrive', () => {
     const translator = new AgentStreamTranslator()
     const chunks = translateAll(translator, [

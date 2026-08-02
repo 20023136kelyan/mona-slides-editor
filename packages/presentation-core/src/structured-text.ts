@@ -14,12 +14,16 @@ import type {
   PowerPointTextStyleLevel,
   PowerPointTheme,
 } from './source'
+import { evaluatePowerPointField } from './powerpoint-fields'
 
 export interface StructuredTextCompileContext {
   colorMap?: PowerPointColorMap
   defaultTextStyle?: PowerPointTextStyleLevel[]
   fallbackColor: string
   fallbackFontName: string
+  fieldDateTime?: Date
+  fieldLocale?: string
+  fieldTimeZone?: string
   layoutBody?: StructuredTextBody
   masterBody?: StructuredTextBody
   masterTextStyles?: PowerPointMasterTextStyles
@@ -445,11 +449,12 @@ const bulletListStyle = (
 const materializedFieldText = (
   run: StructuredTextRun,
   context: StructuredTextCompileContext,
-): string => {
-  const fieldType = run.fieldType?.toLowerCase()
-  if (fieldType?.includes('slidenum')) return String(context.slideNumber)
-  return run.text ?? ''
-}
+): string => evaluatePowerPointField(run, {
+  dateTime: context.fieldDateTime ?? new Date(),
+  ...(context.fieldLocale ? { locale: context.fieldLocale } : {}),
+  slideNumber: context.slideNumber,
+  ...(context.fieldTimeZone ? { timeZone: context.fieldTimeZone } : {}),
+})
 
 const renderRun = (
   run: StructuredTextRun,

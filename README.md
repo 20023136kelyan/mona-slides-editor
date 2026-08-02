@@ -7,9 +7,10 @@ PowerPoint-style editable objects—text, images, shapes, lines, tables, charts,
 media, and equations—rather than flattening a deck into generated images.
 
 It runs as an Electron application: a React renderer inside a shell that hosts
-the agent in its own process. Nothing listens on a port and nothing is sent
-anywhere. Decks are files in an application-managed library, and the agent runs
-on your machine under the Claude login already there.
+the agent in its own process. Nothing listens on a port. Documents stay in the
+user-selected folders that own them; a temporary workspace is shared with the
+selected model through its native Claude or Codex harness when the user asks the
+agent to work on those documents.
 
 The editor, mobile surfaces, slideshow, presenter tools, import/export flows,
 and English/Chinese interface are implemented in React. The repository now
@@ -26,9 +27,11 @@ one undoable transaction, however many turns it took. It creates ordinary
 editable presentation elements; screenshots are inspection evidence, never
 slide data.
 
-The agent runs through the Claude Agent SDK, in the desktop shell's own
-process, using the `claude` login already on the machine. There is no
-credential for Mona to hold and nowhere for a deck to be sent.
+The agent runs in the desktop shell's own process through either the Claude
+Agent SDK or Codex app-server, using the corresponding Claude or ChatGPT
+subscription login already on the machine. Mona does not hold either provider's
+credential. A provider-neutral conversation ledger lets the user change models
+between generations without changing the chat UI or losing the prior context.
 
 ## Technology
 
@@ -65,10 +68,9 @@ Builds the renderer, bundles the shell, and writes an installer to
 `.artifacts/desktop/`. The result is unsigned: signing and notarization need an
 Apple Developer identity, so macOS will warn on first launch.
 
-The application is large — around 600 MB — and most of that is the `claude`
-binary the Agent SDK ships as a platform-specific dependency. It is unpacked
-beside the archive rather than inside it, because a subprocess cannot be run out
-of an asar.
+The application is large because both native agent harnesses ship
+platform-specific executables. They are unpacked beside the archive rather than
+inside it, because a subprocess cannot be run out of an asar.
 
 ## Verification
 

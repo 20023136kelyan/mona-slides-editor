@@ -622,6 +622,27 @@ describe('PowerPoint render graph', () => {
     expect((graph[1]!.element as PPTTextElement).content).not.toContain('‹#›')
   })
 
+  it('applies the presentation first-slide number before adding the slide position', () => {
+    const { sourcePackage, slide } = fieldFixture([
+      field('slide-number', 'sldNum', 'slide'),
+    ])
+    sourcePackage.document = {
+      commentAuthors: [],
+      comments: [],
+      customShows: [],
+      notesMasters: [],
+      notesSlides: [],
+      properties: { firstSlideNumber: 7 },
+      sections: [],
+      timings: [],
+    }
+
+    const graph = resolveSlideRenderGraph(slide, [sourcePackage])
+
+    expect((graph[0]!.element as PPTTextElement).content).toContain('8')
+    expect((graph[0]!.element as PPTTextElement).content).not.toContain('‹#›')
+  })
+
   it('paints no field when the slide never declared one', () => {
     const { sourcePackage, slide } = fieldFixture([])
 

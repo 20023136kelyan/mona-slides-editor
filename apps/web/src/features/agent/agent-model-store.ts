@@ -1,19 +1,17 @@
 import { useSyncExternalStore } from 'react'
 
-/**
- * Which model the next turn runs on, and how hard it should think, app-wide.
- *
- * All that survives of a provider configuration that also carried a provider id and
- * an API key. There is one provider now, and its credential is the machine's own
- * Claude login rather than anything the renderer holds.
- */
+import type { AgentProviderId } from '@mona/agent-protocol'
+
+import type { AgentModel } from './agent-model-catalog'
+
+/** The model used when the next provider turn starts. */
 export interface AgentModelSelection {
-  /** Undefined leaves the SDK's own default rather than asserting a depth. */
   effort?: string
   model?: string
+  providerId: AgentProviderId
 }
 
-let selection: AgentModelSelection = {}
+let selection: AgentModelSelection = { providerId: 'anthropic' }
 const listeners = new Set<() => void>()
 
 const set = (next: AgentModelSelection) => {
@@ -27,12 +25,10 @@ export const agentModelStore = {
     if (effort === selection.effort) return
     set({ ...selection, effort })
   },
-  setModel(model: string) {
-    const next = model.trim()
-    if (!next || next === selection.model) return
-    // A depth chosen for one model may not exist on another, so it is dropped
-    // rather than carried over and rejected when the turn starts.
-    set({ model: next })
+  setModel(model: Pick<AgentModel, 'id' | 'providerId'>) {
+    const id = model.id.trim()
+    if (!id || (id === selection.model && model.providerId === selection.providerId)) return
+    set({ model: id, providerId: model.providerId })
   },
   subscribe: (listener: () => void) => {
     listeners.add(listener)

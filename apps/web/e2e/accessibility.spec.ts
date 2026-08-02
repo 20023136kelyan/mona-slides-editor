@@ -3,7 +3,7 @@ import { expect, isMacChrome, openApp, resizeWindow, stubSignedInAccount, test, 
 test.beforeEach(async ({ app, page }) => {
   await page.addInitScript(() => localStorage.setItem('mona:ui-locale', 'en-US'))
   // The dock only shows a composer to a signed-in machine, and a runner has no
-  // Claude login; the keyboard walk goes through that composer.
+  // provider login; the keyboard walk goes through that composer.
   await stubSignedInAccount(app)
 })
 

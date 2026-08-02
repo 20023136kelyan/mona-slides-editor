@@ -28,8 +28,8 @@ const TEXT_CORPUS_PPTX = fileURLToPath(new URL(
  *
  * The suite this replaces drove a provider picker, a deterministic reference
  * engine and a preview-then-apply flow, none of which exist any more — the agent
- * runs through the Claude Agent SDK under the machine's own login, and applies
- * its edit as one transaction rather than proposing it.
+ * runs through a native provider harness under the machine's own login, and
+ * applies its edit as one transaction rather than proposing it.
  *
  * A real turn is not something a test can ask for: it costs money, it is not
  * deterministic, and it needs a login the machine may not have. What is worth

@@ -20,7 +20,28 @@ const sketchRecords = new Map<string, unknown>()
  * and sign in, so anything testing the dock would be testing that instead.
  */
 const bridge: MonaBridge = {
-  account: async () => ({ accountLabel: 'test@example.com', connected: true, planLabel: 'Claude Max' }),
+  accounts: {
+    connect: async providerId => ({
+      accountLabel: 'test@example.com',
+      connected: true,
+      planLabel: providerId === 'anthropic' ? 'Claude Max' : 'ChatGPT Plus',
+      providerId,
+    }),
+    list: async () => [
+      {
+        accountLabel: 'test@example.com',
+        connected: true,
+        planLabel: 'Claude Max',
+        providerId: 'anthropic',
+      },
+      {
+        accountLabel: 'test@example.com',
+        connected: true,
+        planLabel: 'ChatGPT Plus',
+        providerId: 'openai',
+      },
+    ],
+  },
   agent: {
     interrupt: () => {},
     onChunk: () => () => {},
@@ -50,7 +71,7 @@ const bridge: MonaBridge = {
       messages: [],
       title: '',
       updatedAt: Date.now(),
-      version: 1,
+      version: 2,
     }),
     appendMessage: async id => ({
       artifacts: [],
@@ -60,7 +81,7 @@ const bridge: MonaBridge = {
       messages: [],
       title: '',
       updatedAt: Date.now(),
-      version: 1,
+      version: 2,
     }),
     create: async () => ({
       artifacts: [],
@@ -70,7 +91,7 @@ const bridge: MonaBridge = {
       messages: [],
       title: '',
       updatedAt: Date.now(),
-      version: 1,
+      version: 2,
     }),
     delete: async () => {},
     list: async () => [],
@@ -84,7 +105,7 @@ const bridge: MonaBridge = {
       messages: [],
       title: '',
       updatedAt: Date.now(),
-      version: 1,
+      version: 2,
     }),
     rename: async (id, title) => ({
       artifacts: [],
@@ -94,7 +115,7 @@ const bridge: MonaBridge = {
       messages: [],
       title,
       updatedAt: Date.now(),
-      version: 1,
+      version: 2,
     }),
   },
   browseMedia: async <Result>() => ({ data: [], total: 0, videos: [] }) as Result,
@@ -227,8 +248,9 @@ const bridge: MonaBridge = {
     writeAsset: async (_id: string, _name: string, bytes: ArrayBuffer) => URL.createObjectURL(new Blob([bytes])),
   },
   models: async () => [
-    { effortLevels: ['low', 'medium', 'high'], id: 'default', name: 'Default (recommended)' },
-    { effortLevels: ['low', 'medium', 'high'], id: 'sonnet', name: 'Sonnet' },
+    { effortLevels: ['low', 'medium', 'high'], id: 'default', name: 'Default (recommended)', providerId: 'anthropic' },
+    { effortLevels: ['low', 'medium', 'high'], id: 'sonnet', name: 'Sonnet', providerId: 'anthropic' },
+    { effortLevels: ['low', 'medium', 'high', 'xhigh'], id: 'gpt-test', name: 'Codex Test', providerId: 'openai' },
   ],
   onMenuCommand: () => () => {},
   // No second window in a test page; nothing sends and nothing arrives.

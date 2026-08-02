@@ -7,10 +7,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "test": "vitest run",
     "type-check": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
   },
   "dependencies": {
     "zod": "^4.4.3"

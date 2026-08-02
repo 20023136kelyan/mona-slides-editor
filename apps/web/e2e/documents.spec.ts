@@ -2,6 +2,7 @@ import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import JSZip from 'jszip'
+import type { Locator } from '@playwright/test'
 
 import {
   expect,
@@ -18,6 +19,20 @@ const renameOpenPresentation = async (page: Parameters<typeof openApp>[0], title
   await input.fill(title)
   await input.press('Enter')
   await expect(input).toHaveValue(title)
+}
+
+const expectVerticallyCentered = async (container: Locator) => {
+  const centers = await container.evaluate(element => {
+    const containerBox = element.getBoundingClientRect()
+    const contentBoxes = Array.from(element.children, child => child.getBoundingClientRect())
+    const contentTop = Math.min(...contentBoxes.map(box => box.top))
+    const contentBottom = Math.max(...contentBoxes.map(box => box.bottom))
+    return {
+      container: containerBox.top + containerBox.height / 2,
+      content: contentTop + (contentBottom - contentTop) / 2,
+    }
+  })
+  expect(Math.abs(centers.container - centers.content)).toBeLessThanOrEqual(1)
 }
 
 test.beforeEach(async ({ page }) => {
@@ -56,6 +71,12 @@ test('lays out a dense presentation library with real reusable covers', async ({
   }, { documentId: originalId })
   await page.reload()
 
+  const libraryToolbar = page.getByRole('toolbar', { name: 'Presentations' })
+  await expect(libraryToolbar).toBeVisible()
+  await expect(libraryToolbar).toHaveCSS('height', '44px')
+  await expect(libraryToolbar).toHaveCSS('border-bottom-width', '0px')
+  await expect(libraryToolbar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(page.locator('.mona-application-surface-bar')).toHaveCount(1)
   await expect(page.locator('[data-slot="card"]')).toHaveCount(8)
   await expect(page.getByRole('heading', { name: 'Previous 7 days' })).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Grid view' })).toBeChecked()
@@ -89,6 +110,7 @@ test('creates, autosaves, manages, and reopens user-owned local files', async ({
   await expect(emptyState).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(emptyState).toHaveCSS('border-top-width', '0px')
   await expect(emptyState).toHaveCSS('box-shadow', 'none')
+  await expectVerticallyCentered(emptyState)
   await stubOpenDialog(app, [localFiles])
   await page.getByRole('button', { name: 'New presentation' }).first().click()
   await page.waitForURL(/\/documents\/[^/?]+/)

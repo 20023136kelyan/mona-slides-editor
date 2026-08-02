@@ -14,11 +14,13 @@ deck changed", with no opinion about who is calling.
 
 | Module | Responsibility |
 | --- | --- |
-| `agent-sdk-auth` | Reads the Claude login already on the machine |
+| `agent-sdk-auth` | Reads and starts the Claude login already on the machine |
 | `agent-sdk-session` | One conversation: prompts, steering, interruption |
 | `agent-sdk-stream` | SDK events translated into the UI chunk vocabulary |
 | `agent-sdk-models` | The model catalogue the signed-in plan allows |
 | `agent-sdk-env` | The environment the subprocess is allowed to see |
+| `codex-*` | Codex app-server protocol, ChatGPT login, models, and UI streaming |
+| `provider-conversation` | Provider pinning, native bindings, and context handoff |
 | `agent-tool-bridge` | Tool calls the renderer must answer, correlated by id |
 | `agent-workspace` | The deck as files the agent reads and edits |
 | `agent-workspace-disk` | That workspace, on a real filesystem |
@@ -40,8 +42,8 @@ All of it is gone, and none of it was replaced. There is no boundary to guard
 because there are no longer two parties: the renderer and the agent are two
 halves of one application on one person's machine, talking over IPC through a
 sandboxed preload. The vault protected credentials Mona no longer holds — the
-agent uses the `claude` login the user already has. The origin gate guarded a
-port that no longer exists.
+agent uses native Claude and ChatGPT subscription logins the user already has.
+The origin gate guarded a port that no longer exists.
 
 ## The boundaries that remain
 
@@ -52,7 +54,8 @@ both are about content rather than about callers:
   made. Slides are sanitised before they reach the renderer, an image must
   resolve to a file the deck owns rather than to an arbitrary URL, and PDF
   export renders with scripting disabled.
-- **The agent's environment is an allowlist.** `agent-sdk-env` decides what the
+- **The agent's environment is an allowlist.** `agent-sdk-env` and `codex-env`
+  decide what the
   subprocess may see. This mattered more when a stray operator key would have
   silently served, and billed, every user's turn; it is ordinary hygiene now,
   but the allowlist is still the right shape.

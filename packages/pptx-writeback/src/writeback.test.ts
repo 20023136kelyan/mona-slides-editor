@@ -319,6 +319,62 @@ describe('PowerPoint source-package writeback', () => {
     expect(generatedText?.source?.sourceObjectId).toBeTruthy()
   })
 
+  it('serializes a Mona-authored structured field as a native DrawingML field', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const slide = desired.slides[0]!
+    const generated = structuredClone(editableTextElement(desired))
+    delete generated.source
+    generated.id = 'generated-slide-number-field'
+    generated.left += 84
+    generated.top += 36
+    const text = generated.type === 'text' ? generated : generated.text!
+    text.content = '<p>1</p>'
+    text.structuredText = {
+      listStyle: [],
+      paragraphs: [{
+        level: 0,
+        runs: [{
+          fieldType: 'slidenum',
+          kind: 'field',
+          sourceId: 'generated-slide-number-field.p0.r0',
+          text: '1',
+        }],
+        sourceId: 'generated-slide-number-field.p0',
+      }],
+      scale: fixture.ingested.backing.manifest.coordinateScale ?? 96 / 72,
+      schemaVersion: 1,
+    }
+    slide.elements.push(generated)
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+
+    expect(result.plan.unsupported).toEqual([])
+    const zip = await JSZip.loadAsync(result.bytes)
+    const slideXml = await zip.file(slide.source!.slidePart)!.async('text')
+    expect(slideXml).toMatch(/<a:fld[^>]+id="\{[0-9A-F-]+\}"[^>]+type="slidenum"/)
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'generated-field.pptx',
+      theme,
+    })
+    const fieldRun = reimported.presentation.slides
+      .flatMap(candidate => flattenElementTree(candidate.elements))
+      .flatMap(element => element.type === 'text'
+        ? element.structuredText?.paragraphs ?? []
+        : element.type === 'shape'
+          ? element.text?.structuredText?.paragraphs ?? []
+          : [])
+      .flatMap(paragraph => paragraph.runs)
+      .find(run => run.fieldType === 'slidenum')
+    expect(fieldRun).toMatchObject({ kind: 'field', fieldType: 'slidenum' })
+    expect(fieldRun?.fieldId).toMatch(/^\{[0-9A-F-]{36}\}$/)
+  })
+
   it('serializes Mona-authored image bytes into the retained package and relationship graph', async () => {
     const fixture = await source()
     const desired = structuredClone(fixture.ingested.presentation)
@@ -459,6 +515,49 @@ describe('PowerPoint source-package writeback', () => {
     ))
     expect(['shape', 'text']).toContain(inserted?.type)
     expect(inserted?.source?.sourcePart).toBe(master.partPath)
+  })
+
+  it('writes an explicitly authored slide-master header/footer policy', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const sourcePackage = desired.sourcePackages?.find(candidate => candidate.hierarchy)
+    const master = sourcePackage?.hierarchy?.masters[0]
+    if (!sourcePackage || !master) throw new Error('Fixture has no retained slide master.')
+    master.headerFooter = {
+      dateTime: false,
+      footer: true,
+      header: false,
+      slideNumber: true,
+    }
+    sourcePackage.sharedAuthoring = { partPaths: [master.partPath], revision: 1 }
+
+    const result = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+
+    expect(result.plan.unsupported).toEqual([])
+    expect(result.plan.operations).toContainEqual(expect.objectContaining({
+      after: master.headerFooter,
+      kind: 'header-footer',
+      partPath: master.partPath,
+    }))
+    const zip = await JSZip.loadAsync(result.bytes)
+    const masterXml = await zip.file(master.partPath)!.async('text')
+    const headerFooterXml = masterXml.match(/<p:hf\b[^>]*>/)?.[0]
+    expect(headerFooterXml).toContain('dt="0"')
+    expect(headerFooterXml).toContain('ftr="1"')
+    expect(headerFooterXml).toContain('hdr="0"')
+    expect(headerFooterXml).toContain('sldNum="1"')
+    const reimported = await ingestPowerPoint(result.bytes, {
+      fileName: 'header-footer-policy.pptx',
+      theme,
+    })
+    expect(reimported.presentation.sourcePackages?.[0]?.hierarchy?.masters
+      .find(candidate => candidate.partPath === master.partPath)?.headerFooter).toEqual(master.headerFooter)
+    await writeReferenceArtifact('header-footer-policy.pptx', result.bytes)
   })
 
   it.skipIf(!PRIVATE_FIXTURES.length)('patches a source-backed object in an explicitly authored real shared layer', async () => {
@@ -1335,6 +1434,84 @@ describe('PowerPoint source-package writeback', () => {
         : undefined
     expect(content).toContain('AI rewrote this slide & kept it editable.')
     expect(content).toContain('A second paragraph.')
+  })
+
+  it('authors and edits a field from structured JSON without duplicating the HTML edit', async () => {
+    const fixture = await source()
+    const desired = structuredClone(fixture.ingested.presentation)
+    const target = editableTextElement(desired)
+    const text = target.type === 'text' ? target : target.text!
+    const run = text.structuredText?.paragraphs
+      .flatMap(paragraph => paragraph.runs)
+      .find(candidate => candidate.kind === 'text' && Boolean(candidate.text))
+    if (!run) throw new Error('Fixture has no structured text run to convert into a field.')
+    run.kind = 'field'
+    run.fieldType = 'slidenum'
+    run.text = '1'
+
+    const created = await writeBackPowerPoint({
+      baseline: fixture.ingested.presentation,
+      bytes: fixture.bytes,
+      manifest: fixture.ingested.backing.manifest,
+      presentation: desired,
+    })
+    expect(created.plan.unsupported).toEqual([])
+    const createdImport = await ingestPowerPoint(created.bytes, {
+      fileName: 'structured-field-created.pptx',
+      theme,
+    })
+    const createdTarget = elementBySource(createdImport.presentation, target)
+    const createdText = createdTarget?.type === 'text'
+      ? createdTarget
+      : createdTarget?.type === 'shape'
+        ? createdTarget.text
+        : undefined
+    const createdRun = createdText?.structuredText?.paragraphs
+      .flatMap(paragraph => paragraph.runs)
+      .find(candidate => candidate.kind === 'field')
+    expect(createdRun).toMatchObject({ fieldType: 'slidenum', text: '1' })
+    expect(createdRun?.fieldId).toMatch(/^\{[0-9A-F-]{36}\}$/)
+
+    const edited = structuredClone(createdImport.presentation)
+    const editedTarget = elementBySource(edited, createdTarget!)
+    const editedText = editedTarget?.type === 'text'
+      ? editedTarget
+      : editedTarget?.type === 'shape'
+        ? editedTarget.text
+        : undefined
+    const editedRun = editedText?.structuredText?.paragraphs
+      .flatMap(paragraph => paragraph.runs)
+      .find(candidate => candidate.fieldId === createdRun?.fieldId)
+    if (!editedRun) throw new Error('Created field did not retain its semantic identity.')
+    editedRun.fieldType = 'datetime4'
+    editedRun.text = 'August 2, 2026'
+
+    const updated = await writeBackPowerPoint({
+      baseline: createdImport.presentation,
+      bytes: created.bytes,
+      manifest: createdImport.backing.manifest,
+      presentation: edited,
+    })
+    expect(updated.plan.unsupported).toEqual([])
+    const updatedImport = await ingestPowerPoint(updated.bytes, {
+      fileName: 'structured-field-edited.pptx',
+      theme,
+    })
+    const updatedTarget = elementBySource(updatedImport.presentation, editedTarget!)
+    const updatedText = updatedTarget?.type === 'text'
+      ? updatedTarget
+      : updatedTarget?.type === 'shape'
+        ? updatedTarget.text
+        : undefined
+    expect(updatedText?.structuredText?.paragraphs.flatMap(paragraph => paragraph.runs)).toContainEqual(
+      expect.objectContaining({
+        fieldId: createdRun?.fieldId,
+        fieldType: 'datetime4',
+        kind: 'field',
+        text: 'August 2, 2026',
+      }),
+    )
+    await writeReferenceArtifact('fields-created-edited.pptx', updated.bytes)
   })
 
   it('round-trips authored run formatting and text-body layout properties', async () => {

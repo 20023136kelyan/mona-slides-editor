@@ -1,24 +1,43 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from 'ai'
+import type { AgentProviderId } from '@mona/agent-protocol'
 
+import {
+  agentContextFromUiMessages,
+  newestUserMessage,
+} from '@/features/agent/agent-context'
 import { monaBridge } from '@/lib/mona-bridge'
 
 export class ProjectAgentIpcTransport implements ChatTransport<UIMessage> {
-  readonly #effort: () => string | undefined
-  readonly #model: () => string
+  #effort?: string
+  #model: string
+  #providerId: AgentProviderId
   readonly #projectId: string
 
   constructor({
     effort,
     model,
+    providerId,
     projectId,
   }: {
-    effort: () => string | undefined
-    model: () => string
+    effort?: string
+    model: string
+    providerId: AgentProviderId
     projectId: string
   }) {
     this.#effort = effort
     this.#model = model
+    this.#providerId = providerId
     this.#projectId = projectId
+  }
+
+  updateSelection(selection: {
+    effort?: string
+    model: string
+    providerId: AgentProviderId
+  }): void {
+    this.#effort = selection.effort
+    this.#model = selection.model
+    this.#providerId = selection.providerId
   }
 
   async sendMessages({
@@ -28,8 +47,8 @@ export class ProjectAgentIpcTransport implements ChatTransport<UIMessage> {
     abortSignal: AbortSignal | undefined
     messages: UIMessage[]
   }): Promise<ReadableStream<UIMessageChunk>> {
-    const text = lastUserText(messages)
-    if (!text) throw new Error('There is nothing to send.')
+    const user = newestUserMessage(messages)
+    if (!user) throw new Error('There is nothing to send.')
     const bridge = monaBridge()
     abortSignal?.addEventListener(
       'abort',
@@ -48,10 +67,13 @@ export class ProjectAgentIpcTransport implements ChatTransport<UIMessage> {
           controller.close()
         })
         bridge.projectAgent.send({
-          effort: this.#effort(),
-          model: this.#model(),
+          context: agentContextFromUiMessages(messages),
+          effort: this.#effort,
+          model: this.#model,
           projectId: this.#projectId,
-          text,
+          providerId: this.#providerId,
+          text: user.text,
+          userMessageId: user.id,
         })
       },
     })
@@ -60,17 +82,4 @@ export class ProjectAgentIpcTransport implements ChatTransport<UIMessage> {
   async reconnectToStream(): Promise<ReadableStream<UIMessageChunk> | null> {
     return null
   }
-}
-
-const lastUserText = (messages: UIMessage[]): string => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role !== 'user') continue
-    return message.parts
-      .filter(part => part.type === 'text')
-      .map(part => (part as { text: string }).text)
-      .join('\n')
-      .trim()
-  }
-  return ''
 }

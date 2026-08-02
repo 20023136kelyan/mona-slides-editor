@@ -10,6 +10,7 @@ See also:
 - [`doc/DATA_SOURCE_ARCHITECTURE.md`](DATA_SOURCE_ARCHITECTURE.md) — provider adapters, source identities, catalogs, and unified queries
 - [`doc/DOCUMENT_JOB_ARCHITECTURE.md`](DOCUMENT_JOB_ARCHITECTURE.md) — multi-document mutation, source revisions, cancellation, and recovery
 - [`doc/MONA_RESTART_ARCHITECTURE.md`](MONA_RESTART_ARCHITECTURE.md) — the editor runtime and command bus
+- [`doc/AGENT_PROVIDER_ARCHITECTURE.md`](AGENT_PROVIDER_ARCHITECTURE.md) — native providers, account access, and cross-provider context
 - [`doc/EDITOR_EXPERIENCE.md`](EDITOR_EXPERIENCE.md) — editor disclosure and interaction gates
 
 ## The shape of the product
@@ -19,8 +20,8 @@ detailed editor for one document. The editor is fundamental, but it is not the
 point of the app — it is one of three surfaces over a shared document core.
 
 Project Chat persists projects and conversations locally, references documents
-across configured sources without copying them, reuses the machine's Claude
-login, and presents attached documents in a separate artifact panel. Its agent
+across configured sources without copying them, reuses the machine's Claude or
+ChatGPT subscription login, and presents attached documents in a separate artifact panel. Its agent
 can coordinate, research, and edit several native `.mona` presentations in one
 temporary filesystem workspace. Applying those changes creates an ordered,
 durable document job that validates every source revision before it writes
@@ -132,7 +133,7 @@ them. A project can reference documents from several data sources without moving
 those documents into a project-owned store. The current desktop implementation
 stores one versioned JSON record per project under Application Support, containing
 only the conversation, source-neutral document references, display metadata, and
-the opaque Claude session identity. Source paths, file bytes, and provider
+opaque provider session bindings/cursors. Source paths, file bytes, and provider
 credentials do not enter that record. Projects are the unit of collaboration.
 
 **Routine** — the domain object presented in the sidebar as a workflow. It combines
@@ -141,9 +142,9 @@ routine may discover new or old documents in one or more data sources and operat
 on one document or a batch on every run.
 
 **Machine identity** — Mona has no Mona account. Settings are scoped to the
-machine, and Claude authentication is a property of that machine's existing
-`claude` login rather than a credential Mona stores. This is a deliberate
-consequence of being open source and desktop-first.
+machine. Claude and ChatGPT authentication are properties of their native
+harnesses rather than credentials Mona stores. This is a deliberate consequence
+of being open source and desktop-first.
 
 ## Storage: bring your own
 
@@ -276,11 +277,11 @@ intended semantics for "share a link", but it should be stated rather than impli
 **Mona runs no agent infrastructure.** That has not changed and is now more
 literally true than when it was first written. What changed is where "the user's
 machine" means: this said *in the user's browser, under their own API keys*, and
-it is now *in the user's own copy of the application, under the Claude login
-already on that machine*.
+it is now *in the user's own copy of the application, under a provider login
+already owned by that user*.
 
-The move was forced rather than chosen. The Claude Agent SDK spawns the `claude`
-binary as a subprocess. A browser cannot spawn anything, so as a website that
+The move was forced rather than chosen. The Claude Agent SDK and Codex app-server
+spawn native subprocesses. A browser cannot spawn them, so as a website that
 subprocess had to live on Mona's machine — which would have made Mona an agent
 host processing other people's decks, against all three reasons below. The
 escape hatch this document already described became the product: see *The escape
@@ -358,11 +359,11 @@ things are misfiled — under `features/editor/` because that is where everythin
 built, not because they belong to editing.
 
 **1. The agent has been lifted out and split.**
-The Agent SDK session, authentication, streaming, workspace and tool bridge now
+Provider sessions, authentication, context routing, streaming, workspace and tool bridges now
 live under [`apps/agent-server`](../apps/agent-server) and run inside the Electron
 main process. The renderer retains only the presentation-specific client toolset
 because rendering and committing require the live `EditorRuntime`. Project Chat
-uses a separate project-scoped SDK session with durable resume identity and a
+uses project-scoped provider sessions with durable resume identities and a
 project toolset, rather than pretending the editor's one-live-deck snapshot is a
 multi-document workspace. Native presentations now have a desktop-owned
 document capability for project-agent read, validation, and provider writeback.

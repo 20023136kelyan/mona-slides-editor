@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { promisify } from 'node:util'
 
+import { monaAgentEnv } from './agent-sdk-env.js'
+
 const run = promisify(execFile)
 
 /**
@@ -61,9 +63,12 @@ const resolveExecutable = (): string => {
 const CACHE_MS = 30_000
 let cached: { at: number; value: LocalClaudeLogin } | undefined
 
-export const readLocalClaudeLogin = async (now = Date.now()): Promise<LocalClaudeLogin> => {
+export const readLocalClaudeLogin = async (
+  now = Date.now(),
+  executablePath = resolveExecutable(),
+): Promise<LocalClaudeLogin> => {
   if (cached && now - cached.at < CACHE_MS) return cached.value
-  const value = await probe()
+  const value = await probe(executablePath)
   cached = { at: now, value }
   return value
 }
@@ -92,13 +97,28 @@ export const interpretAuthStatus = (raw: string): LocalClaudeLogin => {
   }
 }
 
-const probe = async (): Promise<LocalClaudeLogin> => {
+const probe = async (executablePath: string): Promise<LocalClaudeLogin> => {
   try {
-    const { stdout } = await run(resolveExecutable(), ['auth', 'status'], { timeout: 10_000 })
+    const { stdout } = await run(executablePath, ['auth', 'status'], {
+      env: monaAgentEnv(),
+      timeout: 10_000,
+    })
     return interpretAuthStatus(stdout)
   }
   catch {
     // No binary, no login, or a CLI too old to answer: all the same to the dock.
     return { connected: false }
   }
+}
+
+/** Launch the CLI's supported Claude subscription browser flow. */
+export const loginLocalClaudeAccount = async (
+  executablePath = resolveExecutable(),
+): Promise<LocalClaudeLogin> => {
+  await run(executablePath, ['auth', 'login', '--claudeai'], {
+    env: monaAgentEnv(),
+    timeout: 5 * 60_000,
+  })
+  forgetLocalClaudeLogin()
+  return await readLocalClaudeLogin(Date.now(), executablePath)
 }

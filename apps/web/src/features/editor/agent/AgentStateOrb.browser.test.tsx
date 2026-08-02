@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { render } from 'vitest-browser-react'
 
-import { AgentStateOrb } from '@/features/editor/agent/AgentStateOrb'
+import { AgentStateOrb } from '@/features/agent/AgentStateOrb'
 
 /** Waits for the orb to paint at least one frame onto its canvas. */
 const paintedCanvas = async (): Promise<HTMLCanvasElement> => {

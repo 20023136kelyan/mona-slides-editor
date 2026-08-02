@@ -7,9 +7,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowUp,
   Bot,
-  Check,
   CircleCheck,
   CircleX,
   Clock3,
@@ -20,14 +18,10 @@ import {
   Plus,
   Presentation,
   Search,
-  Square,
   X,
 } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
 import { useLoaderData, useLocation, useNavigate } from 'react-router'
-import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
-import type { UIMessage } from 'ai'
 
 import type {
   DataSourceDocument,
@@ -44,18 +38,23 @@ import type {
   ProjectSummary,
 } from '@mona/project-core'
 
-import { AgentProviderIcon } from '@/features/agent/AgentProviderIcon'
-import { useAgentAccount } from '@/features/agent/agent-account'
-import { useAgentModels } from '@/features/agent/agent-model-catalog'
 import {
-  agentModelStore,
-  useAgentModelSelection,
-} from '@/features/agent/agent-model-store'
+  AgentComposer,
+  AGENT_LANE_KEYCAP,
+} from '@/features/agent/AgentComposer'
+import { AgentTranscript } from '@/features/agent/AgentTranscript'
+import { useAgentAccounts } from '@/features/agent/agent-account'
+import { useAgentModels } from '@/features/agent/agent-model-catalog'
+import { useAgentModelSelection } from '@/features/agent/agent-model-store'
 import {
   ApplicationSidebar,
   ApplicationSidebarContentToggle,
 } from '@/features/application-shell/ApplicationSidebar'
 import { useOptionalApplicationSidebarState } from '@/features/application-shell/application-sidebar-context'
+import {
+  applicationSurfaceBarClass,
+  applicationSurfaceTitleInputClass,
+} from '@/features/application-shell/application-surface-styles'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -65,31 +64,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   SidebarInset,
   SidebarProvider,
 } from '@/components/ui/sidebar'
-import { Textarea } from '@/components/ui/textarea'
 import { DocumentDataSourceSidebar } from '@/features/documents/DocumentDataSourceSidebar'
 import { useDataSourceBrowser, type DocumentBrowserScope } from '@/features/documents/use-data-source-browser'
 import { createBlankPresentation } from '@/features/presentation-renderer/load-presentation'
 import { monaBridge } from '@/lib/mona-bridge'
+import { cn } from '@/lib/utils'
 
 import type { ProjectPageData } from './project-data'
-import {
-  projectMessageText,
-  useProjectAgentChat,
-} from './use-project-agent-chat'
+import { useProjectAgentChat } from './use-project-agent-chat'
 
 const presentationMediaType = 'application/vnd.mona.presentation-package'
 
@@ -102,7 +98,7 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
-  const account = useAgentAccount()
+  const accounts = useAgentAccounts()
   const models = useAgentModels()
   const selection = useAgentModelSelection()
   const sidebarState = useOptionalApplicationSidebarState()
@@ -118,18 +114,22 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
   const [addingDocuments, setAddingDocuments] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const initialPromptSent = useRef(false)
-  const endRef = useRef<HTMLDivElement>(null)
   const sourceBrowser = useDataSourceBrowser({
     initialDocuments: initialData.sourceDocuments,
     initialSources: initialData.sources,
     query: '',
   })
-  const activeModel = models.find(model => model.id === selection.model) ?? models[0]!
+  const activeModel = models.find(model => (
+    model.id === selection.model && model.providerId === selection.providerId
+  )) ?? models.find(model => model.providerId === selection.providerId) ?? models[0]!
+  const account = accounts.find(candidate => candidate.providerId === activeModel.providerId)
+    ?? { connected: false, connecting: false, loading: false, providerId: activeModel.providerId }
   const chat = useProjectAgentChat({
     effort: selection.effort,
     model: activeModel.id,
     onProjectChange: setProject,
     project,
+    providerId: activeModel.providerId,
   })
   const busy = chat.status === 'streaming' || chat.status === 'submitted'
 
@@ -150,10 +150,6 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
 
   useEffect(() => monaBridge().projects.onChange(refreshProjects), [refreshProjects])
   useEffect(() => monaBridge().projectJobs.onChange(refreshJobs), [refreshJobs])
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' })
-  }, [chat.messages, busy])
-
   const submitText = useCallback(async (text: string) => {
     const content = text.trim()
     if (!content || submitting) return
@@ -165,14 +161,20 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
     }
     setSubmitting(true)
     try {
+      const messageId = crypto.randomUUID()
       const updated = await monaBridge().projects.appendMessage(project.id, {
         content,
+        id: messageId,
         role: 'user',
       })
       setProject(updated)
       setTitleDraft(updated.title)
       setDraft('')
-      await chat.sendMessage({ text: content })
+      await chat.sendMessage({
+        id: messageId,
+        parts: [{ text: content, type: 'text' }],
+        role: 'user',
+      })
     }
     catch (error) {
       toast.error(t('documents.actionFailed'), {
@@ -373,63 +375,49 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
         />
 
         <section className="flex min-w-0 flex-1 flex-col" aria-label={t('projects.conversation')}>
-          <div className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4 ps-12">
-            <Input
-              aria-label={t('projects.titleLabel')}
-              className="h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-base font-semibold shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
-              onBlur={() => { void saveTitle() }}
-              onChange={event => setTitleDraft(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') event.currentTarget.blur()
-                if (event.key === 'Escape') {
-                  setTitleDraft(project.title)
-                  event.currentTarget.blur()
-                }
-              }}
-              placeholder={t('projects.untitled')}
-              value={titleDraft}
-            />
-            <span className="hidden text-xs text-muted-foreground md:inline">
-              {account.loading
-                ? t('projects.checkingAgent')
-                : account.connected
-                  ? account.accountLabel ?? t('projects.agentConnected')
-                  : t('projects.agentDisconnected')}
-            </span>
+          <div className={cn(applicationSurfaceBarClass, 'px-12')}>
+            <div className="pointer-events-none col-start-2 flex w-full min-w-0 justify-center px-3">
+              <Input
+                aria-label={t('projects.titleLabel')}
+                className={applicationSurfaceTitleInputClass}
+                onBlur={() => { void saveTitle() }}
+                onChange={event => setTitleDraft(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') event.currentTarget.blur()
+                  if (event.key === 'Escape') {
+                    setTitleDraft(project.title)
+                    event.currentTarget.blur()
+                  }
+                }}
+                placeholder={t('projects.untitled')}
+                title={titleDraft || t('projects.untitled')}
+                value={titleDraft}
+              />
+            </div>
           </div>
 
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8">
-              {chat.messages.length ? (
-                <div className="flex flex-col gap-7">
-                  {chat.messages.map((message, index) => (
-                    <ProjectMessage
-                      key={message.id}
-                      message={message}
-                      streaming={busy && index === chat.messages.length - 1 && message.role === 'assistant'}
-                    />
-                  ))}
-                  {busy && chat.messages.at(-1)?.role !== 'assistant' ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <LoaderCircle className="size-4 animate-spin" />
-                      {t('projects.working')}
-                    </div>
-                  ) : null}
-                  <div ref={endRef} />
-                </div>
-              ) : (
-                <div className="grid flex-1 place-items-center py-16 text-center">
-                  <div className="max-w-sm">
-                    <Bot className="mx-auto mb-4 size-6 text-muted-foreground" />
-                    <h2 className="text-lg font-semibold">{t('projects.emptyTitle')}</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {t('projects.emptyDescription')}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+          {chat.messages.length || busy || chat.error ? (
+            <ScrollArea className="min-h-0 flex-1">
+              <AgentTranscript
+                busy={busy}
+                className="mx-auto w-full max-w-3xl px-6 py-8"
+                error={chat.error}
+                messages={chat.messages}
+                toolLabel={name => {
+                  const tool = name.replace(/^mcp__mona__/, '').replaceAll('_', ' ').trim()
+                  return tool || t('projects.tool')
+                }}
+              />
+            </ScrollArea>
+          ) : (
+            <Empty className="min-h-0 rounded-none bg-transparent">
+              <EmptyHeader>
+                <EmptyMedia><Bot className="size-6 text-muted-foreground" /></EmptyMedia>
+                <EmptyTitle className="text-lg">{t('projects.emptyTitle')}</EmptyTitle>
+                <EmptyDescription>{t('projects.emptyDescription')}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
 
           {jobs[0] ? (
             <ProjectJobActivity
@@ -450,83 +438,39 @@ function ProjectConversation({ initialData }: { initialData: ProjectPageData }) 
           ) : null}
 
           <div className="shrink-0 px-5 pb-5">
-            <form
-              className="mx-auto max-w-3xl rounded-overlay border border-border bg-background p-2 shadow-sm"
-              onSubmit={event => {
-                event.preventDefault()
-                void submitText(draft)
+            <AgentComposer
+              ariaLabel={t('projects.composerLabel')}
+              attachment={{
+                label: t('projects.attach'),
+                onClick: () => setAddingDocuments(true),
               }}
-            >
-              <Textarea
-                aria-label={t('projects.composerLabel')}
-                className="max-h-40 min-h-16 resize-none border-0 bg-transparent px-2 py-1 shadow-none focus-visible:ring-0"
-                onChange={event => setDraft(event.target.value)}
-                onKeyDown={event => {
-                  if (event.key !== 'Enter' || event.shiftKey) return
-                  event.preventDefault()
-                  void submitText(draft)
-                }}
-                placeholder={t('projects.composerPlaceholder')}
-                value={draft}
-              />
-              <div className="flex items-center gap-2 px-1 pt-1">
-                <Select
-                  onValueChange={value => agentModelStore.setModel(value)}
-                  value={activeModel.id}
-                >
-                  <SelectTrigger
-                    aria-label={t('projects.chooseModel')}
-                    className="h-7 w-auto min-w-28 border-0 bg-transparent px-1.5 shadow-none"
-                    icon={<AgentProviderIcon className="size-3.5" />}
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {models.map(model => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={() => setAddingDocuments(true)}
-                  size="sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  <Paperclip />
-                  {t('projects.attach')}
-                </Button>
-                <div className="ms-auto">
-                  {busy ? (
-                    <Button
-                      aria-label={t('projects.stop')}
-                      onClick={() => { void chat.stop() }}
-                      size="icon-sm"
-                      type="button"
-                      variant="secondary"
+              busy={busy}
+              className="mx-auto max-w-3xl"
+              context={project.artifacts.length ? (
+                <div aria-label={t('projects.artifacts')} className="flex min-w-0 flex-wrap items-center gap-1.5" role="group">
+                  {project.artifacts.slice(0, 3).map(artifact => (
+                    <span
+                      className={`${AGENT_LANE_KEYCAP} inline-flex max-w-45 items-center gap-1.5 px-2 text-foreground/85`}
+                      key={artifact.id}
                     >
-                      <Square />
-                    </Button>
-                  ) : (
-                    <Button
-                      aria-label={t('projects.send')}
-                      disabled={!draft.trim() || submitting || !account.connected}
-                      size="icon-sm"
-                      type="submit"
-                    >
-                      <ArrowUp />
-                    </Button>
-                  )}
+                      <File className="size-3.25 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 truncate">{artifact.name}</span>
+                    </span>
+                  ))}
+                  {project.artifacts.length > 3 ? (
+                    <span className={`${AGENT_LANE_KEYCAP} inline-flex px-2 text-muted-foreground`}>
+                      +{project.artifacts.length - 3}
+                    </span>
+                  ) : null}
                 </div>
-              </div>
-            </form>
-            {chat.error ? (
-              <p className="mx-auto mt-2 max-w-3xl text-xs text-destructive">
-                {chat.error.message}
-              </p>
-            ) : null}
+              ) : undefined}
+              disabled={submitting}
+              onStop={() => { void chat.stop() }}
+              onSubmit={() => { void submitText(draft) }}
+              onValueChange={setDraft}
+              placeholder={t('projects.composerPlaceholder')}
+              value={draft}
+            />
           </div>
         </section>
 
@@ -621,59 +565,6 @@ function sameReference(
   return left?.sourceId === right.sourceId && left.itemId === right.itemId
 }
 
-function ProjectMessage({
-  message,
-  streaming,
-}: {
-  message: UIMessage
-  streaming: boolean
-}) {
-  const { t } = useTranslation()
-  if (message.role === 'user') {
-    return (
-      <div className="ms-auto max-w-[78%] rounded-overlay bg-foreground px-3.5 py-2.5 text-sm leading-6 text-background">
-        {projectMessageText(message)}
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid w-full gap-2 text-sm leading-6">
-      {message.parts.map((part, index) => {
-        if (part.type === 'text') {
-          return (
-            <div className="mona-project-markdown min-w-0" key={index}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {(part as { text: string }).text}
-              </ReactMarkdown>
-            </div>
-          )
-        }
-        if (part.type === 'reasoning') {
-          return (
-            <details className="text-xs text-muted-foreground" key={index}>
-              <summary>{t('projects.thinking')}</summary>
-              <p className="mt-1 whitespace-pre-wrap">{(part as { text?: string }).text}</p>
-            </details>
-          )
-        }
-        if (part.type.startsWith('tool-') || part.type === 'dynamic-tool') {
-          const toolName = 'toolName' in part && typeof part.toolName === 'string'
-            ? part.toolName.replace(/^mcp__mona__/, '')
-            : t('projects.tool')
-          return (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground" key={index}>
-              {streaming ? <LoaderCircle className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-              <span>{toolName}</span>
-            </div>
-          )
-        }
-        return null
-      })}
-    </div>
-  )
-}
-
 function ArtifactPanel({
   onAdd,
   onOpen,
@@ -693,19 +584,20 @@ function ArtifactPanel({
       aria-label={t('projects.artifacts')}
       className="flex w-80 shrink-0 flex-col border-l border-sidebar-border bg-sidebar max-xl:w-72"
     >
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
-        <h2 className="min-w-0 flex-1 text-sm font-semibold">{t('projects.artifacts')}</h2>
+      <div className={cn(applicationSurfaceBarClass, 'flex gap-2 px-3')}>
+        <h2 className="min-w-0 flex-1 text-control font-medium">{t('projects.artifacts')}</h2>
         <Button
           aria-label={t('projects.addDocuments')}
           onClick={onAdd}
-          size="icon-xs"
-          variant="ghost"
+          size="header-icon"
+          title={t('projects.addDocuments')}
+          variant="header-pill"
         >
           <Plus />
         </Button>
       </div>
-      <ScrollArea className="min-h-0 flex-1">
-        {project.artifacts.length ? (
+      {project.artifacts.length ? (
+        <ScrollArea className="min-h-0 flex-1">
           <div className="divide-y divide-sidebar-border">
             {project.artifacts.map(artifact => {
               const Icon = artifact.documentType === 'presentation'
@@ -743,18 +635,16 @@ function ArtifactPanel({
               )
             })}
           </div>
-        ) : (
-          <div className="grid min-h-52 place-items-center px-6 text-center">
-            <div>
-              <Paperclip className="mx-auto mb-3 size-5 text-muted-foreground" />
-              <p className="text-sm font-medium">{t('projects.noArtifacts')}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {t('projects.noArtifactsDescription')}
-              </p>
-            </div>
-          </div>
-        )}
-      </ScrollArea>
+        </ScrollArea>
+      ) : (
+        <Empty className="min-h-0 rounded-none bg-transparent px-6">
+          <EmptyHeader>
+            <EmptyMedia><Paperclip className="size-5 text-muted-foreground" /></EmptyMedia>
+            <EmptyTitle>{t('projects.noArtifacts')}</EmptyTitle>
+            <EmptyDescription>{t('projects.noArtifactsDescription')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
     </aside>
   )
 }
@@ -795,8 +685,8 @@ function AttachDocumentsDialog({
             value={query}
           />
         </div>
-        <ScrollArea className="h-[min(420px,55vh)]">
-          {visible.length ? (
+        {visible.length ? (
+          <ScrollArea className="h-[min(420px,55vh)]">
             <div className="divide-y">
               {visible.map(document => {
                 const Icon = document.documentType === 'presentation'
@@ -827,12 +717,14 @@ function AttachDocumentsDialog({
                 )
               })}
             </div>
-          ) : (
-            <div className="grid h-52 place-items-center text-sm text-muted-foreground">
-              {t('projects.noDocumentsFound')}
-            </div>
-          )}
-        </ScrollArea>
+          </ScrollArea>
+        ) : (
+          <Empty className="h-[min(420px,55vh)] rounded-none bg-transparent">
+            <EmptyHeader>
+              <EmptyTitle>{t('projects.noDocumentsFound')}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>
+        )}
       </DialogContent>
     </Dialog>
   )

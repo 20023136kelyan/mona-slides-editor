@@ -1,6 +1,6 @@
 # Mona release hardening record
 
-Last reviewed: 2026-07-27
+Last reviewed: 2026-08-03
 
 This file records the security and stability decisions that are easy to lose
 when looking only at a package-manager vulnerability count. It is not a claim
@@ -8,17 +8,17 @@ that installed third-party packages are vulnerability-free.
 
 ## Desktop, agent and document trust boundaries
 
-- Mona is a desktop application. No HTTP agent server, WebSocket, session
-  cookie, credential vault or browser OAuth callback exists.
+- Mona is a desktop application. No Mona HTTP agent server, WebSocket, session
+  cookie, credential vault, or renderer-owned OAuth callback exists.
 - The sandboxed renderer has `nodeIntegration: false` and
   `contextIsolation: true`. Its only privileged surface is the explicitly named
   preload bridge.
 - Packaged renderer code is served from the secure `mona://app` origin with a
   Content Security Policy. Navigation to another origin is refused; links open
   in the user's default browser.
-- The Claude Agent SDK runs in the Electron main process and uses the machine's
-  existing `claude` login. Mona asks the CLI for account status but never reads
-  the credential from the operating-system keychain.
+- The Claude Agent SDK and Codex app-server run in the Electron main process.
+  They use the provider's existing native login or supported browser login flow.
+  Mona asks each process for account status but never reads provider credentials.
 - The agent receives a temporary deck workspace and an allowlisted environment.
   It may use ordinary file and shell tools inside that workspace, but changes
   reach the live document only through the revision-checked, validated `apply`
@@ -34,9 +34,9 @@ that installed third-party packages are vulnerability-free.
   archives. The previous singleton deck is moved by rename and its legacy
   renderer records are imported once rather than attached to whichever document
   opens first.
-- The packaged Claude binary is executable only because its platform package is
-  unpacked beside `app.asar`. The Mona agent plugin is shipped as a separate
-  read-only resource; the packaged-app smoke test checks both.
+- Packaged Claude and Codex binaries are executable only because their platform
+  packages are unpacked beside `app.asar`. The Mona agent plugin is shipped as a
+  separate read-only resource; the packaged-app smoke test checks these payloads.
 
 ## Dependency audit disposition
 
@@ -64,14 +64,14 @@ the vulnerable optional parser code is excluded from Mona's production graph.
 Do not accept npm's suggested downgrade to Excalidraw 0.17.6 merely to reduce
 the audit count.
 
-### Claude Agent SDK desktop payload
+### Native agent desktop payloads
 
-The Claude Agent SDK brings a platform-specific executable into the packaged
-application. This explains most of Mona's installed size. `electron-builder`
-keeps the executable outside `app.asar`, and the release smoke test verifies its
-execute bit and exact platform package. Do not remove `asarUnpack` merely to
-reduce the visible resource tree: a subprocess cannot execute a member of an
-asar archive.
+The Claude Agent SDK and `@openai/codex` bring platform-specific executables into
+the packaged application. This explains most of Mona's installed size.
+`electron-builder` keeps the executables outside `app.asar`, and the release
+smoke test verifies their execute bits and exact platform packages. Do not remove
+`asarUnpack` merely to reduce the visible resource tree: a subprocess cannot
+execute a member of an asar archive.
 
 The SDK also installs `@modelcontextprotocol/sdk`, whose optional Hono Node
 server currently carries a Windows encoded-backslash path-traversal advisory.

@@ -1,46 +1,108 @@
-import { ipcMain, type BrowserWindow, type IpcMainEvent } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { ipcMain, shell, type BrowserWindow, type IpcMainEvent } from 'electron'
+import type { UIMessageChunk } from 'ai'
 
-import { readLocalClaudeLogin } from '@mona/agent-server/agent-sdk-auth'
+import {
+  AgentSdkSession,
+} from '@mona/agent-server/agent-sdk-session'
+import {
+  loginLocalClaudeAccount,
+  readLocalClaudeLogin,
+} from '@mona/agent-server/agent-sdk-auth'
 import { readAnthropicModels } from '@mona/agent-server/agent-sdk-models'
-import { AgentSdkSession } from '@mona/agent-server/agent-sdk-session'
-import { AgentStreamTranslator } from '@mona/agent-server/agent-sdk-stream'
 import { AgentToolBridge } from '@mona/agent-server/agent-tool-bridge'
 import { browsePexelsImages, browsePexelsVideos } from '@mona/agent-server/assets'
-import { ProjectAgentSdkSession } from '@mona/agent-server/project-agent-sdk-session'
-import type { ProjectAgentExecutor } from '@mona/agent-server/project-agent-sdk-session'
+import {
+  loginLocalCodexAccount,
+  readLocalCodexAccount,
+} from '@mona/agent-server/codex-account'
+import { readCodexModels } from '@mona/agent-server/codex-models'
+import { CodexSession } from '@mona/agent-server/codex-session'
+import { ClaudeUiSession } from '@mona/agent-server/claude-ui-session'
+import { EditorAgentRuntime } from '@mona/agent-server/editor-agent-runtime'
+import type { ProjectAgentExecutor } from '@mona/agent-server/project-agent-contract'
+import { ProjectAgentRuntime } from '@mona/agent-server/project-agent-runtime'
+import { ProviderConversation } from '@mona/agent-server/provider-conversation'
+import {
+  PROJECT_AGENT_SYSTEM_INSTRUCTION,
+  ProjectAgentSdkSession,
+} from '@mona/agent-server/project-agent-sdk-session'
+import {
+  buildAgentSystemInstruction,
+  isAgentContextMessage,
+  isAgentProviderId,
+  type AgentAccountDescriptor,
+  type AgentContextMessage,
+  type AgentModelDescriptor,
+  type AgentProviderId,
+} from '@mona/agent-protocol'
 import { isProjectId, type ProjectRecord } from '@mona/project-core'
+
 import { resolveClaudeExecutable } from './claude-binary.js'
+import { resolveCodexExecutable } from './codex-binary.js'
 import { projectStore, type ProjectStore } from './project-store.js'
 
-/**
- * The agent, wired straight to the window.
- *
- * This replaces a WebSocket, its JSON framing, a 64 MiB frame cap, an Origin check
- * on the upgrade, a CORS layer and a signed session cookie — roughly 790 lines that
- * existed only because the editor was a web page talking to a separate process.
- * Electron gives the same shape for free: `invoke`/`handle` for request-response,
- * `webContents.send` for the stream.
- *
- * One thing does not simplify away. The agent still has to ask the *renderer* to
- * act, because the renderer owns the live deck, and Electron has no main→renderer
- * `invoke`. So `AgentToolBridge` keeps its id correlation and its timeout; only the
- * transport under it changes.
- */
+const EFFORT_LEVELS = new Set(['minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
 
-const EFFORT_LEVELS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
-
-const isEffortLevel = (value: unknown): value is 'low' | 'medium' | 'high' | 'xhigh' | 'max' => (
+const isEffortLevel = (value: unknown): value is string => (
   typeof value === 'string' && EFFORT_LEVELS.has(value)
 )
 
 interface PromptMessage {
+  context?: unknown
   effort?: unknown
   model?: unknown
+  providerId?: unknown
   text?: unknown
+  userMessageId?: unknown
 }
 
 interface ProjectPromptMessage extends PromptMessage {
   projectId?: unknown
+}
+
+interface ValidPrompt {
+  context: AgentContextMessage[]
+  effort?: string
+  modelId: string
+  providerId: AgentProviderId
+  text: string
+  userMessageId: string
+}
+
+const readPrompt = (message: PromptMessage): ValidPrompt | null => {
+  if (typeof message.text !== 'string' || !message.text.trim()) return null
+  const text = message.text.trim()
+  const rawContext = Array.isArray(message.context)
+    ? message.context.filter(isAgentContextMessage)
+    : []
+  const context: AgentContextMessage[] = []
+  const ids = new Set<string>()
+  for (const candidate of rawContext) {
+    if (ids.has(candidate.id)) continue
+    ids.add(candidate.id)
+    context.push({ ...candidate, content: candidate.content.trim() })
+  }
+  const requestedId = typeof message.userMessageId === 'string' && message.userMessageId
+    ? message.userMessageId
+    : undefined
+  const newestUser = [...context].reverse().find(candidate => candidate.role === 'user')
+  const userMessageId = requestedId ?? newestUser?.id ?? randomUUID()
+  if (!context.some(candidate => candidate.id === userMessageId)) {
+    context.push({ content: text, id: userMessageId, role: 'user' })
+  }
+  const providerId = isAgentProviderId(message.providerId) ? message.providerId : 'anthropic'
+  const modelId = typeof message.model === 'string' && message.model.trim()
+    ? message.model.trim()
+    : 'default'
+  return {
+    context,
+    ...(isEffortLevel(message.effort) ? { effort: message.effort } : {}),
+    modelId,
+    providerId,
+    text,
+    userMessageId,
+  }
 }
 
 const projectContext = (project: ProjectRecord, text: string): string => {
@@ -61,13 +123,10 @@ ${text}
 }
 
 class WindowProjectAgent {
-  readonly #executor: ProjectAgentExecutor
+  readonly #conversation: ProviderConversation
   readonly #projectId: string
   readonly #store: ProjectStore
   readonly #window: BrowserWindow
-  #session?: ProjectAgentSdkSession
-  #start?: Promise<ProjectAgentSdkSession>
-  #turn?: Promise<void>
 
   constructor(
     window: BrowserWindow,
@@ -75,32 +134,70 @@ class WindowProjectAgent {
     store: ProjectStore,
     executor: ProjectAgentExecutor,
   ) {
-    this.#executor = executor
     this.#projectId = projectId
     this.#store = store
     this.#window = window
+    this.#conversation = new ProviderConversation({
+      createSession: async options => {
+        if (options.providerId === 'openai') {
+          const runtime = await ProjectAgentRuntime.create(executor)
+          return new CodexSession({
+            ...(options.effort ? { effort: options.effort } : {}),
+            executablePath: resolveCodexExecutable(),
+            modelId: options.modelId,
+            onSessionId: options.onSessionId,
+            ...(options.binding ? { resumeSessionId: options.binding.sessionId } : {}),
+            runtime,
+            systemInstruction: PROJECT_AGENT_SYSTEM_INSTRUCTION,
+          })
+        }
+        const executablePath = resolveClaudeExecutable()
+        return new ClaudeUiSession(new ProjectAgentSdkSession({
+          ...(options.effort ? { effort: options.effort as never } : {}),
+          executor,
+          ...(executablePath ? { executablePath } : {}),
+          modelId: options.modelId,
+          onSessionId: options.onSessionId,
+          ...(options.binding ? { resumeSessionId: options.binding.sessionId } : {}),
+        }), options.modelId)
+      },
+      emit: chunk => {
+        if (window.isDestroyed()) return
+        window.webContents.send('mona:project-agent:chunk', { chunk, projectId })
+      },
+      onAssistant: async message => {
+        await store.appendMessage(projectId, { ...message, role: 'assistant' })
+      },
+      onBinding: async (providerId, binding) => {
+        await store.setAgentSessionBinding(projectId, providerId, binding)
+      },
+    })
   }
 
   prompt(message: ProjectPromptMessage): void {
-    if (typeof message.text !== 'string' || !message.text.trim()) return
     void this.#send(message)
   }
 
   async interrupt(): Promise<void> {
-    await this.#session?.interrupt()
+    await this.#conversation.interrupt()
   }
 
   close(): void {
-    this.#session?.close()
-    void this.#turn?.catch(() => undefined)
+    this.#conversation.close()
   }
 
   async #send(message: ProjectPromptMessage): Promise<void> {
+    const prompt = readPrompt(message)
+    if (!prompt) return
     try {
       const project = await this.#store.peek(this.#projectId)
       if (!project) throw new Error('This project no longer exists.')
-      const session = await (this.#start ??= this.#startSession(message, project))
-      session.send(projectContext(project, message.text as string))
+      this.#conversation.hydrate(project.agentSessions)
+      const context = project.messages.map(({ content, id, role }) => ({ content, id, role }))
+      this.#conversation.prompt(
+        { ...prompt, context },
+        text => projectContext(project, text),
+      )
     }
     catch (error) {
       this.#emit({
@@ -111,43 +208,7 @@ class WindowProjectAgent {
     }
   }
 
-  async #startSession(
-    message: ProjectPromptMessage,
-    project: ProjectRecord,
-  ): Promise<ProjectAgentSdkSession> {
-    const claudeExecutable = resolveClaudeExecutable()
-    const session = new ProjectAgentSdkSession({
-      ...(isEffortLevel(message.effort) ? { effort: message.effort } : {}),
-      executor: this.#executor,
-      ...(claudeExecutable ? { executablePath: claudeExecutable } : {}),
-      modelId: typeof message.model === 'string' && message.model ? message.model : 'default',
-      onSessionId: sessionId => {
-        void this.#store.setAgentSessionId(this.#projectId, sessionId).catch(() => undefined)
-      },
-      ...(project.agentSessionId ? { resumeSessionId: project.agentSessionId } : {}),
-    })
-    this.#session = session
-    this.#turn = this.#stream(session)
-    return session
-  }
-
-  async #stream(session: ProjectAgentSdkSession): Promise<void> {
-    const translator = new AgentStreamTranslator()
-    try {
-      for await (const sdkMessage of session.run()) {
-        for (const chunk of translator.translate(sdkMessage)) this.#emit(chunk)
-      }
-    }
-    catch (error) {
-      this.#emit({
-        errorText: error instanceof Error ? error.message : 'The project agent failed.',
-        type: 'error',
-      })
-      this.#emit({ type: 'finish' })
-    }
-  }
-
-  #emit(chunk: unknown): void {
+  #emit(chunk: UIMessageChunk): void {
     if (this.#window.isDestroyed()) return
     this.#window.webContents.send('mona:project-agent:chunk', {
       chunk,
@@ -156,21 +217,13 @@ class WindowProjectAgent {
   }
 }
 
-/**
- * One window's conversation.
- *
- * Scoped to the window rather than to a connection, because a window is what owns a
- * deck. Closing it ends the turn and fails any handler the agent is blocked on —
- * without that the subprocess would sit waiting on a renderer that has gone.
- */
 class WindowAgent {
   readonly #bridge: AgentToolBridge
-  readonly #window: BrowserWindow
-  #session?: AgentSdkSession
-  #turn?: Promise<void>
+  readonly #conversation: ProviderConversation
   readonly #projectAgents = new Map<string, WindowProjectAgent>()
   readonly #projectExecutor: (projectId: string) => ProjectAgentExecutor
   readonly #projectStore: ProjectStore
+  readonly #window: BrowserWindow
 
   constructor(
     window: BrowserWindow,
@@ -183,15 +236,37 @@ class WindowAgent {
     this.#bridge = new AgentToolBridge({
       send: request => this.#emit('mona:agent:tool-request', request),
     })
+    this.#conversation = new ProviderConversation({
+      createSession: async options => {
+        if (options.providerId === 'openai') {
+          const runtime = await EditorAgentRuntime.create(this.#bridge)
+          return new CodexSession({
+            ...(options.effort ? { effort: options.effort } : {}),
+            executablePath: resolveCodexExecutable(),
+            modelId: options.modelId,
+            onSessionId: options.onSessionId,
+            ...(options.binding ? { resumeSessionId: options.binding.sessionId } : {}),
+            runtime,
+            systemInstruction: buildAgentSystemInstruction(),
+          })
+        }
+        const executablePath = resolveClaudeExecutable()
+        return new ClaudeUiSession(new AgentSdkSession({
+          bridge: this.#bridge,
+          ...(options.effort ? { effort: options.effort as never } : {}),
+          ...(executablePath ? { executablePath } : {}),
+          modelId: options.modelId,
+          onSessionId: options.onSessionId,
+          ...(options.binding ? { resumeSessionId: options.binding.sessionId } : {}),
+        }), options.modelId)
+      },
+      emit: chunk => this.#emit('mona:agent:chunk', chunk),
+    })
   }
 
   prompt(message: PromptMessage): void {
-    if (typeof message.text !== 'string' || !message.text) return
-    // Started on the first prompt and never again: a later one is queued onto the
-    // same session, which is what makes steering work rather than opening a second
-    // conversation over the top of the first.
-    this.#session ??= this.#start(message)
-    this.#session.send(message.text)
+    const prompt = readPrompt(message)
+    if (prompt) this.#conversation.prompt(prompt)
   }
 
   fulfil(id: unknown, outcome: { errorText?: unknown; output?: unknown }): void {
@@ -203,7 +278,7 @@ class WindowAgent {
   }
 
   async interrupt(): Promise<void> {
-    await this.#session?.interrupt()
+    await this.#conversation.interrupt()
   }
 
   promptProject(message: ProjectPromptMessage): void {
@@ -228,41 +303,9 @@ class WindowAgent {
 
   close(): void {
     this.#bridge.closeAll('The editor window closed.')
-    this.#session?.close()
+    this.#conversation.close()
     for (const projectAgent of this.#projectAgents.values()) projectAgent.close()
     this.#projectAgents.clear()
-    void this.#turn?.catch(() => undefined)
-  }
-
-  #start(message: PromptMessage): AgentSdkSession {
-    const claudeExecutable = resolveClaudeExecutable()
-    const session = new AgentSdkSession({
-      bridge: this.#bridge,
-      // Validated against the SDK's own levels rather than trusted from the
-      // renderer, so a bad value is dropped instead of failing the turn.
-      ...(isEffortLevel(message.effort) ? { effort: message.effort } : {}),
-      // Resolved per turn rather than cached: a build that unpacks the binary
-      // somewhere else should be picked up without a restart.
-      ...(claudeExecutable ? { executablePath: claudeExecutable } : {}),
-      modelId: typeof message.model === 'string' && message.model ? message.model : 'default',
-    })
-    this.#turn = this.#stream(session)
-    return session
-  }
-
-  async #stream(session: AgentSdkSession): Promise<void> {
-    const translator = new AgentStreamTranslator()
-    try {
-      for await (const sdkMessage of session.run()) {
-        for (const chunk of translator.translate(sdkMessage)) this.#emit('mona:agent:chunk', chunk)
-      }
-    }
-    catch (error) {
-      this.#emit('mona:agent:chunk', {
-        errorText: error instanceof Error ? error.message : 'The agent failed.',
-        type: 'error',
-      })
-    }
   }
 
   #emit(channel: string, payload: unknown): void {
@@ -275,7 +318,6 @@ const agents = new Map<number, WindowAgent>()
 
 const agentFor = (event: IpcMainEvent): WindowAgent | undefined => agents.get(event.sender.id)
 
-/** Attaches a window to the agent host, and detaches it when the window goes. */
 export const attachWindowAgent = (
   window: BrowserWindow,
   store: ProjectStore = projectStore,
@@ -294,28 +336,64 @@ export const attachWindowAgent = (
   })
 }
 
-/**
- * Registered once for the process, not per window.
- *
- * `ipcMain` is global, so handlers are keyed by the sender's id rather than closed
- * over a single window — otherwise a second window would silently drive the first
- * one's conversation.
- */
-export const registerAgentIpc = (): void => {
-  ipcMain.handle('mona:account', async () => {
-    const login = await readLocalClaudeLogin()
-    return {
-      connected: login.connected,
-      ...(login.connected
-        ? {
-            accountLabel: login.email ?? 'Claude account connected',
-            ...(login.plan ? { planLabel: login.plan } : {}),
-          }
-        : {}),
-    }
-  })
+const disconnectedAccount = (providerId: AgentProviderId): AgentAccountDescriptor => ({
+  connected: false,
+  providerId,
+})
 
-  ipcMain.handle('mona:models', () => readAnthropicModels())
+const readAccounts = async (): Promise<AgentAccountDescriptor[]> => {
+  const claudePath = resolveClaudeExecutable() ?? 'claude'
+  const codexPath = resolveCodexExecutable()
+  const [anthropic, openai] = await Promise.allSettled([
+    readLocalClaudeLogin(Date.now(), claudePath),
+    readLocalCodexAccount(codexPath),
+  ])
+  return [
+    anthropic.status === 'fulfilled'
+      ? {
+          accountLabel: anthropic.value.email ?? 'Claude account connected',
+          connected: anthropic.value.connected,
+          ...(anthropic.value.plan ? { planLabel: anthropic.value.plan } : {}),
+          providerId: 'anthropic',
+        }
+      : disconnectedAccount('anthropic'),
+    openai.status === 'fulfilled' ? openai.value : disconnectedAccount('openai'),
+  ]
+}
+
+const readModels = async (): Promise<AgentModelDescriptor[]> => {
+  const [anthropic, openai] = await Promise.allSettled([
+    readAnthropicModels(Date.now(), resolveClaudeExecutable()),
+    readCodexModels(resolveCodexExecutable()),
+  ])
+  return [
+    ...(anthropic.status === 'fulfilled'
+      ? anthropic.value.map(model => ({ ...model, providerId: 'anthropic' as const }))
+      : []),
+    ...(openai.status === 'fulfilled' ? openai.value : []),
+  ]
+}
+
+export const registerAgentIpc = (): void => {
+  ipcMain.handle('mona:accounts', readAccounts)
+  ipcMain.handle('mona:account:connect', async (_event, providerId: unknown) => {
+    if (!isAgentProviderId(providerId)) throw new Error('Unknown agent provider.')
+    if (providerId === 'openai') {
+      return await loginLocalCodexAccount({
+        executablePath: resolveCodexExecutable(),
+        openExternal: url => shell.openExternal(url),
+      })
+    }
+    const executablePath = resolveClaudeExecutable() ?? 'claude'
+    const login = await loginLocalClaudeAccount(executablePath)
+    return {
+      accountLabel: login.email ?? 'Claude account connected',
+      connected: login.connected,
+      ...(login.plan ? { planLabel: login.plan } : {}),
+      providerId: 'anthropic',
+    } satisfies AgentAccountDescriptor
+  })
+  ipcMain.handle('mona:models', readModels)
 
   ipcMain.handle('mona:media:browse', async (_event, kind: unknown, query: unknown) => (
     kind === 'videos'
@@ -326,19 +404,19 @@ export const registerAgentIpc = (): void => {
   ipcMain.on('mona:agent:prompt', (event, message: PromptMessage) => {
     agentFor(event)?.prompt(message ?? {})
   })
-
-  ipcMain.on('mona:agent:tool-result', (event, result: { errorText?: unknown; id?: unknown; output?: unknown }) => {
+  ipcMain.on('mona:agent:tool-result', (event, result: {
+    errorText?: unknown
+    id?: unknown
+    output?: unknown
+  }) => {
     agentFor(event)?.fulfil(result?.id, result ?? {})
   })
-
   ipcMain.on('mona:agent:interrupt', event => {
     void agentFor(event)?.interrupt()
   })
-
   ipcMain.on('mona:project-agent:prompt', (event, message: ProjectPromptMessage) => {
     agentFor(event)?.promptProject(message ?? {})
   })
-
   ipcMain.on('mona:project-agent:interrupt', (event, projectId: unknown) => {
     void agentFor(event)?.interruptProject(projectId)
   })

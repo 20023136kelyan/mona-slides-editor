@@ -408,8 +408,13 @@
       "toolSyncing": "重新读取演示文稿",
       "toolWebSearching": "在网络上搜索 {{query}}",
       "toolWriting": "写入{{scope}}",
-      "checkingAccount": "正在检查你的 Claude 账户…",
-      "signedOutHint": "未登录 Claude。请在终端运行 `claude` 登录。"
+      "checkingAccount": "正在检查你的账户…",
+      "connected": "已连接",
+      "connecting": "连接中…",
+      "signIn": "登录",
+      "signInFailed": "无法登录",
+      "signedOutHint": "尚未登录。",
+      "signedOutProviderHint": "尚未登录 {{provider}}。请打开模型菜单进行登录。"
     },
     "drawing": {
       "layer": "绘图图层",

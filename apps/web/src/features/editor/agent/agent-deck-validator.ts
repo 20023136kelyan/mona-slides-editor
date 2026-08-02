@@ -406,6 +406,7 @@ const immutableLayerShell = (layer: Record<string, unknown>): Record<string, unk
   const clone = structuredClone(layer)
   delete clone.background
   delete clone.elements
+  delete clone.headerFooter
   return clone
 }
 
@@ -464,6 +465,7 @@ const normalizeSharedLayerAuthoring = (
     const desiredPartPaths = desiredLayers.map(layerPart)
     const baselineByPart = new Map(baselineLayers.map((layer, index) => [baselinePartPaths[index]!, layer]))
     const desiredByPart = new Map(desiredLayers.map((layer, index) => [desiredPartPaths[index]!, layer]))
+    const masterParts = new Set(source.hierarchy.masters.map(master => master.partPath))
     if (
       baselinePartPaths.some(part => !part)
       || desiredPartPaths.some(part => !part)
@@ -481,6 +483,23 @@ const normalizeSharedLayerAuthoring = (
       const desiredLayer = desiredByPart.get(partPath)!
       if (!same(immutableLayerShell(baselineLayer), immutableLayerShell(desiredLayer))) {
         throw new Error(`Shared layer ${partPath} changed immutable PowerPoint identity fields.`)
+      }
+      if (!same(baselineLayer.headerFooter, desiredLayer.headerFooter)) {
+        if (!masterParts.has(partPath)) {
+          throw new Error(`Shared layer ${partPath} cannot define a header/footer policy because it is not a slide master.`)
+        }
+        if (desiredLayer.headerFooter !== undefined) {
+          const policy = desiredLayer.headerFooter
+          if (
+            !policy
+            || typeof policy !== 'object'
+            || !['dateTime', 'footer', 'header', 'slideNumber'].every(key => (
+              typeof (policy as Record<string, unknown>)[key] === 'boolean'
+            ))
+          ) {
+            throw new Error(`Shared layer ${partPath} has an invalid header/footer policy.`)
+          }
+        }
       }
       const baselineElements = Array.isArray(baselineLayer.elements)
         ? baselineLayer.elements as PPTElement[]

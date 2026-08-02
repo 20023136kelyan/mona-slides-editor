@@ -34,6 +34,10 @@ import PowerPointIcon from '~icons/vscode-icons/file-type-powerpoint2'
 import { Button } from '@/components/ui/button'
 import { ApplicationSidebarContentToggle } from '@/features/application-shell/ApplicationSidebar'
 import {
+  applicationSurfaceBarClass,
+  applicationSurfaceTitleInputClass,
+} from '@/features/application-shell/application-surface-styles'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -409,7 +413,8 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
           // the other, because the two groups are not the same width and their
           // widths change - the file menus go on macOS, the labels drop when
           // the header narrows, the rail's toggle arrives and leaves.
-          'mona-editor-header relative grid h-11 flex-none grid-cols-[auto_minmax(0,1fr)_auto] items-center bg-transparent px-2.5 text-foreground leading-normal select-none @max-[1000px]/header:px-2 @max-[560px]/header:px-1',
+          applicationSurfaceBarClass,
+          'mona-editor-header @max-[1000px]/header:px-2 @max-[560px]/header:px-1',
           // There is no title bar on macOS, so this strip is what the user grabs
           // to move the window. It needs no inset: the rail owns the top-left
           // corner where the traffic lights sit, and reserves the space itself.
@@ -524,7 +529,10 @@ export function EditorHeader({ onToggleDrawing, runtime }: { onToggleDrawing: ()
         <div className="mona-editor-header-center pointer-events-none flex w-full min-w-0 justify-center px-3 @max-[760px]/header:px-1">
           <Input
             aria-label={t('header.presentationTitle')}
-            className="mona-editor-header-title-input pointer-events-auto h-7 w-full max-w-[32rem] rounded-control @max-[1000px]/header:max-w-[24rem] border border-transparent bg-transparent px-2.5 text-center text-[13px]! font-normal text-foreground/80 text-ellipsis shadow-none hover:border-input hover:bg-background focus-visible:border-input focus-visible:bg-background focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/20 read-only:cursor-text md:text-[13px]! placeholder:font-normal placeholder:text-muted-foreground placeholder:opacity-100"
+            className={cn(
+              applicationSurfaceTitleInputClass,
+              'mona-editor-header-title-input @max-[1000px]/header:max-w-[24rem] read-only:cursor-text',
+            )}
             onBlur={commitTitle}
             onChange={event => setTitleValue(event.target.value)}
             onFocus={beginTitleEdit}

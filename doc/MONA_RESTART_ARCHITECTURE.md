@@ -1,9 +1,10 @@
 # Mona product and agent architecture
 
-Status: authoritative presentation and agent architecture, updated 2026-07-27.
+Status: authoritative presentation and agent architecture, updated 2026-08-03.
 
 Mona is an open-source desktop presentation editor: an Electron shell around a
-React renderer, with no server and nothing on the network.
+React renderer, with no Mona-hosted agent server. Native provider harnesses make
+outbound model requests from the user's machine.
 Its differentiator is a drawing-first agent workflow: the user can express a
 slide visually, and an AI agent turns that intent into native, editable slide
 elements. Source-project attribution and licensing are recorded in
@@ -169,24 +170,25 @@ converting sketch objects mechanically.
 
 ## Model access
 
-Mona does not hold model credentials. The Electron main process runs the Claude
-Agent SDK with the `claude` login already present on the machine; the CLI keeps
-that credential in the operating-system keychain. The sandboxed renderer can
-ask whether the machine is signed in and can send prompts over the preload
-bridge, but it cannot read the credential.
+Mona does not hold model credentials. The Electron main process supports two
+complete local harnesses: the Claude Agent SDK uses the machine's Claude login,
+and Codex app-server uses its supported ChatGPT subscription login. Both native
+processes keep credentials outside the sandboxed renderer. The renderer can ask
+for account status, start the provider's browser login, select a discovered
+model, and send a prompt over preload IPC; it cannot read the credential.
 
-The older hosted OpenAI/Anthropic OAuth adapters and Google AI Studio browser-key
-adapter were removed when Mona became a desktop application. Supporting another
-provider later requires a complete local agent harness with equivalent
-filesystem, visual-inspection and transaction semantics—not a second ad-hoc text
-endpoint.
+The conversation is provider-neutral and may move between Claude and Codex only
+between generations. Each provider retains its native thread identity while Mona
+hands it only the canonical user/assistant text it missed. Both harnesses mount
+the same visual-inspection and transactional document tools. See
+[`doc/AGENT_PROVIDER_ARCHITECTURE.md`](AGENT_PROVIDER_ARCHITECTURE.md).
 
 ## Implemented execution path
 
 1. Excalidraw captures structured scene JSON and a visual preview per slide.
 2. Opening the agent creates a temporary file workspace containing the deck and
    its assets.
-3. The Agent SDK uses ordinary filesystem and shell tools to edit that workspace.
+3. The selected native harness uses filesystem and shell tools to edit that workspace.
 4. Mona-specific `look` renders slides for visual inspection.
 5. `apply` validates the workspace against the current document revision and
    commits the result as one undoable transaction.
